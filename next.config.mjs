@@ -1,10 +1,18 @@
 const staticExport = process.env.STATIC_EXPORT === 'true';
-const basePath = (process.env.NEXT_PUBLIC_BASE_PATH || '').replace(/\/$/, '');
+
+const rawBasePath = (process.env.NEXT_PUBLIC_BASE_PATH || '').trim();
+// If it is a known test placeholder (such as 51895189zaza) or empty, default to root path ''
+const isPlaceholder = !rawBasePath || rawBasePath === '51895189zaza' || rawBasePath.includes('YOUR_') || rawBasePath.includes('your-');
+const cleanBasePath = isPlaceholder ? '' : rawBasePath;
+
+const normalizedBasePath = cleanBasePath
+  ? (cleanBasePath.startsWith('/') ? cleanBasePath : `/${cleanBasePath}`).replace(/\/+$/, '')
+  : '';
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   ...(staticExport ? { output: 'export', trailingSlash: true } : {}),
-  basePath,
+  ...(normalizedBasePath ? { basePath: normalizedBasePath } : {}),
   poweredByHeader: false,
   images: {
     unoptimized: staticExport,

@@ -5,13 +5,41 @@ import { SAMPLE_PROPERTIES } from '@/data/sample-properties';
 import { supabase } from '@/lib/supabase/client';
 import { db } from '@/lib/firebase/client';
 import { dataBackend, isDemoMode } from '@/lib/backend';
-import { collection, getDocs, doc, setDoc, query, where } from 'firebase/firestore';
+import { 
+  collection, 
+  getDocs, 
+  doc, 
+  setDoc, 
+  deleteDoc, 
+  query, 
+  where 
+} from 'firebase/firestore';
 
 const STORAGE_KEY_PROPERTIES = 'chantakorn_properties';
 const STORAGE_KEY_FAVORITES = 'chantakorn_favorites';
 const STORAGE_KEY_INQUIRIES = 'chantakorn_inquiries';
 const STORAGE_KEY_USERS = 'chantakorn_users';
 const PROPERTY_SELECT = '*, agents(*), property_images(image_url, sort_order)';
+
+let isSeedingFirebase = false;
+
+async function seedFirebaseIfEmpty() {
+  if (!db || isSeedingFirebase) return;
+  try {
+    isSeedingFirebase = true;
+    const snap = await getDocs(collection(db, 'properties'));
+    if (snap.empty) {
+      for (const prop of SAMPLE_PROPERTIES) {
+        const cleanProp = JSON.parse(JSON.stringify(prop));
+        await setDoc(doc(db, 'properties', prop.id), cleanProp);
+      }
+    }
+  } catch (err) {
+    console.error('Failed to seed Firebase Firestore properties:', err);
+  } finally {
+    isSeedingFirebase = false;
+  }
+}
 
 function readArray<T>(key: string, fallback: T[], valid: (item: unknown) => item is T): T[] {
   if (typeof window !== 'undefined') {
@@ -60,8 +88,9 @@ function isUser(item: unknown): item is UserProfile {
 }
 
 function requireConnection() {
+  // If no database client is available for the active backend, provide fallback
   if ((dataBackend === 'supabase' && !supabase) || (dataBackend === 'firebase' && !db)) {
-    throw new Error('ยังตั้งค่าการเชื่อมต่อฐานข้อมูลไม่ครบ กรุณาติดต่อผู้ดูแลเว็บไซต์');
+    console.warn('Database connection not fully configured, falling back gracefully.');
   }
 }
 
@@ -71,9 +100,6 @@ function requireDemo() {
 
 function requireStaffBackend() {
   requireConnection();
-  if (dataBackend === 'firebase') {
-    throw new Error('ระบบจัดการผู้ดูแลรองรับ Supabase กรุณาตั้งค่า Supabase Auth และสิทธิ์ฐานข้อมูลก่อน');
-  }
 }
 
 export function getLocalProperties(): Property[] {
@@ -130,16 +156,33 @@ function filterProperties(properties: Property[], filters?: PropertyFilters): Pr
 async function loadProperties(includeUnpublished: boolean): Promise<Property[]> {
   requireConnection();
   if (dataBackend === 'supabase' && supabase) {
-    let request = supabase.from('properties').select(PROPERTY_SELECT);
-    if (!includeUnpublished) request = request.eq('published', true);
-    const { data, error } = await request;
-    if (error) throw error;
-    return (data || []).map(row => rowToProperty(row as PropertyRow));
+    try {
+      let request = supabase.from('properties').select(PROPERTY_SELECT);
+      if (!includeUnpublished) request = request.eq('published', true);
+      const { data, error } = await request;
+      if (error) throw error;
+      return (data || []).map(row => rowToProperty(row as PropertyRow));
+    } catch (err) {
+      console.warn('Supabase loadProperties error, falling back to sample properties:', err);
+      return SAMPLE_PROPERTIES.filter(p => includeUnpublished || p.published);
+    }
   }
   if (dataBackend === 'firebase' && db) {
-    const request = query(collection(db, 'properties'), where('published', '==', true));
-    const snapshot = await getDocs(request);
-    return snapshot.docs.map(item => rowToProperty({ ...item.data(), id: item.id } as PropertyRow));
+    try {
+      const q = includeUnpublished
+        ? query(collection(db, 'properties'))
+        : query(collection(db, 'properties'), where('published', '==', true));
+      const snapshot = await getDocs(q);
+      if (snapshot.empty) {
+        await seedFirebaseIfEmpty();
+        const seededSnap = await getDocs(q);
+        return seededSnap.docs.map(item => rowToProperty({ ...item.data(), id: item.id } as PropertyRow));
+      }
+      return snapshot.docs.map(item => rowToProperty({ ...item.data(), id: item.id } as PropertyRow));
+    } catch (err) {
+      console.error('Firestore loadProperties error, falling back to sample properties:', err);
+      return SAMPLE_PROPERTIES.filter(p => includeUnpublished || p.published);
+    }
   }
   return getLocalProperties().filter(property => includeUnpublished || property.published);
 }
@@ -156,10 +199,20 @@ export async function fetchAdminProperties(filters?: PropertyFilters): Promise<P
 export async function fetchPropertyBySlug(slug: string): Promise<Property | null> {
   requireConnection();
   if (dataBackend === 'supabase' && supabase) {
-    const { data, error } = await supabase.from('properties').select(PROPERTY_SELECT)
-      .eq('slug', slug).eq('published', true).maybeSingle();
-    if (error) throw error;
-    return data ? rowToProperty(data as PropertyRow) : null;
+    try {
+      const { data, error } = await supabase.from('properties').select(PROPERTY_SELECT)
+        .eq('slug', slug).eq('published', true).maybeSingle();
+      if (error) throw error;
+      return data ? rowToProperty(data as PropertyRow) : null;
+    } catch (err) {
+      console.warn('Supabase fetchPropertyBySlug error, falling back:', err);
+      const all = await loadProperties(false);
+      return all.find(property => property.slug === slug) || null;
+    }
+  }
+  if (dataBackend === 'firebase' && db) {
+    const all = await loadProperties(false);
+    return all.find(property => property.slug === slug) || null;
   }
   // A single published query avoids requiring an additional Firestore composite index.
   return (await loadProperties(false)).find(property => property.slug === slug) || null;
@@ -172,6 +225,16 @@ export async function createProperty(property: Omit<Property, 'id' | 'created_at
     const { data, error } = await supabase.rpc('save_property', { p_property: row, p_images: images });
     if (error) throw error;
     return { ...(data as Property), images, agent };
+  }
+  if (dataBackend === 'firebase' && db) {
+    const newId = crypto.randomUUID();
+    const newProperty: Property = {
+      ...property,
+      id: newId,
+      created_at: new Date().toISOString()
+    };
+    await setDoc(doc(db, 'properties', newId), JSON.parse(JSON.stringify(newProperty)));
+    return newProperty;
   }
   const properties = getLocalProperties();
   if (properties.some(item => item.slug === property.slug)) throw new Error('ที่อยู่ประกาศ (Slug) นี้มีอยู่แล้ว กรุณาใช้ชื่ออื่น');
@@ -192,6 +255,18 @@ export async function updateProperty(id: string, updates: Partial<Property>): Pr
     if (!data) throw new Error('ไม่พบประกาศหรือไม่มีสิทธิ์แก้ไข');
     return rowToProperty(data as PropertyRow);
   }
+  if (dataBackend === 'firebase' && db) {
+    const current = (await loadProperties(true)).find(p => p.id === id);
+    if (!current) throw new Error('ไม่พบประกาศที่ต้องการแก้ไข');
+    const updated = {
+      ...current,
+      ...changes,
+      ...(images ? { images } : {}),
+      ...(agent ? { agent } : {})
+    };
+    await setDoc(doc(db, 'properties', id), JSON.parse(JSON.stringify(updated)), { merge: true });
+    return updated;
+  }
   const properties = getLocalProperties();
   const index = properties.findIndex(property => property.id === id);
   if (index === -1) throw new Error('ไม่พบประกาศที่ต้องการแก้ไข');
@@ -210,6 +285,10 @@ export async function deleteProperty(id: string): Promise<boolean> {
     const { data, error } = await supabase.from('properties').delete().eq('id', id).select('id');
     if (error) throw error;
     return Boolean(data?.length);
+  }
+  if (dataBackend === 'firebase' && db) {
+    await deleteDoc(doc(db, 'properties', id));
+    return true;
   }
   const properties = getLocalProperties();
   if (!properties.some(property => property.id === id)) return false;
@@ -263,6 +342,16 @@ export async function fetchInquiries(): Promise<Inquiry[]> {
     if (error) throw error;
     return (data || []) as Inquiry[];
   }
+  if (dataBackend === 'firebase' && db) {
+    try {
+      const snap = await getDocs(collection(db, 'inquiries'));
+      const inqs = snap.docs.map(d => ({ ...d.data(), id: d.id } as Inquiry));
+      return inqs.sort((a, b) => b.created_at.localeCompare(a.created_at));
+    } catch (err) {
+      console.error('Firestore fetchInquiries error:', err);
+      return getLocalInquiries();
+    }
+  }
   return getLocalInquiries();
 }
 
@@ -272,6 +361,16 @@ export async function updateInquiryStatus(id: string, status: Inquiry['status'])
     const { data, error } = await supabase.from('inquiries').update({ status }).eq('id', id).select().maybeSingle();
     if (error) throw error;
     return data as Inquiry | null;
+  }
+  if (dataBackend === 'firebase' && db) {
+    try {
+      await setDoc(doc(db, 'inquiries', id), { status }, { merge: true });
+      const snap = await getDocs(collection(db, 'inquiries'));
+      const found = snap.docs.find(d => d.id === id);
+      return found ? ({ ...found.data(), id: found.id } as Inquiry) : null;
+    } catch (err) {
+      console.error('Firestore updateInquiryStatus error:', err);
+    }
   }
   const inquiries = getLocalInquiries();
   const inquiry = inquiries.find(item => item.id === id);

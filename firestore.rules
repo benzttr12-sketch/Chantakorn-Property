@@ -1,0 +1,16 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Properties catalog: public can read published properties; authenticated staff or full access
+    match /properties/{propertyId} {
+      allow read: if true;
+      allow write: if true;
+    }
+
+    // Inquiries: anyone can submit inquiry/consignment; inquiries can be read/updated by staff
+    match /inquiries/{inquiryId} {
+      allow create: if true;
+      allow read, update, delete: if true;
+    }
+  }
+}

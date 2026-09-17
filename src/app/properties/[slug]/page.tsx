@@ -59,6 +59,5 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 export default async function PropertyDetailPage({ params }: PageProps) {
   const { slug } = await params;
   const property = SAMPLE_PROPERTIES.find(item => item.slug === slug);
-  if (!property) notFound();
-  return <PropertyDetail slug={slug} initialProperty={isDemoMode ? property : null} />;
+  return <PropertyDetail slug={slug} initialProperty={property || null} />;
 }
