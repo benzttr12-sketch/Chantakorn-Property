@@ -4,7 +4,11 @@ import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase/client';
-import { dataBackend, isDemoAuthEnabled, isDemoMode } from '@/lib/backend';
+import { auth, db } from '@/lib/firebase/client';
+import { onAuthStateChanged } from 'firebase/auth';
+import { doc, getDoc } from 'firebase/firestore';
+import { dataBackend } from '@/lib/backend';
+import { logoutUser, isAdminEmail } from '@/lib/auth-helpers';
 import { 
   LayoutDashboard, 
   Building2, 
@@ -32,7 +36,10 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   });
 
   useEffect(() => {
+    let unsubscribeFirebase: (() => void) | undefined;
+
     async function authorize() {
+      // 1. Supabase Backend
       if (dataBackend === 'supabase' && supabase) {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) {
@@ -59,28 +66,84 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         return;
       }
 
-      if (isDemoAuthEnabled && typeof window !== 'undefined') {
+      // 2. Local/Stored user check
+      if (typeof window !== 'undefined') {
         const stored = localStorage.getItem('chantakorn_auth_user');
         if (stored) {
           try {
             const user = JSON.parse(stored);
-            if (user.demo === true && ['ADMIN', 'AGENT'].includes(user.role)) {
-              if (pathname.startsWith('/admin/users') && user.role !== 'ADMIN') {
+            const userRole = isAdminEmail(user.email) ? 'ADMIN' : user.role;
+            if (['ADMIN', 'AGENT'].includes(userRole)) {
+              if (pathname.startsWith('/admin/users') && userRole !== 'ADMIN') {
                 router.replace('/admin');
                 return;
               }
-              setCurrentUser(user);
+              setCurrentUser({ ...user, role: userRole });
               setIsAuthorized(true);
               return;
             }
           } catch {}
         }
-
       }
+
+      // 3. Firebase Auth check
+      if (dataBackend === 'firebase' && auth) {
+        if (auth.currentUser) {
+          const u = auth.currentUser;
+          const role = isAdminEmail(u.email) ? 'ADMIN' : 'USER';
+          if (role === 'ADMIN') {
+            setCurrentUser({
+              full_name: u.displayName || 'ผู้ดูแลระบบ',
+              email: u.email,
+              role: 'ADMIN',
+            });
+            setIsAuthorized(true);
+            return;
+          }
+        }
+        // If Firebase Auth is still restoring state, onAuthStateChanged below will handle it
+        return;
+      }
+
       router.replace('/login');
     }
+
     setIsAuthorized(false);
     authorize().catch(() => router.replace('/login'));
+
+    if (dataBackend === 'firebase' && auth) {
+      unsubscribeFirebase = onAuthStateChanged(auth, async (firebaseUser) => {
+        if (firebaseUser) {
+          let role = isAdminEmail(firebaseUser.email) ? 'ADMIN' : 'USER';
+          if (db) {
+            try {
+              const snap = await getDoc(doc(db, 'profiles', firebaseUser.uid));
+              if (snap.exists() && snap.data().role) {
+                // If user is designated as admin email, enforce ADMIN
+                role = isAdminEmail(firebaseUser.email) ? 'ADMIN' : snap.data().role;
+              }
+            } catch {}
+          }
+          if (['ADMIN', 'AGENT'].includes(role)) {
+            setCurrentUser({
+              full_name: firebaseUser.displayName || 'ผู้ดูแลระบบ',
+              email: firebaseUser.email,
+              role,
+            });
+            setIsAuthorized(true);
+          } else {
+            router.replace('/login?reason=admin_required');
+          }
+        } else {
+          // If no stored admin session exists either, redirect to login
+          const stored = typeof window !== 'undefined' ? localStorage.getItem('chantakorn_auth_user') : null;
+          if (!stored) {
+            router.replace('/login');
+          }
+        }
+      });
+    }
+
     if (dataBackend === 'supabase' && supabase) {
       const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
         if (event === 'SIGNED_OUT') {
@@ -90,13 +153,15 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       });
       return () => subscription.unsubscribe();
     }
+
+    return () => {
+      if (unsubscribeFirebase) unsubscribeFirebase();
+    };
   }, [router, pathname]);
 
   const handleLogout = async () => {
     if (dataBackend === 'supabase' && supabase) await supabase.auth.signOut();
-    if (typeof window !== 'undefined') {
-      localStorage.removeItem('chantakorn_auth_user');
-    }
+    await logoutUser();
     router.push('/');
   };
 
@@ -219,7 +284,6 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
       {/* Main Content Area */}
       <main className="flex-grow p-4 sm:p-8 overflow-y-auto max-w-7xl mx-auto w-full">
-        {isDemoMode && <div className="mb-6 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">โหมดตัวอย่าง: การเปลี่ยนแปลงบันทึกเฉพาะเบราว์เซอร์นี้ และไม่ส่งข้อความถึงทีมงาน</div>}
         {children}
       </main>
     </div>

@@ -103,6 +103,10 @@ export interface UserProfile {
   role: 'ADMIN' | 'AGENT' | 'USER';
   avatar_url?: string;
   email?: string;
+  line_id?: string;
+  bio?: string;
+  created_at?: string;
+  updated_at?: string;
 }
 
 export interface PropertyFilters {

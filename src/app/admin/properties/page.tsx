@@ -13,7 +13,8 @@ import {
   Star, 
   Filter, 
   Check, 
-  AlertCircle 
+  AlertCircle,
+  Download
 } from 'lucide-react';
 import { fetchAdminProperties, deleteProperty, updateProperty } from '@/lib/store/properties-store';
 import { Property } from '@/lib/types';
@@ -66,10 +67,78 @@ export default function AdminPropertiesPage() {
     return true;
   });
 
+  const handleExportCSV = () => {
+    if (filteredProperties.length === 0) return;
+
+    const headers = [
+      'ID',
+      'ชื่อทรัพย์ (Title)',
+      'ประเภท (Type)',
+      'สถานะ (Status)',
+      'ราคา (Price)',
+      'จังหวัด (Province)',
+      'อำเภอ/เขต (District)',
+      'ตำบล/แขวง (Subdistrict)',
+      'ที่อยู่ (Address)',
+      'ห้องนอน (Bedrooms)',
+      'ห้องน้ำ (Bathrooms)',
+      'ที่จอดรถ (Parking)',
+      'ขนาดที่ดิน ตร.ว. (Land Size)',
+      'พื้นที่ใช้สอย ตร.ม. (Usable Area)',
+      'ทรัพย์เด่น (Featured)',
+      'สถานะการเผยแพร่ (Published)',
+      'วันที่ลงประกาศ (Created At)',
+      'ลิงก์ (Slug)'
+    ];
+
+    const escapeCSV = (value: unknown) => {
+      if (value === null || value === undefined) return '""';
+      const stringValue = String(value).replace(/"/g, '""');
+      return `"${stringValue}"`;
+    };
+
+    const rows = filteredProperties.map((p) => [
+      escapeCSV(p.id),
+      escapeCSV(p.title),
+      escapeCSV(getPropertyTypeName(p.property_type)),
+      escapeCSV(p.status === 'rent' ? 'เช่า (Rent)' : 'ขาย (Sale)'),
+      escapeCSV(p.price),
+      escapeCSV(p.province),
+      escapeCSV(p.district),
+      escapeCSV(p.subdistrict || ''),
+      escapeCSV(p.address || ''),
+      escapeCSV(p.bedrooms ?? 0),
+      escapeCSV(p.bathrooms ?? 0),
+      escapeCSV(p.parking ?? 0),
+      escapeCSV(p.land_size ?? 0),
+      escapeCSV(p.usable_area ?? 0),
+      escapeCSV(p.featured ? 'ใช่ (Yes)' : 'ไม่ใช่ (No)'),
+      escapeCSV(p.published !== false ? 'เผยแพร่ (Published)' : 'แบบร่าง (Draft)'),
+      escapeCSV(p.created_at || ''),
+      escapeCSV(p.slug || '')
+    ]);
+
+    const csvContent = '\uFEFF' + [
+      headers.join(','),
+      ...rows.map((row) => row.join(','))
+    ].join('\r\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    const dateStr = new Date().toISOString().slice(0, 10);
+    link.setAttribute('download', `properties-export-${statusFilter}-${dateStr}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
   return (
     <div className="space-y-6">
       {error && <p role="alert" className="rounded-xl bg-red-50 p-4 text-sm text-red-700">{error}</p>}
-      {/* Header with Add Button */}
+      {/* Header with Add & Export Buttons */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-6 rounded-2xl border border-surface-border shadow-sm">
         <div>
           <h1 className="text-2xl font-extrabold text-navy-950">จัดการอสังหาริมทรัพย์</h1>
@@ -78,13 +147,28 @@ export default function AdminPropertiesPage() {
           </p>
         </div>
 
-        <Link
-          href="/admin/properties/new"
-          className="px-5 py-2.5 bg-navy-950 hover:bg-navy-900 text-gold-400 font-bold text-xs rounded-xl shadow-md flex items-center space-x-2 transition-all self-start sm:self-auto"
-        >
-          <PlusCircle className="w-4 h-4 text-gold-400" />
-          <span>เพิ่มทรัพย์ใหม่</span>
-        </Link>
+        <div className="flex flex-wrap items-center gap-2.5 self-start sm:self-auto">
+          <button
+            id="export-csv-btn"
+            type="button"
+            onClick={handleExportCSV}
+            disabled={filteredProperties.length === 0}
+            title="ดาวน์โหลดรายการทรัพย์ที่กรองแล้วเป็นไฟล์ CSV"
+            className="px-4 py-2.5 bg-white hover:bg-gray-50 active:bg-gray-100 text-navy-950 border border-gray-300 font-semibold text-xs rounded-xl shadow-sm flex items-center space-x-2 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <Download className="w-4 h-4 text-navy-700" />
+            <span>Export to CSV ({filteredProperties.length})</span>
+          </button>
+
+          <Link
+            id="add-new-property-btn"
+            href="/admin/properties/new"
+            className="px-5 py-2.5 bg-navy-950 hover:bg-navy-900 text-gold-400 font-bold text-xs rounded-xl shadow-md flex items-center space-x-2 transition-all"
+          >
+            <PlusCircle className="w-4 h-4 text-gold-400" />
+            <span>เพิ่มทรัพย์ใหม่</span>
+          </Link>
+        </div>
       </div>
 
       {/* Filter and Search Bar */}

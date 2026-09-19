@@ -53,6 +53,20 @@
         "created_at": { "type": "string" }
       },
       "required": ["name", "phone", "message", "inquiry_type", "status", "created_at"]
+    },
+    "profiles": {
+      "title": "User Profiles & Roles",
+      "description": "Admin, Agent, and User account profiles",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "full_name": { "type": "string" },
+        "email": { "type": "string" },
+        "role": { "type": "string", "enum": ["ADMIN", "AGENT", "USER"] },
+        "phone": { "type": "string" },
+        "created_at": { "type": "string" }
+      },
+      "required": ["id", "full_name", "email", "role"]
     }
   },
   "firestore": {
@@ -63,6 +77,10 @@
     "/inquiries/{inquiryId}": {
       "schema": "inquiries",
       "description": "Collection of customer inquiry submissions"
+    },
+    "/profiles/{userId}": {
+      "schema": "profiles",
+      "description": "Collection of user profiles and administrative roles"
     }
   }
 }

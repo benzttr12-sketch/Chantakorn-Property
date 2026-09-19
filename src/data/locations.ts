@@ -14,7 +14,7 @@ export const LOCATIONS: LocationItem[] = [
     name: "หาดใหญ่",
     nameEn: "Hat Yai Downtown & Central",
     district: "หาดใหญ่",
-    image: "https://images.unsplash.com/photo-1590447158019-883a805f8841?auto=format&fit=crop&w=800&q=80",
+    image: "https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?auto=format&fit=crop&w=800&q=80",
     propertyCount: 85,
     description: "ศูนย์กลางเศรษฐกิจ การค้า และการศึกษา ใกล้ ม.อ. เซ็นทรัลหาดใหญ่ และย่านธุรกิจ"
   },

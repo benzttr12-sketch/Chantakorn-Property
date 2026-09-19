@@ -88,9 +88,11 @@ function isUser(item: unknown): item is UserProfile {
 }
 
 function requireConnection() {
-  // If no database client is available for the active backend, provide fallback
-  if ((dataBackend === 'supabase' && !supabase) || (dataBackend === 'firebase' && !db)) {
-    console.warn('Database connection not fully configured, falling back gracefully.');
+  if (dataBackend === 'supabase' && !supabase) {
+    throw new Error('ระบบฐานข้อมูล Supabase ยังไม่ได้ตั้งค่า');
+  }
+  if (dataBackend === 'firebase' && !db) {
+    throw new Error('ระบบฐานข้อมูล Firebase ยังไม่ได้ตั้งค่า');
   }
 }
 
@@ -118,8 +120,21 @@ type PropertyRow = Property & {
 
 function rowToProperty(row: PropertyRow): Property {
   const { agents, property_images, ...property } = row;
+  const parsedLat = Number(property.latitude);
+  const parsedLng = Number(property.longitude);
+  const validLat = Number.isFinite(parsedLat) && Math.abs(parsedLat) <= 90;
+  const validLng = Number.isFinite(parsedLng) && Math.abs(parsedLng) <= 180;
+
   return {
     ...property,
+    price: Number(property.price) || 0,
+    latitude: validLat && validLng ? parsedLat : 7.0084, // Fallback to Hat Yai center if invalid/NaN
+    longitude: validLat && validLng ? parsedLng : 100.4705,
+    bedrooms: Number(property.bedrooms) || 0,
+    bathrooms: Number(property.bathrooms) || 0,
+    parking: Number(property.parking) || 0,
+    land_size: Number(property.land_size) || 0,
+    usable_area: Number(property.usable_area) || 0,
     images: Array.isArray(property_images)
       ? [...property_images].sort((a, b) => a.sort_order - b.sort_order).map(image => image.image_url)
       : property.images || [],
@@ -156,32 +171,29 @@ function filterProperties(properties: Property[], filters?: PropertyFilters): Pr
 async function loadProperties(includeUnpublished: boolean): Promise<Property[]> {
   requireConnection();
   if (dataBackend === 'supabase' && supabase) {
-    try {
-      let request = supabase.from('properties').select(PROPERTY_SELECT);
-      if (!includeUnpublished) request = request.eq('published', true);
-      const { data, error } = await request;
-      if (error) throw error;
-      return (data || []).map(row => rowToProperty(row as PropertyRow));
-    } catch (err) {
-      console.warn('Supabase loadProperties error, falling back to sample properties:', err);
-      return SAMPLE_PROPERTIES.filter(p => includeUnpublished || p.published);
-    }
+    let request = supabase.from('properties').select(PROPERTY_SELECT);
+    if (!includeUnpublished) request = request.eq('published', true);
+    const { data, error } = await request;
+    if (error) throw error;
+    return (data || []).map(row => rowToProperty(row as PropertyRow));
   }
   if (dataBackend === 'firebase' && db) {
     try {
       const q = includeUnpublished
         ? query(collection(db, 'properties'))
         : query(collection(db, 'properties'), where('published', '==', true));
-      const snapshot = await getDocs(q);
+      let snapshot = await getDocs(q);
       if (snapshot.empty) {
         await seedFirebaseIfEmpty();
-        const seededSnap = await getDocs(q);
-        return seededSnap.docs.map(item => rowToProperty({ ...item.data(), id: item.id } as PropertyRow));
+        snapshot = await getDocs(q);
+        if (snapshot.empty) {
+          return SAMPLE_PROPERTIES.filter(property => includeUnpublished || property.published);
+        }
       }
       return snapshot.docs.map(item => rowToProperty({ ...item.data(), id: item.id } as PropertyRow));
     } catch (err) {
-      console.error('Firestore loadProperties error, falling back to sample properties:', err);
-      return SAMPLE_PROPERTIES.filter(p => includeUnpublished || p.published);
+      console.warn('Firestore loadProperties error, falling back to sample data:', err);
+      return SAMPLE_PROPERTIES.filter(property => includeUnpublished || property.published);
     }
   }
   return getLocalProperties().filter(property => includeUnpublished || property.published);
@@ -382,9 +394,8 @@ export async function updateInquiryStatus(id: string, status: Inquiry['status'])
 
 export function getLocalUsers(): UserProfile[] {
   return readArray<UserProfile>(STORAGE_KEY_USERS, [
-    { id: 'demo-admin', full_name: 'ผู้ดูแลตัวอย่าง', email: 'admin@example.com', role: 'ADMIN' },
-    { id: 'demo-agent', full_name: 'นายหน้าตัวอย่าง', email: 'agent@example.com', role: 'AGENT' },
-    { id: 'demo-user', full_name: 'สมาชิกตัวอย่าง', email: 'user@example.com', role: 'USER' },
+    { id: 'user-benz', full_name: 'คุณเบนซ์ (ผู้ดูแลระบบ)', email: 'benzttr12@gmail.com', role: 'ADMIN' },
+    { id: 'user-pim', full_name: 'คุณพิมลภัส (นายหน้า)', email: 'agent@chantakornproperty.com', role: 'AGENT' },
   ], isUser);
 }
 
@@ -400,11 +411,38 @@ export async function fetchUsers(): Promise<UserProfile[]> {
     if (error) throw error;
     return (data || []) as UserProfile[];
   }
+  if (dataBackend === 'firebase' && db) {
+    try {
+      const snap = await getDocs(collection(db, 'profiles'));
+      if (snap.empty) {
+        const initialUsers: UserProfile[] = [
+          { id: 'admin-benz', full_name: 'คุณเบนซ์ (Admin)', email: 'benzttr12@gmail.com', role: 'ADMIN', created_at: new Date().toISOString() },
+          { id: 'agent-pim', full_name: 'คุณพิมลภัส (Agent)', email: 'agent@chantakornproperty.com', role: 'AGENT', created_at: new Date().toISOString() },
+        ];
+        for (const u of initialUsers) {
+          await setDoc(doc(db, 'profiles', u.id), u);
+        }
+        return initialUsers;
+      }
+      return snap.docs.map(d => ({ ...d.data(), id: d.id } as UserProfile));
+    } catch (err) {
+      console.error('Firestore fetchUsers error:', err);
+      return getLocalUsers();
+    }
+  }
   return getLocalUsers();
 }
 
 export async function updateUserRole(userId: string, role: UserProfile['role']): Promise<UserProfile[]> {
   return updateUserProfile(userId, { role });
+}
+
+export async function addUser(user: UserProfile): Promise<UserProfile[]> {
+  if (dataBackend === 'firebase' && db) {
+    await setDoc(doc(db, 'profiles', user.id), { ...user, created_at: new Date().toISOString() });
+    return fetchUsers();
+  }
+  return addLocalUser(user);
 }
 
 export function addLocalUser(user: UserProfile): UserProfile[] {
@@ -427,10 +465,22 @@ export async function updateUserProfile(userId: string, updates: Partial<UserPro
     if (!data?.length) throw new Error('ไม่สามารถแก้ไขผู้ใช้นี้ได้ กรุณาตรวจสอบสิทธิ์');
     return fetchUsers();
   }
+  if (dataBackend === 'firebase' && db) {
+    await setDoc(doc(db, 'profiles', userId), fields, { merge: true });
+    return fetchUsers();
+  }
   const users = getLocalUsers();
   const updated = users.map(user => user.id === userId ? { ...user, ...fields } : user);
   saveLocalUsers(updated);
   return updated;
+}
+
+export async function deleteUser(userId: string): Promise<UserProfile[]> {
+  if (dataBackend === 'firebase' && db) {
+    await deleteDoc(doc(db, 'profiles', userId));
+    return fetchUsers();
+  }
+  return deleteLocalUser(userId);
 }
 
 export function deleteLocalUser(userId: string): UserProfile[] {

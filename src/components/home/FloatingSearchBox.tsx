@@ -40,10 +40,10 @@ export default function FloatingSearchBox() {
         <button
           type="button"
           onClick={() => setTab('sale')}
-          className={`flex items-center space-x-2 px-6 py-2.5 rounded-xl text-sm font-semibold transition-all ${
+          className={`flex items-center space-x-2 px-6 py-2.5 rounded-xl text-sm font-bold transition-all ${
             tab === 'sale'
-              ? 'bg-navy-950 text-gold-400 shadow-sm'
-              : 'text-gray-500 hover:text-navy-900 hover:bg-gray-100'
+              ? 'bg-navy-950 text-gold-400 shadow-md ring-1 ring-gold-400/30'
+              : 'text-gray-700 hover:text-navy-950 hover:bg-gray-100 bg-gray-50'
           }`}
         >
           <Home className="w-4 h-4" />
@@ -53,10 +53,10 @@ export default function FloatingSearchBox() {
         <button
           type="button"
           onClick={() => setTab('rent')}
-          className={`flex items-center space-x-2 px-6 py-2.5 rounded-xl text-sm font-semibold transition-all ${
+          className={`flex items-center space-x-2 px-6 py-2.5 rounded-xl text-sm font-bold transition-all ${
             tab === 'rent'
-              ? 'bg-navy-950 text-gold-400 shadow-sm'
-              : 'text-gray-500 hover:text-navy-900 hover:bg-gray-100'
+              ? 'bg-navy-950 text-gold-400 shadow-md ring-1 ring-gold-400/30'
+              : 'text-gray-700 hover:text-navy-950 hover:bg-gray-100 bg-gray-50'
           }`}
         >
           <Building className="w-4 h-4" />

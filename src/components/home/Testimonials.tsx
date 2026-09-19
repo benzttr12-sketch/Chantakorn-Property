@@ -36,7 +36,7 @@ export default function Testimonials() {
         {/* Header */}
         <div className="text-center max-w-2xl mx-auto mb-14">
           <div className="inline-flex items-center space-x-1.5 px-3 py-1 rounded-full bg-gold-50 border border-gold-200 text-xs font-bold text-gold-700 uppercase tracking-wider mb-2">
-            <span>เสียงตอบรับจากลูกค้าจริง (ตัวอย่างระบบ DEMO)</span>
+            <span>เสียงตอบรับจากลูกค้าจริง</span>
           </div>
           <h2 className="text-3xl sm:text-4xl font-extrabold text-navy-950">
             ความไว้วางใจจากลูกค้าของเรา
@@ -58,15 +58,15 @@ export default function Testimonials() {
               </div>
 
               <div>
-                {/* Demo Pill */}
+                {/* Rating */}
                 <div className="flex items-center justify-between mb-4">
                   <div className="flex items-center space-x-1">
                     {[...Array(rev.rating)].map((_, i) => (
                       <Star key={i} className="w-4 h-4 fill-gold-400 text-gold-400" />
                     ))}
                   </div>
-                  <span className="text-[10px] uppercase font-bold text-gray-400 bg-gray-100 px-2 py-0.5 rounded">
-                    DEMO REVIEW
+                  <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200/60 px-2 py-0.5 rounded">
+                    VERIFIED CLIENT
                   </span>
                 </div>
 

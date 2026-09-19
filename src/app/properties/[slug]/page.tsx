@@ -3,27 +3,21 @@ import type { Metadata } from 'next';
 import { SAMPLE_PROPERTIES } from '@/data/sample-properties';
 import PropertyDetail from '@/components/properties/PropertyDetail';
 import { formatPrice } from '@/lib/utils';
-import { isDemoMode } from '@/lib/backend';
 
 interface PageProps { params: Promise<{ slug: string }> }
-export const dynamicParams = false;
+export const dynamicParams = true;
 export function generateStaticParams() {
   return SAMPLE_PROPERTIES.map(property => ({ slug: property.slug }));
 }
 
 // Dynamic SEO metadata
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
-  if (!isDemoMode) {
-    return {
-      title: 'รายละเอียดอสังหาริมทรัพย์ | CHANTAKORN PROPERTY',
-      description: 'ดูข้อมูลอสังหาริมทรัพย์และติดต่อ Chantakorn Property หาดใหญ่–สงขลา',
-    };
-  }
   const { slug } = await params;
   const property = SAMPLE_PROPERTIES.find(property => property.slug === slug);
   if (!property) {
     return {
-      title: 'ไม่พบอสังหาริมทรัพย์ | CHANTAKORN PROPERTY',
+      title: 'รายละเอียดอสังหาริมทรัพย์ | CHANTAKORN PROPERTY',
+      description: 'ดูข้อมูลอสังหาริมทรัพย์และติดต่อ Chantakorn Property หาดใหญ่–สงขลา',
     };
   }
 

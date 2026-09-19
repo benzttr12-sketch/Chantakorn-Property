@@ -16,13 +16,13 @@ import {
   X
 } from 'lucide-react';
 import { UserProfile } from '@/lib/types';
-import { isDemoMode } from '@/lib/backend';
+import { dataBackend } from '@/lib/backend';
 import { 
   fetchUsers,
   updateUserProfile, 
   updateUserRole, 
-  addLocalUser, 
-  deleteLocalUser 
+  addUser, 
+  deleteUser 
 } from '@/lib/store/properties-store';
 
 export default function AdminUsersPage() {
@@ -71,7 +71,7 @@ export default function AdminUsersPage() {
     try {
     const updated = await updateUserProfile(editingUser.id, {
       full_name: editFullName.trim(),
-      ...(isDemoMode ? { email: editEmail.trim() || undefined } : {}),
+      email: editEmail.trim() || undefined,
       phone: editPhone.trim() || undefined,
     });
 
@@ -95,24 +95,20 @@ export default function AdminUsersPage() {
     }
   };
 
-  const handleDeleteUser = (userId: string, name: string) => {
-    if (!isDemoMode) {
-      setError('กรุณาลบบัญชีจริงผ่าน Supabase Dashboard > Authentication');
-      return;
-    }
+  const handleDeleteUser = async (userId: string, name: string) => {
     if (window.confirm(`คุณแน่ใจหรือไม่ว่าต้องการลบสมาชิก "${name}"?`)) {
-      const updated = deleteLocalUser(userId);
-      setUsers(updated);
-      triggerNotification(`ลบสมาชิก "${name}" เรียบร้อยแล้ว`);
+      try {
+        const updated = await deleteUser(userId);
+        setUsers(updated);
+        triggerNotification(`ลบสมาชิก "${name}" เรียบร้อยแล้ว`);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'ลบสมาชิกไม่สำเร็จ');
+      }
     }
   };
 
-  const handleAddUser = (e: React.FormEvent) => {
+  const handleAddUser = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!isDemoMode) {
-      setError('เพิ่มบัญชีจริงผ่านหน้าสมัครสมาชิกหรือ Supabase Dashboard > Authentication');
-      return;
-    }
     if (!newFullName.trim() || !newEmail.trim()) return;
 
     const newUser: UserProfile = {
@@ -123,16 +119,18 @@ export default function AdminUsersPage() {
       role: newRole,
     };
 
-    let updated: UserProfile[];
-    try { updated = addLocalUser(newUser); }
-    catch (err) { setError(err instanceof Error ? err.message : 'เพิ่มผู้ใช้ไม่สำเร็จ'); return; }
-    setUsers(updated);
-    setShowAddModal(false);
-    setNewFullName('');
-    setNewEmail('');
-    setNewPhone('');
-    setNewRole('AGENT');
-    triggerNotification(`เพิ่มสมาชิก "${newUser.full_name}" สำเร็จ`);
+    try {
+      const updated = await addUser(newUser);
+      setUsers(updated);
+      setShowAddModal(false);
+      setNewFullName('');
+      setNewEmail('');
+      setNewPhone('');
+      setNewRole('AGENT');
+      triggerNotification(`เพิ่มสมาชิก "${newUser.full_name}" สำเร็จ`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'เพิ่มผู้ใช้ไม่สำเร็จ');
+    }
   };
 
   const filteredUsers = users.filter((u) => {
@@ -155,7 +153,11 @@ export default function AdminUsersPage() {
   return (
     <div className="space-y-6 pb-20">
       {error && <p role="alert" className="rounded-xl bg-red-50 p-4 text-sm text-red-800">{error}</p>}
-      {!isDemoMode && <p className="rounded-xl bg-blue-50 p-4 text-sm text-blue-900">เพิ่มหรือลบบัญชีและเปลี่ยนอีเมลเข้าสู่ระบบผ่าน Supabase Dashboard ส่วนหน้านี้ใช้แก้ไขข้อมูลและสิทธิ์ของบัญชีที่มีอยู่</p>}
+      {dataBackend === 'firebase' && (
+        <p className="rounded-xl bg-emerald-50 border border-emerald-200 p-4 text-xs font-semibold text-emerald-900">
+          ✨ ระบบเชื่อมต่อฐานข้อมูลคลาวด์ Firebase Firestore สำเร็จ: สามารถเพิ่ม แก้ไข และแต่งตั้งสิทธิ์ Admin / Agent ได้แบบ Realtime
+        </p>
+      )}
       {/* Notification Toast */}
       {notification && (
         <div className="fixed top-6 right-6 z-50 bg-emerald-900 text-emerald-100 px-5 py-3.5 rounded-2xl shadow-2xl border border-emerald-500/50 flex items-center space-x-2.5 animate-fadeIn">
@@ -173,13 +175,12 @@ export default function AdminUsersPage() {
           </div>
           <h1 className="text-2xl font-extrabold text-navy-950">จัดการสิทธิ์ผู้ดูแลระบบ (Admin & Agents)</h1>
           <p className="text-xs text-brand-muted mt-0.5">
-            กำหนดบทบาทผู้ใช้งาน เลือกว่าใครเป็น Admin เพื่อเข้าถึงระบบหลังบ้านทั้งหมด หรือ Agent ดูแลงานขาย
+            กำหนดบทบาทผู้ใช้งาน เลือกว่าใครเป็น Admin เพื่อเข้าถึงระบบจัดการทั้งหมด หรือ Agent ดูแลงานขาย
           </p>
         </div>
 
         <button
           onClick={() => setShowAddModal(true)}
-          disabled={!isDemoMode}
           className="px-5 py-2.5 bg-navy-950 hover:bg-navy-900 text-gold-400 font-bold text-xs rounded-xl shadow-md flex items-center space-x-2 transition-all self-start sm:self-auto"
         >
           <UserPlus className="w-4 h-4 text-gold-400" />
@@ -591,7 +592,6 @@ export default function AdminUsersPage() {
                 <input
                   type="email"
                   value={editEmail}
-                  disabled={!isDemoMode}
                   onChange={(e) => setEditEmail(e.target.value)}
                   className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3 text-xs text-gray-900 focus:bg-white focus:ring-2 focus:ring-gold-500 outline-none"
                   placeholder="example@email.com"

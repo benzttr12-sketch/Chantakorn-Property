@@ -49,7 +49,7 @@ export default function MobileBottomNav() {
                   </span>
                 )}
               </div>
-              <span className={`text-[11px] mt-1 font-medium ${isActive ? 'text-gold-400 font-semibold' : 'text-gray-400'}`}>
+              <span className={`text-[11px] mt-1 ${isActive ? 'text-gold-300 font-bold' : 'text-gray-200 font-medium'}`}>
                 {item.label}
               </span>
             </Link>

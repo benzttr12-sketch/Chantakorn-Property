@@ -12,5 +12,11 @@ service cloud.firestore {
       allow create: if true;
       allow read, update, delete: if true;
     }
+
+    // User profiles & roles:
+    match /profiles/{userId} {
+      allow read: if true;
+      allow write: if true;
+    }
   }
 }

@@ -5,7 +5,6 @@ import FeaturedProperties from '@/components/home/FeaturedProperties';
 import WhyChooseUs from '@/components/home/WhyChooseUs';
 import LocationHighlights from '@/components/home/LocationHighlights';
 import SellPropertyCTA from '@/components/home/SellPropertyCTA';
-import Testimonials from '@/components/home/Testimonials';
 import ContactCTA from '@/components/home/ContactCTA';
 
 export default function HomePage() {
@@ -29,11 +28,9 @@ export default function HomePage() {
       {/* 7: SELL PROPERTY CTA */}
       <SellPropertyCTA />
 
-      {/* 8: TESTIMONIALS (Customer reviews with DEMO tags) */}
-      <Testimonials />
-
-      {/* 9: CONTACT CTA */}
+      {/* 8: CONTACT CTA */}
       <ContactCTA />
     </div>
   );
 }
+

@@ -29,6 +29,11 @@
     display: flex;
     flex-direction: column;
   }
+
+  ::selection {
+    background-color: #C9A227;
+    color: #020812;
+  }
 }
 
 /* Custom scrollbar */
@@ -47,7 +52,22 @@
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #9AA5B1;
+  background: #C9A227;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fadeIn {
+  animation: fadeIn 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
 /* Custom map pin and leaflet overrides */

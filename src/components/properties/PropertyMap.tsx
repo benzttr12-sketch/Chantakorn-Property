@@ -17,13 +17,24 @@ interface PropertyMapProps {
   center?: [number, number];
 }
 
+const DEFAULT_HAT_YAI_CENTER: [number, number] = [7.0084, 100.4705];
+
+function sanitizeCoords(lat: unknown, lng: unknown, fallback: [number, number] = DEFAULT_HAT_YAI_CENTER): [number, number] {
+  const numLat = typeof lat === 'number' ? lat : parseFloat(String(lat));
+  const numLng = typeof lng === 'number' ? lng : parseFloat(String(lng));
+  if (Number.isFinite(numLat) && Number.isFinite(numLng) && Math.abs(numLat) <= 90 && Math.abs(numLng) <= 180) {
+    return [numLat, numLng];
+  }
+  return fallback;
+}
+
 export default function PropertyMap({
   properties,
   selectedProperty,
   onSelectProperty,
   height = '100%',
   zoom = 12,
-  center = [7.0084, 100.4705], // Default to Hat Yai city center
+  center,
 }: PropertyMapProps) {
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<any>(null);
@@ -31,6 +42,23 @@ export default function PropertyMap({
   const [mapReady, setMapReady] = useState(false);
   const [mapError, setMapError] = useState(false);
   const [activePopupProp, setActivePopupProp] = useState<Property | null>(null);
+
+  // Compute safe initial center
+  const initialCenter: [number, number] = (() => {
+    if (center && Array.isArray(center) && center.length === 2) {
+      return sanitizeCoords(center[0], center[1], DEFAULT_HAT_YAI_CENTER);
+    }
+    if (selectedProperty) {
+      return sanitizeCoords(selectedProperty.latitude, selectedProperty.longitude, DEFAULT_HAT_YAI_CENTER);
+    }
+    if (properties && properties.length > 0) {
+      for (const p of properties) {
+        const coords = sanitizeCoords(p.latitude, p.longitude, [NaN, NaN]);
+        if (!Number.isNaN(coords[0])) return coords;
+      }
+    }
+    return DEFAULT_HAT_YAI_CENTER;
+  })();
 
   useEffect(() => {
     let isMounted = true;
@@ -42,9 +70,9 @@ export default function PropertyMap({
       const L = (await import('leaflet')).default;
       if (!isMounted || !mapContainerRef.current || mapInstanceRef.current) return;
 
-      // Create Leaflet map instance
+      // Create Leaflet map instance with guaranteed valid coordinates
       const map = L.map(mapContainerRef.current, {
-        center: center,
+        center: initialCenter,
         zoom: zoom,
         zoomControl: false,
         attributionControl: true,
@@ -98,11 +126,14 @@ export default function PropertyMap({
 
   // Focus map when a specific property is selected
   useEffect(() => {
-    if (selectedProperty && mapInstanceRef.current && Number.isFinite(selectedProperty.latitude) && Number.isFinite(selectedProperty.longitude)) {
-      mapInstanceRef.current.flyTo([selectedProperty.latitude, selectedProperty.longitude], 15, {
-        duration: 1.2,
-      });
-      setActivePopupProp(selectedProperty);
+    if (selectedProperty && mapInstanceRef.current) {
+      const safeCoords = sanitizeCoords(selectedProperty.latitude, selectedProperty.longitude, [NaN, NaN]);
+      if (!Number.isNaN(safeCoords[0])) {
+        mapInstanceRef.current.flyTo(safeCoords, 15, {
+          duration: 1.2,
+        });
+        setActivePopupProp(selectedProperty);
+      }
     }
   }, [selectedProperty, mapReady]);
 
@@ -111,8 +142,14 @@ export default function PropertyMap({
     Object.values(markersRef.current).forEach((marker: any) => marker.remove());
     markersRef.current = {};
 
+    const validPropertyPoints: { prop: Property; lat: number; lng: number }[] = [];
+
     properties.forEach((prop) => {
-      if (!Number.isFinite(prop.latitude) || !Number.isFinite(prop.longitude) || Math.abs(prop.latitude) > 90 || Math.abs(prop.longitude) > 180) return;
+      const lat = typeof prop.latitude === 'number' ? prop.latitude : parseFloat(String(prop.latitude));
+      const lng = typeof prop.longitude === 'number' ? prop.longitude : parseFloat(String(prop.longitude));
+      if (!Number.isFinite(lat) || !Number.isFinite(lng) || Math.abs(lat) > 90 || Math.abs(lng) > 180) return;
+
+      validPropertyPoints.push({ prop, lat, lng });
 
       // Custom HTML pin with Gold/Navy styling
       const formattedShortPrice = prop.price >= 1000000 
@@ -148,7 +185,7 @@ export default function PropertyMap({
         iconAnchor: [30, 26],
       });
 
-      const marker = L.marker([prop.latitude, prop.longitude], { icon: customIcon })
+      const marker = L.marker([lat, lng], { icon: customIcon })
         .addTo(map)
         .on('click', () => {
           setActivePopupProp(prop);
@@ -158,15 +195,16 @@ export default function PropertyMap({
       markersRef.current[prop.id] = marker;
     });
 
-    // Auto fit bounds if multiple properties exist
-    if (properties.length > 0) {
-      const validCoords = properties
-        .filter((p) => Number.isFinite(p.latitude) && Number.isFinite(p.longitude) && Math.abs(p.latitude) <= 90 && Math.abs(p.longitude) <= 180)
-        .map((p) => [p.latitude, p.longitude]);
-
-      if (validCoords.length > 0) {
+    // Auto fit bounds if valid coordinates exist
+    if (validPropertyPoints.length > 0) {
+      try {
+        const validCoords = validPropertyPoints.map(p => [p.lat, p.lng]);
         const bounds = L.latLngBounds(validCoords);
-        map.fitBounds(bounds, { padding: [40, 40], maxZoom: properties.length === 1 ? zoom : 14 });
+        if (bounds && bounds.isValid && bounds.isValid()) {
+          map.fitBounds(bounds, { padding: [40, 40], maxZoom: validPropertyPoints.length === 1 ? zoom : 14 });
+        }
+      } catch (err) {
+        console.warn('Leaflet fitBounds error:', err);
       }
     }
   };

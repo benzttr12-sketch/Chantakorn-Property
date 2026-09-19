@@ -1,0 +1,7 @@
+{
+  "firestore": {
+    "database": "ai-studio-chantakornproper-360a048e-68fa-490c-b808-4ca065da7f65",
+    "rules": "firestore.rules",
+    "indexes": "firestore.indexes.json"
+  }
+}

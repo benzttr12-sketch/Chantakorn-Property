@@ -18,7 +18,10 @@ import {
   Maximize, 
   Sparkles,
   CheckCircle2,
-  X
+  X,
+  Star,
+  Image as ImageIcon,
+  Loader2
 } from 'lucide-react';
 import { createProperty, updateProperty, fetchAdminProperties } from '@/lib/store/properties-store';
 import { PropertyType, PropertyStatus } from '@/lib/types';
@@ -72,6 +75,8 @@ function PropertyEditor() {
   const [agentId, setAgentId] = useState(AGENTS[0].id);
   const [submitting, setSubmitting] = useState(false);
   const [imageUrlInput, setImageUrlInput] = useState('');
+  const [uploadingImages, setUploadingImages] = useState(false);
+  const [isDragOver, setIsDragOver] = useState(false);
 
   useEffect(() => {
     if (!editId) return;
@@ -139,6 +144,88 @@ function PropertyEditor() {
     } else {
       setSelectedFeatures([...selectedFeatures, f]);
     }
+  };
+
+  const processFiles = async (files: File[]) => {
+    const validFiles = files.filter(f => f.type.startsWith('image/'));
+    if (!validFiles.length) {
+      setError('กรุณาเลือกไฟล์รูปภาพที่ถูกต้อง (JPG, PNG, WebP)');
+      return;
+    }
+    if (images.length + validFiles.length > 20) {
+      setError('สามารถเพิ่มรูปภาพได้สูงสุด 20 รูปต่อประกาศ');
+      return;
+    }
+
+    setUploadingImages(true);
+    setError('');
+    try {
+      const newPhotos = await Promise.all(validFiles.map(file => new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onerror = () => reject(new Error(`อ่านรูปภาพ ${file.name} ไม่สำเร็จ`));
+        reader.onload = () => {
+          const img = new window.Image();
+          img.onerror = () => reject(new Error(`รูปแบบรูปภาพ ${file.name} ไม่ถูกต้อง`));
+          img.onload = () => {
+            const canvas = document.createElement('canvas');
+            const maxDim = 1200;
+            const scale = Math.min(1, maxDim / Math.max(img.width, img.height));
+            canvas.width = Math.max(1, Math.round(img.width * scale));
+            canvas.height = Math.max(1, Math.round(img.height * scale));
+            const ctx = canvas.getContext('2d');
+            if (!ctx) {
+              reject(new Error('ไม่สามารถประมวลผลรูปภาพได้'));
+              return;
+            }
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+            let quality = 0.8;
+            let resultUrl = canvas.toDataURL('image/jpeg', quality);
+            while (resultUrl.length > 200000 && quality > 0.3) {
+              quality -= 0.15;
+              resultUrl = canvas.toDataURL('image/jpeg', quality);
+            }
+            resolve(resultUrl);
+          };
+          img.src = String(reader.result);
+        };
+        reader.readAsDataURL(file);
+      })));
+
+      setImages(prev => {
+        const updated = [...prev, ...newPhotos];
+        if (!coverImage && updated.length > 0) {
+          setCoverImage(updated[0]);
+        }
+        return updated;
+      });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'เกิดข้อผิดพลาดในการโหลดรูปภาพ');
+    } finally {
+      setUploadingImages(false);
+    }
+  };
+
+  const handleFileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    if (files.length > 0) {
+      processFiles(files);
+    }
+    e.target.value = '';
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragOver(false);
+    const files = Array.from(e.dataTransfer.files || []);
+    if (files.length > 0) {
+      processFiles(files);
+    }
+  };
+
+  const handleSetCoverImage = (imgUrl: string) => {
+    setCoverImage(imgUrl);
   };
 
   const handleAddImageUrl = () => {
@@ -522,49 +609,144 @@ function PropertyEditor() {
         </div>
 
         {/* Card 5: Images & Agent Assignment */}
-        <div className="bg-white rounded-2xl p-6 border border-surface-border shadow-sm space-y-4">
-          <h3 className="font-bold text-navy-950 text-base border-b border-gray-100 pb-3">
-            5. รูปภาพและผู้ดูแลทรัพย์
-          </h3>
+        <div className="bg-white rounded-2xl p-6 border border-surface-border shadow-sm space-y-5">
+          <div className="border-b border-gray-100 pb-3 flex items-center justify-between">
+            <h3 className="font-bold text-navy-950 text-base flex items-center space-x-2">
+              <ImageIcon className="w-4 h-4 text-gold-600" />
+              <span>5. รูปภาพและผู้ดูแลทรัพย์</span>
+            </h3>
+            <span className="text-xs font-semibold text-gray-500">
+              {images.length} รูป (แนะนำ 3-10 รูป)
+            </span>
+          </div>
 
+          {/* Upload Zone (Drag & Drop or Click) */}
           <div>
-            <label className="block text-xs font-semibold text-gray-700 mb-1">
-              เพิ่ม URL รูปภาพ
+            <label className="block text-xs font-semibold text-gray-700 mb-2">
+              อัปโหลดรูปภาพจากเครื่อง (คอมพิวเตอร์ / สมาร์ตโฟน)
+            </label>
+            <div
+              onDragOver={(e) => { e.preventDefault(); setIsDragOver(true); }}
+              onDragLeave={() => setIsDragOver(false)}
+              onDrop={handleDrop}
+              className={`relative border-2 border-dashed rounded-2xl p-6 text-center transition-all ${
+                isDragOver 
+                  ? 'border-gold-500 bg-gold-50/50' 
+                  : 'border-gray-300 hover:border-gold-400 bg-gray-50/50 hover:bg-white'
+              }`}
+            >
+              <input
+                type="file"
+                id="property-image-upload"
+                multiple
+                accept="image/jpeg,image/png,image/webp,image/jpg"
+                onChange={handleFileInputChange}
+                disabled={uploadingImages}
+                className="sr-only"
+              />
+              <label
+                htmlFor="property-image-upload"
+                className="cursor-pointer flex flex-col items-center justify-center space-y-2"
+              >
+                {uploadingImages ? (
+                  <div className="flex flex-col items-center space-y-2 py-4">
+                    <Loader2 className="w-8 h-8 text-gold-600 animate-spin" />
+                    <p className="text-xs font-bold text-navy-950">กำลังประมวลผลรูปภาพ...</p>
+                  </div>
+                ) : (
+                  <>
+                    <div className="w-12 h-12 rounded-full bg-gold-100 text-gold-700 flex items-center justify-center">
+                      <Upload className="w-6 h-6" />
+                    </div>
+                    <div>
+                      <span className="text-xs font-bold text-navy-950 bg-navy-100/60 px-3 py-1.5 rounded-lg hover:bg-navy-200 transition-colors">
+                        คลิกเลือกไฟล์รูปภาพ
+                      </span>
+                      <span className="text-xs text-gray-500 block mt-1.5">
+                        หรือลากไฟล์รูปภาพมาวางที่นี่ (รองรับ JPG, PNG, WebP ขนาดไม่เกิน 20 รูป)
+                      </span>
+                    </div>
+                  </>
+                )}
+              </label>
+            </div>
+          </div>
+
+          {/* Alternative URL input */}
+          <div className="bg-gray-50/70 p-3.5 rounded-xl border border-gray-200/70">
+            <label className="block text-xs font-semibold text-gray-700 mb-1.5">
+              หรือเพิ่มรูปภาพจาก URL อินเทอร์เน็ต
             </label>
             <div className="flex space-x-2">
               <input
                 type="url"
-                placeholder="https://images.unsplash.com/photo-..."
+                placeholder="https://images.unsplash.com/..."
                 value={imageUrlInput}
                 onChange={(e) => setImageUrlInput(e.target.value)}
-                className="flex-grow bg-gray-50 border border-gray-200 rounded-xl p-3 text-xs text-gray-900"
+                className="flex-grow bg-white border border-gray-200 rounded-xl p-2.5 text-xs text-gray-900 focus:ring-2 focus:ring-gold-500 outline-none"
               />
               <button
                 type="button"
                 onClick={handleAddImageUrl}
-                className="px-5 py-2.5 bg-navy-950 text-gold-400 rounded-xl text-xs font-bold"
+                className="px-4 py-2 bg-navy-950 text-gold-400 rounded-xl text-xs font-bold hover:bg-navy-900 transition-colors shrink-0"
               >
-                เพิ่มรูป
+                เพิ่มลิงก์รูป
               </button>
             </div>
           </div>
 
-          {/* Images preview strip */}
-          <div className="flex flex-wrap gap-3 pt-2">
-            {images.map((img, i) => (
-              <div key={i} className="relative w-24 h-20 rounded-xl overflow-hidden border border-gray-200 group">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={img} alt={`Thumb ${i}`} className="w-full h-full object-cover" />
-                <button
-                  type="button"
-                  onClick={() => handleRemoveImage(i)}
-                  className="absolute top-1 right-1 w-5 h-5 bg-black/70 text-white rounded-full flex items-center justify-center text-[10px] hover:bg-red-600"
-                >
-                  <X className="w-3 h-3" />
-                </button>
+          {/* Images preview gallery */}
+          {images.length > 0 && (
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs font-bold text-navy-950">
+                  รายการรูปภาพ ({images.length}) - คลิกเพื่อเปลี่ยนรูปหน้าปก
+                </span>
               </div>
-            ))}
-          </div>
+              <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-5 gap-3">
+                {images.map((img, i) => {
+                  const isCover = (coverImage === img) || (!coverImage && i === 0);
+                  return (
+                    <div 
+                      key={i} 
+                      className={`relative rounded-xl overflow-hidden border-2 transition-all group aspect-[4/3] bg-gray-100 ${
+                        isCover ? 'border-gold-500 ring-2 ring-gold-400/40' : 'border-gray-200 hover:border-gray-400'
+                      }`}
+                    >
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={img} alt={`Property image ${i + 1}`} className="w-full h-full object-cover" />
+                      
+                      {/* Cover Badge */}
+                      {isCover ? (
+                        <div className="absolute top-1.5 left-1.5 bg-gold-500 text-navy-950 text-[10px] font-black px-2 py-0.5 rounded shadow-sm flex items-center space-x-1">
+                          <Star className="w-3 h-3 fill-current" />
+                          <span>หน้าปก</span>
+                        </div>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => handleSetCoverImage(img)}
+                          className="absolute bottom-1.5 left-1.5 right-1.5 bg-black/75 hover:bg-gold-500 hover:text-navy-950 text-white text-[10px] font-bold py-1 rounded transition-colors text-center opacity-0 group-hover:opacity-100"
+                        >
+                          ตั้งเป็นหน้าปก
+                        </button>
+                      )}
+
+                      {/* Remove Button */}
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveImage(i)}
+                        title="ลบรูปภาพนี้"
+                        className="absolute top-1.5 right-1.5 w-6 h-6 bg-black/75 hover:bg-red-600 text-white rounded-full flex items-center justify-center text-xs transition-colors shadow"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-4 border-t border-gray-100">
             <div>
