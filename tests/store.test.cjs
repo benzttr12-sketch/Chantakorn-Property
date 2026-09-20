@@ -6,21 +6,77 @@ const vm = require('node:vm');
 const ts = require('typescript');
 const { webcrypto } = require('node:crypto');
 
-function loadStore({ backend = 'local', supabase = null, firebase = false, firebaseError = null, demoAuth = false } = {}) {
+const plain = value => JSON.parse(JSON.stringify(value));
+
+function loadStore({ backend = 'local', firebase = backend === 'firebase', documents = {}, failOn = [] } = {}) {
   const sourceRoot = path.resolve(__dirname, '../src');
   const cache = new Map();
   const storage = new Map();
+  const records = new Map(Object.entries(plain(documents)));
+  const calls = [];
+  const events = [];
+  const blocked = new Set(failOn);
   const context = vm.createContext({
     console, crypto: webcrypto, Event,
-    process: { env: { NEXT_PUBLIC_DATA_BACKEND: backend, NEXT_PUBLIC_ENABLE_DEMO_AUTH: String(demoAuth) } },
     window: {
       localStorage: {
         getItem: key => storage.get(key) ?? null,
         setItem: (key, value) => storage.set(key, value),
       },
-      dispatchEvent() {},
+      dispatchEvent(event) { events.push(event.type); },
     },
   });
+  function record(operation, reference, value) {
+    calls.push({ operation, path: reference.path, constraints: reference.constraints, value });
+    if (blocked.has(operation)) throw new Error('backend unavailable');
+  }
+  function assertDefined(value) {
+    if (value === undefined) throw new Error('Firestore does not accept undefined');
+    if (value && typeof value === 'object') Object.values(value).forEach(assertDefined);
+  }
+  function documentSnapshot(documentPath) {
+    return {
+      id: documentPath.split('/').at(-1),
+      exists: () => records.has(documentPath),
+      data: () => records.has(documentPath) ? plain(records.get(documentPath)) : undefined,
+    };
+  }
+  const firestore = {
+    collection: (_db, collection) => ({ path: collection }),
+    doc: (_db, collection, id) => ({ path: `${collection}/${id}` }),
+    where: (field, operator, value) => ({ field, operator, value }),
+    query: (reference, ...constraints) => ({ ...reference, constraints }),
+    getDocs: async reference => {
+      record('getDocs', reference);
+      const docs = [...records.entries()].filter(([documentPath, data]) => {
+        if (documentPath.split('/')[0] !== reference.path) return false;
+        return (reference.constraints || []).every(constraint => {
+          assert.equal(constraint.operator, '==');
+          return data[constraint.field] === constraint.value;
+        });
+      }).map(([documentPath]) => documentSnapshot(documentPath));
+      return { docs, empty: docs.length === 0 };
+    },
+    getDocFromServer: async reference => {
+      record('getDocFromServer', reference);
+      return documentSnapshot(reference.path);
+    },
+    setDoc: async (reference, value) => {
+      record('setDoc', reference, value);
+      assertDefined(value);
+      records.set(reference.path, plain(value));
+    },
+    updateDoc: async (reference, changes) => {
+      record('updateDoc', reference, changes);
+      assertDefined(changes);
+      if (!records.has(reference.path)) throw new Error('document does not exist');
+      records.set(reference.path, { ...records.get(reference.path), ...plain(changes) });
+    },
+    deleteDoc: async reference => {
+      record('deleteDoc', reference);
+      records.delete(reference.path);
+    },
+  };
   function load(filename) {
     if (cache.has(filename)) return cache.get(filename).exports;
     const module = { exports: {} };
@@ -29,100 +85,217 @@ function loadStore({ backend = 'local', supabase = null, firebase = false, fireb
       compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
     }).outputText;
     const requireModule = name => {
-      if (name === '@/lib/supabase/client') return { supabase, isSupabaseConfigured: Boolean(supabase) };
-      if (name === '@/lib/firebase/client') return { db: firebase ? {} : null, isFirebaseConfigured: firebase };
-      if (name === 'firebase/firestore') return {
-        collection: () => ({}), query: () => ({}), where: () => ({}), doc: () => ({}),
-        getDocs: async () => { if (firebaseError) throw firebaseError; return { docs: [] }; },
-        setDoc: async () => { if (firebaseError) throw firebaseError; },
-      };
+      if (name === '@/lib/firebase/client') return { db: firebase ? {} : null };
+      if (name === '@/lib/backend') return { dataBackend: backend };
+      if (name === 'firebase/firestore') return firestore;
       const target = name.startsWith('@/') ? path.join(sourceRoot, name.slice(2)) : path.resolve(path.dirname(filename), name);
       return load(`${target}.ts`);
     };
     vm.runInContext(`(function(require,module,exports){${compiled}\n})`, context)(requireModule, module, module.exports);
     return module.exports;
   }
-  return { store: load(path.join(sourceRoot, 'lib/store/properties-store.ts')), flags: load(path.join(sourceRoot, 'lib/backend.ts')), storage };
+  return { store: load(path.join(sourceRoot, 'lib/store/properties-store.ts')), storage, records, calls, events, blocked };
 }
 
-function queryResult(result) {
-  return { select() { return this; }, eq() { return this; }, order() { return this; }, then(resolve, reject) { return Promise.resolve(result).then(resolve, reject); } };
+function property(overrides = {}) {
+  return {
+    id: 'property-1', title: 'House', slug: 'house', description: 'Garden home',
+    property_type: 'house', status: 'sale', price: 2500000, province: 'Songkhla',
+    district: 'Hat Yai', latitude: 7.0084, longitude: 100.4705,
+    bedrooms: 3, bathrooms: 2, parking: 1, land_size: 50, usable_area: 160,
+    furniture: 'partial', features: ['garden'], cover_image: 'https://example.com/house.jpg',
+    images: ['https://example.com/house.jpg'], featured: false, published: true,
+    created_at: '2026-01-01T00:00:00.000Z', ...overrides,
+  };
 }
 
-test('local drafts remain manageable while excluded from public lists and slug lookup', async () => {
-  const { store } = loadStore();
-  const first = store.getLocalProperties()[0];
-  await store.updateProperty(first.id, { published: false });
-  assert.equal((await store.fetchAdminProperties()).some(item => item.id === first.id), true);
-  assert.equal((await store.fetchProperties()).some(item => item.id === first.id), false);
-  assert.equal(await store.fetchPropertyBySlug(first.slug), null);
+const inquiry = {
+  name: 'Visitor', phone: '0810000000', message: 'Please contact me',
+  inquiry_type: 'inquiry', status: 'new',
+};
+const profile = { id: 'user-1', full_name: 'Agent', email: 'agent@example.com', role: 'USER', created_at: '2026-01-01T00:00:00.000Z' };
+
+function documents() {
+  return {
+    'properties/property-1': property(),
+    'inquiries/inquiry-1': { ...inquiry, id: 'inquiry-1', created_at: '2026-01-01T00:00:00.000Z' },
+    'profiles/user-1': profile,
+  };
+}
+
+test('published query excludes drafts from public browsing and slug lookup', async () => {
+  const { store, calls } = loadStore({ backend: 'firebase', documents: {
+    'properties/property-1': property(),
+    'properties/draft': property({ id: 'draft', slug: 'draft', published: false }),
+  } });
+  assert.equal((await store.fetchProperties()).length, 1);
+  assert.equal(await store.fetchPropertyBySlug('draft'), null);
+  assert.equal((await store.fetchAdminProperties()).length, 2);
+  assert.deepEqual(plain(calls[0].constraints), [{ field: 'published', operator: '==', value: true }]);
 });
 
-test('a newly created local listing can be published, viewed, and deleted', async () => {
-  const { store } = loadStore();
-  const property = await store.createProperty({ ...store.getLocalProperties()[0], slug: 'regression-test', published: false });
-  assert.equal(await store.fetchPropertyBySlug(property.slug), null);
-  await store.updateProperty(property.id, { published: true });
-  assert.equal((await store.fetchPropertyBySlug(property.slug)).id, property.id);
-  await store.deleteProperty(property.id);
-  assert.equal(await store.fetchPropertyBySlug(property.slug), null);
+test('empty Firebase collections remain empty and reads never seed data', async () => {
+  const { store, storage, calls, records } = loadStore({ backend: 'firebase' });
+  storage.set('chantakorn_properties', JSON.stringify([property()]));
+  storage.set('chantakorn_users', JSON.stringify([profile]));
+  storage.set('chantakorn_inquiries', JSON.stringify([inquiry]));
+  for (const read of [store.fetchProperties, store.fetchAdminProperties, store.fetchInquiries, store.fetchUsers]) {
+    assert.equal((await read()).length, 0);
+  }
+  assert.equal(await store.fetchPropertyBySlug('house'), null);
+  assert.ok(calls.every(call => call.operation === 'getDocs'));
+  assert.equal(records.size, 0);
 });
 
-test('Firebase empty and failed responses never fall back to local data', async () => {
-  const empty = loadStore({ backend: 'firebase', firebase: true });
-  assert.equal((await empty.store.fetchProperties()).length, 0);
-  const failed = loadStore({ backend: 'firebase', firebase: true, firebaseError: new Error('backend unavailable') });
-  await assert.rejects(failed.store.fetchProperties(), /backend unavailable/);
-  await assert.rejects(failed.store.submitInquiry({ name: 'Test', phone: '0000000000', message: 'Test only', inquiry_type: 'inquiry', status: 'new' }), /backend unavailable/);
-  assert.equal(failed.storage.size, 0);
+test('Firebase read failures propagate without displaying local records or fabricated users', async () => {
+  const { store, storage, calls, records } = loadStore({ backend: 'firebase', failOn: ['getDocs'] });
+  storage.set('chantakorn_properties', JSON.stringify([property()]));
+  storage.set('chantakorn_users', JSON.stringify([profile]));
+  storage.set('chantakorn_inquiries', JSON.stringify([inquiry]));
+  const before = [...storage];
+  for (const read of [store.fetchProperties, store.fetchAdminProperties, store.fetchInquiries, store.fetchUsers, () => store.fetchPropertyBySlug('house')]) {
+    await assert.rejects(read(), /backend unavailable/);
+  }
+  assert.deepEqual([...storage], before);
+  assert.equal(records.size, 0);
+  assert.ok(calls.every(call => call.operation === 'getDocs'));
 });
 
-test('malformed storage does not break browsing; zero price and location filters are respected', async () => {
+test('Firebase property creation, partial editing, publication, and deletion use real records', async () => {
+  const { store, records, calls, storage } = loadStore({ backend: 'firebase' });
+  const created = await store.createProperty(property({ published: false, address: undefined }));
+  assert.equal(await store.fetchPropertyBySlug(created.slug), null);
+  assert.equal(records.get(`properties/${created.id}`).address, undefined);
+  // A different editor may have changed price since this form was opened.
+  records.get(`properties/${created.id}`).price = 2700000;
+  calls.length = 0;
+  const updated = await store.updateProperty(created.id, {
+    title: 'Updated house', published: true, images: [], address: undefined,
+    id: 'forged-id', created_at: 'forged-date',
+  });
+  assert.equal(updated.id, created.id);
+  assert.equal(updated.created_at, created.created_at);
+  assert.equal(updated.price, 2700000);
+  assert.deepEqual(plain(updated.images), []);
+  assert.deepEqual(calls.map(call => call.operation), ['updateDoc', 'getDocFromServer']);
+  assert.equal('price' in calls[0].value, false);
+  assert.equal('id' in calls[0].value, false);
+  assert.equal('created_at' in calls[0].value, false);
+  assert.equal((await store.fetchPropertyBySlug(created.slug)).title, 'Updated house');
+  assert.equal(await store.deleteProperty(created.id), true);
+  assert.equal(await store.fetchPropertyBySlug(created.slug), null);
+  assert.equal(storage.size, 0);
+});
+
+test('failed property, inquiry, and profile writes reject without browser fallback', async () => {
+  const { store, records, storage } = loadStore({
+    backend: 'firebase', documents: documents(), failOn: ['setDoc', 'updateDoc', 'deleteDoc'],
+  });
+  storage.set('chantakorn_inquiries', JSON.stringify([{ ...inquiry, id: 'inquiry-1' }]));
+  storage.set('chantakorn_users', JSON.stringify([profile]));
+  const beforeStorage = [...storage];
+  const beforeRecords = plain([...records]);
+  const writes = [
+    () => store.createProperty(property()),
+    () => store.updateProperty('property-1', { title: 'Changed' }),
+    () => store.deleteProperty('property-1'),
+    () => store.submitInquiry(inquiry),
+    () => store.updateInquiryStatus('inquiry-1', 'closed'),
+    () => store.updateUserProfile('user-1', { full_name: 'Changed' }),
+    () => store.updateUserRole('user-1', 'ADMIN'),
+  ];
+  for (const write of writes) await assert.rejects(write(), /backend unavailable/);
+  assert.deepEqual([...storage], beforeStorage);
+  assert.deepEqual(plain([...records]), beforeRecords);
+});
+
+test('editing missing records never creates partial property, inquiry, or profile documents', async () => {
+  const { store, records } = loadStore({ backend: 'firebase' });
+  for (const write of [
+    () => store.updateProperty('missing', { title: 'Changed' }),
+    () => store.updateInquiryStatus('missing', 'closed'),
+    () => store.updateUserProfile('missing', { full_name: 'Changed' }),
+    () => store.updateUserRole('missing', 'ADMIN'),
+  ]) await assert.rejects(write(), /does not exist/);
+  assert.equal(records.size, 0);
+});
+
+test('anonymous inquiry submission writes once without reading the private inbox', async () => {
+  const { store, calls, records } = loadStore({ backend: 'firebase', failOn: ['getDocs', 'getDocFromServer'] });
+  const result = await store.submitInquiry({ ...inquiry, status: 'closed', line_id: undefined });
+  assert.equal(result.status, 'new');
+  assert.equal(records.get(`inquiries/${result.id}`).status, 'new');
+  assert.equal('line_id' in records.get(`inquiries/${result.id}`), false);
+  assert.deepEqual(calls.map(call => call.operation), ['setDoc']);
+});
+
+test('inquiry status updates preserve message and query only the edited document', async () => {
+  const { store, calls } = loadStore({ backend: 'firebase', documents: documents() });
+  const result = await store.updateInquiryStatus('inquiry-1', 'contacted');
+  assert.equal(result.status, 'contacted');
+  assert.equal(result.message, inquiry.message);
+  assert.deepEqual(calls.map(call => call.operation), ['updateDoc', 'getDocFromServer']);
+  assert.ok(calls.every(call => call.path === 'inquiries/inquiry-1'));
+});
+
+test('profile edits preserve account identity and role changes use a separate operation', async () => {
+  const { store, records } = loadStore({ backend: 'firebase', documents: documents() });
+  await store.updateUserProfile('user-1', {
+    full_name: 'Updated agent', phone: undefined, id: 'other', email: 'other@example.com',
+    created_at: 'forged', role: 'ADMIN', avatar_url: 'https://example.com/other.jpg',
+  });
+  const saved = records.get('profiles/user-1');
+  assert.equal(saved.full_name, 'Updated agent');
+  assert.equal(saved.id, profile.id);
+  assert.equal(saved.email, profile.email);
+  assert.equal(saved.created_at, profile.created_at);
+  assert.equal(saved.role, 'USER');
+  assert.equal('avatar_url' in saved, false);
+  assert.equal('phone' in saved, false);
+  await store.updateUserRole('user-1', 'AGENT');
+  assert.equal(records.get('profiles/user-1').role, 'AGENT');
+});
+
+test('local preview and missing Firebase configuration cannot perform staff work or deliver inquiries', async () => {
+  for (const options of [{ backend: 'local' }, { backend: 'firebase', firebase: false }]) {
+    const { store, storage, calls } = loadStore(options);
+    for (const operation of [
+      () => store.fetchAdminProperties(), () => store.fetchInquiries(), () => store.fetchUsers(),
+      () => store.createProperty(property()), () => store.updateProperty('property-1', { title: 'Changed' }),
+      () => store.deleteProperty('property-1'), () => store.updateInquiryStatus('inquiry-1', 'closed'),
+      () => store.updateUserProfile('user-1', { full_name: 'Changed' }), () => store.updateUserRole('user-1', 'ADMIN'),
+    ]) await assert.rejects(operation(), /ตั้งค่า/);
+    await assert.rejects(store.submitInquiry(inquiry), /LINE|ตั้งค่า/);
+    if (options.backend === 'firebase') await assert.rejects(store.fetchProperties(), /ตั้งค่า/);
+    assert.equal(storage.size, 0);
+    assert.equal(calls.length, 0);
+  }
+});
+
+test('malformed preview data remains safe; drafts, zero price, text and sort filters are respected', async () => {
   const { store, storage } = loadStore();
   storage.set('chantakorn_properties', '{broken');
   assert.ok((await store.fetchProperties()).length > 0);
-  assert.equal((await store.fetchProperties({ maxPrice: 0 })).length, 0);
-  assert.equal((await store.fetchProperties({ province: 'not-a-province' })).length, 0);
-  storage.set('chantakorn_properties', '[null,{},42]');
-  assert.equal((await store.fetchProperties()).length, 0);
+  storage.set('chantakorn_properties', JSON.stringify([
+    property({ id: 'free', slug: 'free', price: 0 }),
+    property({ id: 'paid', slug: 'paid', price: 100 }),
+    property({ id: 'draft', slug: 'draft', published: false }),
+    null, {}, 42,
+  ]));
+  assert.equal((await store.fetchProperties({ maxPrice: 0 })).length, 1);
+  assert.equal((await store.fetchProperties({ minPrice: 0, province: 'songkhla', searchQuery: 'GARDEN' })).length, 2);
+  assert.equal((await store.fetchProperties({ province: 'elsewhere' })).length, 0);
+  assert.equal((await store.fetchProperties({ sortBy: 'price_desc' }))[0].id, 'paid');
+  assert.equal(await store.fetchPropertyBySlug('draft'), null);
 });
 
-test('duplicate local slugs reject without overwriting the existing property', async () => {
-  const { store } = loadStore();
-  const first = store.getLocalProperties()[0];
-  await assert.rejects(store.createProperty(first), /Slug/);
-  await assert.rejects(store.updateProperty('missing', { title: 'Changed' }), /ไม่พบ/);
-  assert.equal((await store.fetchPropertyBySlug(first.slug)).title, first.title);
-});
-
-test('an empty remote catalog remains empty and remote errors never use sample data', async () => {
-  const empty = loadStore({ backend: 'supabase', supabase: { from: () => queryResult({ data: [], error: null }) } });
-  assert.equal((await empty.store.fetchProperties()).length, 0);
-  const failed = loadStore({ backend: 'supabase', supabase: { from: () => queryResult({ data: null, error: new Error('permission denied') }) } });
-  await assert.rejects(failed.store.fetchProperties(), /permission denied/);
-});
-
-test('failed live property writes reject and do not mutate browser data', async () => {
-  const { store, storage } = loadStore({ backend: 'supabase', supabase: { rpc: async () => ({ data: null, error: new Error('write denied') }) } });
-  await assert.rejects(store.createProperty(store.getLocalProperties()[0]), /write denied/);
-  assert.equal(storage.has('chantakorn_properties'), false);
-});
-
-test('anonymous inquiry creation succeeds without requesting private inbox read access', async () => {
-  let inserted;
-  const { store } = loadStore({ backend: 'supabase', supabase: { from: () => ({ insert: async row => { inserted = row; return { error: null }; } }) } });
-  const result = await store.submitInquiry({ name: 'Visitor', phone: '0810000000', message: 'Please contact me', inquiry_type: 'inquiry', status: 'closed' });
-  assert.equal(inserted.id, result.id);
-  assert.equal(inserted.status, 'new');
-});
-
-test('local inquiry is never reported delivered and real backends cannot enable demo authentication', async () => {
-  const local = loadStore({ demoAuth: true });
-  assert.equal(local.flags.isDemoAuthEnabled, true);
-  await assert.rejects(local.store.submitInquiry({ name: 'Visitor', phone: '0810000000', message: 'Hello', inquiry_type: 'inquiry', status: 'new' }), /LINE/);
-  assert.equal(loadStore().flags.isDemoAuthEnabled, false);
-  assert.equal(loadStore({ backend: 'firebase', firebase: true, demoAuth: true }).flags.isDemoAuthEnabled, false);
-  const missing = loadStore({ backend: 'supabase', demoAuth: true });
-  assert.equal(missing.flags.isDemoAuthEnabled, false);
-  await assert.rejects(missing.store.fetchProperties(), /ตั้งค่า/);
+test('favorites are validated and remain local even with Firebase selected', () => {
+  const { store, storage, calls, events } = loadStore({ backend: 'firebase' });
+  storage.set('chantakorn_favorites', '[null,42,"property-1"]');
+  assert.deepEqual(plain(store.getFavoriteIds()), ['property-1']);
+  assert.equal(store.toggleFavoriteId('property-2'), true);
+  assert.equal(store.toggleFavoriteId('property-1'), false);
+  assert.deepEqual(plain(store.getFavoriteIds()), ['property-2']);
+  assert.deepEqual(events, ['favorites-updated', 'favorites-updated']);
+  assert.equal(calls.length, 0);
 });

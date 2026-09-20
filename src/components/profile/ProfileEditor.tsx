@@ -20,10 +20,8 @@ import {
   Trash2,
   Image as ImageIcon
 } from 'lucide-react';
-import { auth, db } from '@/lib/firebase/client';
-import { onAuthStateChanged } from 'firebase/auth';
-import { doc, getDoc } from 'firebase/firestore';
-import { getStoredUser, updateCurrentUserProfile, logoutUser, isAdminEmail } from '@/lib/auth-helpers';
+import { subscribeToUserProfile, updateCurrentUserProfile, logoutUser } from '@/lib/auth-helpers';
+import { uploadImage, isImageUploadEnabled } from '@/lib/firebase/media';
 import { UserProfile } from '@/lib/types';
 
 interface ProfileEditorProps {
@@ -49,86 +47,12 @@ export default function ProfileEditor({ isAdminView = false }: ProfileEditorProp
   const [bio, setBio] = useState('');
   const [avatarUrl, setAvatarUrl] = useState('');
 
-  useEffect(() => {
-    // 1. First check locally stored user for instant rendering
-    const stored = getStoredUser();
-    if (stored) {
-      setUserProfile(stored);
-      setFullName(stored.full_name || '');
-      setPhone(stored.phone || '');
-      setLineId(stored.line_id || '');
-      setBio(stored.bio || '');
-      setAvatarUrl(stored.avatar_url || '');
-    }
-
-    // 2. Synchronize with Firebase Auth
-    let unsubscribe: (() => void) | undefined;
-    if (auth) {
-      unsubscribe = onAuthStateChanged(auth, async (user) => {
-        if (user) {
-          let role: UserProfile['role'] = isAdminEmail(user.email) ? 'ADMIN' : 'USER';
-          let name = user.displayName || user.email?.split('@')[0] || 'ผู้ใช้งาน';
-          let userPhone = user.phoneNumber || '';
-          let userAvatar = user.photoURL || '';
-          let userLine = '';
-          let userBio = '';
-
-          if (db) {
-            try {
-              const snap = await getDoc(doc(db, 'profiles', user.uid));
-              if (snap.exists()) {
-                const data = snap.data() as Partial<UserProfile>;
-                if (isAdminEmail(user.email)) {
-                  role = 'ADMIN';
-                } else if (data.role) {
-                  role = data.role as UserProfile['role'];
-                }
-                if (data.full_name) name = data.full_name;
-                if (data.phone) userPhone = data.phone;
-                if (data.avatar_url) userAvatar = data.avatar_url;
-                if (data.line_id) userLine = data.line_id;
-                if (data.bio) userBio = data.bio;
-              }
-            } catch (err) {
-              console.warn('Could not load Firestore profile:', err);
-            }
-          }
-
-          const profile: UserProfile = {
-            id: user.uid,
-            email: user.email || '',
-            full_name: name,
-            role,
-            phone: userPhone,
-            avatar_url: userAvatar,
-            line_id: userLine,
-            bio: userBio
-          };
-
-          setUserProfile(profile);
-          setFullName(profile.full_name);
-          setPhone(profile.phone || '');
-          setLineId(profile.line_id || '');
-          setBio(profile.bio || '');
-          setAvatarUrl(profile.avatar_url || '');
-          setLoading(false);
-        } else {
-          // If not in Firebase Auth, check if stored user exists
-          const localUser = getStoredUser();
-          if (!localUser) {
-            setUserProfile(null);
-          }
-          setLoading(false);
-        }
-      });
-    } else {
-      setLoading(false);
-    }
-
-    return () => {
-      if (unsubscribe) unsubscribe();
-    };
-  }, []);
+  useEffect(() => subscribeToUserProfile(profile => {
+    setUserProfile(profile);
+    setFullName(profile?.full_name || ''); setPhone(profile?.phone || '');
+    setLineId(profile?.line_id || ''); setBio(profile?.bio || '');
+    setAvatarUrl(profile?.avatar_url || ''); setLoading(false);
+  }, error => { setErrorMessage(error.message); setLoading(false); }), []);
 
   // Process real image file (from input or drag & drop)
   const processImageFile = (file: File) => {
@@ -235,15 +159,17 @@ export default function ProfileEditor({ isAdminView = false }: ProfileEditorProp
     setSuccessMessage('');
 
     try {
+      const savedAvatar = avatarUrl.startsWith('data:') ? await uploadImage(avatarUrl, 'avatar') : avatarUrl;
       const updated = await updateCurrentUserProfile({
         full_name: fullName.trim(),
         phone: phone.trim(),
         line_id: lineId.trim(),
         bio: bio.trim(),
-        avatar_url: avatarUrl.trim(),
+        avatar_url: savedAvatar.trim(),
       });
 
       setUserProfile(updated);
+      setAvatarUrl(updated.avatar_url || '');
       setSuccessMessage('บันทึกข้อมูลส่วนตัวและรูปโปรไฟล์เรียบร้อยแล้ว!');
       setTimeout(() => setSuccessMessage(''), 4000);
     } catch (err: any) {
@@ -387,14 +313,14 @@ export default function ProfileEditor({ isAdminView = false }: ProfileEditorProp
             </div>
 
             {/* Quick camera trigger icon */}
-            <button
+            {isImageUploadEnabled && <button
               type="button"
               onClick={() => fileInputRef.current?.click()}
               className="absolute bottom-1 right-1 p-2.5 bg-navy-950 hover:bg-gold-500 text-gold-400 hover:text-navy-950 rounded-full shadow-md transition-all border-2 border-white"
               title="อัปโหลดรูปภาพใหม่"
             >
               <Camera className="w-4 h-4" />
-            </button>
+            </button>}
           </div>
 
           <div>
@@ -413,7 +339,11 @@ export default function ProfileEditor({ isAdminView = false }: ProfileEditorProp
 
           {/* Dedicated Real Image Upload & Drag-and-Drop Area */}
           <div className="w-full space-y-3 pt-2 border-t border-gray-100">
-            <div
+            <label className="block text-left text-xs font-semibold text-gray-700">
+              ลิงก์รูปโปรไฟล์ HTTPS
+              <input type="url" value={avatarUrl.startsWith('data:') ? '' : avatarUrl} onChange={event => setAvatarUrl(event.target.value)} placeholder="https://example.com/photo.jpg" className="mt-2 w-full rounded-xl border border-gray-200 p-2.5 text-xs" />
+            </label>
+            {isImageUploadEnabled && <div
               id="avatar-dropzone"
               onDragOver={handleDragOver}
               onDragLeave={handleDragLeave}
@@ -439,12 +369,12 @@ export default function ProfileEditor({ isAdminView = false }: ProfileEditorProp
               <span className="text-[10px] text-brand-muted bg-white/80 px-2 py-0.5 rounded-full border border-gray-200">
                 รองรับ JPG, PNG, WebP (ไม่เกิน 10MB)
               </span>
-            </div>
+            </div>}
 
             {/* Actions when photo is present */}
             {avatarUrl && (
               <div className="flex items-center space-x-2 pt-1">
-                <button
+                {isImageUploadEnabled && <button
                   id="change-avatar-file-btn"
                   type="button"
                   onClick={() => fileInputRef.current?.click()}
@@ -452,7 +382,7 @@ export default function ProfileEditor({ isAdminView = false }: ProfileEditorProp
                 >
                   <Camera className="w-3.5 h-3.5" />
                   <span>เปลี่ยนรูปภาพ</span>
-                </button>
+                </button>}
                 <button
                   id="remove-avatar-btn"
                   type="button"

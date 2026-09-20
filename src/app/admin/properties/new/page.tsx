@@ -25,6 +25,7 @@ import {
 } from 'lucide-react';
 import { createProperty, updateProperty, fetchAdminProperties } from '@/lib/store/properties-store';
 import { PropertyType, PropertyStatus } from '@/lib/types';
+import { preparePropertyImages, isImageUploadEnabled } from '@/lib/firebase/media';
 import { slugify } from '@/lib/utils';
 import { DISTRICTS_LIST } from '@/data/locations';
 import { AGENTS } from '@/data/agents';
@@ -147,9 +148,9 @@ function PropertyEditor() {
   };
 
   const processFiles = async (files: File[]) => {
-    const validFiles = files.filter(f => f.type.startsWith('image/'));
-    if (!validFiles.length) {
-      setError('กรุณาเลือกไฟล์รูปภาพที่ถูกต้อง (JPG, PNG, WebP)');
+    const validFiles = files.filter(f => ['image/jpeg', 'image/png', 'image/webp'].includes(f.type) && f.size <= 10 * 1024 * 1024);
+    if (!validFiles.length || validFiles.length !== files.length) {
+      setError('กรุณาเลือกไฟล์ JPG, PNG หรือ WebP ขนาดไม่เกิน 10 MB');
       return;
     }
     if (images.length + validFiles.length > 20) {
@@ -229,12 +230,13 @@ function PropertyEditor() {
   };
 
   const handleAddImageUrl = () => {
-    if (/^https?:\/\//i.test(imageUrlInput.trim())) {
+    if (images.length >= 20) { setError('สามารถเพิ่มรูปภาพได้สูงสุด 20 รูปต่อประกาศ'); return; }
+    if (/^https:\/\//i.test(imageUrlInput.trim()) && imageUrlInput.trim().length <= 2048) {
       setImages([...images, imageUrlInput.trim()]);
       if (!coverImage) setCoverImage(imageUrlInput.trim());
       setError('');
       setImageUrlInput('');
-    } else { setError('กรุณาระบุ URL รูปภาพที่ขึ้นต้นด้วย https:// หรือ http://'); }
+    } else { setError('กรุณาระบุ URL รูปภาพ HTTPS ความยาวไม่เกิน 2048 ตัวอักษร'); }
   };
 
   const handleRemoveImage = (idx: number) => {
@@ -245,10 +247,10 @@ function PropertyEditor() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (submitting || loading) return;
+    if (submitting || loading || uploadingImages) return;
     if (!title.trim() || !Number.isFinite(Number(price)) || Number(price) <= 0) { setError('กรุณาระบุชื่อและราคามากกว่า 0'); return; }
     if (!slug.trim() || /[/?#\\]/.test(slug)) { setError('Slug ต้องไม่ว่างและไม่มี / ? # หรือเครื่องหมายทับ'); return; }
-    if (!images.length || !coverImage) { setError('กรุณาเพิ่มรูปภาพอย่างน้อย 1 รูป'); return; }
+    if (!images.length || !coverImage || images.length > 20) { setError('กรุณาเพิ่มรูปภาพ 1–20 รูป'); return; }
     if (!Number.isFinite(Number(latitude)) || Math.abs(Number(latitude)) > 90 || !Number.isFinite(Number(longitude)) || Math.abs(Number(longitude)) > 180) { setError('พิกัดละติจูดหรือลองจิจูดไม่ถูกต้อง'); return; }
     setError('');
 
@@ -256,6 +258,7 @@ function PropertyEditor() {
     try {
       const selectedAgent = AGENTS.find(a => a.id === agentId) || AGENTS[0];
 
+      const media = await preparePropertyImages(images, coverImage || images[0]);
       const propertyData = {
         title: title.trim(),
         slug: slug.trim(),
@@ -277,8 +280,8 @@ function PropertyEditor() {
         year_built: Number(yearBuilt) || 2024,
         furniture,
         features: selectedFeatures,
-        cover_image: coverImage || images[0],
-        images,
+        cover_image: media.cover_image,
+        images: media.images,
         featured,
         published,
         agent_id: agentId,
@@ -621,7 +624,7 @@ function PropertyEditor() {
           </div>
 
           {/* Upload Zone (Drag & Drop or Click) */}
-          <div>
+          {isImageUploadEnabled && <div>
             <label className="block text-xs font-semibold text-gray-700 mb-2">
               อัปโหลดรูปภาพจากเครื่อง (คอมพิวเตอร์ / สมาร์ตโฟน)
             </label>
@@ -670,7 +673,8 @@ function PropertyEditor() {
                 )}
               </label>
             </div>
-          </div>
+          </div>}
+          {!isImageUploadEnabled && <p className="text-sm text-gray-600">เพิ่มรูปภาพด้วยลิงก์ HTTPS ด้านล่าง</p>}
 
           {/* Alternative URL input */}
           <div className="bg-gray-50/70 p-3.5 rounded-xl border border-gray-200/70">

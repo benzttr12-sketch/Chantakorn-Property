@@ -364,7 +364,7 @@ export default function SellPage() {
                   <input
                     type="file"
                     multiple
-                    accept="image/*,.pdf"
+                    accept="image/jpeg,image/png,image/webp"
                     onChange={handlePhotoUpload} disabled={uploading}
                     className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
                   />

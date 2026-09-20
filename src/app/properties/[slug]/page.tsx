@@ -1,11 +1,10 @@
-import { notFound } from 'next/navigation';
 import type { Metadata } from 'next';
 import { SAMPLE_PROPERTIES } from '@/data/sample-properties';
 import PropertyDetail from '@/components/properties/PropertyDetail';
 import { formatPrice } from '@/lib/utils';
 
 interface PageProps { params: Promise<{ slug: string }> }
-export const dynamicParams = true;
+export const dynamicParams = false;
 export function generateStaticParams() {
   return SAMPLE_PROPERTIES.map(property => ({ slug: property.slug }));
 }
@@ -13,7 +12,7 @@ export function generateStaticParams() {
 // Dynamic SEO metadata
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { slug } = await params;
-  const property = SAMPLE_PROPERTIES.find(property => property.slug === slug);
+  const property = process.env.NEXT_PUBLIC_DATA_BACKEND === 'local' ? SAMPLE_PROPERTIES.find(property => property.slug === slug) : undefined;
   if (!property) {
     return {
       title: 'รายละเอียดอสังหาริมทรัพย์ | CHANTAKORN PROPERTY',
@@ -52,6 +51,6 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 
 export default async function PropertyDetailPage({ params }: PageProps) {
   const { slug } = await params;
-  const property = SAMPLE_PROPERTIES.find(item => item.slug === slug);
+  const property = process.env.NEXT_PUBLIC_DATA_BACKEND === 'local' ? SAMPLE_PROPERTIES.find(item => item.slug === slug) : undefined;
   return <PropertyDetail slug={slug} initialProperty={property || null} />;
 }

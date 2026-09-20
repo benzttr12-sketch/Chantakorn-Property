@@ -11,15 +11,12 @@ import {
   AlertCircle,
   ShieldAlert
 } from 'lucide-react';
-import { supabase } from '@/lib/supabase/client';
-import { auth } from '@/lib/firebase/client';
-import { dataBackend } from '@/lib/backend';
-import { signInWithGoogle, loginWithEmail } from '@/lib/auth-helpers';
+import { signInWithGoogle, loginWithEmail, safeRedirect } from '@/lib/auth-helpers';
 
 function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const redirectTarget = searchParams.get('redirect');
+  const redirectTarget = safeRedirect(searchParams.get('redirect'));
   const reason = searchParams.get('reason');
 
   const [email, setEmail] = useState('');
@@ -45,9 +42,9 @@ function LoginForm() {
     try {
       const profile = await signInWithGoogle();
       handleSuccessfulAuth(profile.role);
-    } catch (err: any) {
+    } catch (err) {
       console.error('Google sign-in error:', err);
-      setError(err.message || 'ไม่สามารถเข้าสู่ระบบด้วย Google ได้ กรุณาลองใหม่อีกครั้ง');
+      setError(err instanceof Error ? err.message : 'ไม่สามารถเข้าสู่ระบบด้วย Google ได้ กรุณาลองใหม่อีกครั้ง');
       setLoading(false);
     }
   };
@@ -57,56 +54,13 @@ function LoginForm() {
     setError('');
     setLoading(true);
 
-    if (dataBackend === 'supabase' && supabase) {
-      try {
-        const { error: authError } = await supabase.auth.signInWithPassword({
-          email,
-          password,
-        });
-        if (authError) {
-          setError(authError.message);
-          setLoading(false);
-          return;
-        }
-        const { data: { user } } = await supabase.auth.getUser();
-        const { data: profile, error: profileError } = user
-          ? await supabase
-              .from('profiles')
-              .select('role')
-              .eq('id', user.id)
-              .single()
-          : { data: null, error: new Error('No authenticated user') };
-
-        if (profileError || !profile || !['ADMIN', 'AGENT', 'USER'].includes(profile.role)) {
-          await supabase.auth.signOut();
-          setError('บัญชีนี้ไม่มีสิทธิ์เข้าถึงระบบจัดการ');
-          setLoading(false);
-          return;
-        }
-
-        handleSuccessfulAuth(profile.role);
-        return;
-      } catch (err: any) {
-        setError(err.message || 'เกิดข้อผิดพลาดในการเข้าสู่ระบบ');
-        setLoading(false);
-        return;
-      }
+    try {
+      const profile = await loginWithEmail(email, password);
+      handleSuccessfulAuth(profile.role);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'อีเมลหรือรหัสผ่านไม่ถูกต้อง');
+      setLoading(false);
     }
-
-    if (dataBackend === 'firebase' && auth) {
-      try {
-        const profile = await loginWithEmail(email, password);
-        handleSuccessfulAuth(profile.role);
-        return;
-      } catch (err: any) {
-        setError(err.message || 'อีเมลหรือรหัสผ่านไม่ถูกต้อง');
-        setLoading(false);
-        return;
-      }
-    }
-
-    setError('กรุณาเข้าสู่ระบบด้วย Google หรือสมัครสมาชิก');
-    setLoading(false);
   };
 
   return (
@@ -165,10 +119,6 @@ function LoginForm() {
         </svg>
         <span>เข้าสู่ระบบด้วย Google</span>
       </button>
-
-      <p className="mt-2 text-[11px] text-center text-gray-500">
-        เข้าสู่ระบบด้วย Google ด้วยบัญชี <strong className="text-navy-950 font-semibold">benzttr12@gmail.com</strong> จะได้รับสิทธิ์ <span className="text-amber-700 font-bold">แอดมิน (ADMIN)</span> อัตโนมัติ
-      </p>
 
       <div className="relative my-6">
         <div className="absolute inset-0 flex items-center">

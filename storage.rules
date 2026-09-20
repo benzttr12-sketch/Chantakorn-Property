@@ -1,0 +1,15 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    match /{kind}/{userId}/{fileId} {
+      // These are public profile/catalog images; private inquiry photos do not use this bucket.
+      allow read: if kind in ['avatar', 'property'];
+      allow create: if request.auth != null && request.auth.uid == userId
+        && kind in ['avatar', 'property']
+        && request.resource.size < 5 * 1024 * 1024
+        && request.resource.contentType.matches('image/(jpeg|png|webp)');
+      allow delete: if request.auth != null && request.auth.uid == userId;
+      allow update: if false;
+    }
+  }
+}

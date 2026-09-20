@@ -1,21 +1,7 @@
-# Security Policy
+# Security
 
-## Supported Versions
+This application uses Firebase Authentication and Firestore rules. Public visitors can read published listings and submit inquiries. Private profiles and inquiries require the roles defined in firestore.rules. All new accounts start as USER.
 
-Use this section to tell people about which versions of your project are
-currently being supported with security updates.
+Run npm run test:rules before deploying rule changes. Never grant staff privileges from a client-supplied email, localStorage, or a public sign-up form. Bootstrap the first administrator only through the Firebase Console using an existing Authentication UID.
 
-| Version | Supported          |
-| ------- | ------------------ |
-| 5.1.x   | :white_check_mark: |
-| 5.0.x   | :x:                |
-| 4.0.x   | :white_check_mark: |
-| < 4.0   | :x:                |
-
-## Reporting a Vulnerability
-
-Use this section to tell people how to report a vulnerability.
-
-Tell them where to go, how often they can expect to get an update on a
-reported vulnerability, what to expect if the vulnerability is accepted or
-declined, etc.
+Public Firebase SDK configuration is intentionally included in the web bundle. Do not commit service-account credentials or private API keys. Report a suspected vulnerability privately to the repository owner, including reproduction steps without customer data.

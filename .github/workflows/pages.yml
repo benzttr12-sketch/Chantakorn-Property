@@ -36,9 +36,7 @@ jobs:
         env:
           NEXT_PUBLIC_BASE_PATH: ${{ github.event_name == 'pull_request' && format('/{0}', github.event.repository.name) || steps.pages.outputs.base_path }}
           NEXT_PUBLIC_SITE_URL: ${{ steps.pages.outputs.base_url || format('https://{0}.github.io/{1}', github.repository_owner, github.event.repository.name) }}
-          DEPLOY_DATA_BACKEND: ${{ vars.DEPLOY_DATA_BACKEND || 'local' }}
-          NEXT_PUBLIC_SUPABASE_URL: ${{ vars.NEXT_PUBLIC_SUPABASE_URL }}
-          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+          DEPLOY_DATA_BACKEND: firebase
       - uses: actions/upload-pages-artifact@v3
         with:
           path: out

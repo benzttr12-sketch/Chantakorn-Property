@@ -1,196 +1,117 @@
 import { auth, db, googleProvider } from '@/lib/firebase/client';
-import { signInWithPopup, signOut as firebaseSignOut, signInWithEmailAndPassword, createUserWithEmailAndPassword, updateProfile, User } from 'firebase/auth';
-import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { dataBackend } from '@/lib/backend';
+import { signInWithPopup, signOut, signInWithEmailAndPassword, createUserWithEmailAndPassword, updateProfile, onAuthStateChanged, User } from 'firebase/auth';
+import { doc, getDocFromServer, runTransaction, updateDoc, onSnapshot } from 'firebase/firestore';
 import { UserProfile } from '@/lib/types';
 
-export const ADMIN_EMAILS = [
-  'benzttr12@gmail.com',
-  'admin@chantakornproperty.com',
-];
-
-export function isAdminEmail(email?: string | null): boolean {
-  if (!email) return false;
-  const lower = email.toLowerCase().trim();
-  return ADMIN_EMAILS.includes(lower) || lower.endsWith('@chantakornproperty.com');
+function asProfile(id: string, value: unknown): UserProfile {
+  const profile = value as UserProfile;
+  if (!profile || !['ADMIN', 'AGENT', 'USER'].includes(profile.role) || typeof profile.full_name !== 'string') {
+    throw new Error('ข้อมูลบัญชีไม่สมบูรณ์ กรุณาติดต่อผู้ดูแลระบบ');
+  }
+  return { ...profile, id };
 }
 
-export function notifyAuthChange(profile: UserProfile | null) {
-  if (typeof window !== 'undefined') {
-    window.dispatchEvent(new CustomEvent('chantakorn_auth_change', { detail: profile }));
-  }
-}
-
-export async function syncFirebaseUserProfile(user: User, customFullName?: string, customPhone?: string): Promise<UserProfile> {
-  const email = user.email || '';
-  const uid = user.uid;
-  let role: UserProfile['role'] = isAdminEmail(email) ? 'ADMIN' : 'USER';
-  let fullName = customFullName || user.displayName || email.split('@')[0] || 'ผู้ใช้งาน';
-  let phone = customPhone || user.phoneNumber || '';
-  let avatarUrl = user.photoURL || '';
-  let lineId = '';
-  let bio = '';
-
-  if (db) {
-    try {
-      const userDocRef = doc(db, 'profiles', uid);
-      const snap = await getDoc(userDocRef);
-      if (snap.exists()) {
-        const data = snap.data() as Partial<UserProfile>;
-        if (isAdminEmail(email)) {
-          role = 'ADMIN';
-        } else if (data.role) {
-          role = data.role as UserProfile['role'];
-        }
-        if (data.full_name) fullName = data.full_name;
-        if (data.phone) phone = data.phone;
-        if (data.avatar_url) avatarUrl = data.avatar_url;
-        if (data.line_id) lineId = data.line_id;
-        if (data.bio) bio = data.bio;
-
-        // Ensure Firestore has the ADMIN role if user is an admin email
-        if (isAdminEmail(email) && data.role !== 'ADMIN') {
-          await setDoc(userDocRef, { role: 'ADMIN', email, updated_at: new Date().toISOString() }, { merge: true });
-        }
-      } else {
-        // Create initial profile in Firestore
-        const newProfile: UserProfile = {
-          id: uid,
-          full_name: fullName,
-          email,
-          role,
-          phone,
-          avatar_url: avatarUrl,
-          created_at: new Date().toISOString()
-        };
-        await setDoc(userDocRef, newProfile);
-      }
-    } catch (err) {
-      console.warn('Could not sync Firestore profile:', err);
-    }
-  }
-
-  const profile: UserProfile = {
-    id: uid,
-    full_name: fullName,
-    email,
-    role,
-    phone,
-    avatar_url: avatarUrl,
-    line_id: lineId,
-    bio,
-  };
-
-  if (typeof window !== 'undefined') {
-    localStorage.setItem('chantakorn_auth_user', JSON.stringify(profile));
-    notifyAuthChange(profile);
-  }
-
-  return profile;
-}
-
-export async function updateCurrentUserProfile(updates: {
-  full_name?: string;
-  phone?: string;
-  avatar_url?: string;
-  line_id?: string;
-  bio?: string;
-}): Promise<UserProfile> {
-  const current = getStoredUser();
-  const uid = auth?.currentUser?.uid || current?.id || `user-${Date.now()}`;
-  const email = auth?.currentUser?.email || current?.email || '';
-  const role = current?.role || (isAdminEmail(email) ? 'ADMIN' : 'USER');
-
-  // Update Firebase Auth display info if user is authenticated
-  if (auth?.currentUser) {
-    try {
-      await updateProfile(auth.currentUser, {
-        displayName: updates.full_name !== undefined ? updates.full_name : auth.currentUser.displayName,
-        photoURL: updates.avatar_url !== undefined ? updates.avatar_url : auth.currentUser.photoURL,
+export async function syncFirebaseUserProfile(user: User, fullName?: string, phone?: string): Promise<UserProfile> {
+  if (!db) throw new Error('ยังไม่ได้ตั้งค่าฐานข้อมูล');
+  const reference = doc(db, 'profiles', user.uid);
+  // Only a trusted server may assign staff roles. Email domains grant no privileges.
+  await runTransaction(db, async transaction => {
+    const existing = await transaction.get(reference);
+    if (!existing.exists()) {
+      transaction.set(reference, {
+        id: user.uid, full_name: fullName || user.displayName || 'สมาชิก',
+        email: user.email || '', role: 'USER', phone: phone || '',
+        avatar_url: user.photoURL || '', line_id: '', bio: '',
+        created_at: new Date().toISOString(),
       });
-    } catch (err) {
-      console.warn('Could not update Firebase Auth profile:', err);
     }
+  });
+  if (fullName !== undefined || phone !== undefined) {
+    await updateDoc(reference, {
+      ...(fullName !== undefined ? { full_name: fullName } : {}),
+      ...(phone !== undefined ? { phone } : {}),
+      updated_at: new Date().toISOString(),
+    });
   }
+  return asProfile(user.uid, (await getDocFromServer(reference)).data());
+}
 
-  // Update Firestore profile document
-  if (db && uid) {
-    try {
-      const userDocRef = doc(db, 'profiles', uid);
-      await setDoc(userDocRef, {
-        ...updates,
-        email,
-        role,
-        updated_at: new Date().toISOString()
-      }, { merge: true });
-    } catch (err) {
-      console.warn('Could not update Firestore profile document:', err);
-    }
-  }
-
-  const updatedProfile: UserProfile = {
-    id: uid,
-    email,
-    role,
-    full_name: updates.full_name ?? current?.full_name ?? 'ผู้ใช้งาน',
-    phone: updates.phone ?? current?.phone ?? '',
-    avatar_url: updates.avatar_url ?? current?.avatar_url ?? '',
-    line_id: updates.line_id ?? current?.line_id ?? '',
-    bio: updates.bio ?? current?.bio ?? '',
-    created_at: current?.created_at || new Date().toISOString(),
-    updated_at: new Date().toISOString()
-  };
-
+// Role changes and deleted profiles must immediately close staff screens. Never
+// authenticate from localStorage or accept profile roles supplied by UI events.
+export function subscribeToUserProfile(next: (profile: UserProfile | null) => void, fail: (error: Error) => void = () => {}) {
+  let active = true;
+  let generation = 0;
+  let stopProfile = () => {};
+  const emit = (profile: UserProfile | null) => { if (active) next(profile); };
+  const reject = (error: unknown) => { emit(null); if (active) fail(error instanceof Error ? error : new Error('ตรวจสอบบัญชีไม่สำเร็จ')); };
   if (typeof window !== 'undefined') {
-    localStorage.setItem('chantakorn_auth_user', JSON.stringify(updatedProfile));
-    notifyAuthChange(updatedProfile);
+    try { window.localStorage.removeItem('chantakorn_auth_user'); } catch { /* Storage is optional. */ }
   }
+  if (dataBackend === 'firebase' && auth && db) {
+    const database = db;
+    const stopAuth = onAuthStateChanged(auth, user => {
+      generation++;
+      const currentGeneration = generation;
+      stopProfile();
+      emit(null);
+      if (!user) return;
+      stopProfile = onSnapshot(doc(database, 'profiles', user.uid), snapshot => {
+        if (currentGeneration !== generation || !active) return;
+        try { emit(snapshot.exists() ? asProfile(user.uid, snapshot.data()) : null); }
+        catch (error) { reject(error); }
+      }, reject);
+    }, reject);
+    return () => { active = false; generation++; stopAuth(); stopProfile(); };
+  }
+  queueMicrotask(() => emit(null));
+  return () => { active = false; };
+}
 
-  return updatedProfile;
+export async function updateCurrentUserProfile(updates: Pick<UserProfile, 'full_name' | 'phone' | 'avatar_url' | 'line_id' | 'bio'>): Promise<UserProfile> {
+  const fields = {
+    full_name: updates.full_name.trim(), phone: updates.phone?.trim() || '',
+    avatar_url: updates.avatar_url?.trim() || '', line_id: updates.line_id?.trim() || '', bio: updates.bio?.trim() || '',
+  };
+  if (!fields.full_name || fields.full_name.length > 120 || fields.phone.length > 30 || fields.line_id.length > 100 || fields.bio.length > 2000) {
+    throw new Error('กรุณาตรวจสอบความยาวข้อมูลโปรไฟล์');
+  }
+  if (fields.avatar_url && !fields.avatar_url.startsWith('https://') && !(process.env.NEXT_PUBLIC_USE_FIREBASE_EMULATORS === 'true' && fields.avatar_url.startsWith('http://127.0.0.1:9199/'))) {
+    throw new Error('กรุณาอัปโหลดรูปโปรไฟล์ก่อนบันทึก');
+  }
+  if (!auth || !db) throw new Error('ระบบบัญชียังไม่พร้อมใช้งาน');
+  await auth.authStateReady();
+  const user = auth.currentUser;
+  if (!user) throw new Error('กรุณาเข้าสู่ระบบใหม่');
+  // Firestore is the canonical profile; failures must reach the form.
+  const reference = doc(db, 'profiles', user.uid);
+  await updateDoc(reference, { ...fields, updated_at: new Date().toISOString() });
+  return asProfile(user.uid, (await getDocFromServer(reference)).data());
 }
 
 export async function signInWithGoogle(): Promise<UserProfile> {
-  if (!auth) {
-    throw new Error('Firebase Auth is not configured');
-  }
+  if (dataBackend !== 'firebase' || !auth) throw new Error('ยังไม่ได้เปิดใช้งาน Google Sign-in');
   const result = await signInWithPopup(auth, googleProvider);
   return syncFirebaseUserProfile(result.user);
 }
-
-export async function loginWithEmail(email: string, pass: string): Promise<UserProfile> {
-  if (auth) {
-    const result = await signInWithEmailAndPassword(auth, email, pass);
-    return syncFirebaseUserProfile(result.user);
-  }
-  throw new Error('ระบบตรวจสอบสิทธิ์ยังไม่พร้อมใช้งาน');
+export async function loginWithEmail(email: string, password: string): Promise<UserProfile> {
+  if (dataBackend !== 'firebase' || !auth) throw new Error('ระบบตรวจสอบสิทธิ์ยังไม่พร้อมใช้งาน');
+  const result = await signInWithEmailAndPassword(auth, email.trim(), password);
+  return syncFirebaseUserProfile(result.user);
 }
-
-export async function registerWithEmail(email: string, pass: string, fullName: string, phone: string): Promise<UserProfile> {
-  if (auth) {
-    const result = await createUserWithEmailAndPassword(auth, email, pass);
-    return syncFirebaseUserProfile(result.user, fullName, phone);
-  }
-  throw new Error('ระบบตรวจสอบสิทธิ์ยังไม่พร้อมใช้งาน');
+export async function registerWithEmail(email: string, password: string, fullName: string, phone: string): Promise<UserProfile> {
+  if (dataBackend !== 'firebase' || !auth) throw new Error('ระบบตรวจสอบสิทธิ์ยังไม่พร้อมใช้งาน');
+  const result = await createUserWithEmailAndPassword(auth, email.trim(), password);
+  await updateProfile(result.user, { displayName: fullName.trim() });
+  return syncFirebaseUserProfile(result.user, fullName.trim(), phone.trim());
 }
-
 export async function logoutUser() {
-  if (auth) {
-    try {
-      await firebaseSignOut(auth);
-    } catch {}
-  }
+  if (dataBackend === 'firebase' && auth) await signOut(auth);
   if (typeof window !== 'undefined') {
-    localStorage.removeItem('chantakorn_auth_user');
-    notifyAuthChange(null);
+    try { window.localStorage.removeItem('chantakorn_auth_user'); } catch { /* No credentials are stored here. */ }
   }
 }
 
-export function getStoredUser(): UserProfile | null {
-  if (typeof window === 'undefined') return null;
-  const stored = localStorage.getItem('chantakorn_auth_user');
-  if (!stored) return null;
-  try {
-    return JSON.parse(stored);
-  } catch {
-    return null;
-  }
+export function safeRedirect(value: string | null): string | null {
+  return value && value.startsWith('/') && !value.startsWith('//') && !/[\\\u0000-\u0020]/.test(value) ? value : null;
 }

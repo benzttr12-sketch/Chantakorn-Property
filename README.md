@@ -1,114 +1,75 @@
 # CHANTAKORN PROPERTY
 
-เว็บไซต์อสังหาริมทรัพย์ หาดใหญ่–สงขลา พัฒนาด้วย Next.js, TypeScript และ Tailwind CSS รองรับการรันบน Node.js และเผยแพร่ผ่าน GitHub Pages
+เว็บไซต์อสังหาริมทรัพย์ Next.js / TypeScript เชื่อม Firebase Authentication และ Cloud Firestore
 
-## เริ่มใช้งานในเครื่อง
+## ฐานข้อมูลที่ใช้งาน
 
-ใช้ Node.js 22 ขึ้นไป (แนะนำ Node.js 22 LTS) และ npm
+- Project: `chantakorn-property-2026`
+- Database: `chantakorn` — Enterprise Native, realtime enabled
+- Region: `asia-southeast1` (สิงคโปร์)
+- Web SDK configuration: `firebase.web.json` เป็น public configuration ไม่ใช่ service-account key
+- `.firebaserc` และ `firebase.json` เลือกโปรเจกต์และฐานข้อมูลเดียวกัน
+
+ข้อมูลทรัพย์ ข้อความติดต่อ และโปรไฟล์ใช้ฐานข้อมูลจริง ไม่มีการเติมข้อมูลตัวอย่างหรือบัญชีแอดมินอัตโนมัติ ฐานข้อมูลว่างจะแสดงรายการว่าง หากอ่าน/เขียนล้มเหลวจะแสดงข้อผิดพลาด
+
+## รันและตรวจสอบ
+
+ใช้ Node.js 22 ขึ้นไป:
 
 ```sh
 npm ci
-```
-
-คัดลอก `.env.example` เป็น `.env.local` แล้วรัน:
-
-```sh
 npm run dev
-```
-
-เปิด http://localhost:3000
-
-ค่าเริ่มต้น `NEXT_PUBLIC_DATA_BACKEND=local` ใช้รายการตัวอย่าง บันทึกรายการโปรดและข้อมูลทดลองเฉพาะเบราว์เซอร์นั้น ฟอร์มในโหมดนี้ไม่ได้ส่งข้อมูลถึงทีมงาน หากต้องการทดลองหลังบ้าน ให้ตั้ง `NEXT_PUBLIC_ENABLE_DEMO_AUTH=true` แล้วเข้า `/login` เพื่อเลือกบัญชีทดลอง ไม่มีการเข้าเป็นแอดมินให้อัตโนมัติ
-
-## ตรวจสอบและ build
-
-```sh
 npm run lint
 npm run typecheck
 npm test
-npm run build
-npm start
+npm run build:pages
+npm run preview:pages
 ```
 
-หากต้องการไฟล์เว็บไซต์แบบ static:
+เปิด dev ที่ http://localhost:3000 หรือ static preview ที่ http://localhost:4173
+
+ไม่ต้องตั้งค่า Firebase เพิ่มเพื่อใช้โปรเจกต์นี้ หากต้องการเปลี่ยนโปรเจกต์ ให้ตั้งค่าครบตาม `.env.example` และเปลี่ยน CLI project/database ให้ตรงกัน อย่าใส่ private key ในตัวแปร `NEXT_PUBLIC_*`
+
+`NEXT_PUBLIC_DATA_BACKEND=local` เป็นโหมดดูตัวอย่างแบบอ่านอย่างเดียว ไม่มีบัญชีทดลองและไม่ส่งข้อความถึงทีมงาน Favorites เก็บเฉพาะเบราว์เซอร์
+
+## บัญชีและสิทธิ์
+
+สมัครผ่าน `/register` หรือ Google ที่ `/login` บัญชีใหม่ได้รับสิทธิ์ `USER` เท่านั้น
+
+แอดมินคนแรก: เจ้าของ Firebase project ต้องตรวจสอบบัญชีที่สมัครจริงใน Authentication และแก้ `role` ของเอกสาร `profiles/<Authentication UID>` ในฐานข้อมูล `chantakorn` เป็น `ADMIN` ผ่าน Firebase Console จากนั้นระบบจะรับสิทธิ์ใหม่ทันที ห้ามสร้าง UID สมมติหรือกำหนดสิทธิ์จากโดเมนอีเมล
+
+- USER: ดูทรัพย์ที่เผยแพร่และแก้โปรไฟล์ตัวเอง
+- AGENT: จัดการรายการทรัพย์และกล่องข้อความของทีม
+- ADMIN: สิทธิ์พนักงาน และจัดการชื่อ/โทรศัพท์/บทบาทของสมาชิกที่สมัครแล้ว
+- ไม่อนุญาตให้แอดมินลดสิทธิ์ตัวเองจากหน้าเว็บ
+- การลบบัญชีหรือแก้อีเมลเข้าสู่ระบบต้องทำผ่าน Firebase Authentication โดยเจ้าของโปรเจกต์
+
+ใช้ SDK query แบบปกติเพื่อให้การอ่านข้อมูลใช้ Security Rules และคง realtime listener สำหรับการเปลี่ยนสิทธิ์ โปรไฟล์และข้อความติดต่อไม่เปิดอ่านสาธารณะ
+
+## รูปภาพ
+
+รูปทรัพย์และรูปโปรไฟล์ใช้ URL HTTPS โดยค่าเริ่มต้น (รูปทรัพย์ไม่เกิน 20 รูป) การอัปโหลดผ่าน Cloud Storage ต้องเปิด Blaze และสร้าง bucket ก่อน แล้วตั้ง `NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET` และ deploy `storage.rules` ด้วย configuration ของ bucket นั้น ไม่มีการเรียก Cloud Function ที่ยังไม่ได้สร้าง
+
+รูปแนบฝากขายยังรองรับการบีบอัด JPEG สูงสุด 5 รูป รูปละ 125,000 ตัวอักษร และเก็บอยู่ใน inquiry ส่วนตัว ไม่เปิดอ่านสาธารณะ
+
+## Security Rules และการทดสอบ
 
 ```sh
-npm run build:pages
-npm run preview:pages
+npx -y firebase-tools@latest deploy --only firestore,auth --project chantakorn-property-2026
 ```
 
-เปิด http://localhost:4173 ไฟล์สำหรับเผยแพร่อยู่ใน `out/` ไม่ต้อง commit โฟลเดอร์นี้
+ทดสอบการป้องกันสิทธิ์ใน Emulator (ต้องมี Java 21+ อยู่ใน PATH):
 
-`build:pages` เลือกข้อมูลตัวอย่างและปิดล็อกอินทดลองโดยค่าเริ่มต้น แม้ในเครื่องมี `.env.local` สำหรับฐานข้อมูลจริง เพื่อให้ผลการ build สำหรับสาธารณะคาดเดาได้
-
-## เผยแพร่บน GitHub Pages
-
-1. Push โค้ดไปที่ `main` ของ repository
-2. ใน GitHub ไปที่ **Settings → Pages → Build and deployment → Source → GitHub Actions**
-3. ไปที่ **Actions → Build and deploy website → Run workflow** หรือ push commit ใหม่
-4. รอ job `build` และ `deploy` สำเร็จ แล้วเปิด URL ที่แสดงใน environment `github-pages`
-
-Workflow `.github/workflows/pages.yml` จะติดตั้งด้วย `npm ci`, ตรวจ lint/types, สร้าง static export และเผยแพร่เว็บ เส้นทาง CSS/JavaScript และลิงก์รองรับชื่อ repository ใน URL แล้ว
-
-URL ตามชื่อ repository ปัจจุบันคือ `https://benzttr12-sketch.github.io/Chantakorn-Property/` โดยจะใช้ได้หลัง deploy สำเร็จและเปิด Pages แล้วเท่านั้น
-
-### ทดสอบ URL ที่มีชื่อ repository ในเครื่อง (PowerShell)
-
-```powershell
-$env:NEXT_PUBLIC_BASE_PATH='/Chantakorn-Property'
-$env:NEXT_PUBLIC_SITE_URL='https://benzttr12-sketch.github.io/Chantakorn-Property'
-npm run build:pages
-npm run preview:pages
+```sh
+npm run test:rules
 ```
 
-เปิด http://localhost:4173/Chantakorn-Property/
+ชุดทดสอบตรวจ public/draft visibility, staff CRUD, profile privacy, role escalation, admin self-lockout, inbox privacy และข้อมูลฟอร์มที่ไม่ถูกต้อง ควรตรวจทบทวน Rules และบัญชีพนักงานก่อนเปิดให้ผู้ใช้ทั่วไปใช้งานในวงกว้าง
 
-ทรัพย์ตัวอย่างมีหน้าที่สร้างไว้ล่วงหน้า ส่วนทรัพย์ที่เพิ่มภายหลังใช้ `/properties/detail/?slug=...` เพื่อเปิดได้บน static hosting โดยไม่ต้อง build ใหม่ ข้อมูลจริงโหลดจาก backend ในเบราว์เซอร์
+## GitHub Pages
 
-## เชื่อมระบบใช้งานจริงด้วย Supabase
+Workflow `.github/workflows/pages.yml` ใช้ `npm ci` พร้อม lockfile ตรวจ lint/types/tests แล้ว build โดยเลือก Firebase เสมอ เมื่อ push ไป `main` จะ deploy ผ่าน GitHub Actions ตามการตั้งค่า Pages ของ repository
 
-1. สร้าง Supabase project แล้วรัน `supabase/schema.sql` ตามด้วย `supabase/seed.sql` ใน SQL Editor (seed เพิ่มตัวแทน 2 คนสำหรับฟอร์ม ไม่เพิ่มรายการทรัพย์หรือลูกค้าปลอม)
-2. ตั้ง `.env.local`:
+ทรัพย์ที่เพิ่มภายหลังเปิดผ่าน `/properties/detail/?slug=...` โดยไม่ต้อง build ใหม่ หน้า slug เก่าของตัวอย่างยังเปิดได้แต่ไม่แสดงข้อมูลตัวอย่างในโหมด Firebase
 
-```dotenv
-NEXT_PUBLIC_DATA_BACKEND=supabase
-NEXT_PUBLIC_SUPABASE_URL=https://YOUR_PROJECT.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=YOUR_PUBLIC_ANON_OR_PUBLISHABLE_KEY
-NEXT_PUBLIC_ENABLE_DEMO_AUTH=false
-NEXT_PUBLIC_SITE_URL=https://YOUR_SITE
-```
-
-3. ตั้ง Supabase Authentication → URL Configuration ให้มี URL ของเว็บไซต์จริง และ URL redirect ที่ใช้ยืนยันอีเมล
-4. สมัครผู้ใช้ผ่าน `/register` แล้วยืนยันอีเมล บัญชีใหม่เริ่มเป็น `USER`
-5. เจ้าของ project กำหนดแอดมินใน SQL Editor ตามคำแนะนำท้าย `supabase/schema.sql`
-6. ล็อกอินที่ `/login` แล้วเพิ่มทรัพย์จาก `/admin/properties/new`
-
-บน GitHub ให้เพิ่ม **Settings → Secrets and variables → Actions**:
-
-| ประเภท | ชื่อ | ค่า |
-| --- | --- | --- |
-| Variable | `DEPLOY_DATA_BACKEND` | `supabase` |
-| Variable | `NEXT_PUBLIC_SUPABASE_URL` | URL ของ project |
-| Secret | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | public anon/publishable key |
-
-จากนั้นรัน workflow ใหม่ ค่าที่ขึ้นต้น `NEXT_PUBLIC_` จะรวมอยู่ใน JavaScript สาธารณะ จึงใช้ได้เฉพาะ public key และต้องมี RLS ตาม schema ห้ามใช้ service-role key
-
-ระบบจะรายงานข้อผิดพลาดเมื่อฐานข้อมูลอ่าน/บันทึกไม่ได้ และจะไม่แอบบันทึกในเครื่องแทน ฐานข้อมูลว่างจะแสดงว่าไม่พบรายการ รูปทรัพย์ในหลังบ้านรับ URL; รูปในฟอร์มฝากขายจำกัด 5 รูป รูปละ 5 MB และบีบอัดในเบราว์เซอร์ก่อนส่ง
-
-### Firebase
-
-โค้ดรองรับ Firestore สำหรับรายการทรัพย์และการสอบถาม โดยตั้ง `NEXT_PUBLIC_DATA_BACKEND=firebase` และค่า Firebase ใน `.env.example` แต่ยังไม่มี Firebase staff authentication หรือการตั้ง rules ใน repository นี้ หลังบ้านสำหรับการใช้งานร่วมกันจึงให้ใช้ Supabase การเชื่อม Firebase ต้องตั้งสิทธิ์อ่าน/สร้าง inquiry ที่ project เองและไม่เปิด public write สำหรับข้อมูลหลังบ้าน
-
-## ขอบเขตข้อมูล
-
-- รายการตัวอย่าง ภาพ และข้อความรีวิวเป็นข้อมูลสาธิต ควรตรวจและแทนที่ข้อมูลติดต่อ/ทรัพย์ก่อนใช้งานธุรกิจจริง
-- โหมด local แยกข้อมูลตามเบราว์เซอร์ ไม่มีฐานข้อมูลส่วนกลาง และล้างข้อมูลเว็บไซต์แล้วข้อมูลทดลองจะหาย
-- Favorites เก็บในเบราว์เซอร์
-- หน้าข้อมูลระบบแสดงโหมดที่เลือก การเปลี่ยนข้อมูลติดต่อหรือฐานข้อมูลต้องแก้โครงการแล้วเผยแพร่ใหม่
-- การติดตั้ง schema และทดสอบกับ Supabase project จริงต้องทำก่อนเปิดรับข้อมูลลูกค้าจริง
-- `.env.local`, dependency folders, build output และไฟล์ log ถูกกันออกจาก Git
-
-## เอกสารอ้างอิง
-
-- [Next.js static exports](https://nextjs.org/docs/app/guides/static-exports)
-- [GitHub Actions ตัวอย่างสำหรับ Next.js Pages](https://github.com/actions/starter-workflows/blob/main/pages/nextjs.yml)
+ไฟล์ build อยู่ใน `out/` และไม่ต้อง commit เอกสาร `.env.local`, logs, dependencies และ build outputs ถูกกันออกจาก Git ข้อมูลติดต่อทีมงานและเนื้อหาสาธิตในหน้าแนะนำยังควรตรวจทานก่อนใช้งานธุรกิจจริง

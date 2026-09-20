@@ -20,9 +20,7 @@ import {
   UserCircle
 } from 'lucide-react';
 import { getFavoriteIds } from '@/lib/store/properties-store';
-import { getStoredUser, logoutUser } from '@/lib/auth-helpers';
-import { auth } from '@/lib/firebase/client';
-import { onAuthStateChanged } from 'firebase/auth';
+import { subscribeToUserProfile, logoutUser } from '@/lib/auth-helpers';
 import { UserProfile } from '@/lib/types';
 
 export default function Header() {
@@ -54,33 +52,7 @@ export default function Header() {
     };
   }, []);
 
-  // Listen to user auth state
-  useEffect(() => {
-    setCurrentUser(getStoredUser());
-
-    const handleAuthCustom = (e: any) => {
-      setCurrentUser(e.detail || null);
-    };
-    window.addEventListener('chantakorn_auth_change', handleAuthCustom);
-
-    let unsubscribe = () => {};
-    if (auth) {
-      unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
-        if (!firebaseUser) {
-          // If no stored user, ensure null
-          const stored = getStoredUser();
-          if (!stored) setCurrentUser(null);
-        } else {
-          setCurrentUser(getStoredUser());
-        }
-      });
-    }
-
-    return () => {
-      window.removeEventListener('chantakorn_auth_change', handleAuthCustom);
-      unsubscribe();
-    };
-  }, []);
+  useEffect(() => subscribeToUserProfile(setCurrentUser), []);
 
   // Close mobile menu on route change
   useEffect(() => {

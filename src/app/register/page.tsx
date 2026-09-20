@@ -10,12 +10,8 @@ import {
   User, 
   Phone, 
   ArrowRight, 
-  CheckCircle2,
   AlertCircle 
 } from 'lucide-react';
-import { supabase } from '@/lib/supabase/client';
-import { auth } from '@/lib/firebase/client';
-import { dataBackend } from '@/lib/backend';
 import { signInWithGoogle, registerWithEmail } from '@/lib/auth-helpers';
 
 export default function RegisterPage() {
@@ -38,8 +34,8 @@ export default function RegisterPage() {
       } else {
         router.push('/favorites');
       }
-    } catch (err: any) {
-      setError(err.message || 'ไม่สามารถสมัครสมาชิกด้วย Google ได้ กรุณาลองใหม่อีกครั้ง');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'ไม่สามารถสมัครสมาชิกด้วย Google ได้ กรุณาลองใหม่อีกครั้ง');
       setLoading(false);
     }
   };
@@ -49,67 +45,17 @@ export default function RegisterPage() {
     setError('');
     setLoading(true);
 
-    if (dataBackend === 'supabase' && supabase) {
-      try {
-        const { error: signUpError } = await supabase.auth.signUp({
-          email,
-          password,
-          options: {
-            data: {
-              full_name: fullName,
-              phone: phone,
-            },
-          },
-        });
-        if (signUpError) {
-          setError(signUpError.message);
-          setLoading(false);
-          return;
-        }
-        setRegistered(true);
-        setLoading(false);
-        return;
-      } catch (err: any) {
-        setError(err.message || 'เกิดข้อผิดพลาดในการลงทะเบียน');
-        setLoading(false);
-        return;
-      }
-    }
-
-    if (dataBackend === 'firebase' && auth) {
-      try {
-        const profile = await registerWithEmail(email, password, fullName, phone);
-        setRegistered(true);
-        setLoading(false);
-        setTimeout(() => {
-          if (profile.role === 'ADMIN' || profile.role === 'AGENT') {
-            router.push('/admin');
-          } else {
-            router.push('/favorites');
-          }
-        }, 1500);
-        return;
-      } catch (err: any) {
-        setError(err.message || 'เกิดข้อผิดพลาดในการลงทะเบียน');
-        setLoading(false);
-        return;
-      }
-    }
-
-    // Local fallback
     try {
-      localStorage.setItem('chantakorn_auth_user', JSON.stringify({
-        id: `usr-${Date.now()}`,
-        full_name: fullName,
-        email,
-        phone,
-        role: 'USER',
-      }));
+      const profile = await registerWithEmail(email, password, fullName, phone);
       setRegistered(true);
-      setLoading(false);
-      setTimeout(() => router.push('/favorites'), 1500);
-    } catch {
-      setError('ไม่สามารถลงทะเบียนได้');
+      if (profile.role === 'ADMIN' || profile.role === 'AGENT') {
+        router.push('/admin');
+      } else {
+        router.push('/favorites');
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'เกิดข้อผิดพลาดในการลงทะเบียน');
+    } finally {
       setLoading(false);
     }
   };
@@ -156,7 +102,7 @@ export default function RegisterPage() {
           <button
             type="button"
             onClick={handleGoogleSignUp}
-            disabled={loading}
+            disabled={loading || registered}
             className="w-full py-3 px-4 mb-5 bg-white hover:bg-gray-50 border border-gray-300 text-gray-700 font-bold text-xs sm:text-sm rounded-xl shadow-sm transition-all flex items-center justify-center space-x-3"
           >
             <svg className="w-4 h-4" viewBox="0 0 24 24">

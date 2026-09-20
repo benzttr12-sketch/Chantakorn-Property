@@ -5,48 +5,65 @@ import {
   Users, 
   ShieldCheck, 
   UserCheck, 
-  UserPlus, 
   Mail, 
   Phone, 
   Search, 
   Check, 
   Shield,
-  Trash2,
   Pencil,
   X
 } from 'lucide-react';
 import { UserProfile } from '@/lib/types';
-import { dataBackend } from '@/lib/backend';
+import { subscribeToUserProfile } from '@/lib/auth-helpers';
 import { 
   fetchUsers,
   updateUserProfile, 
-  updateUserRole, 
-  addUser, 
-  deleteUser 
+  updateUserRole,
 } from '@/lib/store/properties-store';
 
 export default function AdminUsersPage() {
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [roleFilter, setRoleFilter] = useState<'ALL' | 'ADMIN' | 'AGENT' | 'USER'>('ALL');
-  const [showAddModal, setShowAddModal] = useState(false);
   const [notification, setNotification] = useState<string | null>(null);
   const [error, setError] = useState('');
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
 
   // Edit user state
   const [editingUser, setEditingUser] = useState<UserProfile | null>(null);
   const [editFullName, setEditFullName] = useState('');
-  const [editEmail, setEditEmail] = useState('');
   const [editPhone, setEditPhone] = useState('');
 
-  // New user form state
-  const [newFullName, setNewFullName] = useState('');
-  const [newEmail, setNewEmail] = useState('');
-  const [newPhone, setNewPhone] = useState('');
-  const [newRole, setNewRole] = useState<'ADMIN' | 'AGENT' | 'USER'>('AGENT');
-
   useEffect(() => {
-    fetchUsers().then(setUsers).catch(() => setError('โหลดรายชื่อผู้ใช้ไม่ได้ กรุณาตรวจสอบสิทธิ์ผู้ดูแลระบบ'));
+    let active = true;
+    let request = 0;
+    const unsubscribe = subscribeToUserProfile(profile => {
+      const currentRequest = ++request;
+      setCurrentUserId(profile?.id || null);
+      setUsers([]);
+      if (profile?.role !== 'ADMIN') {
+        setLoading(false);
+        return;
+      }
+      setLoading(true);
+      setError('');
+      fetchUsers().then(result => {
+        if (active && request === currentRequest) setUsers(result);
+      }).catch(() => {
+        if (active && request === currentRequest) setError('โหลดรายชื่อผู้ใช้ไม่ได้ กรุณาตรวจสอบสิทธิ์ผู้ดูแลระบบ');
+      }).finally(() => {
+        if (active && request === currentRequest) setLoading(false);
+      });
+    }, () => {
+      request++;
+      setCurrentUserId(null);
+      setUsers([]);
+      setLoading(false);
+      setError('ตรวจสอบสิทธิ์ไม่สำเร็จ กรุณาเข้าสู่ระบบใหม่');
+    });
+    return () => { active = false; unsubscribe(); };
   }, []);
 
   const triggerNotification = (msg: string) => {
@@ -57,79 +74,46 @@ export default function AdminUsersPage() {
   };
 
   const openEditModal = (user: UserProfile) => {
+    setError('');
     setEditingUser(user);
     setEditFullName(user.full_name);
-    setEditEmail(user.email || '');
     setEditPhone(user.phone || '');
   };
 
   const handleSaveEdit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!editingUser || !editFullName.trim()) return;
+    if (!editingUser || !editFullName.trim() || saving) return;
 
     setError('');
+    setSaving(true);
     try {
-    const updated = await updateUserProfile(editingUser.id, {
-      full_name: editFullName.trim(),
-      email: editEmail.trim() || undefined,
-      phone: editPhone.trim() || undefined,
-    });
-
-    setUsers(updated);
-    setEditingUser(null);
-    triggerNotification(`บันทึกข้อมูล "${editFullName}" สำเร็จ`);
+      const updated = await updateUserProfile(editingUser.id, {
+        full_name: editFullName.trim(),
+        phone: editPhone.trim(),
+      });
+      setUsers(updated);
+      setEditingUser(null);
+      triggerNotification(`บันทึกข้อมูล "${editFullName}" สำเร็จ`);
     } catch {
       setError('บันทึกข้อมูลผู้ใช้ไม่สำเร็จ กรุณาตรวจสอบสิทธิ์และลองใหม่');
+    } finally {
+      setSaving(false);
     }
   };
 
   const handleRoleChange = async (userId: string, newRole: 'ADMIN' | 'AGENT' | 'USER') => {
+    if (!currentUserId || userId === currentUserId || saving) return;
     setError('');
+    setSaving(true);
     try {
-    const updated = await updateUserRole(userId, newRole);
-    setUsers(updated);
-    const targetUser = updated.find(u => u.id === userId);
-    triggerNotification(`อัปเดตสิทธิ์ของ "${targetUser?.full_name}" เป็น ${newRole === 'ADMIN' ? 'ผู้ดูแลระบบ (Admin)' : newRole === 'AGENT' ? 'นายหน้า (Agent)' : 'ผู้ใช้ทั่วไป (User)'} สำเร็จ`);
+      const updated = await updateUserRole(userId, newRole);
+      setUsers(updated);
+      const targetUser = updated.find(u => u.id === userId);
+      triggerNotification(`อัปเดตสิทธิ์ของ "${targetUser?.full_name}" เป็น ${newRole === 'ADMIN' ? 'ผู้ดูแลระบบ (Admin)' : newRole === 'AGENT' ? 'นายหน้า (Agent)' : 'ผู้ใช้ทั่วไป (User)'} สำเร็จ`);
     } catch {
       setError('เปลี่ยนสิทธิ์ไม่สำเร็จ กรุณาตรวจสอบสิทธิ์ผู้ดูแลระบบ');
-    }
-  };
-
-  const handleDeleteUser = async (userId: string, name: string) => {
-    if (window.confirm(`คุณแน่ใจหรือไม่ว่าต้องการลบสมาชิก "${name}"?`)) {
-      try {
-        const updated = await deleteUser(userId);
-        setUsers(updated);
-        triggerNotification(`ลบสมาชิก "${name}" เรียบร้อยแล้ว`);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'ลบสมาชิกไม่สำเร็จ');
-      }
-    }
-  };
-
-  const handleAddUser = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newFullName.trim() || !newEmail.trim()) return;
-
-    const newUser: UserProfile = {
-      id: `usr-${Date.now()}`,
-      full_name: newFullName.trim(),
-      email: newEmail.trim(),
-      phone: newPhone.trim() || undefined,
-      role: newRole,
-    };
-
-    try {
-      const updated = await addUser(newUser);
-      setUsers(updated);
-      setShowAddModal(false);
-      setNewFullName('');
-      setNewEmail('');
-      setNewPhone('');
-      setNewRole('AGENT');
-      triggerNotification(`เพิ่มสมาชิก "${newUser.full_name}" สำเร็จ`);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'เพิ่มผู้ใช้ไม่สำเร็จ');
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -153,11 +137,9 @@ export default function AdminUsersPage() {
   return (
     <div className="space-y-6 pb-20">
       {error && <p role="alert" className="rounded-xl bg-red-50 p-4 text-sm text-red-800">{error}</p>}
-      {dataBackend === 'firebase' && (
-        <p className="rounded-xl bg-emerald-50 border border-emerald-200 p-4 text-xs font-semibold text-emerald-900">
-          ✨ ระบบเชื่อมต่อฐานข้อมูลคลาวด์ Firebase Firestore สำเร็จ: สามารถเพิ่ม แก้ไข และแต่งตั้งสิทธิ์ Admin / Agent ได้แบบ Realtime
-        </p>
-      )}
+      <p className="rounded-xl bg-blue-50 border border-blue-200 p-4 text-xs leading-relaxed text-blue-900">
+        รายชื่อนี้แสดงสมาชิกที่สมัครบัญชีแล้ว สามารถแก้ไขชื่อ เบอร์โทรศัพท์ และมอบหมายสิทธิ์ได้ สมาชิกใหม่ต้องสมัครผ่านหน้าสมัครสมาชิกก่อน และไม่สามารถเปลี่ยนสิทธิ์ของบัญชีตนเองจากหน้านี้
+      </p>
       {/* Notification Toast */}
       {notification && (
         <div className="fixed top-6 right-6 z-50 bg-emerald-900 text-emerald-100 px-5 py-3.5 rounded-2xl shadow-2xl border border-emerald-500/50 flex items-center space-x-2.5 animate-fadeIn">
@@ -179,13 +161,6 @@ export default function AdminUsersPage() {
           </p>
         </div>
 
-        <button
-          onClick={() => setShowAddModal(true)}
-          className="px-5 py-2.5 bg-navy-950 hover:bg-navy-900 text-gold-400 font-bold text-xs rounded-xl shadow-md flex items-center space-x-2 transition-all self-start sm:self-auto"
-        >
-          <UserPlus className="w-4 h-4 text-gold-400" />
-          <span>เพิ่มสมาชิก / แต่งตั้งแอดมิน</span>
-        </button>
       </div>
 
       {/* Stats Cards */}
@@ -291,13 +266,14 @@ export default function AdminUsersPage() {
               {filteredUsers.length === 0 ? (
                 <tr>
                   <td colSpan={6} className="p-8 text-center text-gray-500">
-                    ไม่พบรายชื่อผู้ใช้ที่ตรงตามเงื่อนไข
+                    {loading ? 'กำลังโหลดรายชื่อผู้ใช้...' : error ? 'ยังไม่สามารถแสดงรายชื่อผู้ใช้ได้' : 'ไม่พบรายชื่อผู้ใช้ที่ตรงตามเงื่อนไข'}
                   </td>
                 </tr>
               ) : (
                 filteredUsers.map((u) => {
                   const isAdmin = u.role === 'ADMIN';
                   const isAgent = u.role === 'AGENT';
+                  const isSelf = u.id === currentUserId;
 
                   return (
                     <tr key={u.id} className="hover:bg-gray-50/80 transition-colors">
@@ -358,10 +334,14 @@ export default function AdminUsersPage() {
                       <td className="p-4 text-center">
                         <button
                           onClick={() => handleRoleChange(u.id, isAdmin ? 'AGENT' : 'ADMIN')}
-                          className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                          disabled={!currentUserId || isSelf || saving}
+                          role="switch"
+                          aria-checked={isAdmin}
+                          aria-label={`สิทธิ์ผู้ดูแลระบบของ ${u.full_name}`}
+                          className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer disabled:cursor-not-allowed disabled:opacity-50 rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
                             isAdmin ? 'bg-gold-500' : 'bg-gray-300'
                           }`}
-                          title={isAdmin ? 'คลิกเพื่อยกเลิกสิทธิ์ Admin' : 'คลิกเพื่อแต่งตั้งเป็น Admin'}
+                          title={isSelf ? 'ไม่สามารถเปลี่ยนสิทธิ์ของตนเอง' : isAdmin ? 'คลิกเพื่อยกเลิกสิทธิ์ Admin' : 'คลิกเพื่อแต่งตั้งเป็น Admin'}
                         >
                           <span
                             className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
@@ -378,8 +358,10 @@ export default function AdminUsersPage() {
                       <td className="p-4 text-center">
                         <select
                           value={u.role}
-                          onChange={(e) => handleRoleChange(u.id, e.target.value as any)}
-                          className="bg-gray-50 border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs text-navy-950 font-bold focus:outline-none focus:ring-2 focus:ring-gold-500 cursor-pointer"
+                          disabled={!currentUserId || isSelf || saving}
+                          aria-label={`เปลี่ยนสิทธิ์ของ ${u.full_name}`}
+                          onChange={(e) => handleRoleChange(u.id, e.target.value as UserProfile['role'])}
+                          className="bg-gray-50 border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs text-navy-950 font-bold focus:outline-none focus:ring-2 focus:ring-gold-500 cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
                         >
                           <option value="ADMIN">ตั้งเป็น ADMIN</option>
                           <option value="AGENT">ตั้งเป็น AGENT</option>
@@ -392,17 +374,11 @@ export default function AdminUsersPage() {
                         <div className="flex items-center justify-end space-x-1">
                           <button
                             onClick={() => openEditModal(u)}
+                            disabled={saving}
                             className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
                             title="แก้ไขข้อมูลผู้ใช้"
                           >
                             <Pencil className="w-4 h-4" />
-                          </button>
-                          <button
-                            onClick={() => handleDeleteUser(u.id, u.full_name)}
-                            className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                            title="ลบผู้ใช้นี้"
-                          >
-                            <Trash2 className="w-4 h-4" />
                           </button>
                         </div>
                       </td>
@@ -430,125 +406,6 @@ export default function AdminUsersPage() {
         </div>
       </div>
 
-      {/* Add User / Assign Admin Modal */}
-      {showAddModal && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl max-w-md w-full p-6 sm:p-8 shadow-2xl border border-surface-border animate-fadeIn relative">
-            <div className="border-b border-gray-100 pb-4 mb-5">
-              <h3 className="text-lg font-bold text-navy-950">เพิ่มผู้ใช้ / แต่งตั้งแอดมินใหม่</h3>
-              <p className="text-xs text-brand-muted mt-0.5">
-                กรอกข้อมูลและเลือกระดับสิทธิ์ที่ต้องการมอบหมาย
-              </p>
-            </div>
-
-            <form onSubmit={handleAddUser} className="space-y-4">
-              <div>
-                <label className="block text-xs font-semibold text-gray-700 mb-1">
-                  ชื่อ-นามสกุล *
-                </label>
-                <input
-                  type="text"
-                  required
-                  placeholder="เช่น คุณกานดา วงศ์สวัสดิ์"
-                  value={newFullName}
-                  onChange={(e) => setNewFullName(e.target.value)}
-                  className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3 text-xs text-gray-900 focus:bg-white focus:ring-2 focus:ring-gold-500 outline-none"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-gray-700 mb-1">
-                  อีเมล (สำหรับเข้าสู่ระบบ) *
-                </label>
-                <input
-                  type="email"
-                  required
-                  placeholder="admin-kanda@chantakornproperty.com"
-                  value={newEmail}
-                  onChange={(e) => setNewEmail(e.target.value)}
-                  className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3 text-xs text-gray-900 focus:bg-white focus:ring-2 focus:ring-gold-500 outline-none"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-gray-700 mb-1">
-                  เบอร์โทรศัพท์
-                </label>
-                <input
-                  type="tel"
-                  placeholder="081-xxx-xxxx"
-                  value={newPhone}
-                  onChange={(e) => setNewPhone(e.target.value)}
-                  className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3 text-xs text-gray-900 focus:bg-white focus:ring-2 focus:ring-gold-500 outline-none"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-gray-700 mb-1">
-                  ระดับสิทธิ์ในระบบ (Role) *
-                </label>
-                <div className="grid grid-cols-3 gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setNewRole('ADMIN')}
-                    className={`py-2 px-2 text-xs font-bold rounded-xl border transition-all ${
-                      newRole === 'ADMIN'
-                        ? 'bg-gold-500 text-navy-950 border-gold-500 shadow-sm'
-                        : 'bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100'
-                    }`}
-                  >
-                    🛡️ ADMIN
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setNewRole('AGENT')}
-                    className={`py-2 px-2 text-xs font-bold rounded-xl border transition-all ${
-                      newRole === 'AGENT'
-                        ? 'bg-navy-900 text-white border-navy-900 shadow-sm'
-                        : 'bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100'
-                    }`}
-                  >
-                    👔 AGENT
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setNewRole('USER')}
-                    className={`py-2 px-2 text-xs font-bold rounded-xl border transition-all ${
-                      newRole === 'USER'
-                        ? 'bg-gray-800 text-white border-gray-800 shadow-sm'
-                        : 'bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100'
-                    }`}
-                  >
-                    👤 USER
-                  </button>
-                </div>
-                <span className="text-[10px] text-gray-500 mt-1 block">
-                  {newRole === 'ADMIN' && 'ผู้ใช้นี้จะสามารถเข้าถึงและแก้ไขทุกส่วนในแดชบอร์ดได้'}
-                  {newRole === 'AGENT' && 'ผู้ใช้นี้สามารถจัดการทรัพย์และติดต่อลูกค้าที่ได้รับมอบหมาย'}
-                  {newRole === 'USER' && 'สมาชิกทั่วไปสำหรับบันทึกทรัพย์'}
-                </span>
-              </div>
-
-              <div className="flex items-center space-x-3 pt-4 border-t border-gray-100">
-                <button
-                  type="button"
-                  onClick={() => setShowAddModal(false)}
-                  className="flex-1 py-2.5 rounded-xl border border-gray-200 text-gray-600 text-xs font-bold hover:bg-gray-50"
-                >
-                  ยกเลิก
-                </button>
-                <button
-                  type="submit"
-                  className="flex-1 py-2.5 rounded-xl bg-navy-950 hover:bg-navy-900 text-gold-400 text-xs font-bold shadow-md"
-                >
-                  บันทึกผู้ใช้
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
       {/* ===== Edit User Modal ===== */}
       {editingUser && (
         <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
@@ -557,11 +414,12 @@ export default function AdminUsersPage() {
             <div className="flex items-center justify-between border-b border-gray-100 pb-4 mb-5">
               <div>
                 <h3 className="text-lg font-bold text-navy-950">แก้ไขข้อมูลผู้ใช้</h3>
-                <p className="text-xs text-brand-muted mt-0.5">แก้ไขชื่อ-นามสกุล, อีเมล หรือเบอร์โทรศัพท์</p>
+                <p className="text-xs text-brand-muted mt-0.5">แก้ไขชื่อ-นามสกุลและเบอร์โทรศัพท์</p>
               </div>
               <button
                 type="button"
                 onClick={() => setEditingUser(null)}
+                disabled={saving}
                 className="p-1.5 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
               >
                 <X className="w-5 h-5" />
@@ -569,6 +427,7 @@ export default function AdminUsersPage() {
             </div>
 
             <form onSubmit={handleSaveEdit} className="space-y-4">
+              {error && <p role="alert" className="rounded-xl bg-red-50 p-3 text-xs text-red-800">{error}</p>}
               {/* Full Name */}
               <div>
                 <label className="block text-xs font-semibold text-gray-700 mb-1">
@@ -577,6 +436,7 @@ export default function AdminUsersPage() {
                 <input
                   type="text"
                   required
+                  maxLength={120}
                   value={editFullName}
                   onChange={(e) => setEditFullName(e.target.value)}
                   className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3 text-xs text-gray-900 focus:bg-white focus:ring-2 focus:ring-gold-500 outline-none"
@@ -584,18 +444,13 @@ export default function AdminUsersPage() {
                 />
               </div>
 
-              {/* Email */}
+              {/* Authentication email is read-only. */}
               <div>
                 <label className="block text-xs font-semibold text-gray-700 mb-1">
                   อีเมล
                 </label>
-                <input
-                  type="email"
-                  value={editEmail}
-                  onChange={(e) => setEditEmail(e.target.value)}
-                  className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3 text-xs text-gray-900 focus:bg-white focus:ring-2 focus:ring-gold-500 outline-none"
-                  placeholder="example@email.com"
-                />
+                <p className="rounded-xl border border-gray-200 bg-gray-50 p-3 text-xs text-gray-600">{editingUser.email || '-'}</p>
+                <p className="mt-1 text-[11px] text-gray-500">อีเมลเข้าสู่ระบบไม่สามารถเปลี่ยนจากหน้านี้ได้</p>
               </div>
 
               {/* Phone */}
@@ -605,6 +460,7 @@ export default function AdminUsersPage() {
                 </label>
                 <input
                   type="tel"
+                  maxLength={30}
                   value={editPhone}
                   onChange={(e) => setEditPhone(e.target.value)}
                   className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3 text-xs text-gray-900 focus:bg-white focus:ring-2 focus:ring-gold-500 outline-none"
@@ -629,16 +485,18 @@ export default function AdminUsersPage() {
                 <button
                   type="button"
                   onClick={() => setEditingUser(null)}
+                  disabled={saving}
                   className="flex-1 py-2.5 rounded-xl border border-gray-200 text-gray-600 text-xs font-bold hover:bg-gray-50"
                 >
                   ยกเลิก
                 </button>
                 <button
                   type="submit"
+                  disabled={saving}
                   className="flex-1 py-2.5 rounded-xl bg-navy-950 hover:bg-navy-900 text-gold-400 text-xs font-bold shadow-md flex items-center justify-center space-x-1.5"
                 >
                   <Check className="w-4 h-4" />
-                  <span>บันทึกข้อมูล</span>
+                  <span>{saving ? 'กำลังบันทึก...' : 'บันทึกข้อมูล'}</span>
                 </button>
               </div>
             </form>

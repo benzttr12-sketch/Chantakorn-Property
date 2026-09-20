@@ -3,12 +3,8 @@
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { supabase } from '@/lib/supabase/client';
-import { auth, db } from '@/lib/firebase/client';
-import { onAuthStateChanged } from 'firebase/auth';
-import { doc, getDoc } from 'firebase/firestore';
-import { dataBackend } from '@/lib/backend';
-import { logoutUser, isAdminEmail } from '@/lib/auth-helpers';
+import { logoutUser, subscribeToUserProfile } from '@/lib/auth-helpers';
+import { UserProfile } from '@/lib/types';
 import { 
   LayoutDashboard, 
   Building2, 
@@ -19,7 +15,6 @@ import {
   LogOut, 
   ExternalLink,
   ChevronRight,
-  ShieldCheck,
   Menu,
   X
 } from 'lucide-react';
@@ -29,140 +24,25 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const router = useRouter();
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [isAuthorized, setIsAuthorized] = useState(false);
-  const [currentUser, setCurrentUser] = useState<any>({
-    full_name: 'ผู้ดูแลระบบ (Admin)',
-    role: 'ADMIN',
-    email: 'admin@chantakornproperty.com',
-  });
+  const [currentUser, setCurrentUser] = useState<UserProfile | null>(null);
+  const [authError, setAuthError] = useState('');
+  const adminOnlyRoute = ['/admin/users', '/admin/settings'].some(route => pathname === route || pathname.startsWith(`${route}/`));
 
   useEffect(() => {
-    let unsubscribeFirebase: (() => void) | undefined;
-
-    async function authorize() {
-      // 1. Supabase Backend
-      if (dataBackend === 'supabase' && supabase) {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) {
-          router.replace('/login');
-          return;
-        }
-
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('full_name, role, phone')
-          .eq('id', user.id)
-          .single();
-        if (!profile || !['ADMIN', 'AGENT'].includes(profile.role)) {
-          await supabase.auth.signOut();
-          router.replace('/login');
-          return;
-        }
-        if (pathname.startsWith('/admin/users') && profile.role !== 'ADMIN') {
-          router.replace('/admin');
-          return;
-        }
-        setCurrentUser({ ...profile, email: user.email });
-        setIsAuthorized(true);
-        return;
-      }
-
-      // 2. Local/Stored user check
-      if (typeof window !== 'undefined') {
-        const stored = localStorage.getItem('chantakorn_auth_user');
-        if (stored) {
-          try {
-            const user = JSON.parse(stored);
-            const userRole = isAdminEmail(user.email) ? 'ADMIN' : user.role;
-            if (['ADMIN', 'AGENT'].includes(userRole)) {
-              if (pathname.startsWith('/admin/users') && userRole !== 'ADMIN') {
-                router.replace('/admin');
-                return;
-              }
-              setCurrentUser({ ...user, role: userRole });
-              setIsAuthorized(true);
-              return;
-            }
-          } catch {}
-        }
-      }
-
-      // 3. Firebase Auth check
-      if (dataBackend === 'firebase' && auth) {
-        if (auth.currentUser) {
-          const u = auth.currentUser;
-          const role = isAdminEmail(u.email) ? 'ADMIN' : 'USER';
-          if (role === 'ADMIN') {
-            setCurrentUser({
-              full_name: u.displayName || 'ผู้ดูแลระบบ',
-              email: u.email,
-              role: 'ADMIN',
-            });
-            setIsAuthorized(true);
-            return;
-          }
-        }
-        // If Firebase Auth is still restoring state, onAuthStateChanged below will handle it
-        return;
-      }
-
-      router.replace('/login');
-    }
-
     setIsAuthorized(false);
-    authorize().catch(() => router.replace('/login'));
-
-    if (dataBackend === 'firebase' && auth) {
-      unsubscribeFirebase = onAuthStateChanged(auth, async (firebaseUser) => {
-        if (firebaseUser) {
-          let role = isAdminEmail(firebaseUser.email) ? 'ADMIN' : 'USER';
-          if (db) {
-            try {
-              const snap = await getDoc(doc(db, 'profiles', firebaseUser.uid));
-              if (snap.exists() && snap.data().role) {
-                // If user is designated as admin email, enforce ADMIN
-                role = isAdminEmail(firebaseUser.email) ? 'ADMIN' : snap.data().role;
-              }
-            } catch {}
-          }
-          if (['ADMIN', 'AGENT'].includes(role)) {
-            setCurrentUser({
-              full_name: firebaseUser.displayName || 'ผู้ดูแลระบบ',
-              email: firebaseUser.email,
-              role,
-            });
-            setIsAuthorized(true);
-          } else {
-            router.replace('/login?reason=admin_required');
-          }
-        } else {
-          // If no stored admin session exists either, redirect to login
-          const stored = typeof window !== 'undefined' ? localStorage.getItem('chantakorn_auth_user') : null;
-          if (!stored) {
-            router.replace('/login');
-          }
-        }
-      });
-    }
-
-    if (dataBackend === 'supabase' && supabase) {
-      const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
-        if (event === 'SIGNED_OUT') {
-          setIsAuthorized(false);
-          router.replace('/login');
-        }
-      });
-      return () => subscription.unsubscribe();
-    }
-
-    return () => {
-      if (unsubscribeFirebase) unsubscribeFirebase();
-    };
-  }, [router, pathname]);
+    setAuthError('');
+    return subscribeToUserProfile(profile => {
+      setCurrentUser(profile);
+      const staff = profile && ['ADMIN', 'AGENT'].includes(profile.role);
+      const allowed = Boolean(staff && (!adminOnlyRoute || profile?.role === 'ADMIN'));
+      setIsAuthorized(allowed);
+      if (profile && !allowed) router.replace(staff ? '/admin' : '/login?reason=admin_required');
+    }, error => { setIsAuthorized(false); setAuthError(error.message); });
+  }, [router, adminOnlyRoute]);
 
   const handleLogout = async () => {
-    if (dataBackend === 'supabase' && supabase) await supabase.auth.signOut();
-    await logoutUser();
-    router.push('/');
+    try { await logoutUser(); router.push('/'); }
+    catch { setAuthError('ออกจากระบบไม่สำเร็จ กรุณาลองอีกครั้ง'); }
   };
 
   const navItems = [
@@ -174,7 +54,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     { label: 'ตั้งค่าระบบ', href: '/admin/settings', icon: Settings },
   ];
 
-  if (!isAuthorized) return null;
+  if (!isAuthorized || !currentUser || (adminOnlyRoute && currentUser.role !== 'ADMIN')) return <div className="p-12 text-center space-y-4"><p role={authError ? 'alert' : 'status'}>{authError || 'กรุณาเข้าสู่ระบบด้วยบัญชีพนักงานเพื่อเปิดหลังบ้าน'}</p><Link className="text-gold-700 underline" href="/login?redirect=/admin">เข้าสู่ระบบ</Link></div>;
 
   return (
     <div className="min-h-screen bg-gray-100 flex flex-col md:flex-row">
@@ -236,7 +116,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
           {/* Navigation Links */}
           <nav className="mt-6 space-y-1.5">
-            {navItems.filter(item => item.href !== '/admin/users' || currentUser.role === 'ADMIN').map((item) => {
+            {navItems.filter(item => !['/admin/users', '/admin/settings'].includes(item.href) || currentUser.role === 'ADMIN').map((item) => {
               const isActive = pathname === item.href;
               const Icon = item.icon;
               return (
@@ -284,6 +164,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
       {/* Main Content Area */}
       <main className="flex-grow p-4 sm:p-8 overflow-y-auto max-w-7xl mx-auto w-full">
+        {authError && <p role="alert" className="mb-4 rounded-xl bg-red-50 p-4 text-sm text-red-800">{authError}</p>}
         {children}
       </main>
     </div>
