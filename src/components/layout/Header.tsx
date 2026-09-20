@@ -20,10 +20,11 @@ import {
   UserCircle
 } from 'lucide-react';
 import { getFavoriteIds } from '@/lib/store/properties-store';
-import { getStoredUser, logoutUser } from '@/lib/auth-helpers';
+import { getStoredUser, logoutUser, syncFirebaseUserProfile } from '@/lib/auth-helpers';
 import { auth } from '@/lib/firebase/client';
 import { onAuthStateChanged } from 'firebase/auth';
 import { UserProfile } from '@/lib/types';
+import { dataBackend } from '@/lib/backend';
 
 export default function Header() {
   const [isScrolled, setIsScrolled] = useState(false);
@@ -64,14 +65,16 @@ export default function Header() {
     window.addEventListener('chantakorn_auth_change', handleAuthCustom);
 
     let unsubscribe = () => {};
-    if (auth) {
-      unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
+    if (dataBackend === 'firebase' && auth) {
+      unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
         if (!firebaseUser) {
-          // If no stored user, ensure null
-          const stored = getStoredUser();
-          if (!stored) setCurrentUser(null);
+          setCurrentUser(null);
         } else {
-          setCurrentUser(getStoredUser());
+          try {
+            setCurrentUser(await syncFirebaseUserProfile(firebaseUser));
+          } catch {
+            setCurrentUser(null);
+          }
         }
       });
     }

@@ -126,3 +126,26 @@ test('local inquiry is never reported delivered and real backends cannot enable 
   assert.equal(missing.flags.isDemoAuthEnabled, false);
   await assert.rejects(missing.store.fetchProperties(), /ตั้งค่า/);
 });
+
+test('an explicit backend selection wins over automatic configuration detection', () => {
+  const explicitLocal = loadStore({ backend: 'local', firebase: true });
+  assert.equal(explicitLocal.flags.dataBackend, 'local');
+
+  const supabase = { from: () => queryResult({ data: [], error: null }) };
+  const explicitSupabase = loadStore({ backend: 'supabase', supabase, firebase: true });
+  assert.equal(explicitSupabase.flags.dataBackend, 'supabase');
+});
+
+test('security-sensitive Firebase paths have regression guards', () => {
+  const root = path.resolve(__dirname, '..');
+  const rules = fs.readFileSync(path.join(root, 'firestore.rules'), 'utf8');
+  const authHelpers = fs.readFileSync(path.join(root, 'src/lib/auth-helpers.ts'), 'utf8');
+  const adminLayout = fs.readFileSync(path.join(root, 'src/app/admin/layout.tsx'), 'utf8');
+
+  assert.doesNotMatch(rules, /allow\s+write:\s*if\s+true/);
+  assert.match(rules, /request\.resource\.data\.role\s*==\s*'USER'/);
+  assert.match(rules, /allow delete:\s*if false/);
+  assert.doesNotMatch(authHelpers, /ADMIN_EMAILS|endsWith\(['"]@chantakornproperty\.com/);
+  assert.doesNotMatch(adminLayout, /localStorage/);
+  assert.match(adminLayout, /getDocFromServer/);
+});

@@ -4,7 +4,7 @@ import { Property, PropertyFilters, Inquiry, UserProfile } from '@/lib/types';
 import { SAMPLE_PROPERTIES } from '@/data/sample-properties';
 import { supabase } from '@/lib/supabase/client';
 import { db } from '@/lib/firebase/client';
-import { dataBackend, isDemoMode } from '@/lib/backend';
+import { dataBackend, isDemoAuthEnabled, isDemoMode } from '@/lib/backend';
 import { 
   collection, 
   getDocs, 
@@ -20,26 +20,6 @@ const STORAGE_KEY_FAVORITES = 'chantakorn_favorites';
 const STORAGE_KEY_INQUIRIES = 'chantakorn_inquiries';
 const STORAGE_KEY_USERS = 'chantakorn_users';
 const PROPERTY_SELECT = '*, agents(*), property_images(image_url, sort_order)';
-
-let isSeedingFirebase = false;
-
-async function seedFirebaseIfEmpty() {
-  if (!db || isSeedingFirebase) return;
-  try {
-    isSeedingFirebase = true;
-    const snap = await getDocs(collection(db, 'properties'));
-    if (snap.empty) {
-      for (const prop of SAMPLE_PROPERTIES) {
-        const cleanProp = JSON.parse(JSON.stringify(prop));
-        await setDoc(doc(db, 'properties', prop.id), cleanProp);
-      }
-    }
-  } catch (err) {
-    console.error('Failed to seed Firebase Firestore properties:', err);
-  } finally {
-    isSeedingFirebase = false;
-  }
-}
 
 function readArray<T>(key: string, fallback: T[], valid: (item: unknown) => item is T): T[] {
   if (typeof window !== 'undefined') {
@@ -98,6 +78,10 @@ function requireConnection() {
 
 function requireDemo() {
   if (!isDemoMode) throw new Error('ข้อมูลนี้ต้องจัดการผ่านฐานข้อมูลที่เชื่อมต่ออยู่');
+}
+
+function requireDemoAuth() {
+  if (!isDemoAuthEnabled) throw new Error('เปิดใช้การจัดการบัญชีทดลองเฉพาะในโหมด demo auth เท่านั้น');
 }
 
 function requireStaffBackend() {
@@ -178,23 +162,11 @@ async function loadProperties(includeUnpublished: boolean): Promise<Property[]> 
     return (data || []).map(row => rowToProperty(row as PropertyRow));
   }
   if (dataBackend === 'firebase' && db) {
-    try {
-      const q = includeUnpublished
-        ? query(collection(db, 'properties'))
-        : query(collection(db, 'properties'), where('published', '==', true));
-      let snapshot = await getDocs(q);
-      if (snapshot.empty) {
-        await seedFirebaseIfEmpty();
-        snapshot = await getDocs(q);
-        if (snapshot.empty) {
-          return SAMPLE_PROPERTIES.filter(property => includeUnpublished || property.published);
-        }
-      }
-      return snapshot.docs.map(item => rowToProperty({ ...item.data(), id: item.id } as PropertyRow));
-    } catch (err) {
-      console.warn('Firestore loadProperties error, falling back to sample data:', err);
-      return SAMPLE_PROPERTIES.filter(property => includeUnpublished || property.published);
-    }
+    const q = includeUnpublished
+      ? query(collection(db, 'properties'))
+      : query(collection(db, 'properties'), where('published', '==', true));
+    const snapshot = await getDocs(q);
+    return snapshot.docs.map(item => rowToProperty({ ...item.data(), id: item.id } as PropertyRow));
   }
   return getLocalProperties().filter(property => includeUnpublished || property.published);
 }
@@ -355,14 +327,9 @@ export async function fetchInquiries(): Promise<Inquiry[]> {
     return (data || []) as Inquiry[];
   }
   if (dataBackend === 'firebase' && db) {
-    try {
-      const snap = await getDocs(collection(db, 'inquiries'));
-      const inqs = snap.docs.map(d => ({ ...d.data(), id: d.id } as Inquiry));
-      return inqs.sort((a, b) => b.created_at.localeCompare(a.created_at));
-    } catch (err) {
-      console.error('Firestore fetchInquiries error:', err);
-      return getLocalInquiries();
-    }
+    const snap = await getDocs(collection(db, 'inquiries'));
+    const inqs = snap.docs.map(d => ({ ...d.data(), id: d.id } as Inquiry));
+    return inqs.sort((a, b) => b.created_at.localeCompare(a.created_at));
   }
   return getLocalInquiries();
 }
@@ -412,23 +379,8 @@ export async function fetchUsers(): Promise<UserProfile[]> {
     return (data || []) as UserProfile[];
   }
   if (dataBackend === 'firebase' && db) {
-    try {
-      const snap = await getDocs(collection(db, 'profiles'));
-      if (snap.empty) {
-        const initialUsers: UserProfile[] = [
-          { id: 'admin-benz', full_name: 'คุณเบนซ์ (Admin)', email: 'benzttr12@gmail.com', role: 'ADMIN', created_at: new Date().toISOString() },
-          { id: 'agent-pim', full_name: 'คุณพิมลภัส (Agent)', email: 'agent@chantakornproperty.com', role: 'AGENT', created_at: new Date().toISOString() },
-        ];
-        for (const u of initialUsers) {
-          await setDoc(doc(db, 'profiles', u.id), u);
-        }
-        return initialUsers;
-      }
-      return snap.docs.map(d => ({ ...d.data(), id: d.id } as UserProfile));
-    } catch (err) {
-      console.error('Firestore fetchUsers error:', err);
-      return getLocalUsers();
-    }
+    const snap = await getDocs(collection(db, 'profiles'));
+    return snap.docs.map(d => ({ ...d.data(), id: d.id } as UserProfile));
   }
   return getLocalUsers();
 }
@@ -438,10 +390,7 @@ export async function updateUserRole(userId: string, role: UserProfile['role']):
 }
 
 export async function addUser(user: UserProfile): Promise<UserProfile[]> {
-  if (dataBackend === 'firebase' && db) {
-    await setDoc(doc(db, 'profiles', user.id), { ...user, created_at: new Date().toISOString() });
-    return fetchUsers();
-  }
+  requireDemoAuth();
   return addLocalUser(user);
 }
 
@@ -476,10 +425,7 @@ export async function updateUserProfile(userId: string, updates: Partial<UserPro
 }
 
 export async function deleteUser(userId: string): Promise<UserProfile[]> {
-  if (dataBackend === 'firebase' && db) {
-    await deleteDoc(doc(db, 'profiles', userId));
-    return fetchUsers();
-  }
+  requireDemoAuth();
   return deleteLocalUser(userId);
 }
 

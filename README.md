@@ -97,7 +97,13 @@ NEXT_PUBLIC_SITE_URL=https://YOUR_SITE
 
 ### Firebase
 
-โค้ดรองรับ Firestore สำหรับรายการทรัพย์และการสอบถาม โดยตั้ง `NEXT_PUBLIC_DATA_BACKEND=firebase` และค่า Firebase ใน `.env.example` แต่ยังไม่มี Firebase staff authentication หรือการตั้ง rules ใน repository นี้ หลังบ้านสำหรับการใช้งานร่วมกันจึงให้ใช้ Supabase การเชื่อม Firebase ต้องตั้งสิทธิ์อ่าน/สร้าง inquiry ที่ project เองและไม่เปิด public write สำหรับข้อมูลหลังบ้าน
+ตั้ง `NEXT_PUBLIC_DATA_BACKEND=firebase` และค่า Firebase ใน `.env.example` จากนั้น deploy `firestore.rules` ไปยัง Firebase project ก่อนเปิดใช้งานจริง Rules อนุญาตให้สาธารณะอ่านเฉพาะทรัพย์ที่เผยแพร่และสร้าง inquiry สถานะ `new`; การอ่านข้อมูลส่วนตัวและแก้ข้อมูลหลังบ้านต้องเป็น `ADMIN` หรือ `AGENT` จากเอกสาร `profiles/{uid}` ที่ได้รับการป้องกัน
+
+บัญชี Firebase ใหม่เริ่มด้วย role `USER` เสมอ ไม่มีการยกสิทธิ์จากชื่อโดเมนหรืออีเมลใน browser การตั้ง Admin คนแรกต้องทำจาก Firebase Console หรือ Admin SDK ที่เชื่อถือได้ โดยแก้ `profiles/{uid}.role` เป็น `ADMIN` หลังจากผู้ใช้นั้นสมัครและมี profile แล้ว หลังจากนั้น Admin สามารถเปลี่ยน role ของ profile ที่มีอยู่ผ่านหน้า `/admin/users`
+
+หน้า `/admin/users` ไม่สร้างหรือลบบัญชี Firebase Authentication และไม่เปลี่ยนอีเมลสำหรับเข้าสู่ระบบ เพราะการแก้ profile document อย่างเดียวไม่ใช่การจัดการ Auth account ให้สร้าง ลบ หรือเปลี่ยนอีเมลบัญชีผ่าน Firebase Authentication Console/Admin SDK แล้วใช้หน้านี้จัดการชื่อ เบอร์โทร และ role ของ profile
+
+ค่าที่กำหนดใน `NEXT_PUBLIC_DATA_BACKEND` เป็นตัวเลือกหลักเสมอ หากเลือก backend ที่ยังตั้งค่าไม่ครบ ระบบจะแสดงข้อผิดพลาดแทนการสลับไปใช้ backend อื่นหรือข้อมูล local โดยเงียบ ๆ
 
 ## ขอบเขตข้อมูล
 

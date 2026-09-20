@@ -13,8 +13,9 @@ import {
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase/client';
 import { auth } from '@/lib/firebase/client';
-import { dataBackend } from '@/lib/backend';
-import { signInWithGoogle, loginWithEmail } from '@/lib/auth-helpers';
+import { dataBackend, isDemoAuthEnabled } from '@/lib/backend';
+import { signInWithGoogle, loginWithEmail, notifyAuthChange } from '@/lib/auth-helpers';
+import { getLocalUsers } from '@/lib/store/properties-store';
 
 function LoginForm() {
   const router = useRouter();
@@ -105,7 +106,22 @@ function LoginForm() {
       }
     }
 
-    setError('กรุณาเข้าสู่ระบบด้วย Google หรือสมัครสมาชิก');
+    if (isDemoAuthEnabled) {
+      const profile = getLocalUsers().find(
+        (candidate) => candidate.email?.toLowerCase() === email.trim().toLowerCase(),
+      );
+      if (profile) {
+        localStorage.setItem('chantakorn_auth_user', JSON.stringify(profile));
+        notifyAuthChange(profile);
+        handleSuccessfulAuth(profile.role);
+        return;
+      }
+      setError('ไม่พบบัญชีทดลองนี้');
+      setLoading(false);
+      return;
+    }
+
+    setError('ระบบเข้าสู่ระบบยังไม่ได้ตั้งค่า');
     setLoading(false);
   };
 
@@ -137,8 +153,15 @@ function LoginForm() {
         </div>
       )}
 
+      {isDemoAuthEnabled && (
+        <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
+          โหมดทดลอง: ใช้ <strong>benzttr12@gmail.com</strong> หรือ{' '}
+          <strong>agent@chantakornproperty.com</strong> และกรอกรหัสผ่านค่าใดก็ได้
+        </div>
+      )}
+
       {/* Google Sign-in Button */}
-      <button
+      {dataBackend === 'firebase' && <button
         id="google-signin-btn"
         type="button"
         onClick={handleGoogleLogin}
@@ -164,7 +187,7 @@ function LoginForm() {
           />
         </svg>
         <span>เข้าสู่ระบบด้วย Google</span>
-      </button>
+      </button>}
 
       <div className="relative my-6">
         <div className="absolute inset-0 flex items-center">
