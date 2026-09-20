@@ -20,8 +20,8 @@ interface PropertyMapProps {
 const DEFAULT_HAT_YAI_CENTER: [number, number] = [7.0084, 100.4705];
 
 function sanitizeCoords(lat: unknown, lng: unknown, fallback: [number, number] = DEFAULT_HAT_YAI_CENTER): [number, number] {
-  const numLat = typeof lat === 'number' ? lat : parseFloat(String(lat));
-  const numLng = typeof lng === 'number' ? lng : parseFloat(String(lng));
+  const numLat = Number(lat);
+  const numLng = Number(lng);
   if (Number.isFinite(numLat) && Number.isFinite(numLng) && Math.abs(numLat) <= 90 && Math.abs(numLng) <= 180) {
     return [numLat, numLng];
   }
@@ -51,10 +51,13 @@ export default function PropertyMap({
     if (selectedProperty) {
       return sanitizeCoords(selectedProperty.latitude, selectedProperty.longitude, DEFAULT_HAT_YAI_CENTER);
     }
-    if (properties && properties.length > 0) {
+    if (Array.isArray(properties) && properties.length > 0) {
       for (const p of properties) {
+        if (!p) continue;
         const coords = sanitizeCoords(p.latitude, p.longitude, [NaN, NaN]);
-        if (!Number.isNaN(coords[0])) return coords;
+        if (!Number.isNaN(coords[0]) && !Number.isNaN(coords[1])) {
+          return coords;
+        }
       }
     }
     return DEFAULT_HAT_YAI_CENTER;
@@ -127,12 +130,16 @@ export default function PropertyMap({
   // Focus map when a specific property is selected
   useEffect(() => {
     if (selectedProperty && mapInstanceRef.current) {
-      const safeCoords = sanitizeCoords(selectedProperty.latitude, selectedProperty.longitude, [NaN, NaN]);
-      if (!Number.isNaN(safeCoords[0])) {
-        mapInstanceRef.current.flyTo(safeCoords, 15, {
-          duration: 1.2,
-        });
-        setActivePopupProp(selectedProperty);
+      const safeCoords = sanitizeCoords(selectedProperty.latitude, selectedProperty.longitude, DEFAULT_HAT_YAI_CENTER);
+      if (Number.isFinite(safeCoords[0]) && Number.isFinite(safeCoords[1])) {
+        try {
+          mapInstanceRef.current.flyTo(safeCoords, 15, {
+            duration: 1.2,
+          });
+          setActivePopupProp(selectedProperty);
+        } catch (e) {
+          console.warn('Map flyTo error:', e);
+        }
       }
     }
   }, [selectedProperty, mapReady]);
@@ -144,64 +151,75 @@ export default function PropertyMap({
 
     const validPropertyPoints: { prop: Property; lat: number; lng: number }[] = [];
 
-    properties.forEach((prop) => {
-      const lat = typeof prop.latitude === 'number' ? prop.latitude : parseFloat(String(prop.latitude));
-      const lng = typeof prop.longitude === 'number' ? prop.longitude : parseFloat(String(prop.longitude));
-      if (!Number.isFinite(lat) || !Number.isFinite(lng) || Math.abs(lat) > 90 || Math.abs(lng) > 180) return;
+    if (Array.isArray(properties)) {
+      properties.forEach((prop) => {
+        if (!prop) return;
+        const [lat, lng] = sanitizeCoords(prop.latitude, prop.longitude, [NaN, NaN]);
+        if (Number.isNaN(lat) || Number.isNaN(lng)) return;
 
-      validPropertyPoints.push({ prop, lat, lng });
+        validPropertyPoints.push({ prop, lat, lng });
 
-      // Custom HTML pin with Gold/Navy styling
-      const formattedShortPrice = prop.price >= 1000000 
-        ? `${(prop.price / 1000000).toFixed(1)}M` 
-        : prop.status === 'rent'
-        ? `${(prop.price / 1000).toFixed(0)}k/ด.`
-        : `${(prop.price / 1000).toFixed(0)}k`;
+        // Custom HTML pin with Gold/Navy styling
+        const formattedShortPrice = prop.price >= 1000000 
+          ? `${(prop.price / 1000000).toFixed(1)}M` 
+          : prop.status === 'rent'
+          ? `${(prop.price / 1000).toFixed(0)}k/ด.`
+          : `${(prop.price / 1000).toFixed(0)}k`;
 
-      const customIcon = L.divIcon({
-        className: 'custom-property-pin',
-        html: `
-          <div style="
-            background: #0B1F3A;
-            color: #C9A227;
-            padding: 4px 8px;
-            border-radius: 20px;
-            font-size: 11px;
-            font-weight: 700;
-            border: 2px solid #C9A227;
-            box-shadow: 0 4px 12px rgba(11,31,58,0.35);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            white-space: nowrap;
-            cursor: pointer;
-            transform: translate(-50%, -100%);
-            transition: transform 0.2s;
-          " onmouseover="this.style.transform='translate(-50%, -110%) scale(1.08)'" onmouseout="this.style.transform='translate(-50%, -100%) scale(1)'">
-            <span>฿${formattedShortPrice}</span>
-          </div>
-        `,
-        iconSize: [60, 26],
-        iconAnchor: [30, 26],
-      });
-
-      const marker = L.marker([lat, lng], { icon: customIcon })
-        .addTo(map)
-        .on('click', () => {
-          setActivePopupProp(prop);
-          if (onSelectProperty) onSelectProperty(prop);
+        const customIcon = L.divIcon({
+          className: 'custom-property-pin',
+          html: `
+            <div style="
+              background: #0B1F3A;
+              color: #C9A227;
+              padding: 4px 8px;
+              border-radius: 20px;
+              font-size: 11px;
+              font-weight: 700;
+              border: 2px solid #C9A227;
+              box-shadow: 0 4px 12px rgba(11,31,58,0.35);
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              white-space: nowrap;
+              cursor: pointer;
+              transform: translate(-50%, -100%);
+              transition: transform 0.2s;
+            " onmouseover="this.style.transform='translate(-50%, -110%) scale(1.08)'" onmouseout="this.style.transform='translate(-50%, -100%) scale(1)'">
+              <span>฿${formattedShortPrice}</span>
+            </div>
+          `,
+          iconSize: [60, 26],
+          iconAnchor: [30, 26],
         });
 
-      markersRef.current[prop.id] = marker;
-    });
+        try {
+          const marker = L.marker([lat, lng], { icon: customIcon })
+            .addTo(map)
+            .on('click', () => {
+              setActivePopupProp(prop);
+              if (onSelectProperty) onSelectProperty(prop);
+            });
+
+          markersRef.current[prop.id] = marker;
+        } catch (err) {
+          console.warn('Error adding marker:', err);
+        }
+      });
+    }
 
     // Auto fit bounds if valid coordinates exist
     if (validPropertyPoints.length > 0) {
       try {
-        const validCoords = validPropertyPoints.map(p => [p.lat, p.lng]);
-        const bounds = L.latLngBounds(validCoords);
-        if (bounds && bounds.isValid && bounds.isValid()) {
-          map.fitBounds(bounds, { padding: [40, 40], maxZoom: validPropertyPoints.length === 1 ? zoom : 14 });
+        const validCoords = validPropertyPoints
+          .map(p => [p.lat, p.lng] as [number, number])
+          .filter(([lat, lng]) => Number.isFinite(lat) && Number.isFinite(lng));
+
+        if (validCoords.length > 0) {
+          const bounds = L.latLngBounds(validCoords);
+          if (bounds && typeof bounds.isValid === 'function' && bounds.isValid()) {
+            map.fitBounds(bounds, { padding: [40, 40], maxZoom: validPropertyPoints.length === 1 ? zoom : 14 });
+          }
         }
       } catch (err) {
         console.warn('Leaflet fitBounds error:', err);
