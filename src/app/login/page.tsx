@@ -166,10 +166,6 @@ function LoginForm() {
         <span>เข้าสู่ระบบด้วย Google</span>
       </button>
 
-      <p className="mt-2 text-[11px] text-center text-gray-500">
-        เข้าสู่ระบบด้วย Google ด้วยบัญชี <strong className="text-navy-950 font-semibold">benzttr12@gmail.com</strong> จะได้รับสิทธิ์ <span className="text-amber-700 font-bold">แอดมิน (ADMIN)</span> อัตโนมัติ
-      </p>
-
       <div className="relative my-6">
         <div className="absolute inset-0 flex items-center">
           <div className="w-full border-t border-gray-200" />
