@@ -6,9 +6,10 @@ import { usePathname, useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase/client';
 import { auth, db } from '@/lib/firebase/client';
 import { onAuthStateChanged } from 'firebase/auth';
-import { doc, getDoc } from 'firebase/firestore';
-import { dataBackend } from '@/lib/backend';
-import { logoutUser, isAdminEmail } from '@/lib/auth-helpers';
+import { doc, getDocFromServer } from 'firebase/firestore';
+import { dataBackend, isDemoAuthEnabled } from '@/lib/backend';
+import { getStoredUser, logoutUser } from '@/lib/auth-helpers';
+import { UserProfile } from '@/lib/types';
 import { 
   LayoutDashboard, 
   Building2, 
@@ -29,17 +30,28 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const router = useRouter();
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [isAuthorized, setIsAuthorized] = useState(false);
-  const [currentUser, setCurrentUser] = useState<any>({
-    full_name: 'ผู้ดูแลระบบ (Admin)',
-    role: 'ADMIN',
-    email: 'admin@chantakornproperty.com',
-  });
+  const [currentUser, setCurrentUser] = useState<UserProfile | null>(null);
 
   useEffect(() => {
-    let unsubscribeFirebase: (() => void) | undefined;
+    let cancelled = false;
+    let unsubscribe: (() => void) | undefined;
+
+    function acceptProfile(profile: UserProfile) {
+      if (!['ADMIN', 'AGENT'].includes(profile.role)) {
+        setIsAuthorized(false);
+        router.replace('/login?reason=admin_required');
+        return;
+      }
+      if (pathname.startsWith('/admin/users') && profile.role !== 'ADMIN') {
+        setIsAuthorized(false);
+        router.replace('/admin');
+        return;
+      }
+      setCurrentUser(profile);
+      setIsAuthorized(true);
+    }
 
     async function authorize() {
-      // 1. Supabase Backend
       if (dataBackend === 'supabase' && supabase) {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) {
@@ -47,101 +59,59 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           return;
         }
 
-        const { data: profile } = await supabase
+        const { data: profile, error } = await supabase
           .from('profiles')
-          .select('full_name, role, phone')
+          .select('id, full_name, role, phone')
           .eq('id', user.id)
           .single();
-        if (!profile || !['ADMIN', 'AGENT'].includes(profile.role)) {
-          await supabase.auth.signOut();
-          router.replace('/login');
+        if (error || !profile || !['ADMIN', 'AGENT', 'USER'].includes(profile.role)) {
+          router.replace('/login?reason=admin_required');
           return;
         }
-        if (pathname.startsWith('/admin/users') && profile.role !== 'ADMIN') {
-          router.replace('/admin');
-          return;
-        }
-        setCurrentUser({ ...profile, email: user.email });
-        setIsAuthorized(true);
+        if (!cancelled) acceptProfile({ ...profile, email: user.email } as UserProfile);
         return;
       }
 
-      // 2. Local/Stored user check
-      if (typeof window !== 'undefined') {
-        const stored = localStorage.getItem('chantakorn_auth_user');
-        if (stored) {
-          try {
-            const user = JSON.parse(stored);
-            const userRole = isAdminEmail(user.email) ? 'ADMIN' : user.role;
-            if (['ADMIN', 'AGENT'].includes(userRole)) {
-              if (pathname.startsWith('/admin/users') && userRole !== 'ADMIN') {
-                router.replace('/admin');
-                return;
-              }
-              setCurrentUser({ ...user, role: userRole });
-              setIsAuthorized(true);
-              return;
-            }
-          } catch {}
-        }
-      }
-
-      // 3. Firebase Auth check
       if (dataBackend === 'firebase' && auth) {
-        if (auth.currentUser) {
-          const u = auth.currentUser;
-          const role = isAdminEmail(u.email) ? 'ADMIN' : 'USER';
-          if (role === 'ADMIN') {
-            setCurrentUser({
-              full_name: u.displayName || 'ผู้ดูแลระบบ',
-              email: u.email,
-              role: 'ADMIN',
-            });
-            setIsAuthorized(true);
+        unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+          setIsAuthorized(false);
+          if (!firebaseUser || !db) {
+            router.replace('/login');
             return;
           }
-        }
-        // If Firebase Auth is still restoring state, onAuthStateChanged below will handle it
+          try {
+            // Server-only read avoids authorizing from a stale client cache. The
+            // profile role itself is protected by firestore.rules.
+            const snap = await getDocFromServer(doc(db, 'profiles', firebaseUser.uid));
+            const profile = snap.data() as Partial<UserProfile> | undefined;
+            if (!snap.exists() || !profile || !['ADMIN', 'AGENT', 'USER'].includes(profile.role || '')) {
+              router.replace('/login?reason=admin_required');
+              return;
+            }
+            if (!cancelled) {
+              acceptProfile({
+                ...profile,
+                id: firebaseUser.uid,
+                email: firebaseUser.email || profile.email || '',
+                full_name: profile.full_name || firebaseUser.displayName || 'ผู้ใช้งาน',
+                role: profile.role,
+              } as UserProfile);
+            }
+          } catch {
+            if (!cancelled) router.replace('/login?reason=admin_required');
+          }
+        });
+        return;
+      }
+
+      if (dataBackend === 'local' && isDemoAuthEnabled) {
+        const demoUser = getStoredUser();
+        if (demoUser) acceptProfile(demoUser);
+        else router.replace('/login');
         return;
       }
 
       router.replace('/login');
-    }
-
-    setIsAuthorized(false);
-    authorize().catch(() => router.replace('/login'));
-
-    if (dataBackend === 'firebase' && auth) {
-      unsubscribeFirebase = onAuthStateChanged(auth, async (firebaseUser) => {
-        if (firebaseUser) {
-          let role = isAdminEmail(firebaseUser.email) ? 'ADMIN' : 'USER';
-          if (db) {
-            try {
-              const snap = await getDoc(doc(db, 'profiles', firebaseUser.uid));
-              if (snap.exists() && snap.data().role) {
-                // If user is designated as admin email, enforce ADMIN
-                role = isAdminEmail(firebaseUser.email) ? 'ADMIN' : snap.data().role;
-              }
-            } catch {}
-          }
-          if (['ADMIN', 'AGENT'].includes(role)) {
-            setCurrentUser({
-              full_name: firebaseUser.displayName || 'ผู้ดูแลระบบ',
-              email: firebaseUser.email,
-              role,
-            });
-            setIsAuthorized(true);
-          } else {
-            router.replace('/login?reason=admin_required');
-          }
-        } else {
-          // If no stored admin session exists either, redirect to login
-          const stored = typeof window !== 'undefined' ? localStorage.getItem('chantakorn_auth_user') : null;
-          if (!stored) {
-            router.replace('/login');
-          }
-        }
-      });
     }
 
     if (dataBackend === 'supabase' && supabase) {
@@ -151,16 +121,20 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           router.replace('/login');
         }
       });
-      return () => subscription.unsubscribe();
+      unsubscribe = () => subscription.unsubscribe();
     }
 
+    setIsAuthorized(false);
+    setCurrentUser(null);
+    authorize().catch(() => router.replace('/login'));
+
     return () => {
-      if (unsubscribeFirebase) unsubscribeFirebase();
+      cancelled = true;
+      unsubscribe?.();
     };
   }, [router, pathname]);
 
   const handleLogout = async () => {
-    if (dataBackend === 'supabase' && supabase) await supabase.auth.signOut();
     await logoutUser();
     router.push('/');
   };
@@ -174,7 +148,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     { label: 'ตั้งค่าระบบ', href: '/admin/settings', icon: Settings },
   ];
 
-  if (!isAuthorized) return null;
+  if (!isAuthorized || !currentUser) return null;
 
   return (
     <div className="min-h-screen bg-gray-100 flex flex-col md:flex-row">

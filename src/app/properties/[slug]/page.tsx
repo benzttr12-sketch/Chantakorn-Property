@@ -5,7 +5,9 @@ import PropertyDetail from '@/components/properties/PropertyDetail';
 import { formatPrice } from '@/lib/utils';
 
 interface PageProps { params: Promise<{ slug: string }> }
-export const dynamicParams = true;
+// GitHub Pages exports only the sample slugs generated below. Listings created
+// later use /properties/detail/?slug=... as documented in the README.
+export const dynamicParams = false;
 export function generateStaticParams() {
   return SAMPLE_PROPERTIES.map(property => ({ slug: property.slug }));
 }

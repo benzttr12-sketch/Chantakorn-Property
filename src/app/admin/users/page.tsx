@@ -16,7 +16,7 @@ import {
   X
 } from 'lucide-react';
 import { UserProfile } from '@/lib/types';
-import { dataBackend } from '@/lib/backend';
+import { dataBackend, isDemoAuthEnabled } from '@/lib/backend';
 import { 
   fetchUsers,
   updateUserProfile, 
@@ -71,7 +71,7 @@ export default function AdminUsersPage() {
     try {
     const updated = await updateUserProfile(editingUser.id, {
       full_name: editFullName.trim(),
-      email: editEmail.trim() || undefined,
+      ...(isDemoAuthEnabled ? { email: editEmail.trim() || undefined } : {}),
       phone: editPhone.trim() || undefined,
     });
 
@@ -149,13 +149,14 @@ export default function AdminUsersPage() {
   const adminCount = users.filter((u) => u.role === 'ADMIN').length;
   const agentCount = users.filter((u) => u.role === 'AGENT').length;
   const generalUserCount = users.filter((u) => u.role === 'USER').length;
+  const isCloudBackend = dataBackend === 'firebase' || dataBackend === 'supabase';
 
   return (
     <div className="space-y-6 pb-20">
       {error && <p role="alert" className="rounded-xl bg-red-50 p-4 text-sm text-red-800">{error}</p>}
-      {dataBackend === 'firebase' && (
-        <p className="rounded-xl bg-emerald-50 border border-emerald-200 p-4 text-xs font-semibold text-emerald-900">
-          ✨ ระบบเชื่อมต่อฐานข้อมูลคลาวด์ Firebase Firestore สำเร็จ: สามารถเพิ่ม แก้ไข และแต่งตั้งสิทธิ์ Admin / Agent ได้แบบ Realtime
+      {isCloudBackend && (
+        <p className="rounded-xl bg-amber-50 border border-amber-200 p-4 text-xs font-semibold text-amber-900">
+          หน้านี้จัดการข้อมูลโปรไฟล์และบทบาทของบัญชีที่มีอยู่แล้ว การสร้าง ลบ หรือเปลี่ยนอีเมลบัญชีจริงต้องทำผ่าน {dataBackend === 'firebase' ? 'Firebase Authentication Console หรือ Admin SDK' : 'Supabase Authentication Dashboard หรือเซิร์ฟเวอร์ที่ใช้ service role'}
         </p>
       )}
       {/* Notification Toast */}
@@ -179,13 +180,13 @@ export default function AdminUsersPage() {
           </p>
         </div>
 
-        <button
+        {isDemoAuthEnabled && <button
           onClick={() => setShowAddModal(true)}
           className="px-5 py-2.5 bg-navy-950 hover:bg-navy-900 text-gold-400 font-bold text-xs rounded-xl shadow-md flex items-center space-x-2 transition-all self-start sm:self-auto"
         >
           <UserPlus className="w-4 h-4 text-gold-400" />
           <span>เพิ่มสมาชิก / แต่งตั้งแอดมิน</span>
-        </button>
+        </button>}
       </div>
 
       {/* Stats Cards */}
@@ -397,13 +398,13 @@ export default function AdminUsersPage() {
                           >
                             <Pencil className="w-4 h-4" />
                           </button>
-                          <button
+                          {isDemoAuthEnabled && <button
                             onClick={() => handleDeleteUser(u.id, u.full_name)}
                             className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
                             title="ลบผู้ใช้นี้"
                           >
                             <Trash2 className="w-4 h-4" />
-                          </button>
+                          </button>}
                         </div>
                       </td>
                     </tr>
@@ -431,7 +432,7 @@ export default function AdminUsersPage() {
       </div>
 
       {/* Add User / Assign Admin Modal */}
-      {showAddModal && (
+      {isDemoAuthEnabled && showAddModal && (
         <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-white rounded-3xl max-w-md w-full p-6 sm:p-8 shadow-2xl border border-surface-border animate-fadeIn relative">
             <div className="border-b border-gray-100 pb-4 mb-5">
@@ -593,9 +594,13 @@ export default function AdminUsersPage() {
                   type="email"
                   value={editEmail}
                   onChange={(e) => setEditEmail(e.target.value)}
+                  disabled={!isDemoAuthEnabled}
                   className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3 text-xs text-gray-900 focus:bg-white focus:ring-2 focus:ring-gold-500 outline-none"
                   placeholder="example@email.com"
                 />
+                {!isDemoAuthEnabled && (
+                  <p className="mt-1 text-[11px] text-gray-500">อีเมลบัญชีต้องแก้ในระบบ Authentication</p>
+                )}
               </div>
 
               {/* Phone */}

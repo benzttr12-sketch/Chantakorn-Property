@@ -20,10 +20,9 @@ import {
   Trash2,
   Image as ImageIcon
 } from 'lucide-react';
-import { auth, db } from '@/lib/firebase/client';
+import { auth } from '@/lib/firebase/client';
 import { onAuthStateChanged } from 'firebase/auth';
-import { doc, getDoc } from 'firebase/firestore';
-import { getStoredUser, updateCurrentUserProfile, logoutUser, isAdminEmail } from '@/lib/auth-helpers';
+import { getStoredUser, updateCurrentUserProfile, logoutUser, syncFirebaseUserProfile } from '@/lib/auth-helpers';
 import { UserProfile } from '@/lib/types';
 
 interface ProfileEditorProps {
@@ -50,7 +49,7 @@ export default function ProfileEditor({ isAdminView = false }: ProfileEditorProp
   const [avatarUrl, setAvatarUrl] = useState('');
 
   useEffect(() => {
-    // 1. First check locally stored user for instant rendering
+    // Local profile state exists only in explicitly enabled demo mode.
     const stored = getStoredUser();
     if (stored) {
       setUserProfile(stored);
@@ -61,59 +60,26 @@ export default function ProfileEditor({ isAdminView = false }: ProfileEditorProp
       setAvatarUrl(stored.avatar_url || '');
     }
 
-    // 2. Synchronize with Firebase Auth
+    // Firebase display and role data are loaded from the protected profile doc.
     let unsubscribe: (() => void) | undefined;
     if (auth) {
       unsubscribe = onAuthStateChanged(auth, async (user) => {
         if (user) {
-          let role: UserProfile['role'] = isAdminEmail(user.email) ? 'ADMIN' : 'USER';
-          let name = user.displayName || user.email?.split('@')[0] || 'ผู้ใช้งาน';
-          let userPhone = user.phoneNumber || '';
-          let userAvatar = user.photoURL || '';
-          let userLine = '';
-          let userBio = '';
-
-          if (db) {
-            try {
-              const snap = await getDoc(doc(db, 'profiles', user.uid));
-              if (snap.exists()) {
-                const data = snap.data() as Partial<UserProfile>;
-                if (isAdminEmail(user.email)) {
-                  role = 'ADMIN';
-                } else if (data.role) {
-                  role = data.role as UserProfile['role'];
-                }
-                if (data.full_name) name = data.full_name;
-                if (data.phone) userPhone = data.phone;
-                if (data.avatar_url) userAvatar = data.avatar_url;
-                if (data.line_id) userLine = data.line_id;
-                if (data.bio) userBio = data.bio;
-              }
-            } catch (err) {
-              console.warn('Could not load Firestore profile:', err);
-            }
+          try {
+            const profile = await syncFirebaseUserProfile(user);
+            setUserProfile(profile);
+            setFullName(profile.full_name);
+            setPhone(profile.phone || '');
+            setLineId(profile.line_id || '');
+            setBio(profile.bio || '');
+            setAvatarUrl(profile.avatar_url || '');
+          } catch {
+            setUserProfile(null);
+            setErrorMessage('โหลดข้อมูลสมาชิกจากระบบไม่ได้ กรุณาเข้าสู่ระบบอีกครั้ง');
           }
-
-          const profile: UserProfile = {
-            id: user.uid,
-            email: user.email || '',
-            full_name: name,
-            role,
-            phone: userPhone,
-            avatar_url: userAvatar,
-            line_id: userLine,
-            bio: userBio
-          };
-
-          setUserProfile(profile);
-          setFullName(profile.full_name);
-          setPhone(profile.phone || '');
-          setLineId(profile.line_id || '');
-          setBio(profile.bio || '');
-          setAvatarUrl(profile.avatar_url || '');
           setLoading(false);
         } else {
-          // If not in Firebase Auth, check if stored user exists
+          // Explicit demo auth may still provide a local profile.
           const localUser = getStoredUser();
           if (!localUser) {
             setUserProfile(null);

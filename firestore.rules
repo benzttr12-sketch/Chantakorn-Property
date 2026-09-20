@@ -1,22 +1,87 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Properties catalog: public can read published properties; authenticated staff or full access
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function currentRole() {
+      return get(/databases/$(database)/documents/profiles/$(request.auth.uid)).data.role;
+    }
+
+    function isAdmin() {
+      return isSignedIn() && currentRole() == 'ADMIN';
+    }
+
+    function isStaff() {
+      return isSignedIn() && currentRole() in ['ADMIN', 'AGENT'];
+    }
+
+    function hasValidRole(data) {
+      return data.role in ['ADMIN', 'AGENT', 'USER'];
+    }
+
+    // Public queries must include `where('published', '==', true)`.
     match /properties/{propertyId} {
-      allow read: if true;
-      allow write: if true;
+      allow read: if resource.data.published == true || isStaff();
+      allow create, update, delete: if isStaff();
     }
 
-    // Inquiries: anyone can submit inquiry/consignment; inquiries can be read/updated by staff
+    // Visitors may submit a new inquiry, but never read the private inbox or
+    // choose its workflow status.
     match /inquiries/{inquiryId} {
-      allow create: if true;
-      allow read, update, delete: if true;
+      allow create: if
+        request.resource.data.keys().hasAll([
+          'id', 'name', 'phone', 'message', 'inquiry_type', 'status', 'created_at'
+        ]) &&
+        request.resource.data.keys().hasOnly([
+          'id', 'property_id', 'property_title', 'name', 'phone', 'line_id',
+          'message', 'inquiry_type', 'status', 'consignment_details', 'created_at'
+        ]) &&
+        request.resource.data.id == inquiryId &&
+        request.resource.data.name is string &&
+        request.resource.data.phone is string &&
+        request.resource.data.message is string &&
+        request.resource.data.inquiry_type in ['inquiry', 'viewing', 'consignment_sell'] &&
+        request.resource.data.status == 'new' &&
+        request.resource.data.created_at is string;
+      allow read, update, delete: if isStaff();
     }
 
-    // User profiles & roles:
+    // Profiles mirror Firebase Auth users. A signed-in user may create only a
+    // USER profile for their own uid and can never change their own role/email.
+    // Administrators may maintain profile details and assign roles, but profile
+    // deletion is intentionally disabled because it would not delete Auth users.
     match /profiles/{userId} {
-      allow read: if true;
-      allow write: if true;
+      allow read: if isSignedIn() && (request.auth.uid == userId || isAdmin());
+
+      allow create: if
+        isSignedIn() &&
+        request.auth.uid == userId &&
+        request.resource.data.id == userId &&
+        request.resource.data.email == request.auth.token.email &&
+        request.resource.data.role == 'USER' &&
+        hasValidRole(request.resource.data);
+
+      allow update: if
+        hasValidRole(request.resource.data) &&
+        (
+          (
+            isSignedIn() &&
+            request.auth.uid == userId &&
+            request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+              'full_name', 'phone', 'avatar_url', 'line_id', 'bio', 'updated_at'
+            ])
+          ) ||
+          (
+            isAdmin() &&
+            request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+              'full_name', 'phone', 'avatar_url', 'line_id', 'bio', 'role', 'updated_at'
+            ])
+          )
+        );
+
+      allow delete: if false;
     }
   }
 }

@@ -15,7 +15,7 @@ import {
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase/client';
 import { auth } from '@/lib/firebase/client';
-import { dataBackend } from '@/lib/backend';
+import { dataBackend, isDemoAuthEnabled } from '@/lib/backend';
 import { signInWithGoogle, registerWithEmail } from '@/lib/auth-helpers';
 
 export default function RegisterPage() {
@@ -96,22 +96,28 @@ export default function RegisterPage() {
       }
     }
 
-    // Local fallback
-    try {
-      localStorage.setItem('chantakorn_auth_user', JSON.stringify({
-        id: `usr-${Date.now()}`,
-        full_name: fullName,
-        email,
-        phone,
-        role: 'USER',
-      }));
-      setRegistered(true);
-      setLoading(false);
-      setTimeout(() => router.push('/favorites'), 1500);
-    } catch {
-      setError('ไม่สามารถลงทะเบียนได้');
-      setLoading(false);
+    if (isDemoAuthEnabled) {
+      try {
+        localStorage.setItem('chantakorn_auth_user', JSON.stringify({
+          id: `usr-${Date.now()}`,
+          full_name: fullName,
+          email,
+          phone,
+          role: 'USER',
+        }));
+        setRegistered(true);
+        setLoading(false);
+        setTimeout(() => router.push('/favorites'), 1500);
+        return;
+      } catch {
+        setError('ไม่สามารถลงทะเบียนได้');
+        setLoading(false);
+        return;
+      }
     }
+
+    setError('ระบบสมัครสมาชิกยังไม่ได้ตั้งค่า');
+    setLoading(false);
   };
 
   return (
@@ -153,7 +159,7 @@ export default function RegisterPage() {
           )}
 
           {/* Google Sign-up Button */}
-          <button
+          {dataBackend === 'firebase' && <button
             type="button"
             onClick={handleGoogleSignUp}
             disabled={loading}
@@ -178,7 +184,7 @@ export default function RegisterPage() {
               />
             </svg>
             <span>สมัครสมาชิกด้วยบัญชี Google</span>
-          </button>
+          </button>}
 
           <div className="relative mb-5">
             <div className="absolute inset-0 flex items-center">
