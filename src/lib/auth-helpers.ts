@@ -1,7 +1,8 @@
 import { auth, db, googleProvider } from '@/lib/firebase/client';
 import { signInWithPopup, signOut as firebaseSignOut, signInWithEmailAndPassword, createUserWithEmailAndPassword, updateProfile, User } from 'firebase/auth';
-import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc, collection, getDocs } from 'firebase/firestore';
 import { UserProfile } from '@/lib/types';
+import { syncPropertiesAgentProfile } from '@/lib/store/properties-store';
 
 export const ADMIN_EMAILS = [
   'benzttr12@gmail.com',
@@ -143,6 +144,13 @@ export async function updateCurrentUserProfile(updates: {
   if (typeof window !== 'undefined') {
     localStorage.setItem('chantakorn_auth_user', JSON.stringify(updatedProfile));
     notifyAuthChange(updatedProfile);
+  }
+
+  // Propagate profile updates (including avatar_url, name, phone, etc.) to all posted properties
+  try {
+    await syncPropertiesAgentProfile(updatedProfile);
+  } catch (syncErr) {
+    console.warn('Could not sync properties with updated profile:', syncErr);
   }
 
   return updatedProfile;
