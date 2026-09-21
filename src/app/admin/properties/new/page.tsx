@@ -24,11 +24,12 @@ import {
   Loader2
 } from 'lucide-react';
 import { createProperty, updateProperty, fetchAdminProperties } from '@/lib/store/properties-store';
-import { PropertyType, PropertyStatus } from '@/lib/types';
+import { Agent, PropertyType, PropertyStatus, UserProfile } from '@/lib/types';
 import { preparePropertyImages, isImageUploadEnabled } from '@/lib/firebase/media';
 import { slugify } from '@/lib/utils';
-import { DISTRICTS_LIST } from '@/data/locations';
-import { AGENTS } from '@/data/agents';
+import { SONGKHLA_DISTRICTS, subdistrictsForSongkhlaDistrict } from '@/data/songkhla-addresses';
+import { subscribeToUserProfile } from '@/lib/auth-helpers';
+import { agentFromProfile } from '@/lib/agent-profile';
 
 function PropertyEditor() {
   const router = useRouter();
@@ -73,11 +74,28 @@ function PropertyEditor() {
     'กล้องวงจรปิด CCTV'
   ]);
   const [featured, setFeatured] = useState(false);
-  const [agentId, setAgentId] = useState(AGENTS[0].id);
+  const [agentId, setAgentId] = useState('');
+  const [authorId, setAuthorId] = useState('');
+  const [listingAgent, setListingAgent] = useState<Agent | null>(null);
+  const [currentProfile, setCurrentProfile] = useState<UserProfile | null>(null);
+  const [profileReady, setProfileReady] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [imageUrlInput, setImageUrlInput] = useState('');
   const [uploadingImages, setUploadingImages] = useState(false);
   const [isDragOver, setIsDragOver] = useState(false);
+
+  useEffect(() => subscribeToUserProfile(profile => {
+    setCurrentProfile(profile);
+    setProfileReady(true);
+    if (!editId && profile?.role === 'AGENT') {
+      setAgentId(profile.id);
+      setAuthorId(profile.id);
+      setListingAgent(agentFromProfile(profile));
+    }
+  }, err => {
+    setProfileReady(true);
+    setError(err.message);
+  }), [editId]);
 
   useEffect(() => {
     if (!editId) return;
@@ -111,6 +129,8 @@ function PropertyEditor() {
       setSelectedFeatures(property.features);
       setFeatured(property.featured);
       setAgentId(property.agent_id || '');
+      setAuthorId(property.author_id || property.agent_id || '');
+      setListingAgent(property.agent || null);
       setPublished(property.published);
       setEditorLoaded(true);
     }).catch(err => { if (active) setError(err instanceof Error ? err.message : 'โหลดข้อมูลไม่สำเร็จ'); })
@@ -138,6 +158,13 @@ function PropertyEditor() {
     'ใกล้เซ็นทรัลหาดใหญ่',
     'ใกล้สนามบินหาดใหญ่'
   ];
+  const formSteps = [
+    { href: '#property-basics', label: 'ข้อมูลประกาศ', detail: 'ชื่อ ประเภท และราคา', complete: Boolean(title.trim()) && Number(price) > 0 },
+    { href: '#property-location', label: 'ทำเลทรัพย์', detail: 'อำเภอ ตำบล และที่อยู่', complete: Boolean(district && subdistrict) },
+    { href: '#property-media', label: 'รูปภาพ', detail: 'อย่างน้อย 1 รูป', complete: images.length > 0 && Boolean(coverImage) },
+  ];
+  const completedStepCount = formSteps.filter((step) => step.complete).length;
+  const completionPercent = Math.round((completedStepCount / formSteps.length) * 100);
 
   const toggleFeature = (f: string) => {
     if (selectedFeatures.includes(f)) {
@@ -252,12 +279,14 @@ function PropertyEditor() {
     if (!slug.trim() || /[/?#\\]/.test(slug)) { setError('Slug ต้องไม่ว่างและไม่มี / ? # หรือเครื่องหมายทับ'); return; }
     if (!images.length || !coverImage || images.length > 20) { setError('กรุณาเพิ่มรูปภาพ 1–20 รูป'); return; }
     if (!Number.isFinite(Number(latitude)) || Math.abs(Number(latitude)) > 90 || !Number.isFinite(Number(longitude)) || Math.abs(Number(longitude)) > 180) { setError('พิกัดละติจูดหรือลองจิจูดไม่ถูกต้อง'); return; }
+    if (!editId && currentProfile?.role !== 'AGENT') { setError('เฉพาะสมาชิกบทบาทนายหน้าเท่านั้นที่ลงประกาศได้'); return; }
+    const selectedAgent = currentProfile?.role === 'AGENT' ? agentFromProfile(currentProfile) : listingAgent;
+    const selectedAuthorId = editId ? authorId : currentProfile?.id;
+    if (!selectedAgent || !selectedAuthorId || selectedAgent.id !== agentId) { setError('ไม่พบข้อมูลนายหน้าผู้โพสต์ กรุณาเข้าสู่ระบบใหม่'); return; }
     setError('');
 
     setSubmitting(true);
     try {
-      const selectedAgent = AGENTS.find(a => a.id === agentId) || AGENTS[0];
-
       const media = await preparePropertyImages(images, coverImage || images[0]);
       const propertyData = {
         title: title.trim(),
@@ -284,6 +313,7 @@ function PropertyEditor() {
         images: media.images,
         featured,
         published,
+        author_id: selectedAuthorId,
         agent_id: agentId,
         agent: selectedAgent,
       };
@@ -302,28 +332,70 @@ function PropertyEditor() {
 
   if (!editorLoaded) return <p role="alert" className="p-8 text-red-700">{error || 'ไม่สามารถเปิดรายการนี้ได้'}</p>;
 
+  if (!editId && profileReady && currentProfile?.role !== 'AGENT') {
+    return (
+      <div className="rounded-2xl border border-red-200 bg-red-50 p-6 text-red-800">
+        <h1 className="font-bold">เฉพาะนายหน้าเท่านั้นที่ลงประกาศได้</h1>
+        <p className="mt-1 text-sm">บัญชีผู้ใช้ทั่วไปไม่มีสิทธิ์เข้าหน้าจัดการหรือสร้างประกาศ โปรดติดต่อผู้ดูแลเพื่อกำหนดบทบาทนายหน้า</p>
+        <Link href="/admin/properties" className="mt-4 inline-block text-sm font-bold underline">กลับไปหน้าจัดการทรัพย์</Link>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6 pb-20">
       {error && <p role="alert" className="rounded-xl bg-red-50 p-4 text-sm text-red-700">{error}</p>}
       {/* Top Header */}
-      <div className="flex items-center justify-between bg-white p-6 rounded-2xl border border-surface-border shadow-sm">
-        <div className="flex items-center space-x-3">
-          <Link
-            href="/admin/properties"
-            className="p-2 text-gray-500 hover:text-navy-950 hover:bg-gray-100 rounded-xl transition-colors"
-          >
-            <ArrowLeft className="w-5 h-5" />
-          </Link>
-          <div>
-            <h1 className="text-2xl font-extrabold text-navy-950">{editId ? 'แก้ไขอสังหาริมทรัพย์' : 'เพิ่มอสังหาริมทรัพย์ใหม่'}</h1>
-            <p className="text-xs text-brand-muted">กรอกข้อมูลให้ครบถ้วนเพื่อลงประกาศบนเว็บไซต์ Chantakorn Property</p>
+      <div className="rounded-3xl border border-surface-border bg-white p-5 shadow-sm sm:p-6">
+        <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
+          <div className="flex items-start space-x-3">
+            <Link
+              href="/admin/properties"
+              aria-label="กลับไปหน้าจัดการทรัพย์"
+              className="mt-0.5 p-2 text-gray-500 hover:text-navy-950 hover:bg-gray-100 rounded-xl transition-colors"
+            >
+              <ArrowLeft className="w-5 h-5" />
+            </Link>
+            <div>
+              <p className="mb-1 text-xs font-bold uppercase tracking-[0.16em] text-gold-600">Property workspace</p>
+              <h1 className="text-2xl font-extrabold text-navy-950">{editId ? 'แก้ไขอสังหาริมทรัพย์' : 'เพิ่มอสังหาริมทรัพย์ใหม่'}</h1>
+              <p className="mt-1 text-xs text-brand-muted">กรอกเฉพาะข้อมูลสำคัญก่อน แล้วค่อยเพิ่มรายละเอียดภายหลังได้</p>
+            </div>
+          </div>
+          <div className="min-w-[250px] rounded-2xl bg-navy-950 p-4 text-white">
+            <div className="flex items-center justify-between text-xs">
+              <span className="font-semibold text-gray-300">ความพร้อมของประกาศ</span>
+              <span className="font-bold text-gold-400">{completedStepCount}/{formSteps.length} ขั้นตอน</span>
+            </div>
+            <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-navy-800">
+              <div className="h-full rounded-full bg-gradient-to-r from-gold-400 to-amber-300 transition-all" style={{ width: completionPercent + '%' }} />
+            </div>
+            <p className="mt-2 text-[11px] text-gray-300">{completionPercent === 100 ? 'พร้อมบันทึกและเผยแพร่ประกาศ' : 'เติมข้อมูลในขั้นตอนที่ยังไม่ครบเพื่อบันทึกประกาศ'}</p>
           </div>
         </div>
       </div>
 
+      <nav aria-label="ขั้นตอนการสร้างประกาศ" className="grid grid-cols-1 gap-2 rounded-2xl border border-surface-border bg-white p-2 shadow-sm sm:grid-cols-3">
+        {formSteps.map((step, index) => (
+          <a
+            key={step.href}
+            href={step.href}
+            className="group flex items-center gap-3 rounded-xl px-3 py-3 hover:bg-navy-50"
+          >
+            <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-black ${step.complete ? 'bg-emerald-500 text-white' : 'bg-gray-100 text-gray-500 group-hover:bg-gold-100 group-hover:text-navy-950'}`}>
+              {step.complete ? <CheckCircle2 className="h-4 w-4" /> : index + 1}
+            </span>
+            <span className="min-w-0">
+              <span className="block text-xs font-bold text-navy-950">{step.label}</span>
+              <span className="block truncate text-[11px] text-brand-muted">{step.detail}</span>
+            </span>
+          </a>
+        ))}
+      </nav>
+
       <form onSubmit={handleSubmit} className="space-y-6">
         {/* Card 1: Basic Information */}
-        <div className="bg-white rounded-2xl p-6 border border-surface-border shadow-sm space-y-4">
+        <div id="property-basics" className="scroll-mt-24 bg-white rounded-2xl p-6 border border-surface-border shadow-sm space-y-4">
           <h3 className="font-bold text-navy-950 text-base border-b border-gray-100 pb-3 flex items-center space-x-2">
             <Home className="w-4 h-4 text-gold-600" />
             <span>1. ข้อมูลพื้นฐานและราคา</span>
@@ -419,10 +491,10 @@ function PropertyEditor() {
         </div>
 
         {/* Card 2: Location & Geo Coordinates */}
-        <div className="bg-white rounded-2xl p-6 border border-surface-border shadow-sm space-y-4">
+        <div id="property-location" className="scroll-mt-24 bg-white rounded-2xl p-6 border border-surface-border shadow-sm space-y-4">
           <h3 className="font-bold text-navy-950 text-base border-b border-gray-100 pb-3 flex items-center space-x-2">
             <MapPin className="w-4 h-4 text-gold-600" />
-            <span>2. ทำเลที่ตั้งและพิกัดแผนที่ (หาดใหญ่–สงขลา)</span>
+            <span>2. ทำเลที่ตั้งและพิกัดแผนที่ (สงขลา)</span>
           </h3>
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -432,10 +504,14 @@ function PropertyEditor() {
               </label>
               <select
                 value={district}
-                onChange={(e) => setDistrict(e.target.value)}
+                onChange={(e) => {
+                  const nextDistrict = e.target.value;
+                  setDistrict(nextDistrict);
+                  setSubdistrict(subdistrictsForSongkhlaDistrict(nextDistrict)[0] || '');
+                }}
                 className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3 text-xs text-gray-900 font-medium focus:bg-white focus:ring-2 focus:ring-gold-500 outline-none"
               >
-                {DISTRICTS_LIST.map((dist) => (
+                {SONGKHLA_DISTRICTS.map((dist) => (
                   <option key={dist} value={dist}>{dist}</option>
                 ))}
               </select>
@@ -445,13 +521,15 @@ function PropertyEditor() {
               <label className="block text-xs font-semibold text-gray-700 mb-1">
                 ตำบล
               </label>
-              <input
-                type="text"
-                placeholder="เช่น ควนลัง, คลองแห, หาดใหญ่"
+              <select
                 value={subdistrict}
                 onChange={(e) => setSubdistrict(e.target.value)}
                 className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3 text-xs text-gray-900 focus:bg-white focus:ring-2 focus:ring-gold-500 outline-none"
-              />
+              >
+                {subdistrictsForSongkhlaDistrict(district).map((tambon) => (
+                  <option key={tambon} value={tambon}>{tambon}</option>
+                ))}
+              </select>
             </div>
 
             <div>
@@ -612,7 +690,7 @@ function PropertyEditor() {
         </div>
 
         {/* Card 5: Images & Agent Assignment */}
-        <div className="bg-white rounded-2xl p-6 border border-surface-border shadow-sm space-y-5">
+        <div id="property-media" className="scroll-mt-24 bg-white rounded-2xl p-6 border border-surface-border shadow-sm space-y-5">
           <div className="border-b border-gray-100 pb-3 flex items-center justify-between">
             <h3 className="font-bold text-navy-950 text-base flex items-center space-x-2">
               <ImageIcon className="w-4 h-4 text-gold-600" />
@@ -757,17 +835,10 @@ function PropertyEditor() {
               <label className="block text-xs font-semibold text-gray-700 mb-1">
                 นายหน้าที่รับผิดชอบทรัพย์นี้
               </label>
-              <select
-                value={agentId}
-                onChange={(e) => setAgentId(e.target.value)}
-                className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3 text-xs text-gray-900 font-medium"
-              >
-                {AGENTS.map((agent) => (
-                  <option key={agent.id} value={agent.id}>
-                    {agent.name} ({agent.title})
-                  </option>
-                ))}
-              </select>
+              <div className="rounded-xl border border-gold-200 bg-gold-50 p-3 text-xs text-navy-950">
+                <p className="font-bold">{listingAgent?.name || 'กำลังตรวจสอบบัญชีนายหน้า...'}</p>
+                <p className="mt-1 text-brand-muted">แสดงข้อมูลจากบัญชีผู้โพสต์อัตโนมัติ เพื่อให้ผู้สนใจติดต่อผู้รับผิดชอบทรัพย์ได้ถูกคน</p>
+              </div>
             </div>
 
             <div className="flex flex-col items-start gap-3 pt-4">
@@ -786,7 +857,7 @@ function PropertyEditor() {
         </div>
 
         {/* Submit Bar */}
-        <div className="flex items-center justify-end space-x-3 pt-4">
+        <div className="sticky bottom-3 z-20 flex items-center justify-end gap-3 rounded-2xl border border-surface-border bg-white/95 p-3 shadow-lg backdrop-blur">
           <Link
             href="/admin/properties"
             className="px-6 py-3 rounded-xl border border-gray-300 text-gray-700 text-xs font-bold hover:bg-gray-50"
@@ -795,11 +866,11 @@ function PropertyEditor() {
           </Link>
           <button
             type="submit"
-            disabled={submitting}
+            disabled={submitting || !profileReady}
             className="px-8 py-3 bg-navy-950 hover:bg-navy-900 text-gold-400 rounded-xl text-xs font-bold shadow-lg transition-all flex items-center space-x-2 disabled:opacity-50"
           >
             <Sparkles className="w-4 h-4 text-gold-400" />
-            <span>{submitting ? 'กำลังบันทึกข้อมูล...' : 'บันทึกข้อมูลทรัพย์'}</span>
+            <span>{submitting ? 'กำลังบันทึกข้อมูล...' : published ? 'บันทึกและเผยแพร่' : 'บันทึกแบบร่าง'}</span>
           </button>
         </div>
       </form>

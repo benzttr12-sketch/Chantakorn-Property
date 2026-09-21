@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useMemo, Suspense } from 'react';
+import React, { useState, useEffect, useMemo, useDeferredValue, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { 
   SlidersHorizontal, 
@@ -9,7 +9,8 @@ import {
   ArrowUpDown, 
   Building2, 
   X,
-  Search
+  Search,
+  RotateCcw
 } from 'lucide-react';
 import PropertyCard from '@/components/properties/PropertyCard';
 import PropertyFilterPanel from '@/components/properties/PropertyFilterPanel';
@@ -54,6 +55,7 @@ function PropertiesContent() {
   // Mobile drawer states
   const [mobileFilterOpen, setMobileFilterOpen] = useState(false);
   const [mobileViewMode, setMobileViewMode] = useState<'list' | 'map'>('list');
+  const deferredFilters = useDeferredValue(filters);
 
   // Load properties based on current filters
   useEffect(() => {
@@ -62,7 +64,7 @@ function PropertiesContent() {
       setLoading(true);
       setError('');
       try {
-        const data = await fetchProperties(filters);
+        const data = await fetchProperties(deferredFilters);
         if (active) { setProperties(data); setSelectedProperty(null); }
       } catch (err) {
         if (active) { setProperties([]); setError(err instanceof Error ? err.message : 'ไม่สามารถโหลดข้อมูลได้ กรุณาลองอีกครั้ง'); }
@@ -72,7 +74,7 @@ function PropertiesContent() {
     }
     load();
     return () => { active = false; };
-  }, [filters]);
+  }, [deferredFilters]);
 
   // Sort properties
   const sortedProperties = useMemo(() => {
@@ -105,8 +107,36 @@ function PropertiesContent() {
     });
   };
 
+  const activeFilters = [
+    filters.status === 'sale' ? { key: 'status', label: 'สำหรับขาย' } : null,
+    filters.status === 'rent' ? { key: 'status', label: 'สำหรับเช่า' } : null,
+    filters.type && filters.type !== 'all'
+      ? { key: 'type', label: ({ house: 'บ้าน', land: 'ที่ดิน', condo: 'คอนโด', commercial: 'อาคารพาณิชย์', investment: 'ลงทุน', consignment: 'ขายฝาก / จำนอง' } as Record<PropertyType, string>)[filters.type] }
+      : null,
+    filters.district ? { key: 'district', label: 'อำเภอ ' + filters.district } : null,
+    filters.searchQuery ? { key: 'searchQuery', label: '“' + filters.searchQuery + '”' } : null,
+    filters.minPrice !== undefined || filters.maxPrice !== undefined
+      ? { key: 'price', label: (filters.minPrice !== undefined ? '≥ ' + filters.minPrice.toLocaleString() : 'ทุกงบ') + (filters.maxPrice !== undefined ? ' – ' + filters.maxPrice.toLocaleString() + ' บาท' : ' บาท') }
+      : null,
+    typeof filters.bedrooms === 'number' ? { key: 'bedrooms', label: filters.bedrooms + '+ ห้องนอน' } : null,
+    typeof filters.bathrooms === 'number' ? { key: 'bathrooms', label: filters.bathrooms + '+ ห้องน้ำ' } : null,
+  ].filter((filter): filter is { key: string; label: string } => Boolean(filter));
+
+  const clearFilter = (key: string) => {
+    if (key === 'price') {
+      setFilters({ ...filters, minPrice: undefined, maxPrice: undefined });
+      return;
+    }
+    if (key === 'status') setFilters({ ...filters, status: 'all' });
+    else if (key === 'type') setFilters({ ...filters, type: 'all' });
+    else if (key === 'district') setFilters({ ...filters, district: '' });
+    else if (key === 'searchQuery') setFilters({ ...filters, searchQuery: '' });
+    else if (key === 'bedrooms') setFilters({ ...filters, bedrooms: 'any' });
+    else if (key === 'bathrooms') setFilters({ ...filters, bathrooms: 'any' });
+  };
+
   return (
-    <div className="bg-surface-bg min-h-screen pb-20">
+    <main className="bg-surface-bg min-h-screen pb-20">
       {/* Top Banner / Search Context */}
       <div className="bg-navy-950 text-white py-8 border-b border-navy-800">
         <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8">
@@ -123,14 +153,26 @@ function PropertiesContent() {
 
             {/* Quick Text Search Bar */}
             <div className="relative max-w-md w-full">
+              <label className="sr-only" htmlFor="property-keyword-search">ค้นหาชื่อโครงการ ถนน หรือทำเล</label>
               <input
-                type="text"
+                id="property-keyword-search"
+                type="search"
                 placeholder="ค้นหาชื่อโครงการ, ถนน, หรือทำเล เช่น เซ็นทรัล, ควนลัง..."
                 value={filters.searchQuery || ''}
                 onChange={(e) => setFilters({ ...filters, searchQuery: e.target.value })}
-                className="w-full bg-navy-900 border border-navy-700 text-white text-xs sm:text-sm rounded-xl pl-10 pr-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-gold-500 placeholder-gray-400"
+                className="w-full bg-navy-900 border border-navy-700 text-white text-xs sm:text-sm rounded-xl pl-10 pr-10 py-2.5 focus:outline-none focus:ring-2 focus:ring-gold-500 placeholder-gray-400"
               />
               <Search className="w-4 h-4 text-gray-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+              {filters.searchQuery && (
+                <button
+                  type="button"
+                  onClick={() => setFilters({ ...filters, searchQuery: '' })}
+                  aria-label="ล้างคำค้นหา"
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 rounded-lg p-1 text-gray-400 hover:bg-navy-800 hover:text-white"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              )}
             </div>
           </div>
         </div>
@@ -138,6 +180,30 @@ function PropertiesContent() {
 
       {/* Main 3-Pane Container: [ FILTER (280px) | LISTINGS (Flexible) | MAP (380px) ] */}
       <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 pt-6">
+        {activeFilters.length > 0 && (
+          <div className="mb-4 flex flex-wrap items-center gap-2 rounded-2xl border border-gold-200 bg-gold-50/70 p-3">
+            <span className="px-2 text-xs font-bold text-navy-950">เงื่อนไขที่เลือก</span>
+            {activeFilters.map((filter) => (
+              <button
+                key={filter.key}
+                type="button"
+                onClick={() => clearFilter(filter.key)}
+                className="inline-flex items-center gap-1 rounded-full border border-gold-300 bg-white px-2.5 py-1 text-xs font-medium text-navy-950 hover:border-gold-500 hover:bg-gold-100"
+              >
+                {filter.label}
+                <X className="h-3 w-3" />
+              </button>
+            ))}
+            <button
+              type="button"
+              onClick={handleResetFilters}
+              className="ml-auto inline-flex items-center gap-1 px-2 text-xs font-semibold text-brand-muted hover:text-navy-950"
+            >
+              <RotateCcw className="h-3.5 w-3.5" />
+              ล้างทั้งหมด
+            </button>
+          </div>
+        )}
         {/* Mobile Control Bar */}
         <div className="lg:hidden flex items-center justify-between bg-white p-3 rounded-2xl border border-surface-border shadow-sm mb-4">
           <button
@@ -317,7 +383,7 @@ function PropertiesContent() {
           </div>
         </div>
       )}
-    </div>
+    </main>
   );
 }
 

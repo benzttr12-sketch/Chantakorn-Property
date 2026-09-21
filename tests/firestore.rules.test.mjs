@@ -6,7 +6,8 @@ import { doc, setDoc, getDoc, getDocs, collection, query, where, updateDoc, dele
 let env;
 const date = '2026-09-20T00:00:00.000Z';
 const profile = (id, role = 'USER') => ({ id, full_name: id, email: `${id}@example.com`, role, created_at: date });
-const property = (id, published = true) => ({ id, title: 'Test property', slug: id, description: 'Test description', property_type: 'house', status: 'sale', price: 100, province: 'สงขลา', district: 'หาดใหญ่', latitude: 7, longitude: 100, bedrooms: 1, bathrooms: 1, parking: 0, land_size: 10, usable_area: 10, furniture: '', features: [], cover_image: 'https://example.com/image.jpg', images: ['https://example.com/image.jpg'], featured: false, published, created_at: date });
+const agentSnapshot = id => ({ id, name: id, title: 'นายหน้าผู้รับผิดชอบทรัพย์', phone: '0810000000', line_id: '', photo_url: '', bio: '' });
+const property = (id, published = true, agentId = 'agent') => ({ id, title: 'Test property', slug: id, description: 'Test description', property_type: 'house', status: 'sale', price: 100, province: 'สงขลา', district: 'หาดใหญ่', latitude: 7, longitude: 100, bedrooms: 1, bathrooms: 1, parking: 0, land_size: 10, usable_area: 10, furniture: '', features: [], cover_image: 'https://example.com/image.jpg', images: ['https://example.com/image.jpg'], featured: false, published, author_id: agentId, agent_id: agentId, agent: agentSnapshot(agentId), created_at: date });
 const inquiry = id => ({ id, name: 'Visitor', phone: '0810000000', message: 'Please contact me', inquiry_type: 'inquiry', status: 'new', created_at: date });
 const database = uid => uid ? env.authenticatedContext(uid, { email: `${uid}@example.com` }).firestore() : env.unauthenticatedContext().firestore();
 
@@ -16,9 +17,10 @@ before(async () => {
   await env.withSecurityRulesDisabled(async context => {
     const db = context.firestore();
     await Promise.all([
-      ...['admin', 'agent', 'member'].map(id => setDoc(doc(db, 'profiles', id), profile(id, id === 'admin' ? 'ADMIN' : id === 'agent' ? 'AGENT' : 'USER'))),
+      ...['admin', 'agent', 'agent2', 'member'].map(id => setDoc(doc(db, 'profiles', id), profile(id, id === 'admin' ? 'ADMIN' : id.startsWith('agent') ? 'AGENT' : 'USER'))),
       setDoc(doc(db, 'properties', 'public'), property('public')),
       setDoc(doc(db, 'properties', 'draft'), property('draft', false)),
+      setDoc(doc(db, 'properties', 'other-agent-property'), property('other-agent-property', true, 'agent2')),
     ]);
   });
 });
@@ -31,18 +33,22 @@ test('public catalog only exposes published properties and denies writes', async
   await assertFails(getDoc(doc(db, 'properties', 'draft')));
   await assertFails(setDoc(doc(db, 'properties', 'hacked'), property('hacked')));
 });
-test('staff can create/edit/delete valid properties; schema and immutable fields protected', async () => {
+test('only the responsible agent can create or update a listing; admins can supervise', async () => {
   const db = database('agent');
   await assertSucceeds(getDocs(collection(db, 'properties')));
   await assertSucceeds(setDoc(doc(db, 'properties', 'staff-property'), property('staff-property')));
   await assertSucceeds(updateDoc(doc(db, 'properties', 'staff-property'), { price: 200 }));
   await assertSucceeds(updateDoc(doc(db, 'properties', 'staff-property'), { images: Array(20).fill('https://example.com/image.jpg'), features: Array(20).fill('เครื่องปรับอากาศ') }));
-  await assertSucceeds(updateDoc(doc(db, 'properties', 'staff-property'), { subdistrict: 'ควนลัง', address: 'Test address', year_built: 2024, updated_at: date, agent_id: 'business-agent', agent: { id: 'business-agent', name: 'Agent', title: 'Staff', phone: '0810000000', line_id: 'agent', email: 'agent@example.com', photo_url: 'https://example.com/photo.jpg', bio: 'Business contact', facebook: '' } }));
+  await assertSucceeds(updateDoc(doc(db, 'properties', 'staff-property'), { subdistrict: 'ควนลัง', address: 'Test address', year_built: 2024, updated_at: date, agent: agentSnapshot('agent') }));
   await assertFails(updateDoc(doc(db, 'properties', 'staff-property'), { id: 'changed' }));
+  await assertFails(updateDoc(doc(db, 'properties', 'staff-property'), { agent_id: 'agent2', author_id: 'agent2', agent: agentSnapshot('agent2') }));
   await assertFails(updateDoc(doc(db, 'properties', 'staff-property'), { images: ['javascript:alert(1)'] }));
   await assertFails(updateDoc(doc(db, 'properties', 'staff-property'), { images: ['https://example.com/image.jpg', 42] }));
+  await assertFails(updateDoc(doc(db, 'properties', 'other-agent-property'), { price: 200 }));
+  await assertSucceeds(updateDoc(doc(database('admin'), 'properties', 'other-agent-property'), { price: 200 }));
   await assertSucceeds(deleteDoc(doc(db, 'properties', 'staff-property')));
   await assertFails(setDoc(doc(database('member'), 'properties', 'member-property'), property('member-property')));
+  await assertFails(setDoc(doc(database('admin'), 'properties', 'admin-property'), property('admin-property')));
 });
 test('profile ownership never grants role escalation or private directory access', async () => {
   const db = database('newmember');

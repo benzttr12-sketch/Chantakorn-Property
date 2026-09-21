@@ -15,7 +15,7 @@ export interface Agent {
   phone: string;
   line_id: string;
   facebook?: string;
-  email: string;
+  email?: string;
   photo_url: string;
   bio: string;
 }
@@ -46,6 +46,8 @@ export interface Property {
   images: string[];
   featured: boolean;
   published: boolean;
+  /** UID of the agent who created and remains responsible for this listing. */
+  author_id?: string;
   agent_id?: string;
   agent?: Agent;
   created_at: string;

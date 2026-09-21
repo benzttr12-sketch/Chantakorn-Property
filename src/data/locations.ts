@@ -65,13 +65,4 @@ export const LOCATIONS: LocationItem[] = [
   }
 ];
 
-export const DISTRICTS_LIST = [
-  "หาดใหญ่",
-  "เมืองสงขลา",
-  "ควนลัง",
-  "คลองแห",
-  "บ้านพรุ",
-  "ทุ่งลุง",
-  "คอหงส์",
-  "สิงหนคร"
-];
+export { SONGKHLA_DISTRICTS as DISTRICTS_LIST } from './songkhla-addresses';

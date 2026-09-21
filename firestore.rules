@@ -7,7 +7,8 @@ rules_version = '2';
 // property_type and status. Numeric price/areas/coordinates/counts are bounded.
 // images contains 1..20 HTTPS URLs; features contains <=20 bounded strings.
 // published/featured are booleans. Optional: subdistrict/address/year_built,
-// agent_id, public business-contact agent map, and updated_at.
+// author_id/agent_id identify the AGENT who posted the listing. The public
+// agent map has only the responsible agent's business-contact information.
 // inquiries/{id}: immutable id, name (1..120), phone (1..30), message (1..5000),
 // inquiry_type, created_at. Optional property_id/property_title/line_id and a
 // strictly bounded consignment_details map (at most 5 compressed JPEG photos).
@@ -31,6 +32,10 @@ service cloud.firestore {
     function isStaff() {
       return isAuthenticated()
         && get(/databases/$(database)/documents/profiles/$(request.auth.uid)).data.role in ['ADMIN', 'AGENT'];
+    }
+    function isAgent() {
+      return isAuthenticated()
+        && get(/databases/$(database)/documents/profiles/$(request.auth.uid)).data.role == 'AGENT';
     }
     function validString(value, minimum, maximum) {
       return value is string && value.size() >= minimum && value.size() <= maximum;
@@ -82,15 +87,19 @@ service cloud.firestore {
           'ระบบรักษาความปลอดภัย 24 ชม.', 'ติดถนนใหญ่',
           'ใกล้มหาวิทยาลัยสงขลานครินทร์ (ม.อ.)', 'ใกล้เซ็นทรัลหาดใหญ่', 'ใกล้สนามบินหาดใหญ่']);
     }
-    function validAgent(agent) {
-      // Public business contacts supplied by staff, never private user profiles.
+    function isAssignedAgent(agentId) {
+      return validId(agentId)
+        && get(/databases/$(database)/documents/profiles/$(agentId)).data.role == 'AGENT';
+    }
+    function validAgent(agent, agentId) {
+      // This public listing snapshot deliberately excludes the account email.
       return agent is map
-        && agent.keys().hasAll(['id', 'name', 'title', 'phone', 'line_id', 'email', 'photo_url', 'bio'])
-        && agent.keys().hasOnly(['id', 'name', 'title', 'phone', 'line_id', 'email', 'photo_url', 'bio', 'facebook'])
-        && agent.id is string && agent.name is string && agent.title is string
-        && agent.phone is string && agent.line_id is string && agent.email is string
-        && agent.bio is string && validUrl(agent.photo_url)
-        && (!('facebook' in agent) || agent.facebook is string)
+        && agent.keys().hasAll(['id', 'name', 'title', 'phone', 'line_id', 'photo_url', 'bio'])
+        && agent.keys().hasOnly(['id', 'name', 'title', 'phone', 'line_id', 'photo_url', 'bio'])
+        && agent.id == agentId && validString(agent.name, 1, 120)
+        && validString(agent.title, 1, 120) && validString(agent.phone, 0, 30)
+        && validString(agent.line_id, 0, 100) && validString(agent.bio, 0, 2000)
+        && (agent.photo_url == '' || validUrl(agent.photo_url))
         && agent.values().join('').size() <= 8000;
     }
     function isValidProperty(data, propertyId) {
@@ -98,14 +107,15 @@ service cloud.firestore {
           'id', 'title', 'slug', 'description', 'property_type', 'status', 'price',
           'province', 'district', 'latitude', 'longitude', 'bedrooms', 'bathrooms',
           'parking', 'land_size', 'usable_area', 'furniture', 'features',
-          'cover_image', 'images', 'featured', 'published', 'created_at'
+          'cover_image', 'images', 'featured', 'published', 'author_id', 'agent_id',
+          'agent', 'created_at'
         ])
         && data.keys().hasOnly([
           'id', 'title', 'slug', 'description', 'property_type', 'status', 'price',
           'province', 'district', 'subdistrict', 'address', 'latitude', 'longitude',
           'bedrooms', 'bathrooms', 'parking', 'land_size', 'usable_area',
           'year_built', 'furniture', 'features', 'cover_image', 'images',
-          'featured', 'published', 'agent_id', 'agent', 'created_at', 'updated_at'
+          'featured', 'published', 'author_id', 'agent_id', 'agent', 'created_at', 'updated_at'
         ])
         && validId(data.id) && data.id == propertyId
         && validString(data.title, 1, 200) && validString(data.slug, 1, 200)
@@ -124,8 +134,9 @@ service cloud.firestore {
         && validString(data.furniture, 0, 200) && validFeatures(data.features)
         && validUrl(data.cover_image) && validImages(data.images) && data.cover_image in data.images
         && data.featured is bool && data.published is bool
-        && (!('agent_id' in data) || validId(data.agent_id))
-        && (!('agent' in data) || (validAgent(data.agent) && data.agent.id == data.agent_id))
+        && validId(data.author_id) && validId(data.agent_id)
+        && data.author_id == data.agent_id && isAssignedAgent(data.agent_id)
+        && validAgent(data.agent, data.agent_id)
         && validDate(data.created_at) && optionalDate(data, 'updated_at');
     }
     function validPhotoAt(photos, index) {
@@ -185,10 +196,21 @@ service cloud.firestore {
     match /properties/{propertyId} {
       // Public queries must explicitly filter published == true.
       allow read: if resource.data.published == true || isStaff();
-      allow create: if isStaff() && isValidProperty(request.resource.data, propertyId);
-      allow update: if isStaff() && isValidProperty(request.resource.data, propertyId)
-        && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['id', 'created_at']);
-      allow delete: if isStaff();
+      // A listing is always created by the AGENT who is publicly shown on it.
+      allow create: if isAgent() && request.resource.data.author_id == request.auth.uid
+        && isValidProperty(request.resource.data, propertyId);
+      allow update: if isValidProperty(request.resource.data, propertyId)
+        && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['id', 'created_at'])
+        && (
+          (isAgent() && resource.data.author_id == request.auth.uid
+            && request.resource.data.author_id == resource.data.author_id
+            && request.resource.data.agent_id == resource.data.agent_id)
+          || (isAdmin()
+            && request.resource.data.author_id == resource.data.author_id
+            && request.resource.data.agent_id == resource.data.agent_id
+            && request.resource.data.agent == resource.data.agent)
+        );
+      allow delete: if isAdmin() || (isAgent() && resource.data.author_id == request.auth.uid);
     }
     match /inquiries/{inquiryId} {
       allow create: if isValidInquiry(request.resource.data, inquiryId)

@@ -18,7 +18,7 @@ import {
   Sparkles
 } from 'lucide-react';
 import { submitInquiry } from '@/lib/store/properties-store';
-import { DISTRICTS_LIST } from '@/data/locations';
+import { SONGKHLA_DISTRICTS, subdistrictsForSongkhlaDistrict } from '@/data/songkhla-addresses';
 
 export default function SellPage() {
   const [name, setName] = useState('');
@@ -27,7 +27,7 @@ export default function SellPage() {
   const [propertyType, setPropertyType] = useState('house');
   const [province] = useState('สงขลา');
   const [district, setDistrict] = useState('หาดใหญ่');
-  const [subdistrict, setSubdistrict] = useState('');
+  const [subdistrict, setSubdistrict] = useState('ควนลัง');
   const [expectedPrice, setExpectedPrice] = useState('');
   const [landSize, setLandSize] = useState('');
   const [usableArea, setUsableArea] = useState('');
@@ -273,10 +273,14 @@ export default function SellPage() {
                     </label>
                     <select
                       value={district}
-                      onChange={(e) => setDistrict(e.target.value)}
+                      onChange={(e) => {
+                        const nextDistrict = e.target.value;
+                        setDistrict(nextDistrict);
+                        setSubdistrict(subdistrictsForSongkhlaDistrict(nextDistrict)[0] || '');
+                      }}
                       className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3 text-xs text-gray-900 font-medium cursor-pointer focus:bg-white focus:ring-2 focus:ring-gold-500 outline-none"
                     >
-                      {DISTRICTS_LIST.map((dist) => (
+                      {SONGKHLA_DISTRICTS.map((dist) => (
                         <option key={dist} value={dist}>{dist}</option>
                       ))}
                     </select>
@@ -286,13 +290,15 @@ export default function SellPage() {
                     <label className="block text-xs font-semibold text-gray-700 mb-1">
                       ตำบล (ถ้าทราบ)
                     </label>
-                    <input
-                      type="text"
-                      placeholder="เช่น ควนลัง, คลองแห..."
+                    <select
                       value={subdistrict}
                       onChange={(e) => setSubdistrict(e.target.value)}
                       className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3 text-xs text-gray-900 focus:bg-white focus:ring-2 focus:ring-gold-500 outline-none"
-                    />
+                    >
+                      {subdistrictsForSongkhlaDistrict(district).map((tambon) => (
+                        <option key={tambon} value={tambon}>{tambon}</option>
+                      ))}
+                    </select>
                   </div>
                 </div>
 

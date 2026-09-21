@@ -3,11 +3,9 @@
 import React, { useState } from 'react';
 import Image from 'next/image';
 import { Agent, Property } from '@/lib/types';
-import { DEFAULT_AGENT } from '@/data/agents';
 import { 
   Phone, 
   MessageCircle, 
-  Facebook, 
   Calendar, 
   ShieldCheck, 
   CheckCircle,
@@ -20,7 +18,7 @@ interface AgentCardProps {
   property: Property;
 }
 
-export default function AgentCard({ agent = DEFAULT_AGENT, property }: AgentCardProps) {
+export default function AgentCard({ agent, property }: AgentCardProps) {
   const [scheduleModalOpen, setScheduleModalOpen] = useState(false);
   const [viewDate, setViewDate] = useState('');
   const [viewTime, setViewTime] = useState('10:00');
@@ -29,6 +27,15 @@ export default function AgentCard({ agent = DEFAULT_AGENT, property }: AgentCard
   const [submitted, setSubmitted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
+  const contact: Agent = agent ?? {
+    id: '',
+    name: 'ทีม Chantakorn Property',
+    title: 'ติดต่อทีมงาน',
+    phone: '',
+    line_id: '',
+    photo_url: '',
+    bio: '',
+  };
 
   const handleBookViewing = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -64,24 +71,30 @@ export default function AgentCard({ agent = DEFAULT_AGENT, property }: AgentCard
       <div className="bg-white rounded-2xl p-6 border border-surface-border shadow-card space-y-5">
         {/* Agent Info Header */}
         <div className="flex items-center space-x-4">
-          <div className="relative w-16 h-16 rounded-full overflow-hidden border-2 border-gold-400 flex-shrink-0 bg-gray-100 shadow-sm">
-            <Image
-              src={agent.photo_url}
-              alt={agent.name}
-              fill
-              className="object-cover"
-            />
+          <div className="relative w-16 h-16 rounded-full overflow-hidden border-2 border-gold-400 flex-shrink-0 bg-navy-100 shadow-sm">
+            {contact.photo_url ? (
+              <Image
+                src={contact.photo_url}
+                alt={contact.name}
+                fill
+                className="object-cover"
+              />
+            ) : (
+              <span className="flex h-full items-center justify-center text-xl font-bold text-navy-900">
+                {contact.name.slice(0, 1)}
+              </span>
+            )}
           </div>
 
           <div className="min-w-0 flex-grow">
             <div className="text-[11px] font-bold text-gold-600 uppercase tracking-wider">
-              CHANTAKORN PROPERTY
+              นายหน้าที่รับผิดชอบทรัพย์นี้
             </div>
             <h4 className="text-base font-bold text-navy-950 truncate">
-              {agent.name}
+              {contact.name}
             </h4>
             <p className="text-xs text-brand-muted">
-              {agent.title}
+              {contact.title}
             </p>
           </div>
         </div>
@@ -97,10 +110,11 @@ export default function AgentCard({ agent = DEFAULT_AGENT, property }: AgentCard
         </div>
 
         {/* Fast Action Buttons */}
-        <div className="grid grid-cols-3 gap-2">
+        <div className="grid grid-cols-2 gap-2">
           <a
-            href={`tel:${agent.phone}`}
-            className="py-2.5 px-3 bg-navy-950 hover:bg-navy-900 text-white rounded-xl text-xs font-semibold flex items-center justify-center space-x-1.5 shadow-sm transition-all"
+            href={contact.phone ? `tel:${contact.phone}` : undefined}
+            aria-disabled={!contact.phone}
+            className="py-2.5 px-3 bg-navy-950 hover:bg-navy-900 text-white rounded-xl text-xs font-semibold flex items-center justify-center space-x-1.5 shadow-sm transition-all aria-disabled:cursor-not-allowed aria-disabled:opacity-50"
           >
             <Phone className="w-3.5 h-3.5 text-gold-400" />
             <span>โทร</span>
@@ -113,17 +127,7 @@ export default function AgentCard({ agent = DEFAULT_AGENT, property }: AgentCard
             className="py-2.5 px-3 bg-[#06C755] hover:bg-[#05b34c] text-white rounded-xl text-xs font-semibold flex items-center justify-center space-x-1.5 shadow-sm transition-all"
           >
             <MessageCircle className="w-3.5 h-3.5 fill-current" />
-            <span>LINE</span>
-          </a>
-
-          <a
-            href={agent.facebook && agent.facebook.startsWith('http') ? agent.facebook : "https://www.facebook.com/people/Chantakorn-Property-%E0%B8%99%E0%B8%B2%E0%B8%A2%E0%B8%AB%E0%B8%99%E0%B9%89%E0%B8%B2-%E0%B8%9A%E0%B9%89%E0%B8%B2%E0%B8%99-%E0%B8%97%E0%B8%B5%E0%B9%88%E0%B8%94%E0%B8%B4%E0%B8%99-%E0%B8%84%E0%B8%AD%E0%B8%99%E0%B9%82%E0%B8%94-%E0%B8%AB%E0%B8%B2%E0%B8%94%E0%B9%83%E0%B8%AB%E0%B8%8D%E0%B9%88-%E0%B8%AA%E0%B8%87%E0%B8%82%E0%B8%A5%E0%B8%B2/61593092347613/"}
-            target="_blank"
-            rel="noreferrer"
-            className="py-2.5 px-3 bg-[#1877F2] hover:bg-[#166fe5] text-white rounded-xl text-xs font-semibold flex items-center justify-center space-x-1.5 shadow-sm transition-all"
-          >
-            <Facebook className="w-3.5 h-3.5 fill-current" />
-            <span>Facebook</span>
+            <span>{contact.line_id || 'LINE'}</span>
           </a>
         </div>
 
@@ -160,7 +164,7 @@ export default function AgentCard({ agent = DEFAULT_AGENT, property }: AgentCard
               </div>
             ) : (
               <form onSubmit={handleBookViewing} className="space-y-4">
-                {error && <div role="alert" className="rounded-xl bg-red-50 p-3 text-xs text-red-800">{error} <a href={`tel:${agent.phone}`} className="font-bold underline">โทรหาทีมงาน</a> · <a href="https://lin.ee/NMSe28T3" target="_blank" rel="noreferrer" className="font-bold underline">LINE</a></div>}
+                {error && <div role="alert" className="rounded-xl bg-red-50 p-3 text-xs text-red-800">{error} {contact.phone && <><a href={`tel:${contact.phone}`} className="font-bold underline">โทรหานายหน้า</a> · </>}<a href="https://lin.ee/NMSe28T3" target="_blank" rel="noreferrer" className="font-bold underline">LINE</a></div>}
                 <div>
                   <div className="text-xs font-bold text-gold-600 uppercase tracking-wider">
                     นัดชมสถานที่จริง

@@ -34,7 +34,7 @@ export default function Header() {
     const handleScroll = () => {
       setIsScrolled(window.scrollY > 20);
     };
-    window.addEventListener('scroll', handleScroll);
+    window.addEventListener('scroll', handleScroll, { passive: true });
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
@@ -69,9 +69,9 @@ export default function Header() {
     { name: 'ซื้อ', href: '/buy' },
     { name: 'เช่า', href: '/rent' },
     { name: 'ขาย', href: '/sell' },
-    { name: 'บ้าน', href: '/properties?type=house' },
-    { name: 'ที่ดิน', href: '/properties?type=land' },
-    { name: 'คอนโด', href: '/properties?type=condo' },
+    { name: 'บ้าน', href: '/properties?type=house', desktopClass: 'hidden xl:inline-flex' },
+    { name: 'ที่ดิน', href: '/properties?type=land', desktopClass: 'hidden xl:inline-flex' },
+    { name: 'คอนโด', href: '/properties?type=condo', desktopClass: 'hidden xl:inline-flex' },
     { name: 'อสังหาริมทรัพย์', href: '/properties' },
     { name: 'บริการ', href: '/services' },
   ];
@@ -181,7 +181,7 @@ export default function Header() {
                   key={link.name}
                   href={link.href}
                   onClick={() => setMobileMenuOpen(false)}
-                  className={`px-3 py-1.5 rounded-xl text-sm transition-all ${
+                  className={`${link.desktopClass || ''} px-3 py-1.5 rounded-xl text-sm transition-all ${
                     isActive
                       ? 'text-gold-300 bg-navy-900 border border-gold-400/50 font-bold shadow-sm'
                       : 'text-white hover:text-gold-300 hover:bg-navy-900/80 font-medium'
@@ -278,6 +278,8 @@ export default function Header() {
 
             <button
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              aria-expanded={mobileMenuOpen}
+              aria-controls="mobile-navigation"
               className="p-2 text-gray-200 hover:text-gold-400 hover:bg-navy-900 rounded-lg focus:outline-none"
               aria-label="Toggle Navigation Menu"
             >
@@ -289,7 +291,8 @@ export default function Header() {
 
       {/* Mobile Slide-down Navigation Menu */}
       {mobileMenuOpen && (
-        <div 
+        <div
+          id="mobile-navigation"
           className="lg:hidden fixed inset-0 top-[60px] z-[60] bg-[#020812] border-t border-navy-800 flex flex-col p-5 overflow-y-auto animate-fadeIn shadow-2xl"
           style={{ backgroundColor: '#020812' }}
         >
