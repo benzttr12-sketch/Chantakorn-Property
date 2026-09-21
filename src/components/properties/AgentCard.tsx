@@ -69,7 +69,9 @@ export default function AgentCard({ agent = DEFAULT_AGENT, property }: AgentCard
               src={agent.photo_url}
               alt={agent.name}
               fill
+              unoptimized
               className="object-cover"
+              referrerPolicy="no-referrer"
             />
           </div>
 

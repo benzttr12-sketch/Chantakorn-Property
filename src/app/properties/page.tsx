@@ -131,7 +131,97 @@ function PropertiesContent() {
                 className="w-full bg-navy-900 border border-navy-700 text-white text-xs sm:text-sm rounded-xl pl-10 pr-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-gold-500 placeholder-gray-400"
               />
               <Search className="w-4 h-4 text-gray-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+              {filters.searchQuery && (
+                <button
+                  type="button"
+                  onClick={() => setFilters({ ...filters, searchQuery: '' })}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              )}
             </div>
+          </div>
+
+          {/* Quick Filter Horizontal Scrollbar */}
+          <div className="mt-5 pt-4 border-t border-navy-800/80 flex items-center gap-2 overflow-x-auto pb-1 text-xs no-scrollbar">
+            <span className="text-gray-400 text-xs font-semibold flex-shrink-0 mr-1">กรองด่วน:</span>
+
+            {/* Status pills */}
+            <button
+              type="button"
+              onClick={() => setFilters({ ...filters, status: 'all' })}
+              className={`px-3 py-1.5 rounded-xl font-bold flex-shrink-0 transition-all ${
+                filters.status === 'all'
+                  ? 'bg-gold-500 text-navy-950 shadow-sm'
+                  : 'bg-navy-900 text-gray-300 hover:bg-navy-800'
+              }`}
+            >
+              ทั้งหมด
+            </button>
+            <button
+              type="button"
+              onClick={() => setFilters({ ...filters, status: 'sale' })}
+              className={`px-3 py-1.5 rounded-xl font-bold flex-shrink-0 transition-all ${
+                filters.status === 'sale'
+                  ? 'bg-gold-500 text-navy-950 shadow-sm'
+                  : 'bg-navy-900 text-gray-300 hover:bg-navy-800'
+              }`}
+            >
+              สำหรับขาย
+            </button>
+            <button
+              type="button"
+              onClick={() => setFilters({ ...filters, status: 'rent' })}
+              className={`px-3 py-1.5 rounded-xl font-bold flex-shrink-0 transition-all ${
+                filters.status === 'rent'
+                  ? 'bg-gold-500 text-navy-950 shadow-sm'
+                  : 'bg-navy-900 text-gray-300 hover:bg-navy-800'
+              }`}
+            >
+              สำหรับเช่า
+            </button>
+
+            <span className="text-navy-700 mx-1 flex-shrink-0">|</span>
+
+            {/* Popular property types */}
+            {[
+              { label: 'บ้านเดี่ยว/ทาวน์โฮม', val: 'house' },
+              { label: 'คอนโดมิเนียม', val: 'condo' },
+              { label: 'ที่ดิน', val: 'land' },
+              { label: 'อาคารพาณิชย์', val: 'commercial' }
+            ].map(item => (
+              <button
+                key={item.val}
+                type="button"
+                onClick={() => setFilters({ ...filters, type: filters.type === item.val ? 'all' : item.val as PropertyType })}
+                className={`px-3 py-1.5 rounded-xl font-medium flex-shrink-0 transition-all ${
+                  filters.type === item.val
+                    ? 'bg-white text-navy-950 font-bold'
+                    : 'bg-navy-900 text-gray-300 hover:bg-navy-800'
+                }`}
+              >
+                {item.label}
+              </button>
+            ))}
+
+            <span className="text-navy-700 mx-1 flex-shrink-0">|</span>
+
+            {/* Popular districts */}
+            {['หาดใหญ่', 'เมืองสงขลา', 'คลองหอยโข่ง', 'สะเดา'].map(dist => (
+              <button
+                key={dist}
+                type="button"
+                onClick={() => setFilters({ ...filters, district: filters.district === dist ? '' : dist })}
+                className={`px-3 py-1.5 rounded-xl font-medium flex-shrink-0 transition-all ${
+                  filters.district === dist
+                    ? 'bg-gold-400 text-navy-950 font-bold'
+                    : 'bg-navy-900 text-gray-300 hover:bg-navy-800'
+                }`}
+              >
+                📍 {dist}
+              </button>
+            ))}
           </div>
         </div>
       </div>
@@ -191,7 +281,7 @@ function PropertiesContent() {
           {/* PANE 2: CENTER PROPERTY LISTINGS (5 or 6 Cols) */}
           <section className={`lg:col-span-5 xl:col-span-5 ${mobileViewMode === 'map' ? 'hidden lg:block' : 'block'}`}>
             {/* Sorting & Results Header */}
-            <div className="bg-white rounded-2xl p-4 border border-surface-border shadow-sm mb-5 flex items-center justify-between">
+            <div className="bg-white rounded-2xl p-4 border border-surface-border shadow-sm mb-4 flex items-center justify-between">
               <div className="text-xs sm:text-sm font-semibold text-navy-950">
                 พบ <span className="text-gold-600 font-bold text-base">{sortedProperties.length}</span> รายการ
               </div>
@@ -212,6 +302,68 @@ function PropertiesContent() {
                 </select>
               </div>
             </div>
+
+            {/* Active Filters Bar */}
+            {(filters.type !== 'all' || filters.status !== 'all' || filters.district || filters.minPrice || filters.maxPrice || filters.bedrooms !== 'any' || filters.searchQuery) && (
+              <div className="bg-white/80 backdrop-blur rounded-2xl p-3 border border-gray-200 mb-4 flex flex-wrap items-center gap-1.5 text-xs animate-in fade-in">
+                <span className="text-[11px] text-gray-500 font-semibold mr-1">กำลังกรอง:</span>
+                
+                {filters.status !== 'all' && (
+                  <span className="inline-flex items-center space-x-1 px-2.5 py-1 rounded-full bg-gold-100 text-gold-900 font-medium text-[11px]">
+                    <span>{filters.status === 'rent' ? 'สำหรับเช่า' : 'สำหรับขาย'}</span>
+                    <button type="button" onClick={() => setFilters({ ...filters, status: 'all' })} className="hover:text-red-600">
+                      <X className="w-3 h-3" />
+                    </button>
+                  </span>
+                )}
+
+                {filters.type !== 'all' && (
+                  <span className="inline-flex items-center space-x-1 px-2.5 py-1 rounded-full bg-blue-50 text-blue-800 font-medium text-[11px]">
+                    <span>{filters.type}</span>
+                    <button type="button" onClick={() => setFilters({ ...filters, type: 'all' })} className="hover:text-red-600">
+                      <X className="w-3 h-3" />
+                    </button>
+                  </span>
+                )}
+
+                {filters.district && (
+                  <span className="inline-flex items-center space-x-1 px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-800 font-medium text-[11px]">
+                    <span>📍 {filters.district}</span>
+                    <button type="button" onClick={() => setFilters({ ...filters, district: '' })} className="hover:text-red-600">
+                      <X className="w-3 h-3" />
+                    </button>
+                  </span>
+                )}
+
+                {filters.searchQuery && (
+                  <span className="inline-flex items-center space-x-1 px-2.5 py-1 rounded-full bg-gray-100 text-gray-800 font-medium text-[11px]">
+                    <span>ค้นหา: &quot;{filters.searchQuery}&quot;</span>
+                    <button type="button" onClick={() => setFilters({ ...filters, searchQuery: '' })} className="hover:text-red-600">
+                      <X className="w-3 h-3" />
+                    </button>
+                  </span>
+                )}
+
+                {(filters.minPrice || filters.maxPrice) && (
+                  <span className="inline-flex items-center space-x-1 px-2.5 py-1 rounded-full bg-purple-50 text-purple-800 font-medium text-[11px]">
+                    <span>
+                      ราคา: {filters.minPrice ? `${(filters.minPrice / 1000000).toFixed(1)}ลบ.` : '0'} - {filters.maxPrice ? `${(filters.maxPrice / 1000000).toFixed(1)}ลบ.` : 'ไม่จำกัด'}
+                    </span>
+                    <button type="button" onClick={() => setFilters({ ...filters, minPrice: undefined, maxPrice: undefined })} className="hover:text-red-600">
+                      <X className="w-3 h-3" />
+                    </button>
+                  </span>
+                )}
+
+                <button
+                  type="button"
+                  onClick={handleResetFilters}
+                  className="text-[11px] text-red-600 hover:underline font-bold ml-auto px-2 py-0.5"
+                >
+                  ล้างทั้งหมด
+                </button>
+              </div>
+            )}
 
             {error && <p role="alert" className="mb-4 rounded-xl bg-red-50 p-4 text-sm text-red-700">{error}</p>}
             {/* Listings Grid */}

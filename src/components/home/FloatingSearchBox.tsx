@@ -137,7 +137,7 @@ export default function FloatingSearchBox() {
         <div>
           <button
             type="submit"
-            className="w-full py-2.5 px-4 bg-navy-950 hover:bg-navy-900 text-gold-400 hover:text-white rounded-lg font-semibold text-sm flex items-center justify-center space-x-2 shadow-md hover:shadow-lg transition-all duration-200"
+            className="w-full py-2.5 px-4 bg-navy-950 hover:bg-navy-900 text-gold-400 hover:text-white rounded-lg font-semibold text-sm flex items-center justify-center space-x-2 shadow-md hover:shadow-lg transition-all duration-200 cursor-pointer"
           >
             <Search className="w-4 h-4 text-gold-400" />
             <span>ค้นหาอสังหาฯ</span>
@@ -145,6 +145,137 @@ export default function FloatingSearchBox() {
           </button>
         </div>
       </form>
+
+      {/* Quick Search Chips for Easy UX */}
+      <div className="mt-4 pt-3.5 border-t border-gray-100 flex flex-wrap items-center justify-between gap-2.5 text-xs">
+        <div className="flex flex-wrap items-center gap-1.5">
+          <span className="text-gray-600 font-semibold flex items-center mr-1">
+            <span className="text-gold-600 mr-1">📍</span> ทำเลยอดนิยม:
+          </span>
+          {['หาดใหญ่', 'เมืองสงขลา', 'คลองหอยโข่ง', 'สะเดา', 'สิงหนคร', 'นาหม่อม'].map((loc) => {
+            const isActive = district === loc;
+            return (
+              <button
+                key={loc}
+                type="button"
+                onClick={() => setDistrict(isActive ? '' : loc)}
+                className={`px-2.5 py-1 rounded-full text-[11px] font-medium transition-all ${
+                  isActive
+                    ? 'bg-gold-500 text-navy-950 font-bold shadow-xs'
+                    : 'bg-gray-100/90 hover:bg-gray-200 text-gray-700'
+                }`}
+              >
+                {loc}
+              </button>
+            );
+          })}
+        </div>
+
+        <div className="flex flex-wrap items-center gap-1.5">
+          <span className="text-gray-600 font-semibold flex items-center mr-1">
+            <span className="text-gold-600 mr-1">💰</span> ราคายอดนิยม:
+          </span>
+          {tab === 'sale' ? (
+            <>
+              <button
+                type="button"
+                onClick={() => { setMinPrice(''); setMaxPrice('2000000'); }}
+                className={`px-2 py-0.5 rounded-md text-[11px] font-medium transition-all ${
+                  maxPrice === '2000000' && !minPrice
+                    ? 'bg-navy-950 text-gold-400 font-bold'
+                    : 'bg-gray-100 hover:bg-gray-200 text-gray-700'
+                }`}
+              >
+                &lt; 2 ล้าน
+              </button>
+              <button
+                type="button"
+                onClick={() => { setMinPrice('2000000'); setMaxPrice('4000000'); }}
+                className={`px-2 py-0.5 rounded-md text-[11px] font-medium transition-all ${
+                  minPrice === '2000000' && maxPrice === '4000000'
+                    ? 'bg-navy-950 text-gold-400 font-bold'
+                    : 'bg-gray-100 hover:bg-gray-200 text-gray-700'
+                }`}
+              >
+                2 - 4 ล้าน
+              </button>
+              <button
+                type="button"
+                onClick={() => { setMinPrice('4000000'); setMaxPrice('8000000'); }}
+                className={`px-2 py-0.5 rounded-md text-[11px] font-medium transition-all ${
+                  minPrice === '4000000' && maxPrice === '8000000'
+                    ? 'bg-navy-950 text-gold-400 font-bold'
+                    : 'bg-gray-100 hover:bg-gray-200 text-gray-700'
+                }`}
+              >
+                4 - 8 ล้าน
+              </button>
+              <button
+                type="button"
+                onClick={() => { setMinPrice('8000000'); setMaxPrice(''); }}
+                className={`px-2 py-0.5 rounded-md text-[11px] font-medium transition-all ${
+                  minPrice === '8000000' && !maxPrice
+                    ? 'bg-navy-950 text-gold-400 font-bold'
+                    : 'bg-gray-100 hover:bg-gray-200 text-gray-700'
+                }`}
+              >
+                8 ล้าน+
+              </button>
+            </>
+          ) : (
+            <>
+              <button
+                type="button"
+                onClick={() => { setMinPrice(''); setMaxPrice('10000'); }}
+                className={`px-2 py-0.5 rounded-md text-[11px] font-medium transition-all ${
+                  maxPrice === '10000' && !minPrice
+                    ? 'bg-navy-950 text-gold-400 font-bold'
+                    : 'bg-gray-100 hover:bg-gray-200 text-gray-700'
+                }`}
+              >
+                &lt; 1 หมื่น
+              </button>
+              <button
+                type="button"
+                onClick={() => { setMinPrice('10000'); setMaxPrice('25000'); }}
+                className={`px-2 py-0.5 rounded-md text-[11px] font-medium transition-all ${
+                  minPrice === '10000' && maxPrice === '25000'
+                    ? 'bg-navy-950 text-gold-400 font-bold'
+                    : 'bg-gray-100 hover:bg-gray-200 text-gray-700'
+                }`}
+              >
+                1 - 2.5 หมื่น
+              </button>
+              <button
+                type="button"
+                onClick={() => { setMinPrice('25000'); setMaxPrice(''); }}
+                className={`px-2 py-0.5 rounded-md text-[11px] font-medium transition-all ${
+                  minPrice === '25000' && !maxPrice
+                    ? 'bg-navy-950 text-gold-400 font-bold'
+                    : 'bg-gray-100 hover:bg-gray-200 text-gray-700'
+                }`}
+              >
+                2.5 หมื่น+
+              </button>
+            </>
+          )}
+
+          {(district || minPrice || maxPrice || propertyType !== 'all') && (
+            <button
+              type="button"
+              onClick={() => {
+                setDistrict('');
+                setMinPrice('');
+                setMaxPrice('');
+                setPropertyType('all');
+              }}
+              className="text-[11px] text-red-600 hover:underline font-semibold ml-1"
+            >
+              ล้างค่า
+            </button>
+          )}
+        </div>
+      </div>
     </div>
   );
 }

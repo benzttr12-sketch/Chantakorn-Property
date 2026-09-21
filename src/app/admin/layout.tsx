@@ -6,10 +6,9 @@ import { usePathname, useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase/client';
 import { auth, db } from '@/lib/firebase/client';
 import { onAuthStateChanged } from 'firebase/auth';
-import { doc, getDocFromServer } from 'firebase/firestore';
-import { dataBackend, isDemoAuthEnabled } from '@/lib/backend';
-import { getStoredUser, logoutUser } from '@/lib/auth-helpers';
-import { UserProfile } from '@/lib/types';
+import { doc, getDoc } from 'firebase/firestore';
+import { dataBackend } from '@/lib/backend';
+import { logoutUser, isAdminEmail } from '@/lib/auth-helpers';
 import { 
   LayoutDashboard, 
   Building2, 
@@ -21,120 +20,174 @@ import {
   ExternalLink,
   ChevronRight,
   ShieldCheck,
+  ShieldAlert,
   Menu,
   X
 } from 'lucide-react';
+import Image from 'next/image';
+import ProfileHeader from '@/components/admin/ProfileHeader';
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [isAuthorized, setIsAuthorized] = useState(false);
-  const [currentUser, setCurrentUser] = useState<UserProfile | null>(null);
+  const [accessDeniedUser, setAccessDeniedUser] = useState<any>(null);
+  const [currentUser, setCurrentUser] = useState<any>({
+    full_name: 'ผู้ดูแลระบบ (Admin)',
+    role: 'ADMIN',
+    email: 'admin@chantakornproperty.com',
+    avatar_url: '',
+  });
 
   useEffect(() => {
-    let cancelled = false;
-    let unsubscribe: (() => void) | undefined;
+    let unsubscribeFirebase: (() => void) | undefined;
 
-    function acceptProfile(profile: UserProfile) {
-      if (!['ADMIN', 'AGENT'].includes(profile.role)) {
-        setIsAuthorized(false);
-        router.replace('/login?reason=admin_required');
-        return;
+    const handleAuthChange = (e: any) => {
+      if (e.detail) {
+        const u = e.detail;
+        const r = isAdminEmail(u.email) ? 'ADMIN' : u.role;
+        if (['ADMIN', 'AGENT'].includes(r)) {
+          setCurrentUser((prev: any) => ({ ...prev, ...u, role: r }));
+        }
       }
-      if (pathname.startsWith('/admin/users') && profile.role !== 'ADMIN') {
-        setIsAuthorized(false);
-        router.replace('/admin');
-        return;
-      }
-      setCurrentUser(profile);
-      setIsAuthorized(true);
-    }
+    };
+    window.addEventListener('chantakorn_auth_change', handleAuthChange);
 
     async function authorize() {
+      let isDenied = false;
+
+      // 1. Supabase Backend
       if (dataBackend === 'supabase' && supabase) {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) {
-          router.replace('/login');
-          return;
-        }
-
-        const { data: profile, error } = await supabase
-          .from('profiles')
-          .select('id, full_name, role, phone')
-          .eq('id', user.id)
-          .single();
-        if (error || !profile || !['ADMIN', 'AGENT', 'USER'].includes(profile.role)) {
           router.replace('/login?reason=admin_required');
           return;
         }
-        if (!cancelled) acceptProfile({ ...profile, email: user.email } as UserProfile);
+
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', user.id)
+          .single();
+        if (!profile || !['ADMIN', 'AGENT'].includes(profile.role)) {
+          setAccessDeniedUser({ ...profile, email: user.email, role: 'USER' });
+          setIsAuthorized(false);
+          return;
+        }
+        if (pathname.startsWith('/admin/users') && profile.role !== 'ADMIN') {
+          router.replace('/admin');
+          return;
+        }
+        setCurrentUser({ ...profile, email: user.email });
+        setIsAuthorized(true);
         return;
       }
 
-      if (dataBackend === 'firebase' && auth) {
-        unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-          setIsAuthorized(false);
-          if (!firebaseUser || !db) {
-            router.replace('/login');
-            return;
-          }
+      // 2. Local/Stored user check
+      if (typeof window !== 'undefined') {
+        const stored = localStorage.getItem('chantakorn_auth_user');
+        if (stored) {
           try {
-            // Server-only read avoids authorizing from a stale client cache. The
-            // profile role itself is protected by firestore.rules.
-            const snap = await getDocFromServer(doc(db, 'profiles', firebaseUser.uid));
-            const profile = snap.data() as Partial<UserProfile> | undefined;
-            if (!snap.exists() || !profile || !['ADMIN', 'AGENT', 'USER'].includes(profile.role || '')) {
-              router.replace('/login?reason=admin_required');
+            const user = JSON.parse(stored);
+            const userRole = isAdminEmail(user.email) ? 'ADMIN' : (user.role || 'USER');
+            if (['ADMIN', 'AGENT'].includes(userRole)) {
+              if (pathname.startsWith('/admin/users') && userRole !== 'ADMIN') {
+                router.replace('/admin');
+                return;
+              }
+              setCurrentUser({ ...user, role: userRole });
+              setIsAuthorized(true);
+              return;
+            } else {
+              // Regular user explicitly attempting to access admin
+              isDenied = true;
+              setAccessDeniedUser({ ...user, role: userRole });
+              setIsAuthorized(false);
               return;
             }
-            if (!cancelled) {
-              acceptProfile({
-                ...profile,
-                id: firebaseUser.uid,
-                email: firebaseUser.email || profile.email || '',
-                full_name: profile.full_name || firebaseUser.displayName || 'ผู้ใช้งาน',
-                role: profile.role,
-              } as UserProfile);
-            }
-          } catch {
-            if (!cancelled) router.replace('/login?reason=admin_required');
-          }
-        });
-        return;
-      }
-
-      if (dataBackend === 'local' && isDemoAuthEnabled) {
-        const demoUser = getStoredUser();
-        if (demoUser) acceptProfile(demoUser);
-        else router.replace('/login');
-        return;
-      }
-
-      router.replace('/login');
-    }
-
-    if (dataBackend === 'supabase' && supabase) {
-      const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
-        if (event === 'SIGNED_OUT') {
-          setIsAuthorized(false);
-          router.replace('/login');
+          } catch {}
         }
-      });
-      unsubscribe = () => subscription.unsubscribe();
+      }
+
+      // 3. Firebase Auth check
+      if (dataBackend === 'firebase' && auth) {
+        if (auth.currentUser) {
+          const u = auth.currentUser;
+          const role = isAdminEmail(u.email) ? 'ADMIN' : 'USER';
+          if (role === 'ADMIN') {
+            setCurrentUser({
+              full_name: u.displayName || 'ผู้ดูแลระบบ',
+              email: u.email,
+              role: 'ADMIN',
+              avatar_url: u.photoURL || '',
+            });
+            setIsAuthorized(true);
+            return;
+          }
+        }
+      }
+
+      if (!isDenied) {
+        router.replace('/login?reason=admin_required');
+      }
     }
 
     setIsAuthorized(false);
-    setCurrentUser(null);
-    authorize().catch(() => router.replace('/login'));
+    authorize().catch(() => router.replace('/login?reason=admin_required'));
+
+    if (dataBackend === 'firebase' && auth) {
+      unsubscribeFirebase = onAuthStateChanged(auth, async (firebaseUser) => {
+        if (firebaseUser) {
+          let role = isAdminEmail(firebaseUser.email) ? 'ADMIN' : 'USER';
+          let avatar = firebaseUser.photoURL || '';
+          let name = firebaseUser.displayName || firebaseUser.email?.split('@')[0] || 'ผู้ดูแลระบบ';
+          if (db) {
+            try {
+              const snap = await getDoc(doc(db, 'profiles', firebaseUser.uid));
+              if (snap.exists() && snap.data().role) {
+                role = isAdminEmail(firebaseUser.email) ? 'ADMIN' : snap.data().role;
+                if (snap.data().avatar_url) avatar = snap.data().avatar_url;
+                if (snap.data().full_name) name = snap.data().full_name;
+              }
+            } catch {}
+          }
+          if (['ADMIN', 'AGENT'].includes(role)) {
+            setCurrentUser({
+              full_name: name,
+              email: firebaseUser.email,
+              avatar_url: avatar,
+              role,
+            });
+            setIsAuthorized(true);
+            setAccessDeniedUser(null);
+          } else {
+            // User is authenticated but role is USER (regular user)
+            setAccessDeniedUser({
+              full_name: name,
+              email: firebaseUser.email,
+              role: 'USER',
+              avatar_url: avatar
+            });
+            setIsAuthorized(false);
+          }
+        } else {
+          const stored = typeof window !== 'undefined' ? localStorage.getItem('chantakorn_auth_user') : null;
+          if (!stored) {
+            router.replace('/login?reason=admin_required');
+          }
+        }
+      });
+    }
 
     return () => {
-      cancelled = true;
-      unsubscribe?.();
+      window.removeEventListener('chantakorn_auth_change', handleAuthChange);
+      if (unsubscribeFirebase) unsubscribeFirebase();
     };
   }, [router, pathname]);
 
   const handleLogout = async () => {
+    if (dataBackend === 'supabase' && supabase) await supabase.auth.signOut();
     await logoutUser();
     router.push('/');
   };
@@ -148,7 +201,50 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     { label: 'ตั้งค่าระบบ', href: '/admin/settings', icon: Settings },
   ];
 
-  if (!isAuthorized || !currentUser) return null;
+  if (accessDeniedUser) {
+    return (
+      <div className="min-h-screen bg-slate-900 flex items-center justify-center p-4">
+        <div className="max-w-md w-full bg-white rounded-3xl p-7 sm:p-8 border border-surface-border shadow-2xl text-center space-y-5 animate-in fade-in zoom-in-95 duration-200">
+          <div className="w-16 h-16 rounded-2xl bg-rose-50 text-rose-600 mx-auto flex items-center justify-center border border-rose-200 shadow-sm">
+            <ShieldAlert className="w-8 h-8" />
+          </div>
+
+          <div className="space-y-2">
+            <h1 className="text-xl font-extrabold text-navy-950">ไม่มีสิทธิ์เข้าถึงระบบหลังบ้าน</h1>
+            <p className="text-xs text-brand-muted leading-relaxed">
+              คุณได้เข้าสู่ระบบด้วยบัญชี <strong className="text-navy-950">{accessDeniedUser.email || accessDeniedUser.full_name}</strong>
+            </p>
+            <div className="p-3 bg-amber-50 rounded-2xl border border-amber-200 text-amber-900 text-xs text-left space-y-1">
+              <span className="font-bold flex items-center space-x-1 text-amber-800">
+                <ShieldAlert className="w-3.5 h-3.5 mr-1" />
+                <span>ข้อจำกัดด้านสิทธิ์การใช้งาน (Role Permissions):</span>
+              </span>
+              <p className="text-[11px] text-amber-800/90 leading-relaxed">
+                บัญชีของคุณมียศเป็น <strong>ผู้ใช้ทั่วไป (USER)</strong> ระบบหลังบ้านสงวนสิทธิ์การเข้าใช้งานเฉพาะสมาชิกที่มียศ <strong>นายหน้า (AGENT)</strong> และ <strong>ผู้ดูแลระบบ (ADMIN)</strong> เท่านั้น
+              </p>
+            </div>
+          </div>
+
+          <div className="flex flex-col gap-2 pt-2">
+            <Link
+              href="/"
+              className="w-full py-2.5 px-4 rounded-xl bg-navy-950 hover:bg-navy-900 text-white font-bold text-xs shadow-md transition-all active:scale-95"
+            >
+              กลับสู่หน้าหลักเว็บไซต์
+            </Link>
+            <button
+              onClick={handleLogout}
+              className="w-full py-2.5 px-4 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold text-xs transition-colors"
+            >
+              ออกจากระบบ / เข้าสู่ระบบด้วยบัญชีเจ้าหน้าที่
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!isAuthorized) return null;
 
   return (
     <div className="min-h-screen bg-gray-100 flex flex-col md:flex-row">
@@ -195,15 +291,26 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
           {/* User Badge */}
           <div className="mt-4 p-3 bg-navy-900/80 rounded-xl border border-navy-800 flex items-center space-x-3">
-            <div className="w-8 h-8 rounded-full bg-gold-500/20 text-gold-400 flex items-center justify-center font-bold text-xs border border-gold-500/40">
-              {currentUser.full_name?.charAt(0) || 'A'}
+            <div className="relative w-9 h-9 rounded-full overflow-hidden bg-gold-500/20 text-gold-400 flex items-center justify-center font-bold text-xs border border-gold-500/40 flex-shrink-0">
+              {currentUser.avatar_url ? (
+                <Image
+                  src={currentUser.avatar_url}
+                  alt={currentUser.full_name || 'Admin'}
+                  fill
+                  unoptimized
+                  className="object-cover"
+                  referrerPolicy="no-referrer"
+                />
+              ) : (
+                <span>{currentUser.full_name?.charAt(0) || 'A'}</span>
+              )}
             </div>
             <div className="min-w-0 flex-grow">
               <span className="text-xs font-bold text-white block truncate">
                 {currentUser.full_name}
               </span>
-              <span className="text-[10px] text-gold-400 block font-semibold">
-                บทบาท: {currentUser.role}
+              <span className="text-[10px] text-gold-400 block font-semibold truncate">
+                บทบาท: {currentUser.role === 'ADMIN' ? 'ผู้ดูแลระบบ (ADMIN)' : 'นายหน้า (AGENT)'}
               </span>
             </div>
           </div>
@@ -257,7 +364,12 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       </aside>
 
       {/* Main Content Area */}
-      <main className="flex-grow p-4 sm:p-8 overflow-y-auto max-w-7xl mx-auto w-full">
+      <main className="flex-grow p-4 sm:p-8 overflow-y-auto max-w-7xl mx-auto w-full space-y-6">
+        <ProfileHeader 
+          onProfileUpdated={(updated) => {
+            setCurrentUser((prev: any) => ({ ...prev, ...updated }));
+          }} 
+        />
         {children}
       </main>
     </div>

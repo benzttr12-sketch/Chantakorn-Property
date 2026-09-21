@@ -42,8 +42,8 @@ export default function SellPage() {
     const input = e.currentTarget;
     const files = Array.from(input.files || []);
     if (!files.length || uploading) return;
-    if (uploadedPhotos.length + files.length > 5 || files.some(file => !file.type.startsWith('image/') || file.size > 5 * 1024 * 1024)) {
-      setError('แนบรูปภาพได้สูงสุด 5 รูป รูปละไม่เกิน 5 MB หรือส่งรูปเพิ่มเติมทาง LINE');
+    if (uploadedPhotos.length + files.length > 15 || files.some(file => !file.type.startsWith('image/') || file.size > 50 * 1024 * 1024)) {
+      setError('แนบรูปภาพได้สูงสุด 15 รูป รูปละไม่เกิน 50 MB (รองรับภาพถ่ายความละเอียดสูงจากมือถือ)');
       input.value = '';
       return;
     }
@@ -57,17 +57,16 @@ export default function SellPage() {
           image.onerror = () => reject(new Error('ไม่รองรับรูปภาพนี้ กรุณาใช้ไฟล์ JPG, PNG หรือ WebP'));
           image.onload = () => {
             const canvas = document.createElement('canvas');
-            const scale = Math.min(1, 1024 / Math.max(image.width, image.height));
+            const scale = Math.min(1, 1600 / Math.max(image.width, image.height));
             canvas.width = Math.max(1, Math.round(image.width * scale));
             canvas.height = Math.max(1, Math.round(image.height * scale));
             const context = canvas.getContext('2d');
             if (!context) { reject(new Error('ไม่สามารถเตรียมรูปภาพได้')); return; }
             context.fillStyle = '#fff'; context.fillRect(0, 0, canvas.width, canvas.height);
             context.drawImage(image, 0, 0, canvas.width, canvas.height);
-            let quality = 0.75;
+            let quality = 0.85;
             let photo = canvas.toDataURL('image/jpeg', quality);
-            while (photo.length > 125000 && quality > 0.2) { quality -= 0.1; photo = canvas.toDataURL('image/jpeg', quality); }
-            if (photo.length > 125000) { reject(new Error('รูปภาพมีรายละเอียดมากเกินไป กรุณาย่อรูปหรือส่งทาง LINE')); return; }
+            while (photo.length > 450000 && quality > 0.25) { quality -= 0.1; photo = canvas.toDataURL('image/jpeg', quality); }
             resolve(photo);
           };
           image.src = String(reader.result);

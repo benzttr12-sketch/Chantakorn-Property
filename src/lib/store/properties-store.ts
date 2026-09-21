@@ -1,6 +1,6 @@
 'use client';
 
-import { Property, PropertyFilters, Inquiry, UserProfile } from '@/lib/types';
+import { Property, PropertyFilters, Inquiry, UserProfile, Agent } from '@/lib/types';
 import { SAMPLE_PROPERTIES } from '@/data/sample-properties';
 import { supabase } from '@/lib/supabase/client';
 import { db } from '@/lib/firebase/client';
@@ -109,6 +109,25 @@ function rowToProperty(row: PropertyRow): Property {
   const validLat = Number.isFinite(parsedLat) && Math.abs(parsedLat) <= 90;
   const validLng = Number.isFinite(parsedLng) && Math.abs(parsedLng) <= 180;
 
+  let resolvedAgent = agents || property.agent || undefined;
+  if (typeof window !== 'undefined' && resolvedAgent) {
+    try {
+      const stored = localStorage.getItem('chantakorn_auth_user');
+      if (stored) {
+        const u = JSON.parse(stored);
+        if (u && (u.id === property.agent_id || (u.email && u.email.toLowerCase() === resolvedAgent.email?.toLowerCase()) || u.id === resolvedAgent.id)) {
+          resolvedAgent = {
+            ...resolvedAgent,
+            photo_url: u.avatar_url || resolvedAgent.photo_url,
+            name: u.full_name || resolvedAgent.name,
+            phone: u.phone || resolvedAgent.phone,
+            line_id: u.line_id || resolvedAgent.line_id,
+          };
+        }
+      }
+    } catch {}
+  }
+
   return {
     ...property,
     price: Number(property.price) || 0,
@@ -123,7 +142,7 @@ function rowToProperty(row: PropertyRow): Property {
       ? [...property_images].sort((a, b) => a.sort_order - b.sort_order).map(image => image.image_url)
       : property.images || [],
     features: property.features || [],
-    agent: agents || property.agent || undefined,
+    agent: resolvedAgent,
   };
 }
 
@@ -278,6 +297,91 @@ export async function deleteProperty(id: string): Promise<boolean> {
   if (!properties.some(property => property.id === id)) return false;
   saveLocalProperties(properties.filter(property => property.id !== id));
   return true;
+}
+
+export async function syncPropertiesAgentProfile(profile: UserProfile): Promise<void> {
+  if (!profile) return;
+  const newAvatar = profile.avatar_url || '';
+  const newName = profile.full_name || '';
+  const newPhone = profile.phone || '';
+  const newLine = profile.line_id || '';
+  const newEmail = profile.email || '';
+
+  // 1. Sync in Firebase Firestore if connected
+  if (dataBackend === 'firebase' && db) {
+    try {
+      const snap = await getDocs(collection(db, 'properties'));
+      for (const docSnap of snap.docs) {
+        const p = docSnap.data() as Property;
+        const isMatch = 
+          (p.agent_id && (p.agent_id === profile.id || p.agent_id === profile.email)) ||
+          (p.agent && (p.agent.id === profile.id || (profile.email && p.agent.email?.toLowerCase() === profile.email.toLowerCase())));
+
+        if (isMatch) {
+          const updatedAgent: Agent = {
+            id: p.agent?.id || profile.id,
+            name: newName || p.agent?.name || 'ตัวแทน Chantakorn Property',
+            title: p.agent?.title || (profile.role === 'ADMIN' ? 'ผู้ดูแลระบบและที่ปรึกษาอสังหาริมทรัพย์' : 'ตัวแทนนายหน้าอสังหาริมทรัพย์'),
+            phone: newPhone || p.agent?.phone || '081-604-0097',
+            line_id: newLine || p.agent?.line_id || 'LINE Official Account',
+            email: newEmail || p.agent?.email || '',
+            photo_url: newAvatar || p.agent?.photo_url || 'https://images.unsplash.com/photo-1560250097-0b93528c311a?auto=format&fit=crop&w=600&q=80',
+            bio: p.agent?.bio || (profile.bio || 'พร้อมให้คำปรึกษาและบริการด้านอสังหาริมทรัพย์ในสงขลา-หาดใหญ่'),
+            facebook: p.agent?.facebook
+          };
+          await setDoc(doc(db, 'properties', docSnap.id), {
+            agent: updatedAgent,
+            agent_id: profile.id,
+            updated_at: new Date().toISOString()
+          }, { merge: true });
+        }
+      }
+    } catch (err) {
+      console.warn('Firebase syncPropertiesAgentProfile error:', err);
+    }
+  }
+
+  // 2. Sync in Local Storage
+  try {
+    const localProps = getLocalProperties();
+    let hasChanges = false;
+    const updated = localProps.map(p => {
+      const isMatch = 
+        (p.agent_id && (p.agent_id === profile.id || p.agent_id === profile.email)) ||
+        (p.agent && (p.agent.id === profile.id || (profile.email && p.agent.email?.toLowerCase() === profile.email.toLowerCase())));
+
+      if (isMatch) {
+        hasChanges = true;
+        const updatedAgent: Agent = {
+          id: p.agent?.id || profile.id,
+          name: newName || p.agent?.name || 'ตัวแทน Chantakorn Property',
+          title: p.agent?.title || (profile.role === 'ADMIN' ? 'ผู้ดูแลระบบและที่ปรึกษาอสังหาริมทรัพย์' : 'ตัวแทนนายหน้าอสังหาริมทรัพย์'),
+          phone: newPhone || p.agent?.phone || '081-604-0097',
+          line_id: newLine || p.agent?.line_id || 'LINE Official Account',
+          email: newEmail || p.agent?.email || '',
+          photo_url: newAvatar || p.agent?.photo_url || 'https://images.unsplash.com/photo-1560250097-0b93528c311a?auto=format&fit=crop&w=600&q=80',
+          bio: p.agent?.bio || (profile.bio || 'พร้อมให้คำปรึกษาและบริการด้านอสังหาริมทรัพย์ในสงขลา-หาดใหญ่'),
+          facebook: p.agent?.facebook
+        };
+        return {
+          ...p,
+          agent: updatedAgent,
+          agent_id: profile.id,
+          updated_at: new Date().toISOString()
+        };
+      }
+      return p;
+    });
+
+    if (hasChanges) {
+      saveLocalProperties(updated);
+    }
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new Event('properties-updated'));
+    }
+  } catch (err) {
+    console.warn('Local storage syncPropertiesAgentProfile error:', err);
+  }
 }
 
 export function getFavoriteIds(): string[] {

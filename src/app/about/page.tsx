@@ -175,7 +175,9 @@ export default function AboutPage() {
                     src={agent.photo_url}
                     alt={agent.name}
                     fill
+                    unoptimized
                     className="object-cover"
+                    referrerPolicy="no-referrer"
                   />
                 </div>
 

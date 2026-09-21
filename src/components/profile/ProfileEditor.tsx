@@ -105,8 +105,8 @@ export default function ProfileEditor({ isAdminView = false }: ProfileEditorProp
       return;
     }
 
-    if (file.size > 10 * 1024 * 1024) {
-      setErrorMessage('ไฟล์รูปภาพมีขนาดใหญ่เกินไป (กรุณาใช้ไฟล์ขนาดไม่เกิน 10MB)');
+    if (file.size > 50 * 1024 * 1024) {
+      setErrorMessage('ไฟล์รูปภาพมีขนาดใหญ่เกินไป (กรุณาใช้ไฟล์ขนาดไม่เกิน 50MB)');
       return;
     }
 
@@ -116,9 +116,9 @@ export default function ProfileEditor({ isAdminView = false }: ProfileEditorProp
     reader.onload = (event) => {
       const img = new Image();
       img.onload = () => {
-        // Resize canvas to max 480x480 to keep it crisp, high-resolution and lightweight
+        // Resize canvas to max 800x800 to keep it crisp, high-resolution and lightweight
         const canvas = document.createElement('canvas');
-        const maxDim = 480;
+        const maxDim = 800;
         let width = img.width;
         let height = img.height;
 
