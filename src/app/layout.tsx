@@ -4,6 +4,7 @@ import Header from '@/components/layout/Header';
 import Footer from '@/components/layout/Footer';
 import MobileBottomNav from '@/components/layout/MobileBottomNav';
 import FloatingLineButton from '@/components/layout/FloatingLineButton';
+import { SpeedInsights } from '@vercel/speed-insights/next';
 
 const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
 
@@ -56,6 +57,7 @@ export default function RootLayout({
         <Footer />
         <MobileBottomNav />
         <FloatingLineButton />
+        <SpeedInsights />
       </body>
     </html>
   );
