@@ -2,7 +2,7 @@
 
 import { Database } from 'lucide-react';
 import { dataBackend } from '@/lib/backend';
-import { isFirebaseConfigured } from '@/lib/firebase/client';
+import { activeFirebaseProjectId, activeFirestoreDatabaseId, isFirebaseConfigured } from '@/lib/firebase/client';
 
 export default function AdminSettingsPage() {
   const usesFirebase = dataBackend === 'firebase';
@@ -26,8 +26,8 @@ export default function AdminSettingsPage() {
         </p>
         {usesFirebase && (
           <dl className="space-y-2 border-t border-gray-100 pt-4 text-sm">
-            <div><dt className="font-semibold text-gray-700">Firebase Project ID</dt><dd className="break-all text-gray-600">{process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || 'ยังไม่ได้กำหนด'}</dd></div>
-            <div><dt className="font-semibold text-gray-700">Firestore Database ID</dt><dd className="text-gray-600">{process.env.NEXT_PUBLIC_FIREBASE_DATABASE_ID || '(default)'}</dd></div>
+            <div><dt className="font-semibold text-gray-700">Firebase Project ID</dt><dd className="break-all text-gray-600">{activeFirebaseProjectId || 'ยังไม่ได้กำหนด'}</dd></div>
+            <div><dt className="font-semibold text-gray-700">Firestore Database ID</dt><dd className="break-all text-gray-600">{activeFirestoreDatabaseId}</dd></div>
           </dl>
         )}
       </section>

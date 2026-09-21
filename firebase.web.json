@@ -1,8 +1,10 @@
 {
-  "apiKey": "AIzaSyCoGNKOy3_m16JnYOGHmoCRgJdXVTBUT_I",
-  "authDomain": "chantakorn-property-2026.firebaseapp.com",
-  "projectId": "chantakorn-property-2026",
-  "appId": "1:261324603492:web:1df88d7de8cfd0a6279f71",
-  "messagingSenderId": "261324603492",
-  "databaseId": "chantakorn"
+  "apiKey": "AIzaSyAAU8h_2MnicHHF0lM2XYQ_rHD3JbOjwM8",
+  "authDomain": "project-d417918c-0e3b-4185-812.firebaseapp.com",
+  "projectId": "project-d417918c-0e3b-4185-812",
+  "appId": "1:256306327731:web:4efafba6c9382c5b0540c6",
+  "messagingSenderId": "256306327731",
+  "storageBucket": "project-d417918c-0e3b-4185-812.firebasestorage.app",
+  "measurementId": "G-LLVZJ3WW9L",
+  "databaseId": "ai-studio-chantakornproper-360a048e-68fa-490c-b808-4ca065da7f65"
 }

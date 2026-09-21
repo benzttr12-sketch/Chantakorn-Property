@@ -12,13 +12,16 @@ const firebaseConfig = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID ? {
   storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
   messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
   appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
-} : { ...projectConfig, storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET };
+} : { ...projectConfig, storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET || projectConfig.storageBucket };
 const usable = (value: string | undefined) => Boolean(value && !/YOUR_|your-project|51895189zaza/.test(value));
 export const isFirebaseConfigured = [firebaseConfig.apiKey, firebaseConfig.projectId, firebaseConfig.authDomain, firebaseConfig.appId].every(usable);
 const selected = process.env.NEXT_PUBLIC_DATA_BACKEND;
 const enabled = isFirebaseConfigured && (!selected || selected === 'firebase');
+export const activeFirebaseProjectId = firebaseConfig.projectId || '';
+export const activeFirestoreDatabaseId = process.env.NEXT_PUBLIC_FIREBASE_DATABASE_ID
+  || (firebaseConfig.projectId === projectConfig.projectId ? projectConfig.databaseId : '(default)');
 export const app = enabled ? (getApps().length ? getApp() : initializeApp(firebaseConfig)) : null;
-export const db = app ? getFirestore(app, process.env.NEXT_PUBLIC_FIREBASE_DATABASE_ID || (firebaseConfig.projectId === projectConfig.projectId ? projectConfig.databaseId : '(default)')) : null;
+export const db = app ? getFirestore(app, activeFirestoreDatabaseId) : null;
 export const auth = app ? getAuth(app) : null;
 export const storage = app && usable(firebaseConfig.storageBucket) ? getStorage(app) : null;
 export const googleProvider = new GoogleAuthProvider();

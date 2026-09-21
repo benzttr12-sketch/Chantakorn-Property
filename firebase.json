@@ -1,13 +1,16 @@
 {
   "firestore": {
-    "database": "chantakorn",
+    "database": "ai-studio-chantakornproper-360a048e-68fa-490c-b808-4ca065da7f65",
     "edition": "enterprise",
     "location": "asia-southeast1",
     "rules": "firestore.rules",
     "indexes": "firestore.indexes.json"
   },
+  "storage": {
+    "rules": "storage.rules"
+  },
   "auth": {
-    "authorizedDomains": ["localhost", "127.0.0.1", "benzttr12-sketch.github.io", "chantakorn-property-2026.firebaseapp.com", "chantakorn-property-2026.web.app"],
+    "authorizedDomains": ["localhost", "127.0.0.1", "benzttr12-sketch.github.io", "project-d417918c-0e3b-4185-812.firebaseapp.com", "project-d417918c-0e3b-4185-812.web.app"],
     "providers": {
       "emailPassword": true,
       "googleSignIn": { "oAuthBrandDisplayName": "Chantakorn Property", "supportEmail": "benzttr12@gmail.com" }
