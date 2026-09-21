@@ -11,6 +11,10 @@ const normalizedBasePath = cleanBasePath
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  distDir: staticExport ? '.next-pages' : '.next',
+  experimental: {
+    devtoolSegmentExplorer: false,
+  },
   ...(staticExport ? { output: 'export', trailingSlash: true } : {}),
   ...(normalizedBasePath ? { basePath: normalizedBasePath } : {}),
   poweredByHeader: false,
