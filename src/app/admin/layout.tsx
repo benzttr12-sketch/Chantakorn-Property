@@ -6,9 +6,9 @@ import { usePathname, useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase/client';
 import { auth, db } from '@/lib/firebase/client';
 import { onAuthStateChanged } from 'firebase/auth';
-import { doc, getDoc } from 'firebase/firestore';
-import { dataBackend } from '@/lib/backend';
-import { logoutUser, isAdminEmail } from '@/lib/auth-helpers';
+import { doc, getDocFromServer } from 'firebase/firestore';
+import { dataBackend, isDemoAuthEnabled } from '@/lib/backend';
+import { logoutUser, getStoredUser } from '@/lib/auth-helpers';
 import { 
   LayoutDashboard, 
   Building2, 
@@ -46,7 +46,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     const handleAuthChange = (e: any) => {
       if (e.detail) {
         const u = e.detail;
-        const r = isAdminEmail(u.email) ? 'ADMIN' : u.role;
+        const r = u.role;
         if (['ADMIN', 'AGENT'].includes(r)) {
           setCurrentUser((prev: any) => ({ ...prev, ...u, role: r }));
         }
@@ -84,47 +84,60 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         return;
       }
 
-      // 2. Local/Stored user check
-      if (typeof window !== 'undefined') {
-        const stored = localStorage.getItem('chantakorn_auth_user');
-        if (stored) {
-          try {
-            const user = JSON.parse(stored);
-            const userRole = isAdminEmail(user.email) ? 'ADMIN' : (user.role || 'USER');
-            if (['ADMIN', 'AGENT'].includes(userRole)) {
-              if (pathname.startsWith('/admin/users') && userRole !== 'ADMIN') {
-                router.replace('/admin');
-                return;
-              }
-              setCurrentUser({ ...user, role: userRole });
-              setIsAuthorized(true);
-              return;
-            } else {
-              // Regular user explicitly attempting to access admin
-              isDenied = true;
-              setAccessDeniedUser({ ...user, role: userRole });
-              setIsAuthorized(false);
+      // 2. Demo Auth check (only active when demo auth is explicitly enabled)
+      if (isDemoAuthEnabled) {
+        const user = getStoredUser();
+        if (user) {
+          const userRole = user.role || 'USER';
+          if (['ADMIN', 'AGENT'].includes(userRole)) {
+            if (pathname.startsWith('/admin/users') && userRole !== 'ADMIN') {
+              router.replace('/admin');
               return;
             }
-          } catch {}
+            setCurrentUser({ ...user, role: userRole });
+            setIsAuthorized(true);
+            return;
+          } else {
+            // Regular user explicitly attempting to access admin
+            isDenied = true;
+            setAccessDeniedUser({ ...user, role: userRole });
+            setIsAuthorized(false);
+            return;
+          }
         }
       }
 
       // 3. Firebase Auth check
-      if (dataBackend === 'firebase' && auth) {
+      if (dataBackend === 'firebase' && auth && db) {
         if (auth.currentUser) {
-          const u = auth.currentUser;
-          const role = isAdminEmail(u.email) ? 'ADMIN' : 'USER';
-          if (role === 'ADMIN') {
-            setCurrentUser({
-              full_name: u.displayName || 'ผู้ดูแลระบบ',
-              email: u.email,
-              role: 'ADMIN',
-              avatar_url: u.photoURL || '',
-            });
-            setIsAuthorized(true);
-            return;
-          }
+          try {
+            const snap = await getDocFromServer(doc(db, 'profiles', auth.currentUser.uid));
+            if (snap.exists() && ['ADMIN', 'AGENT'].includes(snap.data().role)) {
+              const profile = snap.data();
+              if (pathname.startsWith('/admin/users') && profile.role !== 'ADMIN') {
+                router.replace('/admin');
+                return;
+              }
+              setCurrentUser({
+                id: auth.currentUser.uid,
+                full_name: profile.full_name || auth.currentUser.displayName || 'ผู้ดูแลระบบ',
+                email: auth.currentUser.email,
+                role: profile.role,
+                avatar_url: profile.avatar_url || auth.currentUser.photoURL || '',
+              });
+              setIsAuthorized(true);
+              return;
+            } else {
+              isDenied = true;
+              setAccessDeniedUser({
+                id: auth.currentUser.uid,
+                email: auth.currentUser.email,
+                role: snap.exists() ? snap.data().role : 'USER',
+              });
+              setIsAuthorized(false);
+              return;
+            }
+          } catch {}
         }
       }
 
@@ -136,22 +149,22 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     setIsAuthorized(false);
     authorize().catch(() => router.replace('/login?reason=admin_required'));
 
-    if (dataBackend === 'firebase' && auth) {
+    if (dataBackend === 'firebase' && auth && db) {
+      const firestore = db;
       unsubscribeFirebase = onAuthStateChanged(auth, async (firebaseUser) => {
         if (firebaseUser) {
-          let role = isAdminEmail(firebaseUser.email) ? 'ADMIN' : 'USER';
+          let role = 'USER';
           let avatar = firebaseUser.photoURL || '';
           let name = firebaseUser.displayName || firebaseUser.email?.split('@')[0] || 'ผู้ดูแลระบบ';
-          if (db) {
-            try {
-              const snap = await getDoc(doc(db, 'profiles', firebaseUser.uid));
-              if (snap.exists() && snap.data().role) {
-                role = isAdminEmail(firebaseUser.email) ? 'ADMIN' : snap.data().role;
-                if (snap.data().avatar_url) avatar = snap.data().avatar_url;
-                if (snap.data().full_name) name = snap.data().full_name;
-              }
-            } catch {}
-          }
+          try {
+            const snap = await getDocFromServer(doc(firestore, 'profiles', firebaseUser.uid));
+            if (snap.exists() && snap.data().role) {
+              role = snap.data().role;
+              if (snap.data().avatar_url) avatar = snap.data().avatar_url;
+              if (snap.data().full_name) name = snap.data().full_name;
+            }
+          } catch {}
+
           if (['ADMIN', 'AGENT'].includes(role)) {
             setCurrentUser({
               full_name: name,
@@ -172,7 +185,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             setIsAuthorized(false);
           }
         } else {
-          const stored = typeof window !== 'undefined' ? localStorage.getItem('chantakorn_auth_user') : null;
+          const stored = isDemoAuthEnabled ? getStoredUser() : null;
           if (!stored) {
             router.replace('/login?reason=admin_required');
           }

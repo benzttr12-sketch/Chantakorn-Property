@@ -56,7 +56,7 @@ import {
   getSongkhlaSubdistricts, 
   getSongkhlaCoordinates 
 } from '@/data/locations';
-import { getStoredUser, isAdminEmail } from '@/lib/auth-helpers';
+import { getStoredUser } from '@/lib/auth-helpers';
 
 // ตัวอย่างรูปภาพคุณภาพสูง สำหรับปุ่ม "ใส่รูปภาพตัวอย่างทันที 1 คลิก"
 const SAMPLE_HOUSE_PHOTOS = [
@@ -239,11 +239,11 @@ function PropertyEditor() {
       try {
         const users = await fetchUsers();
         // Filter strictly to ADMIN and AGENT
-        const staffOnly = users.filter(u => u.role === 'ADMIN' || u.role === 'AGENT' || isAdminEmail(u.email));
+        const staffOnly = users.filter(u => u.role === 'ADMIN' || u.role === 'AGENT');
         
         // Also ensure current user is represented if they are staff
         const current = getStoredUser();
-        if (current && (current.role === 'ADMIN' || current.role === 'AGENT' || isAdminEmail(current.email))) {
+        if (current && (current.role === 'ADMIN' || current.role === 'AGENT')) {
           if (!staffOnly.some(s => s.id === current.id || s.email === current.email)) {
             staffOnly.unshift(current);
           }

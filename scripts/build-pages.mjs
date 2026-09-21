@@ -4,6 +4,7 @@ import { writeFileSync } from 'node:fs';
 // The explicit backend keeps a local .env.local out of the public demo build.
 const env = {
   ...process.env,
+  NODE_ENV: 'production',
   STATIC_EXPORT: 'true',
   NEXT_PUBLIC_DATA_BACKEND: process.env.DEPLOY_DATA_BACKEND || 'local',
   NEXT_PUBLIC_ENABLE_DEMO_AUTH: process.env.DEPLOY_DEMO_AUTH || 'false',
