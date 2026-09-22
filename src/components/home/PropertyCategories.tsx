@@ -1,14 +1,34 @@
-import React from 'react';
+'use client';
+
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { Home, Trees, Building2, Store, TrendingUp, HandCoins, ArrowRight } from 'lucide-react';
+import { fetchProperties } from '@/lib/store/properties-store';
 
 export default function PropertyCategories() {
+  const [counts, setCounts] = useState<Record<string, number>>({});
+
+  useEffect(() => {
+    async function loadCounts() {
+      try {
+        const props = await fetchProperties();
+        const map: Record<string, number> = {};
+        props.forEach((p) => {
+          map[p.property_type] = (map[p.property_type] || 0) + 1;
+        });
+        setCounts(map);
+      } catch {
+        // Ignore fallback
+      }
+    }
+    loadCounts();
+  }, []);
+
   const categories = [
     {
       name: 'บ้าน',
       type: 'house',
-      count: '120 รายการ',
       description: 'บ้านเดี่ยว ทาวน์โฮม บ้านแฝด โซนหาดใหญ่และสงขลา',
       icon: Home,
       image: 'https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?auto=format&fit=crop&w=600&q=80',
@@ -16,7 +36,6 @@ export default function PropertyCategories() {
     {
       name: 'ที่ดิน',
       type: 'land',
-      count: '45 รายการ',
       description: 'ที่ดินเปล่าถมแล้ว ที่ดินติดถนนใหญ่ แปลงสร้างบ้านหรือจัดสรร',
       icon: Trees,
       image: 'https://images.unsplash.com/photo-1500382017468-9049fed747ef?auto=format&fit=crop&w=600&q=80',
@@ -24,7 +43,6 @@ export default function PropertyCategories() {
     {
       name: 'คอนโด',
       type: 'condo',
-      count: '35 รายการ',
       description: 'คอนโดพร้อมอยู่ใกล้มหาวิทยาลัยสงขลานครินทร์ และเซ็นทรัลหาดใหญ่',
       icon: Building2,
       image: 'https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?auto=format&fit=crop&w=600&q=80',
@@ -32,7 +50,6 @@ export default function PropertyCategories() {
     {
       name: 'อาคารพาณิชย์',
       type: 'commercial',
-      count: '28 รายการ',
       description: 'ตึกแถวและโฮมออฟฟิศทำเลค้าขาย ใจกลางย่านธุรกิจหาดใหญ่',
       icon: Store,
       image: 'https://images.unsplash.com/photo-1577495508048-b635879837f1?auto=format&fit=crop&w=600&q=80',
@@ -40,7 +57,6 @@ export default function PropertyCategories() {
     {
       name: 'อสังหาริมทรัพย์เพื่อการลงทุน',
       type: 'investment',
-      count: '15 รายการ',
       description: 'อพาร์ทเมนท์ หอพัก และอาคารพร้อมผู้เช่า ผลตอบแทนสูง',
       icon: TrendingUp,
       image: 'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?auto=format&fit=crop&w=600&q=80',
@@ -48,7 +64,6 @@ export default function PropertyCategories() {
     {
       name: 'ขายฝาก / จำนอง',
       type: 'consignment',
-      count: '22 รายการ',
       description: 'บริการจัดหาเงินทุนถูกกฎหมาย ดอกเบี้ยเป็นธรรม อนุมัติไว',
       icon: HandCoins,
       image: 'https://images.unsplash.com/photo-1554224155-8d04cb21cd6c?auto=format&fit=crop&w=600&q=80',
@@ -75,6 +90,7 @@ export default function PropertyCategories() {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
           {categories.map((cat) => {
             const Icon = cat.icon;
+            const realCount = counts[cat.type] || 0;
             return (
               <Link
                 key={cat.name}
@@ -95,13 +111,13 @@ export default function PropertyCategories() {
 
                 {/* Content Overlay */}
                 <div className="absolute inset-0 p-6 flex flex-col justify-between z-10">
-                  {/* Top Badge: Icon & Count */}
+                  {/* Top Badge: Icon & Real Count */}
                   <div className="flex items-center justify-between">
                     <div className="w-12 h-12 rounded-xl bg-white/90 backdrop-blur-md flex items-center justify-center text-navy-900 group-hover:bg-gold-500 group-hover:text-navy-950 transition-colors shadow-md">
                       <Icon className="w-6 h-6" />
                     </div>
                     <span className="px-3 py-1 bg-navy-900/80 backdrop-blur-md border border-white/10 rounded-full text-xs font-semibold text-gold-300">
-                      {cat.count}
+                      {realCount > 0 ? `${realCount} รายการจริง` : 'ดูรายการ'}
                     </span>
                   </div>
 

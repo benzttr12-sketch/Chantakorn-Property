@@ -154,41 +154,67 @@ export default function AboutPage() {
         <div className="mt-24">
           <div className="text-center max-w-2xl mx-auto mb-12">
             <span className="text-xs font-bold text-gold-600 uppercase tracking-widest bg-gold-50 px-3.5 py-1 rounded-full border border-gold-200">
-              ทีมงานมืออาชีพ
+              โปรไฟล์ที่ปรึกษาและทีมงาน
             </span>
             <h2 className="text-3xl font-extrabold text-navy-950 mt-2">
-              พบกับทีมงาน Chantakorn Property
+              ที่ปรึกษาและทีมงาน Chantakorn Property
             </h2>
             <p className="text-xs sm:text-sm text-brand-muted mt-1">
-              พร้อมดูแลและตอบทุกคำถามด้านอสังหาริมทรัพย์ในหาดใหญ่และสงขลา
+              ทีมงานได้รับการแบ่งหน้าที่ตามยศอย่างชัดเจน: <strong>แอดมิน</strong> และ <strong>นายหน้า</strong>
             </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-4xl mx-auto">
-            {AGENTS.map((agent) => (
-              <div
-                key={agent.id}
-                className="bg-white rounded-2xl p-6 border border-surface-border shadow-card flex flex-col sm:flex-row items-center sm:items-start space-y-4 sm:space-y-0 sm:space-x-5"
-              >
-                <div className="relative w-28 h-28 rounded-2xl overflow-hidden border-2 border-gold-400 flex-shrink-0 shadow-md">
-                  <Image
-                    src={agent.photo_url}
-                    alt={agent.name}
-                    fill
-                    unoptimized
-                    className="object-cover"
-                    referrerPolicy="no-referrer"
-                  />
-                </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-4xl mx-auto">
+            {AGENTS.map((agent) => {
+              const isAdmin = agent.rank === 'แอดมิน';
+              return (
+                <div
+                  key={agent.id}
+                  className="bg-white rounded-2xl p-6 border border-surface-border shadow-card flex flex-col justify-between hover:shadow-card-hover transition-all"
+                >
+                  <div className="flex flex-col sm:flex-row items-center sm:items-start space-y-4 sm:space-y-0 sm:space-x-5">
+                    <div className="relative w-24 h-24 rounded-2xl overflow-hidden border-2 border-gold-400 flex-shrink-0 shadow-md">
+                      <Image
+                        src={agent.photo_url}
+                        alt={agent.name}
+                        fill
+                        unoptimized
+                        className="object-cover"
+                        referrerPolicy="no-referrer"
+                      />
+                    </div>
 
-                <div className="flex-grow text-center sm:text-left">
-                  <h3 className="text-lg font-bold text-navy-950">{agent.name}</h3>
-                  <p className="text-xs font-semibold text-gold-700 mt-0.5">{agent.title}</p>
-                  <p className="text-xs text-gray-600 mt-2 leading-relaxed line-clamp-3">
-                    {agent.bio}
-                  </p>
+                    <div className="flex-grow text-center sm:text-left">
+                      <h3 className="text-base sm:text-lg font-bold text-navy-950">{agent.name}</h3>
+                      
+                      {/* Strict Rank Badge */}
+                      <div className="mt-1.5 flex justify-center sm:justify-start">
+                        <span className={`inline-flex items-center space-x-1.5 px-3 py-1 rounded-full text-xs font-bold border ${
+                          isAdmin 
+                            ? 'bg-gold-50 text-gold-900 border-gold-300' 
+                            : 'bg-navy-50 text-navy-900 border-navy-200'
+                        }`}>
+                          {isAdmin ? (
+                            <>
+                              <ShieldCheck className="w-3.5 h-3.5 text-gold-600" />
+                              <span>ยศ: แอดมิน (Admin)</span>
+                            </>
+                          ) : (
+                            <>
+                              <Award className="w-3.5 h-3.5 text-navy-700" />
+                              <span>ยศ: นายหน้า (Agent)</span>
+                            </>
+                          )}
+                        </span>
+                      </div>
 
-                  <div className="mt-4 pt-3 border-t border-gray-100 flex items-center justify-center sm:justify-start space-x-3 text-xs">
+                      <p className="text-xs text-gray-600 mt-3 leading-relaxed">
+                        {agent.bio}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="mt-5 pt-3.5 border-t border-gray-100 flex flex-wrap items-center justify-between text-xs gap-2">
                     <a
                       href={`tel:${agent.phone}`}
                       className="font-bold text-navy-950 hover:text-gold-600 flex items-center space-x-1"
@@ -196,12 +222,11 @@ export default function AboutPage() {
                       <Phone className="w-3.5 h-3.5 text-gold-600" />
                       <span>{agent.phone}</span>
                     </a>
-                    <span className="text-gray-300">•</span>
                     <span className="text-gray-500">LINE: <strong className="text-emerald-600">{agent.line_id}</strong></span>
                   </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       </div>

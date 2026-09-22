@@ -1,7 +1,8 @@
 'use client';
 
-import { Property, PropertyFilters, Inquiry, UserProfile, Agent } from '@/lib/types';
+import { Property, PropertyFilters, Inquiry, UserProfile, Agent, AgentRank } from '@/lib/types';
 import { SAMPLE_PROPERTIES } from '@/data/sample-properties';
+import { formatPropertyCode } from '@/lib/format-code';
 import { supabase } from '@/lib/supabase/client';
 import { db } from '@/lib/firebase/client';
 import { dataBackend, isDemoAuthEnabled, isDemoMode } from '@/lib/backend';
@@ -68,9 +69,6 @@ function isUser(item: unknown): item is UserProfile {
 }
 
 function requireConnection() {
-  if (dataBackend === 'supabase' && !supabase) {
-    throw new Error('ระบบฐานข้อมูล Supabase ยังไม่ได้ตั้งค่า');
-  }
   if (dataBackend === 'firebase' && !db) {
     throw new Error('ระบบฐานข้อมูล Firebase ยังไม่ได้ตั้งค่า');
   }
@@ -158,8 +156,15 @@ function filterProperties(properties: Property[], filters?: PropertyFilters): Pr
     if (filters?.maxPrice !== undefined && property.price > filters.maxPrice) return false;
     if (filters?.bedrooms && filters.bedrooms !== 'any' && property.bedrooms < filters.bedrooms) return false;
     if (filters?.bathrooms && filters.bathrooms !== 'any' && property.bathrooms < filters.bathrooms) return false;
-    if (filters?.searchQuery && ![property.title, property.description, property.province, property.district, property.subdistrict]
-      .some(value => contains(value, filters.searchQuery!))) return false;
+    if (filters?.searchQuery && ![
+      property.title,
+      property.description,
+      property.province,
+      property.district,
+      property.subdistrict,
+      property.id,
+      formatPropertyCode(property.id)
+    ].some(value => contains(value, filters.searchQuery!))) return false;
     if (filters?.features?.length && !filters.features.every(feature => property.features.some(value => contains(value, feature)))) return false;
     return true;
   });
@@ -221,6 +226,15 @@ export async function fetchPropertyBySlug(slug: string): Promise<Property | null
   return (await loadProperties(false)).find(property => property.slug === slug) || null;
 }
 
+function generateShortPropertyId(): string {
+  const chars = '23456789abcdefghjkmnpqrstuvwxyz';
+  let rand = '';
+  for (let i = 0; i < 6; i++) {
+    rand += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return `ck-${rand}`;
+}
+
 export async function createProperty(property: Omit<Property, 'id' | 'created_at'>): Promise<Property> {
   requireStaffBackend();
   if (dataBackend === 'supabase' && supabase) {
@@ -230,7 +244,7 @@ export async function createProperty(property: Omit<Property, 'id' | 'created_at
     return { ...(data as Property), images, agent };
   }
   if (dataBackend === 'firebase' && db) {
-    const newId = crypto.randomUUID();
+    const newId = generateShortPropertyId();
     const newProperty: Property = {
       ...property,
       id: newId,
@@ -241,7 +255,7 @@ export async function createProperty(property: Omit<Property, 'id' | 'created_at
   }
   const properties = getLocalProperties();
   if (properties.some(item => item.slug === property.slug)) throw new Error('ที่อยู่ประกาศ (Slug) นี้มีอยู่แล้ว กรุณาใช้ชื่ออื่น');
-  const newProperty: Property = { ...property, id: crypto.randomUUID(), created_at: new Date().toISOString() };
+  const newProperty: Property = { ...property, id: generateShortPropertyId(), created_at: new Date().toISOString() };
   saveLocalProperties([newProperty, ...properties]);
   return newProperty;
 }
@@ -318,15 +332,17 @@ export async function syncPropertiesAgentProfile(profile: UserProfile): Promise<
           (p.agent && (p.agent.id === profile.id || (profile.email && p.agent.email?.toLowerCase() === profile.email.toLowerCase())));
 
         if (isMatch) {
+          const resolvedRank: AgentRank = profile.role === 'ADMIN' ? 'แอดมิน' : 'นายหน้า';
           const updatedAgent: Agent = {
             id: p.agent?.id || profile.id,
             name: newName || p.agent?.name || 'ตัวแทน Chantakorn Property',
-            title: p.agent?.title || (profile.role === 'ADMIN' ? 'ผู้ดูแลระบบและที่ปรึกษาอสังหาริมทรัพย์' : 'ตัวแทนนายหน้าอสังหาริมทรัพย์'),
+            rank: resolvedRank,
+            title: resolvedRank,
             phone: newPhone || p.agent?.phone || '081-604-0097',
             line_id: newLine || p.agent?.line_id || 'LINE Official Account',
             email: newEmail || p.agent?.email || '',
             photo_url: newAvatar || p.agent?.photo_url || 'https://images.unsplash.com/photo-1560250097-0b93528c311a?auto=format&fit=crop&w=600&q=80',
-            bio: p.agent?.bio || (profile.bio || 'พร้อมให้คำปรึกษาและบริการด้านอสังหาริมทรัพย์ในสงขลา-หาดใหญ่'),
+            bio: p.agent?.bio || (profile.bio || (resolvedRank === 'แอดมิน' ? 'ผู้ดูแลระบบและที่ปรึกษาอสังหาริมทรัพย์ Chantakorn Property' : 'ตัวแทนนายหน้าอสังหาริมทรัพย์')),
             facebook: p.agent?.facebook
           };
           await setDoc(doc(db, 'properties', docSnap.id), {
@@ -352,15 +368,17 @@ export async function syncPropertiesAgentProfile(profile: UserProfile): Promise<
 
       if (isMatch) {
         hasChanges = true;
+        const resolvedRank: AgentRank = profile.role === 'ADMIN' ? 'แอดมิน' : 'นายหน้า';
         const updatedAgent: Agent = {
           id: p.agent?.id || profile.id,
           name: newName || p.agent?.name || 'ตัวแทน Chantakorn Property',
-          title: p.agent?.title || (profile.role === 'ADMIN' ? 'ผู้ดูแลระบบและที่ปรึกษาอสังหาริมทรัพย์' : 'ตัวแทนนายหน้าอสังหาริมทรัพย์'),
+          rank: resolvedRank,
+          title: resolvedRank,
           phone: newPhone || p.agent?.phone || '081-604-0097',
           line_id: newLine || p.agent?.line_id || 'LINE Official Account',
           email: newEmail || p.agent?.email || '',
           photo_url: newAvatar || p.agent?.photo_url || 'https://images.unsplash.com/photo-1560250097-0b93528c311a?auto=format&fit=crop&w=600&q=80',
-          bio: p.agent?.bio || (profile.bio || 'พร้อมให้คำปรึกษาและบริการด้านอสังหาริมทรัพย์ในสงขลา-หาดใหญ่'),
+          bio: p.agent?.bio || (profile.bio || (resolvedRank === 'แอดมิน' ? 'ผู้ดูแลระบบและที่ปรึกษาอสังหาริมทรัพย์ Chantakorn Property' : 'ตัวแทนนายหน้าอสังหาริมทรัพย์')),
           facebook: p.agent?.facebook
         };
         return {

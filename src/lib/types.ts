@@ -8,10 +8,13 @@ export interface PropertyImage {
   sort_order: number;
 }
 
+export type AgentRank = 'แอดมิน' | 'นายหน้า';
+
 export interface Agent {
   id: string;
   name: string;
-  title: string;
+  rank?: AgentRank;
+  title: AgentRank | string;
   phone: string;
   line_id: string;
   facebook?: string;

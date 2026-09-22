@@ -42,7 +42,7 @@ import {
   fetchAdminProperties, 
   fetchUsers 
 } from '@/lib/store/properties-store';
-import { PropertyType, PropertyStatus, UserProfile, Agent } from '@/lib/types';
+import { PropertyType, PropertyStatus, UserProfile, Agent, AgentRank } from '@/lib/types';
 import { 
   slugify, 
   formatPrice, 
@@ -99,22 +99,17 @@ function PropertyEditor() {
   const [address, setAddress] = useState('');
   const [latitude, setLatitude] = useState('7.0084');
   const [longitude, setLongitude] = useState('100.4705');
-  const [bedrooms, setBedrooms] = useState('3');
-  const [bathrooms, setBathrooms] = useState('2');
-  const [parking, setParking] = useState('2');
-  const [landSize, setLandSize] = useState('50');
-  const [usableArea, setUsableArea] = useState('160');
-  const [yearBuilt, setYearBuilt] = useState('2024');
-  const [furniture, setFurniture] = useState('พร้อมอยู่บางส่วน');
+  const [bedrooms, setBedrooms] = useState('0');
+  const [bathrooms, setBathrooms] = useState('0');
+  const [parking, setParking] = useState('0');
+  const [landSize, setLandSize] = useState('');
+  const [usableArea, setUsableArea] = useState('');
+  const [yearBuilt, setYearBuilt] = useState('');
+  const [furniture, setFurniture] = useState('');
   const [description, setDescription] = useState('');
-  const [coverImage, setCoverImage] = useState(SAMPLE_HOUSE_PHOTOS[0]);
-  const [images, setImages] = useState<string[]>(SAMPLE_HOUSE_PHOTOS.slice(0, 3));
-  const [selectedFeatures, setSelectedFeatures] = useState<string[]>([
-    'เครื่องปรับอากาศ',
-    'ที่จอดรถส่วนตัว',
-    'กล้องวงจรปิด CCTV',
-    'ใกล้เซ็นทรัลหาดใหญ่'
-  ]);
+  const [coverImage, setCoverImage] = useState('');
+  const [images, setImages] = useState<string[]>([]);
+  const [selectedFeatures, setSelectedFeatures] = useState<string[]>([]);
   const [featured, setFeatured] = useState(false);
 
   // Staff (Agent & Admin) List
@@ -617,17 +612,19 @@ function PropertyEditor() {
     try {
       // Build resolved Agent details based on strictly Admin / Agent profile
       const agentProfile = currentAssignedStaff;
+      const resolvedRank: AgentRank = (agentProfile?.role === 'ADMIN' ? 'แอดมิน' : 'นายหน้า');
       const resolvedAgent: Agent = {
         id: agentProfile?.id || 'admin-benz',
-        name: agentProfile?.full_name || 'ตัวแทน Chantakorn Property',
-        title: agentProfile?.role === 'ADMIN' 
-          ? 'ผู้ดูแลระบบและที่ปรึกษาอสังหาริมทรัพย์' 
-          : 'ตัวแทนนายหน้าอสังหาริมทรัพย์ประจำสงขลา',
+        name: agentProfile?.full_name || 'คุณฉันทากร นวลจันทร์ (เบนซ์)',
+        rank: resolvedRank,
+        title: resolvedRank,
         phone: agentProfile?.phone || '081-604-0097',
-        line_id: agentProfile?.line_id || '@chantakorn',
-        email: agentProfile?.email || 'benzttr12@gmail.com',
+        line_id: agentProfile?.line_id || 'LINE Official Account',
+        email: agentProfile?.email || 'chantakorn@chantakornproperty.com',
         photo_url: agentProfile?.avatar_url || 'https://images.unsplash.com/photo-1560250097-0b93528c311a?auto=format&fit=crop&w=600&q=80',
-        bio: agentProfile?.bio || 'พร้อมให้บริการ ซื้อ-ขาย-เช่า-ฝากขาย อสังหาริมทรัพย์ในจังหวัดสงขลาอย่างมืออาชีพ',
+        bio: agentProfile?.bio || (resolvedRank === 'แอดมิน'
+          ? 'ผู้ดูแลระบบและที่ปรึกษาอสังหาริมทรัพย์ Chantakorn Property ดูแลลูกค้าทุกท่านอย่างซื่อตรงและโปร่งใส'
+          : 'ตัวแทนนายหน้าอสังหาริมทรัพย์มืออาชีพ พร้อมดูแลพานัดชมทรัพย์และอำนวยความสะดวกทุกขั้นตอน'),
       };
 
       const propertyData = {
@@ -1677,16 +1674,16 @@ function PropertyEditor() {
                   <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
                     currentAssignedStaff?.role === 'ADMIN'
                       ? 'bg-gold-100 text-gold-800 border border-gold-300'
-                      : 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                      : 'bg-navy-100 text-navy-800 border border-navy-300'
                   }`}>
-                    {currentAssignedStaff?.role === 'ADMIN' ? '👑 ผู้ดูแลระบบ (ADMIN)' : '💼 นายหน้า (AGENT)'}
+                    {currentAssignedStaff?.role === 'ADMIN' ? '🛡️ ยศ: แอดมิน (Admin)' : '👔 ยศ: นายหน้า (Agent)'}
                   </span>
                 </div>
 
                 <p className="text-xs text-brand-muted">
                   {currentAssignedStaff?.role === 'ADMIN' 
-                    ? 'ผู้ดูแลระบบและที่ปรึกษาอสังหาริมทรัพย์ Chantakorn Property' 
-                    : 'ตัวแทนนายหน้าอสังหาริมทรัพย์ประจำจังหวัดสงขลา'}
+                    ? 'ยศ: แอดมิน ผู้ดูแลระบบและที่ปรึกษาอสังหาริมทรัพย์ Chantakorn Property' 
+                    : 'ยศ: นายหน้า ตัวแทนนายหน้าอสังหาริมทรัพย์ประจำจังหวัดสงขลา'}
                 </p>
 
                 <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-navy-900 pt-1">

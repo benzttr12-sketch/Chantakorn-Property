@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import { Property } from '@/lib/types';
 import { Send, CheckCircle2, User, Phone, MessageCircle, FileText } from 'lucide-react';
 import { submitInquiry } from '@/lib/store/properties-store';
+import { formatPropertyCode } from '@/lib/utils';
 
 interface PropertyInquiryFormProps {
   property: Property;
@@ -14,7 +15,7 @@ export default function PropertyInquiryForm({ property }: PropertyInquiryFormPro
   const [phone, setPhone] = useState('');
   const [lineId, setLineId] = useState('');
   const [message, setMessage] = useState(
-    `สนใจทรัพย์ "${property.title}" รหัส ${property.id} ต้องการสอบถามรายละเอียดเพิ่มเติมครับ`
+    `สนใจทรัพย์ "${property.title}" รหัส ${formatPropertyCode(property.id)} ต้องการสอบถามรายละเอียดเพิ่มเติมครับ`
   );
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');

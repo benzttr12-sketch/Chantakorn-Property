@@ -15,7 +15,8 @@ import {
   Calendar,
   ChevronRight,
   ShieldCheck,
-  Compass
+  Compass,
+  Copy
 } from 'lucide-react';
 import PropertyGallery from '@/components/properties/PropertyGallery';
 import PropertySpecs from '@/components/properties/PropertySpecs';
@@ -24,7 +25,7 @@ import PropertyInquiryForm from '@/components/properties/PropertyInquiryForm';
 import PropertyCard from '@/components/properties/PropertyCard';
 import PropertyMap from '@/components/properties/PropertyMap';
 import { fetchPropertyBySlug, fetchProperties } from '@/lib/store/properties-store';
-import { formatPrice, getPropertyStatusBadge, formatThaiNumber } from '@/lib/utils';
+import { formatPrice, getPropertyStatusBadge, formatThaiNumber, formatPropertyCode } from '@/lib/utils';
 
 import { Property } from '@/lib/types';
 
@@ -33,6 +34,16 @@ export default function PropertyDetail({ slug, initialProperty = null }: { slug:
   const [relatedProperties, setRelatedProperties] = useState<Property[]>([]);
   const [loading, setLoading] = useState(!initialProperty);
   const [error, setError] = useState('');
+  const [copiedCode, setCopiedCode] = useState(false);
+
+  const handleCopyCode = () => {
+    if (!property) return;
+    const code = formatPropertyCode(property.id);
+    navigator.clipboard?.writeText(code).then(() => {
+      setCopiedCode(true);
+      setTimeout(() => setCopiedCode(false), 2000);
+    }).catch(() => {});
+  };
 
   useEffect(() => {
     let active = true;
@@ -135,10 +146,26 @@ export default function PropertyDetail({ slug, initialProperty = null }: { slug:
                     ทรัพย์เด่นแนะนำ
                   </span>
                 )}
-                <span className="text-xs text-gray-500 flex items-center ml-auto">
-                  <Compass className="w-3.5 h-3.5 mr-1 text-gold-600" />
-                  รหัสทรัพย์: <strong className="ml-1 text-navy-950">{property.id.toUpperCase()}</strong>
-                </span>
+                <div className="text-xs text-gray-600 flex items-center ml-auto bg-gray-50 hover:bg-gray-100 transition-colors px-2.5 py-1 rounded-lg border border-gray-200">
+                  <Compass className="w-3.5 h-3.5 mr-1.5 text-gold-600 flex-shrink-0" />
+                  <span>รหัสทรัพย์:</span>
+                  <strong className="ml-1 text-navy-950 font-mono font-bold tracking-wide">
+                    {formatPropertyCode(property.id)}
+                  </strong>
+                  <button
+                    type="button"
+                    onClick={handleCopyCode}
+                    title={copiedCode ? 'คัดลอกรหัสเรียบร้อย' : 'คัดลอกรหัสทรัพย์'}
+                    className="ml-1.5 p-0.5 text-gray-400 hover:text-navy-950 transition-colors cursor-pointer"
+                    aria-label="คัดลอกรหัสทรัพย์"
+                  >
+                    {copiedCode ? (
+                      <Check className="w-3.5 h-3.5 text-emerald-600" />
+                    ) : (
+                      <Copy className="w-3.5 h-3.5" />
+                    )}
+                  </button>
+                </div>
               </div>
 
               <h1 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold text-navy-950 tracking-tight leading-snug">

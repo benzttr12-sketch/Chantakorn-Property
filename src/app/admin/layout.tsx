@@ -26,6 +26,7 @@ import {
 } from 'lucide-react';
 import Image from 'next/image';
 import ProfileHeader from '@/components/admin/ProfileHeader';
+import { fetchInquiries } from '@/lib/store/properties-store';
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -33,12 +34,30 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [isAuthorized, setIsAuthorized] = useState(false);
   const [accessDeniedUser, setAccessDeniedUser] = useState<any>(null);
+  const [pendingInquiriesCount, setPendingInquiriesCount] = useState<number>(0);
   const [currentUser, setCurrentUser] = useState<any>({
     full_name: 'ผู้ดูแลระบบ (Admin)',
     role: 'ADMIN',
     email: 'admin@chantakornproperty.com',
     avatar_url: '',
   });
+
+  useEffect(() => {
+    let active = true;
+    const loadBadges = async () => {
+      try {
+        const inqs = await fetchInquiries();
+        if (active) {
+          const pending = inqs.filter((i) => i.status === 'new').length;
+          setPendingInquiriesCount(pending);
+        }
+      } catch {}
+    };
+    if (isAuthorized) {
+      loadBadges();
+    }
+    return () => { active = false; };
+  }, [isAuthorized, pathname]);
 
   useEffect(() => {
     let unsubscribeFirebase: (() => void) | undefined;
@@ -328,11 +347,12 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             </div>
           </div>
 
-          {/* Navigation Links */}
+            {/* Navigation Links */}
           <nav className="mt-6 space-y-1.5">
             {navItems.filter(item => item.href !== '/admin/users' || currentUser.role === 'ADMIN').map((item) => {
               const isActive = pathname === item.href;
               const Icon = item.icon;
+              const isLeadItem = item.href === '/admin/inquiries';
               return (
                 <Link
                   key={item.label}
@@ -344,11 +364,22 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                       : 'text-gray-300 hover:bg-navy-900 hover:text-white'
                   }`}
                 >
-                  <div className="flex items-center space-x-2.5">
-                    <Icon className="w-4 h-4" />
-                    <span>{item.label}</span>
+                  <div className="flex items-center space-x-2.5 min-w-0">
+                    <Icon className="w-4 h-4 flex-shrink-0" />
+                    <span className="truncate">{item.label}</span>
                   </div>
-                  {isActive && <ChevronRight className="w-3.5 h-3.5" />}
+                  <div className="flex items-center space-x-1.5 flex-shrink-0">
+                    {isLeadItem && pendingInquiriesCount > 0 && (
+                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-black ${
+                        isActive 
+                          ? 'bg-navy-950 text-gold-400' 
+                          : 'bg-amber-400 text-navy-950'
+                      }`}>
+                        {pendingInquiriesCount}
+                      </span>
+                    )}
+                    {isActive && <ChevronRight className="w-3.5 h-3.5" />}
+                  </div>
                 </Link>
               );
             })}
@@ -376,8 +407,56 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         </div>
       </aside>
 
+      {/* Mobile Backdrop */}
+      {mobileSidebarOpen && (
+        <div
+          onClick={() => setMobileSidebarOpen(false)}
+          className="fixed inset-0 bg-black/60 backdrop-blur-xs z-40 md:hidden"
+          aria-hidden="true"
+        />
+      )}
+
       {/* Main Content Area */}
       <main className="flex-grow p-4 sm:p-8 overflow-y-auto max-w-7xl mx-auto w-full space-y-6">
+        {/* Quick Top Utility Bar */}
+        <div className="flex flex-wrap items-center justify-between gap-3 pb-2 border-b border-gray-200">
+          <div className="flex items-center space-x-2 text-xs text-gray-500">
+            <Link href="/admin" className="hover:text-navy-950 font-semibold flex items-center space-x-1">
+              <LayoutDashboard className="w-3.5 h-3.5 text-gold-600" />
+              <span>แอดมิน</span>
+            </Link>
+            <span>/</span>
+            <span className="text-navy-950 font-bold">
+              {pathname === '/admin' ? 'แดชบอร์ดภาพรวม'
+                : pathname.startsWith('/admin/properties/new') ? 'ลงประกาศ / แก้ไขข้อมูลทรัพย์'
+                : pathname.startsWith('/admin/properties') ? 'จัดการอสังหาริมทรัพย์'
+                : pathname.startsWith('/admin/inquiries') ? 'รายการผู้ติดต่อ & ฝากขาย'
+                : pathname.startsWith('/admin/users') ? 'จัดการสมาชิก & สิทธิ์'
+                : 'ตั้งค่าระบบ'}
+            </span>
+          </div>
+
+          <div className="flex items-center space-x-2">
+            {pathname !== '/admin/properties/new' && (
+              <Link
+                href="/admin/properties/new"
+                className="px-3.5 py-1.5 bg-navy-950 hover:bg-navy-900 text-gold-400 font-bold text-xs rounded-xl shadow-xs flex items-center space-x-1.5 transition-all"
+              >
+                <PlusCircle className="w-3.5 h-3.5 text-gold-400" />
+                <span>+ เพิ่มทรัพย์ใหม่</span>
+              </Link>
+            )}
+            <Link
+              href="/"
+              target="_blank"
+              className="px-3 py-1.5 bg-white hover:bg-gray-50 text-gray-700 font-semibold text-xs rounded-xl border border-gray-200 shadow-xs flex items-center space-x-1.5 transition-all"
+            >
+              <ExternalLink className="w-3.5 h-3.5 text-gray-500" />
+              <span>ดูหน้าเว็บ</span>
+            </Link>
+          </div>
+        </div>
+
         <ProfileHeader 
           onProfileUpdated={(updated) => {
             setCurrentUser((prev: any) => ({ ...prev, ...updated }));

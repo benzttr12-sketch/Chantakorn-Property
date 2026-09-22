@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { propertyHref } from '@/components/properties/property-link';
 import { Heart, MapPin, Bed, Bath, Maximize, Images, ArrowRight } from 'lucide-react';
 import { PropertyCardProps } from '@/lib/types';
-import { formatPrice, getPropertyStatusBadge, formatThaiNumber } from '@/lib/utils';
+import { formatPrice, getPropertyStatusBadge, formatThaiNumber, formatPropertyCode } from '@/lib/utils';
 import { getFavoriteIds, toggleFavoriteId } from '@/lib/store/properties-store';
 
 export default function PropertyCard({
@@ -98,11 +98,14 @@ export default function PropertyCard({
           />
         </button>
 
-        {/* Bottom Image Overlay: Image Count & Type */}
+        {/* Bottom Image Overlay: Image Count & Property Code */}
         <div className="absolute bottom-3 left-3.5 right-3.5 flex items-center justify-between text-xs text-white z-10 pointer-events-none">
           <span className="px-2.5 py-1 bg-black/60 backdrop-blur-md rounded-md flex items-center space-x-1">
             <Images className="w-3.5 h-3.5 text-gold-400" />
             <span>{imageCount} รูป</span>
+          </span>
+          <span className="px-2.5 py-1 bg-black/60 backdrop-blur-md rounded-md font-mono text-[11px] font-bold text-gold-300 tracking-wider">
+            {formatPropertyCode(id)}
           </span>
         </div>
 

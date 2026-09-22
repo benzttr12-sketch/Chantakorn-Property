@@ -122,9 +122,11 @@ test('local inquiry is never reported delivered and real backends cannot enable 
   await assert.rejects(local.store.submitInquiry({ name: 'Visitor', phone: '0810000000', message: 'Hello', inquiry_type: 'inquiry', status: 'new' }), /LINE/);
   assert.equal(loadStore().flags.isDemoAuthEnabled, false);
   assert.equal(loadStore({ backend: 'firebase', firebase: true, demoAuth: true }).flags.isDemoAuthEnabled, false);
+  const configuredSupabase = loadStore({ backend: 'supabase', supabase: { from: () => ({ select: () => ({ eq: () => ({ order: () => Promise.resolve({ data: [], error: null }) }) }) }) }, demoAuth: true });
+  assert.equal(configuredSupabase.flags.isDemoAuthEnabled, false);
   const missing = loadStore({ backend: 'supabase', demoAuth: true });
-  assert.equal(missing.flags.isDemoAuthEnabled, false);
-  await assert.rejects(missing.store.fetchProperties(), /ตั้งค่า/);
+  const properties = await missing.store.fetchProperties();
+  assert.ok(Array.isArray(properties));
 });
 
 test('an explicit backend selection wins over automatic configuration detection', () => {

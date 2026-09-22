@@ -82,9 +82,17 @@ export default function AgentCard({ agent = DEFAULT_AGENT, property }: AgentCard
             <h4 className="text-base font-bold text-navy-950 truncate">
               {agent.name}
             </h4>
-            <p className="text-xs text-brand-muted">
-              {agent.title}
-            </p>
+            <div className="mt-1">
+              <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-bold border ${
+                (agent.rank === 'แอดมิน' || agent.title === 'แอดมิน')
+                  ? 'bg-gold-50 text-gold-900 border-gold-300'
+                  : 'bg-navy-50 text-navy-900 border-navy-200'
+              }`}>
+                {(agent.rank === 'แอดมิน' || agent.title === 'แอดมิน')
+                  ? '🛡️ ยศ: แอดมิน (Admin)'
+                  : '👔 ยศ: นายหน้า (Agent)'}
+              </span>
+            </div>
           </div>
         </div>
 

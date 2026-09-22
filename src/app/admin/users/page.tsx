@@ -253,7 +253,7 @@ export default function AdminUsersPage() {
               roleFilter === 'ADMIN' ? 'bg-gold-500 text-navy-950 font-bold' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
             }`}
           >
-            แอดมิน ({adminCount})
+            ยศ: แอดมิน ({adminCount})
           </button>
           <button
             onClick={() => setRoleFilter('AGENT')}
@@ -261,7 +261,7 @@ export default function AdminUsersPage() {
               roleFilter === 'AGENT' ? 'bg-navy-800 text-white font-bold' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
             }`}
           >
-            ตัวแทน ({agentCount})
+            ยศ: นายหน้า ({agentCount})
           </button>
           <button
             onClick={() => setRoleFilter('USER')}
@@ -282,9 +282,9 @@ export default function AdminUsersPage() {
               <tr className="bg-gray-50 text-gray-600 border-b border-gray-200">
                 <th className="p-4 font-semibold">ผู้ใช้งาน</th>
                 <th className="p-4 font-semibold">ข้อมูลติดต่อ</th>
-                <th className="p-4 font-semibold">บทบาทปัจจุบัน</th>
+                <th className="p-4 font-semibold">ยศ / บทบาทปัจจุบัน</th>
                 <th className="p-4 font-semibold text-center">สิทธิ์ Admin</th>
-                <th className="p-4 font-semibold text-center">เปลี่ยนระดับสิทธิ์</th>
+                <th className="p-4 font-semibold text-center">แต่งตั้งยศ</th>
                 <th className="p-4 font-semibold text-right">การจัดการ</th>
               </tr>
             </thead>
@@ -351,7 +351,7 @@ export default function AdminUsersPage() {
                             ? 'bg-blue-100 text-blue-900 border border-blue-200'
                             : 'bg-gray-100 text-gray-700'
                         }`}>
-                          {isAdmin ? '🛡️ ผู้ดูแลระบบ (ADMIN)' : isAgent ? '👔 นายหน้า (AGENT)' : '👤 ผู้ใช้ทั่วไป (USER)'}
+                          {isAdmin ? '🛡️ ยศ: แอดมิน (ADMIN)' : isAgent ? '👔 ยศ: นายหน้า (AGENT)' : '👤 ผู้ใช้ทั่วไป (USER)'}
                         </span>
                       </td>
 
@@ -362,7 +362,7 @@ export default function AdminUsersPage() {
                           className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
                             isAdmin ? 'bg-gold-500' : 'bg-gray-300'
                           }`}
-                          title={isAdmin ? 'คลิกเพื่อยกเลิกสิทธิ์ Admin' : 'คลิกเพื่อแต่งตั้งเป็น Admin'}
+                          title={isAdmin ? 'คลิกเพื่อเปลี่ยนเป็นยศนายหน้า' : 'คลิกเพื่อแต่งตั้งเป็นยศแอดมิน'}
                         >
                           <span
                             className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
@@ -371,7 +371,7 @@ export default function AdminUsersPage() {
                           />
                         </button>
                         <span className="block text-[10px] text-gray-500 mt-1">
-                          {isAdmin ? 'เป็นแอดมิน' : 'ไม่ได้เป็นแอดมิน'}
+                          {isAdmin ? 'ยศ: แอดมิน' : 'ยศ: นายหน้า/ทั่วไป'}
                         </span>
                       </td>
 
@@ -382,9 +382,9 @@ export default function AdminUsersPage() {
                           onChange={(e) => handleRoleChange(u.id, e.target.value as any)}
                           className="bg-gray-50 border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs text-navy-950 font-bold focus:outline-none focus:ring-2 focus:ring-gold-500 cursor-pointer"
                         >
-                          <option value="ADMIN">ตั้งเป็น ADMIN</option>
-                          <option value="AGENT">ตั้งเป็น AGENT</option>
-                          <option value="USER">ตั้งเป็น USER</option>
+                          <option value="ADMIN">🛡️ ยศ: แอดมิน (ADMIN)</option>
+                          <option value="AGENT">👔 ยศ: นายหน้า (AGENT)</option>
+                          <option value="USER">👤 ผู้ใช้ทั่วไป (USER)</option>
                         </select>
                       </td>
 
@@ -498,7 +498,7 @@ export default function AdminUsersPage() {
                         : 'bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100'
                     }`}
                   >
-                    🛡️ ADMIN
+                    🛡️ ยศ: แอดมิน (ADMIN)
                   </button>
                   <button
                     type="button"
@@ -509,7 +509,7 @@ export default function AdminUsersPage() {
                         : 'bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100'
                     }`}
                   >
-                    👔 AGENT
+                    👔 ยศ: นายหน้า (AGENT)
                   </button>
                   <button
                     type="button"

@@ -263,4 +263,29 @@ export function parseGoogleMapsCoordinates(input: string): ParsedCoordinates | n
   return null;
 }
 
+export { formatPropertyCode } from './format-code';
+
+export function propertyHref(slug: string): string {
+  return `/properties/${encodeURIComponent(slug)}`;
+}
+
+export const DISTRICTS_LIST = [
+  'หาดใหญ่',
+  'เมืองสงขลา',
+  'สะเดา',
+  'คลองหอยโข่ง',
+  'สิงหนคร',
+  'นาหม่อม',
+  'บางกล่ำ',
+  'รัตภูมิ',
+  'จะนะ',
+  'เทพา',
+  'นาทวี',
+  'สะบ้าย้อย',
+  'ระโนด',
+  'สทิงพระ',
+  'กระแสสินธุ์',
+  'ควนเนียง'
+];
+
 
