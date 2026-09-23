@@ -15,7 +15,9 @@ import {
   Pencil,
   X,
   MessageCircle,
-  Facebook
+  Facebook,
+  Star,
+  Sparkles
 } from 'lucide-react';
 import { UserProfile } from '@/lib/types';
 import { dataBackend, isDemoAuthEnabled } from '@/lib/backend';
@@ -26,6 +28,8 @@ import {
   addUser, 
   deleteUser 
 } from '@/lib/store/properties-store';
+import { updateAgent } from '@/lib/store/agents-store';
+import { ExtendedAgent } from '@/data/agents';
 
 export default function AdminUsersPage() {
   const [users, setUsers] = useState<UserProfile[]>([]);
@@ -91,6 +95,30 @@ export default function AdminUsersPage() {
     } catch {
       setError('บันทึกข้อมูลผู้ใช้ไม่สำเร็จ กรุณาตรวจสอบสิทธิ์และลองใหม่');
     }
+  };
+
+  const handlePromoteToFeaturedAgent = (user: UserProfile) => {
+    const newAgent: ExtendedAgent = {
+      id: `agent-${user.id}`,
+      name: user.full_name,
+      rank: user.role === 'ADMIN' ? 'แอดมิน' : 'นายหน้า',
+      title: user.role === 'ADMIN' ? 'ผู้บริหาร & หัวหน้าฝ่ายที่ปรึกษา' : 'ที่ปรึกษาอสังหาริมทรัพย์มืออาชีพ',
+      phone: user.phone || '081-604-0097',
+      line_id: user.line_id || '@chantakorn',
+      facebook: user.facebook || '',
+      email: user.email || 'contact@chantakornproperty.com',
+      photo_url: user.avatar_url || 'https://images.unsplash.com/photo-1560250097-0b93528c311a?auto=format&fit=crop&w=600&q=80',
+      bio: user.bio || `พร้อมดูแลและให้คำปรึกษาการซื้อ-ขาย-เช่า-ขายฝาก อสังหาริมทรัพย์ในหาดใหญ่และสงขลาอย่างมืออาชีพ`,
+      specialty: 'บ้านเดี่ยว, คอนโด, ทาวน์โฮม, ที่ดิน',
+      zone: 'โซนหาดใหญ่ – สงขลา',
+      experienceYears: 3,
+      closedDeals: 15,
+      rating: 5.0,
+      languages: ['ไทย', 'English'],
+    };
+
+    updateAgent(newAgent.id, newAgent);
+    triggerNotification(`แต่งตั้ง "${user.full_name}" เป็นนายหน้าแนะนำบนหน้าแรกเรียบร้อยแล้ว!`);
   };
 
   const handleRoleChange = async (userId: string, newRole: 'ADMIN' | 'AGENT' | 'USER') => {
@@ -416,7 +444,15 @@ export default function AdminUsersPage() {
 
                       {/* Actions */}
                       <td className="p-4 text-right">
-                        <div className="flex items-center justify-end space-x-1">
+                        <div className="flex items-center justify-end space-x-1.5">
+                          <button
+                            onClick={() => handlePromoteToFeaturedAgent(u)}
+                            className="px-2 py-1 text-xs font-bold text-navy-950 bg-gold-400/20 hover:bg-gold-400/30 border border-gold-400/40 rounded-lg flex items-center space-x-1 transition-colors"
+                            title="แต่งตั้งเป็นนายหน้าแนะนำบนหน้าแรก"
+                          >
+                            <Sparkles className="w-3.5 h-3.5 text-gold-600" />
+                            <span className="hidden sm:inline">ตั้งเป็นนายหน้าแนะนำ</span>
+                          </button>
                           <button
                             onClick={() => openEditModal(u)}
                             className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"

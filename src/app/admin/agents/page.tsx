@@ -18,27 +18,39 @@ import {
   ShieldCheck, 
   Sparkles,
   Save,
-  UserCheck
+  UserCheck,
+  UserPlus,
+  ArrowRight,
+  Search,
+  CheckCircle2
 } from 'lucide-react';
 import { ExtendedAgent } from '@/data/agents';
 import { getAgents, saveAgents, updateAgent, deleteAgent, resetAgentsToDefault } from '@/lib/store/agents-store';
+import { fetchUsers } from '@/lib/store/properties-store';
+import { UserProfile } from '@/lib/types';
 
 export default function AdminAgentsPage() {
   const [agents, setAgents] = useState<ExtendedAgent[]>([]);
+  const [users, setUsers] = useState<UserProfile[]>([]);
   const [editingAgent, setEditingAgent] = useState<ExtendedAgent | null>(null);
   const [isCreating, setIsCreating] = useState(false);
   const [notification, setNotification] = useState<string | null>(null);
 
+  // Member selection helper
+  const [selectedMemberId, setSelectedMemberId] = useState<string>('');
+  const [memberImportSuccess, setMemberImportSuccess] = useState<string | null>(null);
+
   const showNotification = (msg: string) => {
     setNotification(msg);
-    setTimeout(() => setNotification(null), 3000);
+    setTimeout(() => setNotification(null), 3500);
   };
 
   useEffect(() => {
     setAgents(getAgents());
+    fetchUsers().then(setUsers).catch(() => {});
 
     const handleUpdate = (e: any) => {
-      if (e.detail) setAgents(e.detail);
+      if (e.detail && Array.isArray(e.detail)) setAgents(e.detail);
     };
     window.addEventListener('chantakorn_agents_updated', handleUpdate);
     return () => window.removeEventListener('chantakorn_agents_updated', handleUpdate);
@@ -46,37 +58,66 @@ export default function AdminAgentsPage() {
 
   const handleEdit = (agent: ExtendedAgent) => {
     setIsCreating(false);
+    setSelectedMemberId('');
+    setMemberImportSuccess(null);
     setEditingAgent({ ...agent });
   };
 
   const handleCreateNew = () => {
     const newAgent: ExtendedAgent = {
       id: `agent-${Date.now()}`,
-      name: 'คุณนายหน้าคนใหม่',
+      name: '',
       rank: 'นายหน้า',
-      title: 'ที่ปรึกษาอสังหาริมทรัพย์',
-      phone: '081-604-0097',
-      line_id: 'LINE Official Account',
+      title: 'ที่ปรึกษาอสังหาริมทรัพย์มืออาชีพ',
+      phone: '',
+      line_id: '',
       facebook: '',
-      email: 'agent@chantakornproperty.com',
-      photo_url: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&w=600&q=80',
+      email: '',
+      photo_url: 'https://images.unsplash.com/photo-1560250097-0b93528c311a?auto=format&fit=crop&w=600&q=80',
       bio: 'พร้อมให้คำปรึกษา แนะนำการซื้อ-ขาย-เช่า-ขายฝาก อสังหาริมทรัพย์ในหาดใหญ่และสงขลาอย่างมืออาชีพ',
-      specialty: 'บ้านเดี่ยว, คอนโด, การลงทุน',
+      specialty: 'บ้านเดี่ยว, คอนโด, ทาวน์โฮม, ที่ดิน',
       zone: 'โซนหาดใหญ่ – สงขลา',
-      experienceYears: 5,
-      closedDeals: 30,
+      experienceYears: 3,
+      closedDeals: 15,
       rating: 5.0,
       languages: ['ไทย', 'English'],
     };
     setIsCreating(true);
+    setSelectedMemberId('');
+    setMemberImportSuccess(null);
     setEditingAgent(newAgent);
+  };
+
+  const handleSelectMemberToImport = (userId: string) => {
+    setSelectedMemberId(userId);
+    if (!userId) return;
+
+    const member = users.find((u) => u.id === userId);
+    if (!member) return;
+
+    if (editingAgent) {
+      setEditingAgent({
+        ...editingAgent,
+        name: member.full_name,
+        phone: member.phone || editingAgent.phone || '081-604-0097',
+        email: member.email || editingAgent.email || '',
+        line_id: member.line_id || editingAgent.line_id || '@chantakorn',
+        facebook: member.facebook || editingAgent.facebook || '',
+        photo_url: member.avatar_url || editingAgent.photo_url || 'https://images.unsplash.com/photo-1560250097-0b93528c311a?auto=format&fit=crop&w=600&q=80',
+        rank: member.role === 'ADMIN' ? 'แอดมิน' : 'นายหน้า',
+        title: member.role === 'ADMIN' ? 'ผู้บริหาร & หัวหน้าฝ่ายที่ปรึกษา' : 'ที่ปรึกษาอสังหาริมทรัพย์มืออาชีพ',
+        bio: member.bio || editingAgent.bio || 'พร้อมดูแลและให้คำปรึกษาด้านอสังหาริมทรัพย์อย่างจริงใจและตรงไปตรงมา',
+      });
+      setMemberImportSuccess(`ดึงข้อมูลสมาชิก "${member.full_name}" เรียบร้อยแล้ว`);
+      setTimeout(() => setMemberImportSuccess(null), 4000);
+    }
   };
 
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingAgent) return;
 
-    if (!editingAgent.name || !editingAgent.phone) {
+    if (!editingAgent.name.trim() || !editingAgent.phone.trim()) {
       alert('กรุณากรอกชื่อและเบอร์โทรศัพท์');
       return;
     }
@@ -84,11 +125,11 @@ export default function AdminAgentsPage() {
     if (isCreating) {
       const updated = updateAgent(editingAgent.id, editingAgent);
       setAgents(updated);
-      showNotification('เพิ่มนายหน้าแนะนำใหม่เรียบร้อยแล้ว!');
+      showNotification(`เพิ่ม "${editingAgent.name}" เป็นนายหน้าแนะนำสำเร็จ!`);
     } else {
       const updated = updateAgent(editingAgent.id, editingAgent);
       setAgents(updated);
-      showNotification('บันทึกการแก้ไขข้อมูลนายหน้าเรียบร้อยแล้ว!');
+      showNotification(`บันทึกการแก้ไขข้อมูลของ "${editingAgent.name}" สำเร็จ!`);
     }
 
     setEditingAgent(null);
@@ -132,7 +173,7 @@ export default function AdminAgentsPage() {
             ระบบนายหน้าแนะนำ & ที่ปรึกษาประจำพื้นที่
           </h1>
           <p className="text-xs sm:text-sm text-slate-500 mt-1">
-            แก้ไขข้อมูลทีมงาน รูปโปรไฟล์ พื้นที่รับผิดชอบ ความเชี่ยวชาญ และช่องทางติดต่อที่จะแสดงบนหน้าเว็บไซต์
+            เพิ่มนายหน้าใหม่โดยสามารถดึงข้อมูลจากสมาชิกในระบบได้ทันที และแก้ไขรายละเอียดที่แสดงบนหน้าแรก
           </p>
         </div>
 
@@ -180,7 +221,7 @@ export default function AdminAgentsPage() {
                 
                 <div className="absolute top-3 right-3 bg-white/95 px-2.5 py-1 rounded-full text-xs font-bold text-slate-800 flex items-center space-x-1 shadow-sm">
                   <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
-                  <span className="font-mono">{agent.rating.toFixed(1)}</span>
+                  <span className="font-mono">{agent.rating ? agent.rating.toFixed(1) : '5.0'}</span>
                 </div>
 
                 <div className="absolute top-3 left-3 bg-navy-950/80 text-gold-400 text-[10px] font-bold px-2.5 py-1 rounded-full border border-gold-400/40">
@@ -211,11 +252,11 @@ export default function AdminAgentsPage() {
                 <div className="grid grid-cols-2 gap-2 text-center text-slate-600">
                   <div className="p-2 bg-slate-50 rounded-xl border border-slate-100">
                     <span className="block text-[10px] text-slate-400">ปิดการขาย</span>
-                    <strong className="text-navy-950 font-bold font-mono">{agent.closedDeals}+ รายการ</strong>
+                    <strong className="text-navy-950 font-bold font-mono">{agent.closedDeals || 10}+ รายการ</strong>
                   </div>
                   <div className="p-2 bg-slate-50 rounded-xl border border-slate-100">
                     <span className="block text-[10px] text-slate-400">ประสบการณ์</span>
-                    <strong className="text-navy-950 font-bold font-mono">{agent.experienceYears} ปี</strong>
+                    <strong className="text-navy-950 font-bold font-mono">{agent.experienceYears || 3} ปี</strong>
                   </div>
                 </div>
 
@@ -268,23 +309,60 @@ export default function AdminAgentsPage() {
             <div className="p-6 border-b border-slate-100 flex items-center justify-between sticky top-0 bg-white z-10">
               <div>
                 <h3 className="text-lg font-black text-navy-950">
-                  {isCreating ? 'เพิ่มนายหน้าแนะนำใหม่' : `แก้ไขข้อมูล: ${editingAgent.name}`}
+                  {isCreating ? 'เพิ่มนายหน้าแนะนำใหม่' : `แก้ไขข้อมูล: ${editingAgent.name || 'นายหน้า'}`}
                 </h3>
                 <p className="text-xs text-slate-500">
-                  กรอกข้อมูลให้ครบถ้วนเพื่อแสดงผลบนหน้าแรกและระบบจองคิวนัดชมทรัพย์
+                  {isCreating ? 'สามารถเลือกดึงข้อมูลจากสมาชิกที่มีอยู่ในระบบได้ทันที' : 'ปรับปรุงข้อมูลโปรไฟล์นายหน้าที่แสดงบนหน้าแรก'}
                 </p>
               </div>
               <button
                 type="button"
                 onClick={() => setEditingAgent(null)}
-                className="p-2 text-slate-400 hover:text-slate-700 rounded-full hover:bg-slate-100 transition-colors"
+                className="p-2 text-slate-400 hover:text-slate-700 rounded-full hover:bg-slate-100 transition-colors cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
             {/* Modal Form */}
-            <form onSubmit={handleSave} className="p-6 space-y-4">
+            <form onSubmit={handleSave} className="p-6 space-y-5">
+              {/* MEMBER SELECTION BOX (ดึงข้อมูลของสมาชิก) */}
+              <div className="bg-gradient-to-r from-gold-50/80 to-amber-50/50 p-4 rounded-2xl border border-gold-200 space-y-2">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-black text-navy-950 flex items-center space-x-1.5">
+                    <UserPlus className="w-4 h-4 text-gold-600" />
+                    <span>ดึงข้อมูลจากสมาชิกในระบบ (Import Member Data)</span>
+                  </label>
+                  <span className="text-[11px] text-gold-800 font-medium">
+                    {users.length} สมาชิกในระบบ
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-12 gap-2 items-center">
+                  <div className="sm:col-span-12">
+                    <select
+                      value={selectedMemberId}
+                      onChange={(e) => handleSelectMemberToImport(e.target.value)}
+                      className="w-full px-3.5 py-2.5 bg-white border border-gold-300 rounded-xl text-xs font-bold text-navy-950 focus:ring-2 focus:ring-gold-500 outline-none"
+                    >
+                      <option value="">-- เลือกสมาชิกเพื่อดึงข้อมูลอัตโนมัติ (คลิกเพื่อเลือก) --</option>
+                      {users.map((u) => (
+                        <option key={u.id} value={u.id}>
+                          👤 {u.full_name} ({u.role === 'ADMIN' ? 'ผู้ดูแลระบบ' : u.role === 'AGENT' ? 'นายหน้า' : 'สมาชิกทั่วไป'}) - {u.email || u.phone || 'ไม่มีอีเมล'}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                {memberImportSuccess && (
+                  <div className="flex items-center space-x-1.5 text-xs text-emerald-700 font-bold bg-emerald-50 px-3 py-1.5 rounded-xl border border-emerald-200 animate-fadeIn">
+                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                    <span>{memberImportSuccess}</span>
+                  </div>
+                )}
+              </div>
+
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-bold text-navy-950 mb-1">
