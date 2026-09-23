@@ -77,6 +77,7 @@ import {
   MAX_UPLOAD_IMAGE_SIZE_BYTES,
   MAX_UPLOAD_VIDEO_SIZE_BYTES
 } from '@/lib/image-compressor';
+import { calculateNearbyLandmarks } from '@/lib/nearby-landmarks';
 
 // ตัวอย่างรูปภาพคุณภาพสูง สำหรับปุ่ม "ใส่รูปภาพตัวอย่างทันที 1 คลิก"
 const SAMPLE_HOUSE_PHOTOS = [
@@ -147,6 +148,18 @@ function PropertyEditor() {
   }>>([]);
   const [selectedFeatures, setSelectedFeatures] = useState<string[]>([]);
   const [featured, setFeatured] = useState(false);
+
+  // Auto-calculated nearby landmarks based on pinned coordinates
+  const autoLandmarks = isValidLatLng(Number(latitude), Number(longitude))
+    ? calculateNearbyLandmarks(Number(latitude), Number(longitude), { limit: 8 })
+    : [];
+
+  const handleAppendLandmarksToDescription = () => {
+    if (!autoLandmarks.length) return;
+    const landmarkText = `\n\n📍 สถานที่สำคัญใกล้เคียง (คำนวณจากพิกัดอัตโนมัติ):\n` +
+      autoLandmarks.map(item => `• ${item.title}: ${item.combinedText}`).join('\n');
+    setDescription(prev => (prev ? `${prev.trim()}${landmarkText}` : landmarkText.trim()));
+  };
 
   // Staff (Agent & Admin) List & Specific Contact Channels
   const [eligibleStaff, setEligibleStaff] = useState<UserProfile[]>([]);
@@ -1437,6 +1450,44 @@ function PropertyEditor() {
               </div>
             </div>
           </div>
+
+          {/* Auto-Discovered Nearby Landmarks Box */}
+          {isValidLatLng(Number(latitude), Number(longitude)) && (
+            <div className="mt-4 p-4 rounded-xl bg-gradient-to-br from-slate-50 to-gold-50/30 border border-gold-200">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3">
+                <div className="flex items-center space-x-2">
+                  <Sparkles className="w-4 h-4 text-gold-600 flex-shrink-0" />
+                  <h4 className="text-xs font-bold text-navy-950">
+                    สถานที่สำคัญใกล้เคียงที่ค้นพบอัตโนมัติจากหมุดพิกัด ({Number(latitude).toFixed(4)}, {Number(longitude).toFixed(4)})
+                  </h4>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleAppendLandmarksToDescription}
+                  className="px-3 py-1.5 bg-navy-950 hover:bg-navy-900 text-gold-400 text-[11px] font-bold rounded-lg shadow-sm flex items-center space-x-1.5 transition-all cursor-pointer self-start sm:self-auto"
+                >
+                  <Wand2 className="w-3.5 h-3.5" />
+                  <span>เเทรกสถานที่ใกล้เคียงลงในคำอธิบายประกาศ 1-Click</span>
+                </button>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
+                {autoLandmarks.map((lm, idx) => (
+                  <div key={idx} className="p-2.5 bg-white rounded-lg border border-slate-200 text-xs flex flex-col justify-between shadow-2xs">
+                    <div className="flex items-center space-x-1.5 mb-1">
+                      <span className="text-[10px] font-bold px-1.5 py-0.2 rounded bg-navy-100 text-navy-800 flex-shrink-0">
+                        {lm.categoryLabel}
+                      </span>
+                      <span className="font-semibold text-navy-950 truncate">{lm.title}</span>
+                    </div>
+                    <span className="text-gold-700 font-extrabold text-[11px]">
+                      {lm.combinedText}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Section 3: Property Specs & Features */}

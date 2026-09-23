@@ -47,30 +47,28 @@ export default function FeaturedAgents({ onSelectAgentForBooking }: FeaturedAgen
     return () => window.removeEventListener('chantakorn_agents_updated', handleUpdate);
   }, []);
 
-  const checkScrollability = () => {
-    const el = scrollContainerRef.current;
-    if (!el) return;
-    setCanScrollLeft(el.scrollLeft > 10);
-    setCanScrollRight(el.scrollLeft < el.scrollWidth - el.clientWidth - 10);
-
-    // Calculate approximate active card index
-    const cardWidth = 320;
-    const index = Math.round(el.scrollLeft / cardWidth);
-    setActiveIndex(Math.min(index, Math.max(0, agents.length - 1)));
-  };
-
   useEffect(() => {
     const el = scrollContainerRef.current;
-    if (el) {
-      checkScrollability();
-      el.addEventListener('scroll', checkScrollability, { passive: true });
-      window.addEventListener('resize', checkScrollability);
-      return () => {
-        el.removeEventListener('scroll', checkScrollability);
-        window.removeEventListener('resize', checkScrollability);
-      };
-    }
-  }, [agents]);
+    if (!el) return;
+
+    const checkScrollability = () => {
+      setCanScrollLeft(el.scrollLeft > 10);
+      setCanScrollRight(el.scrollLeft < el.scrollWidth - el.clientWidth - 10);
+
+      // Calculate approximate active card index
+      const cardWidth = 320;
+      const index = Math.round(el.scrollLeft / cardWidth);
+      setActiveIndex(Math.min(index, Math.max(0, (agents.length || 1) - 1)));
+    };
+
+    checkScrollability();
+    el.addEventListener('scroll', checkScrollability, { passive: true });
+    window.addEventListener('resize', checkScrollability);
+    return () => {
+      el.removeEventListener('scroll', checkScrollability);
+      window.removeEventListener('resize', checkScrollability);
+    };
+  }, [agents.length]);
 
   const scroll = (direction: 'left' | 'right') => {
     const el = scrollContainerRef.current;

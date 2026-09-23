@@ -47,9 +47,7 @@ export default function ViewingBookingSection({ initialAgent, initialPropertyTit
   useEffect(() => {
     const loadedAgents = getAgents();
     setAgents(loadedAgents);
-    if (!selectedAgent && loadedAgents.length > 0) {
-      setSelectedAgent(loadedAgents[0].name);
-    }
+    setSelectedAgent(prev => prev || (loadedAgents.length > 0 ? loadedAgents[0].name : ''));
 
     const handleUpdate = (e: any) => {
       if (e.detail && Array.isArray(e.detail)) {
@@ -67,8 +65,8 @@ export default function ViewingBookingSection({ initialAgent, initialPropertyTit
         ]);
         const finalAgents = cloudAgents && cloudAgents.length > 0 ? cloudAgents : getAgents();
         setAgents(finalAgents);
-        if (finalAgents.length > 0 && !selectedAgent) {
-          setSelectedAgent(finalAgents[0].name);
+        if (finalAgents.length > 0) {
+          setSelectedAgent(prev => prev || finalAgents[0].name);
         }
         setProperties(list.slice(0, 15));
       } catch {

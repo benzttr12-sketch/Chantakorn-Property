@@ -30,6 +30,7 @@ import { fetchPropertyBySlug, fetchProperties } from '@/lib/store/properties-sto
 import { formatPrice, getPropertyStatusBadge, formatThaiNumber, formatPropertyCode, formatLineUrl } from '@/lib/utils';
 
 import { Property } from '@/lib/types';
+import { calculateNearbyLandmarks } from '@/lib/nearby-landmarks';
 
 export default function PropertyDetail({ slug, initialProperty = null }: { slug: string; initialProperty?: Property | null }) {
   const [property, setProperty] = useState<Property | null>(initialProperty);
@@ -104,14 +105,21 @@ export default function PropertyDetail({ slug, initialProperty = null }: { slug:
     },
   };
 
-  const nearbyAmenities = [
-    { title: 'มหาวิทยาลัยสงขลานครินทร์ (ม.อ.) & รพ.ม.อ.', distance: '10-15 นาที' },
-    { title: 'เซ็นทรัลหาดใหญ่ (Central Hatyai)', distance: '7 นาที' },
-    { title: 'สนามบินนานาชาติหาดใหญ่ (HDY Airport)', distance: '15 นาที' },
-    { title: 'ตลาดกิมหยง & ย่านการค้าหาดใหญ่', distance: '12 นาที' },
-    { title: 'โรงพยาบาลกรุงเทพหาดใหญ่', distance: '12 นาที' },
-    { title: 'แหลมสมิหลา & หาดชลาทัศน์ เมืองสงขลา', distance: '30 นาที' },
-  ];
+  const dynamicLandmarks = calculateNearbyLandmarks(property.latitude, property.longitude, { limit: 8 });
+  const nearbyAmenities = dynamicLandmarks.length > 0
+    ? dynamicLandmarks.map(item => ({
+        title: item.title,
+        distance: item.combinedText,
+        categoryLabel: item.categoryLabel,
+      }))
+    : [
+        { title: 'มหาวิทยาลัยสงขลานครินทร์ (ม.อ.) & รพ.ม.อ.', distance: '10-15 นาที', categoryLabel: 'การศึกษา/การแพทย์' },
+        { title: 'เซ็นทรัลหาดใหญ่ (Central Hatyai)', distance: '7 นาที', categoryLabel: 'ห้างสรรพสินค้า' },
+        { title: 'สนามบินนานาชาติหาดใหญ่ (HDY Airport)', distance: '15 นาที', categoryLabel: 'การเดินทาง' },
+        { title: 'ตลาดกิมหยง & ย่านการค้าหาดใหญ่', distance: '12 นาที', categoryLabel: 'ตลาด & ช้อปปิ้ง' },
+        { title: 'โรงพยาบาลกรุงเทพหาดใหญ่', distance: '12 นาที', categoryLabel: 'การแพทย์' },
+        { title: 'แหลมสมิหลา & หาดชลาทัศน์ เมืองสงขลา', distance: '30 นาที', categoryLabel: 'ท่องเที่ยว' },
+      ];
 
   return (
     <div className="bg-surface-bg min-h-screen pb-24 md:pb-16">
@@ -326,14 +334,30 @@ export default function PropertyDetail({ slug, initialProperty = null }: { slug:
 
               {/* Nearby Landmarks Grid */}
               <div>
-                <h4 className="text-xs font-bold text-navy-900 uppercase tracking-wider mb-3">
-                  สถานที่สำคัญใกล้เคียง (เดินทางสะดวก)
-                </h4>
+                <div className="flex items-center justify-between mb-3">
+                  <h4 className="text-xs font-bold text-navy-900 uppercase tracking-wider">
+                    สถานที่สำคัญใกล้เคียง (คำนวณจากพิกัดจริง)
+                  </h4>
+                  <span className="text-[11px] text-emerald-700 font-semibold bg-emerald-50 border border-emerald-200 px-2.5 py-0.5 rounded-full">
+                    คำนวณอัตโนมัติ
+                  </span>
+                </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                   {nearbyAmenities.map((item, i) => (
-                    <div key={i} className="flex items-center justify-between p-2.5 bg-gray-50 rounded-lg text-xs">
-                      <span className="text-gray-700 font-medium truncate mr-2">{item.title}</span>
-                      <span className="text-gold-700 font-bold flex-shrink-0">{item.distance}</span>
+                    <div key={i} className="flex items-center justify-between p-2.5 bg-slate-50 border border-slate-200/80 rounded-xl text-xs hover:border-gold-300 transition-colors">
+                      <div className="min-w-0 pr-2">
+                        <div className="flex items-center space-x-1.5">
+                          {item.categoryLabel && (
+                            <span className="text-[10px] font-bold px-1.5 py-0.2 rounded bg-navy-100 text-navy-800 flex-shrink-0">
+                              {item.categoryLabel}
+                            </span>
+                          )}
+                          <span className="text-navy-950 font-medium truncate">{item.title}</span>
+                        </div>
+                      </div>
+                      <span className="text-gold-700 font-extrabold flex-shrink-0 text-[11px] bg-gold-50 px-2 py-0.5 rounded-md border border-gold-200">
+                        {item.distance}
+                      </span>
                     </div>
                   ))}
                 </div>
