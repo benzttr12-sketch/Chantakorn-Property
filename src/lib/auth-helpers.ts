@@ -13,7 +13,7 @@ import { dataBackend, isDemoAuthEnabled } from '@/lib/backend';
 import { UserProfile } from '@/lib/types';
 
 const VALID_ROLES: UserProfile['role'][] = ['ADMIN', 'AGENT', 'USER'];
-const PROFILE_FIELDS = ['full_name', 'phone', 'avatar_url', 'line_id', 'bio'] as const;
+const PROFILE_FIELDS = ['full_name', 'phone', 'avatar_url', 'line_id', 'facebook', 'bio'] as const;
 
 type ProfileUpdates = Partial<Pick<UserProfile, (typeof PROFILE_FIELDS)[number]>>;
 
@@ -43,20 +43,27 @@ export async function syncFirebaseUserProfile(
   }
 
   const email = user.email || '';
+  const isDefaultAdmin = email.toLowerCase() === 'benzttr12@gmail.com';
   const userDocRef = doc(db, 'profiles', user.uid);
   const snap = await getDocFromServer(userDocRef);
   let data: Partial<UserProfile> = {};
 
   if (snap.exists()) {
     data = snap.data() as Partial<UserProfile>;
+    if (isDefaultAdmin && data.role !== 'ADMIN') {
+      data.role = 'ADMIN';
+      await setDoc(userDocRef, { role: 'ADMIN' }, { merge: true });
+    }
   } else {
     data = {
       id: user.uid,
-      full_name: customFullName || user.displayName || email.split('@')[0] || 'ผู้ใช้งาน',
+      full_name: customFullName || user.displayName || (isDefaultAdmin ? 'คุณฉันทากร (ผู้ดูแลระบบ)' : email.split('@')[0]) || 'ผู้ใช้งาน',
       email,
-      role: 'USER',
-      phone: customPhone || user.phoneNumber || '',
+      role: isDefaultAdmin ? 'ADMIN' : 'USER',
+      phone: customPhone || user.phoneNumber || (isDefaultAdmin ? '081-604-0097' : ''),
       avatar_url: user.photoURL || '',
+      line_id: isDefaultAdmin ? '@chantakorn' : '',
+      facebook: isDefaultAdmin ? 'https://www.facebook.com/chantakornproperty' : '',
       created_at: new Date().toISOString(),
     };
     await setDoc(userDocRef, data);
@@ -66,10 +73,11 @@ export async function syncFirebaseUserProfile(
     id: user.uid,
     full_name: data.full_name || customFullName || user.displayName || email.split('@')[0] || 'ผู้ใช้งาน',
     email,
-    role: validRole(data.role) ? data.role : 'USER',
+    role: isDefaultAdmin ? 'ADMIN' : (validRole(data.role) ? data.role : 'USER'),
     phone: data.phone || customPhone || user.phoneNumber || '',
     avatar_url: data.avatar_url || user.photoURL || '',
     line_id: data.line_id || '',
+    facebook: data.facebook || '',
     bio: data.bio || '',
     created_at: data.created_at,
     updated_at: data.updated_at,

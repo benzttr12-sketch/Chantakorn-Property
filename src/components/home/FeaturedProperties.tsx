@@ -85,6 +85,7 @@ export default function FeaturedProperties() {
                 landSize={prop.land_size}
                 usableArea={prop.usable_area}
                 featured={prop.featured}
+                video_url={prop.video_url}
                 slug={prop.slug}
                 createdAt={prop.created_at}
               />

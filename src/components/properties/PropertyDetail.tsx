@@ -20,12 +20,14 @@ import {
 } from 'lucide-react';
 import PropertyGallery from '@/components/properties/PropertyGallery';
 import PropertySpecs from '@/components/properties/PropertySpecs';
+import PropertyVideoTour from '@/components/properties/PropertyVideoTour';
+import MortgageCalculator from '@/components/tools/MortgageCalculator';
 import AgentCard from '@/components/properties/AgentCard';
 import PropertyInquiryForm from '@/components/properties/PropertyInquiryForm';
 import PropertyCard from '@/components/properties/PropertyCard';
 import PropertyMap from '@/components/properties/PropertyMap';
 import { fetchPropertyBySlug, fetchProperties } from '@/lib/store/properties-store';
-import { formatPrice, getPropertyStatusBadge, formatThaiNumber, formatPropertyCode } from '@/lib/utils';
+import { formatPrice, getPropertyStatusBadge, formatThaiNumber, formatPropertyCode, formatLineUrl } from '@/lib/utils';
 
 import { Property } from '@/lib/types';
 
@@ -239,6 +241,15 @@ export default function PropertyDetail({ slug, initialProperty = null }: { slug:
               )}
             </div>
 
+            {/* Video Tour Section (if available) */}
+            {property.video_url && (
+              <PropertyVideoTour
+                videoUrl={property.video_url}
+                title={property.title}
+                coverImage={property.cover_image}
+              />
+            )}
+
             {/* 4. Description */}
             <div className="bg-white rounded-2xl p-6 border border-surface-border shadow-card">
               <h3 className="text-lg font-bold text-navy-950 mb-4 pb-2 border-b border-gray-100">
@@ -259,6 +270,18 @@ export default function PropertyDetail({ slug, initialProperty = null }: { slug:
 
             {/* 5. Property Information Specifications */}
             <PropertySpecs property={property} />
+
+            {/* 5.1 Mortgage & Loan Calculator for For-Sale Properties */}
+            {property.status === 'sale' && property.price > 0 && (
+              <div className="scroll-mt-24">
+                <MortgageCalculator
+                  initialPrice={property.price}
+                  compact={true}
+                  title={`ประมาณการค่างวดผ่อนธนาคารสำหรับ ${property.title}`}
+                  subtitle={`คำนวณค่างวดผ่อนรายเดือนเบื้องต้นจากราคาเสนอขาย ฿${formatThaiNumber(property.price)} เพื่อวางแผนการยื่นกู้สินเชื่อ`}
+                />
+              </div>
+            )}
 
             {/* 6. Features & Amenities */}
             {property.features && property.features.length > 0 && (
@@ -364,6 +387,7 @@ export default function PropertyDetail({ slug, initialProperty = null }: { slug:
                   landSize={rel.land_size}
                   usableArea={rel.usable_area}
                   featured={rel.featured}
+                  video_url={rel.video_url}
                   slug={rel.slug}
                   createdAt={rel.created_at}
                 />
@@ -376,7 +400,7 @@ export default function PropertyDetail({ slug, initialProperty = null }: { slug:
       {/* Sticky Bottom CTA Bar on Mobile */}
       <div className="md:hidden fixed bottom-14 left-0 right-0 z-40 bg-white/95 backdrop-blur-md border-t border-surface-border p-3 shadow-lg flex items-center space-x-2">
         <a
-          href="tel:0816040097"
+          href={`tel:${property.agent?.phone || '0816040097'}`}
           className="flex-1 py-2.5 bg-navy-950 text-white rounded-xl text-xs font-bold flex items-center justify-center space-x-1"
         >
           <Phone className="w-3.5 h-3.5 text-gold-400" />
@@ -384,7 +408,7 @@ export default function PropertyDetail({ slug, initialProperty = null }: { slug:
         </a>
 
         <a
-          href="https://lin.ee/NMSe28T3"
+          href={formatLineUrl(property.agent?.line_id)}
           target="_blank"
           rel="noreferrer"
           className="flex-1 py-2.5 bg-[#06C755] text-white rounded-xl text-xs font-bold flex items-center justify-center space-x-1"

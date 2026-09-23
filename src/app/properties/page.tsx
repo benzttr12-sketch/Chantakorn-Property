@@ -9,7 +9,8 @@ import {
   ArrowUpDown, 
   Building2, 
   X,
-  Search
+  Search,
+  Video
 } from 'lucide-react';
 import PropertyCard from '@/components/properties/PropertyCard';
 import PropertyFilterPanel from '@/components/properties/PropertyFilterPanel';
@@ -35,6 +36,7 @@ function filtersFromQuery(query: string): PropertyFilters {
     minPrice: numeric('minPrice'), maxPrice: numeric('maxPrice'),
     bedrooms: numeric('bedrooms') ?? 'any', bathrooms: numeric('bathrooms') ?? 'any',
     searchQuery: params.get('searchQuery') || params.get('q') || '',
+    hasVideo: params.get('hasVideo') === 'true',
     features: [], sortBy: 'newest',
   };
 }
@@ -102,6 +104,7 @@ function PropertiesContent() {
       features: [],
       sortBy: 'newest',
       searchQuery: '',
+      hasVideo: false,
     });
   };
 
@@ -180,6 +183,20 @@ function PropertiesContent() {
               }`}
             >
               สำหรับเช่า
+            </button>
+
+            {/* Video Tour Quick Filter Button */}
+            <button
+              type="button"
+              onClick={() => setFilters({ ...filters, hasVideo: !filters.hasVideo })}
+              className={`px-3 py-1.5 rounded-xl font-bold flex-shrink-0 transition-all flex items-center space-x-1.5 ${
+                filters.hasVideo
+                  ? 'bg-red-600 text-white shadow-md ring-2 ring-red-400'
+                  : 'bg-navy-900 text-red-300 hover:bg-navy-850 hover:text-white border border-red-500/40'
+              }`}
+            >
+              <Video className="w-3.5 h-3.5 text-red-400" />
+              <span>วิดีโอพาทัวร์ 🎬</span>
             </button>
 
             <span className="text-navy-700 mx-1 flex-shrink-0">|</span>
@@ -409,6 +426,7 @@ function PropertiesContent() {
                       landSize={prop.land_size}
                       usableArea={prop.usable_area}
                       featured={prop.featured}
+                      video_url={prop.video_url}
                       slug={prop.slug}
                       createdAt={prop.created_at}
                     />

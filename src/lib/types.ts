@@ -47,6 +47,8 @@ export interface Property {
   features: string[];
   cover_image: string;
   images: string[];
+  video_url?: string;
+  videos?: string[];
   featured: boolean;
   published: boolean;
   agent_id?: string;
@@ -71,6 +73,7 @@ export interface PropertyCardProps {
   landSize: number;
   usableArea: number;
   featured?: boolean;
+  video_url?: string;
   slug: string;
   createdAt?: string;
 }
@@ -107,6 +110,7 @@ export interface UserProfile {
   avatar_url?: string;
   email?: string;
   line_id?: string;
+  facebook?: string;
   bio?: string;
   created_at?: string;
   updated_at?: string;
@@ -124,5 +128,6 @@ export interface PropertyFilters {
   bathrooms?: number | 'any';
   features?: string[];
   searchQuery?: string;
+  hasVideo?: boolean;
   sortBy?: 'newest' | 'price_asc' | 'price_desc' | 'popular';
 }

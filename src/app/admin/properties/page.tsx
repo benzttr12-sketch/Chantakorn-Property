@@ -709,6 +709,17 @@ export default function AdminPropertiesPage() {
                       {copiedCodeId === prop.id && <Check className="w-2.5 h-2.5 text-emerald-600" />}
                     </button>
                   </div>
+
+                  {/* Agent badge on mobile */}
+                  <div className="flex items-center space-x-1.5 mt-1.5 pt-1.5 border-t border-gray-100 text-[11px] text-navy-900">
+                    <span className="text-gray-400 text-[10px]">ผู้ดูแล:</span>
+                    <span className="truncate font-bold max-w-[130px]">{prop.agent?.name || 'Chantakorn Property'}</span>
+                    <span className={`px-1.5 py-0.2 rounded text-[9px] font-bold ${
+                      prop.agent?.rank === 'แอดมิน' ? 'bg-gold-100 text-gold-800' : 'bg-blue-100 text-blue-800'
+                    }`}>
+                      {prop.agent?.rank === 'แอดมิน' ? '🛡️ แอดมิน' : '👔 นายหน้า'}
+                    </span>
+                  </div>
                 </div>
               </div>
 
@@ -811,6 +822,7 @@ export default function AdminPropertiesPage() {
                 <th className="p-3.5 font-semibold">ราคา</th>
                 <th className="p-3.5 font-semibold">ทำเล</th>
                 <th className="p-3.5 font-semibold">สถานะ</th>
+                <th className="p-3.5 font-semibold">นายหน้าผู้ดูแล</th>
                 <th className="p-3.5 font-semibold text-center">เผยแพร่</th>
                 <th className="p-3.5 font-semibold text-center">ทรัพย์เด่น</th>
                 <th className="p-3.5 font-semibold">วันที่ลง</th>
@@ -820,13 +832,13 @@ export default function AdminPropertiesPage() {
             <tbody className="divide-y divide-gray-100">
               {loading ? (
                 <tr>
-                  <td colSpan={11} className="p-8 text-center text-gray-400">
+                  <td colSpan={12} className="p-8 text-center text-gray-400">
                     กำลังโหลดข้อมูล...
                   </td>
                 </tr>
               ) : sortedProperties.length === 0 ? (
                 <tr>
-                  <td colSpan={11} className="p-8 text-center text-gray-500">
+                  <td colSpan={12} className="p-8 text-center text-gray-500">
                     ไม่พบข้อมูลอสังหาริมทรัพย์ที่ค้นหา
                   </td>
                 </tr>
@@ -900,6 +912,30 @@ export default function AdminPropertiesPage() {
                         }`}>
                           {prop.status === 'rent' ? 'เช่า' : 'ขาย'}
                         </span>
+                      </td>
+                      <td className="p-3.5">
+                        <div className="space-y-0.5 min-w-[130px]">
+                          <div className="font-bold text-navy-950 text-xs truncate max-w-[140px]" title={prop.agent?.name}>
+                            {prop.agent?.name || 'Chantakorn Property'}
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <span className={`inline-block px-1.5 py-0.2 rounded text-[9px] font-bold ${
+                              prop.agent?.rank === 'แอดมิน' ? 'bg-gold-100 text-gold-800 border border-gold-300' : 'bg-blue-100 text-blue-800 border border-blue-300'
+                            }`}>
+                              {prop.agent?.rank === 'แอดมิน' ? '🛡️ แอดมิน' : '👔 นายหน้า'}
+                            </span>
+                          </div>
+                          {prop.agent?.phone && (
+                            <div className="text-[10px] text-gray-500 font-medium">
+                              📞 {prop.agent.phone}
+                            </div>
+                          )}
+                          {prop.agent?.line_id && (
+                            <div className="text-[10px] text-emerald-600 truncate max-w-[130px]">
+                              💬 LINE: {prop.agent.line_id}
+                            </div>
+                          )}
+                        </div>
                       </td>
                       <td className="p-3.5 text-center">
                         <button

@@ -34,7 +34,16 @@ import {
   HelpCircle,
   FileText,
   ExternalLink,
-  Eye
+  Eye,
+  Facebook,
+  ShieldAlert,
+  Video,
+  Film,
+  Play,
+  Gauge,
+  Sliders,
+  CheckCheck,
+  Trash2
 } from 'lucide-react';
 import { 
   createProperty, 
@@ -49,7 +58,10 @@ import {
   formatThaiBahtReadable, 
   numberToThaiBahtWords, 
   parseGoogleMapsCoordinates, 
-  isValidLatLng 
+  isValidLatLng,
+  DEFAULT_OFFICIAL_FACEBOOK,
+  formatLineUrl,
+  formatFacebookUrl
 } from '@/lib/utils';
 import { 
   DISTRICTS_LIST, 
@@ -57,6 +69,13 @@ import {
   getSongkhlaCoordinates 
 } from '@/data/locations';
 import { getStoredUser } from '@/lib/auth-helpers';
+import { 
+  compressMultipleImages, 
+  parseVideoUrl, 
+  formatBytes,
+  MAX_UPLOAD_IMAGE_SIZE_BYTES,
+  MAX_UPLOAD_VIDEO_SIZE_BYTES
+} from '@/lib/image-compressor';
 
 // ตัวอย่างรูปภาพคุณภาพสูง สำหรับปุ่ม "ใส่รูปภาพตัวอย่างทันที 1 คลิก"
 const SAMPLE_HOUSE_PHOTOS = [
@@ -109,12 +128,32 @@ function PropertyEditor() {
   const [description, setDescription] = useState('');
   const [coverImage, setCoverImage] = useState('');
   const [images, setImages] = useState<string[]>([]);
+  const [videoUrl, setVideoUrl] = useState('');
+  const [uploadingVideo, setUploadingVideo] = useState(false);
+  const [compressionProgress, setCompressionProgress] = useState<{
+    current: number;
+    total: number;
+    currentName?: string;
+    originalSize?: string;
+    compressedSize?: string;
+    percentSaved?: number;
+  } | null>(null);
+  const [uploadStatsList, setUploadStatsList] = useState<Array<{
+    url: string;
+    origSize: string;
+    compSize: string;
+    saved: number;
+  }>>([]);
   const [selectedFeatures, setSelectedFeatures] = useState<string[]>([]);
   const [featured, setFeatured] = useState(false);
 
-  // Staff (Agent & Admin) List
+  // Staff (Agent & Admin) List & Specific Contact Channels
   const [eligibleStaff, setEligibleStaff] = useState<UserProfile[]>([]);
   const [selectedAgentId, setSelectedAgentId] = useState<string>('');
+  const [agentPhone, setAgentPhone] = useState<string>('081-604-0097');
+  const [agentLine, setAgentLine] = useState<string>('@chantakorn');
+  const [agentFacebook, setAgentFacebook] = useState<string>('');
+  const [currentUserRole, setCurrentUserRole] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [imageUrlInput, setImageUrlInput] = useState('');
   const [uploadingImages, setUploadingImages] = useState(false);
@@ -232,12 +271,16 @@ function PropertyEditor() {
   useEffect(() => {
     async function loadStaff() {
       try {
+        const current = getStoredUser();
+        if (current) {
+          setCurrentUserRole(current.role || 'USER');
+        }
+
         const users = await fetchUsers();
         // Filter strictly to ADMIN and AGENT
         const staffOnly = users.filter(u => u.role === 'ADMIN' || u.role === 'AGENT');
         
         // Also ensure current user is represented if they are staff
-        const current = getStoredUser();
         if (current && (current.role === 'ADMIN' || current.role === 'AGENT')) {
           if (!staffOnly.some(s => s.id === current.id || s.email === current.email)) {
             staffOnly.unshift(current);
@@ -253,6 +296,7 @@ function PropertyEditor() {
             email: 'benzttr12@gmail.com',
             phone: '081-604-0097',
             line_id: '@chantakorn',
+            facebook: DEFAULT_OFFICIAL_FACEBOOK,
             avatar_url: 'https://images.unsplash.com/photo-1560250097-0b93528c311a?auto=format&fit=crop&w=600&q=80',
           });
         }
@@ -261,14 +305,17 @@ function PropertyEditor() {
 
         // Pre-select current user as default if not in edit mode
         if (!editId && staffOnly.length > 0) {
+          let chosen = staffOnly[0];
           if (current) {
             const matchCurrent = staffOnly.find(s => s.id === current.id || s.email === current.email);
             if (matchCurrent) {
-              setSelectedAgentId(matchCurrent.id);
-              return;
+              chosen = matchCurrent;
             }
           }
-          setSelectedAgentId(staffOnly[0].id);
+          setSelectedAgentId(chosen.id);
+          setAgentPhone(chosen.phone || '081-604-0097');
+          setAgentLine(chosen.line_id || '@chantakorn');
+          setAgentFacebook(chosen.facebook || (chosen.role === 'ADMIN' ? DEFAULT_OFFICIAL_FACEBOOK : ''));
         }
       } catch (err) {
         console.warn('Error fetching staff list:', err);
@@ -276,6 +323,17 @@ function PropertyEditor() {
     }
     loadStaff();
   }, [editId]);
+
+  // Handle manual selection of agent from dropdown
+  const handleSelectAgent = (agentId: string) => {
+    setSelectedAgentId(agentId);
+    const target = eligibleStaff.find(s => s.id === agentId);
+    if (target) {
+      setAgentPhone(target.phone || '081-604-0097');
+      setAgentLine(target.line_id || '@chantakorn');
+      setAgentFacebook(target.facebook || (target.role === 'ADMIN' ? DEFAULT_OFFICIAL_FACEBOOK : ''));
+    }
+  };
 
   // 2. Load Property Data if in Edit Mode
   useEffect(() => {
@@ -307,9 +365,13 @@ function PropertyEditor() {
       setDescription(property.description || '');
       setCoverImage(property.cover_image || property.images[0] || '');
       setImages(property.images || []);
+      setVideoUrl(property.video_url || '');
       setSelectedFeatures(property.features || []);
       setFeatured(property.featured || false);
       setSelectedAgentId(property.agent_id || property.agent?.id || '');
+      setAgentPhone(property.agent?.phone || '081-604-0097');
+      setAgentLine(property.agent?.line_id || '@chantakorn');
+      setAgentFacebook(property.agent?.facebook || '');
       setPublished(property.published);
       setEditorLoaded(true);
     }).catch(err => { 
@@ -487,59 +549,51 @@ function PropertyEditor() {
     }
   };
 
-  // Image Processing
+  // Image Processing with Auto-Compression (up to 100MB per file)
   const processFiles = async (files: File[]) => {
     const validFiles = files.filter(f => f.type.startsWith('image/'));
     if (!validFiles.length) {
-      setError('กรุณาเลือกไฟล์รูปภาพที่ถูกต้อง (JPG, PNG, WebP)');
+      setError('กรุณาเลือกไฟล์รูปภาพที่ถูกต้อง (JPG, PNG, WebP, HEIC/HEIF)');
       return;
     }
-    const oversized = validFiles.filter(f => f.size > 50 * 1024 * 1024);
+    const oversized = validFiles.filter(f => f.size > MAX_UPLOAD_IMAGE_SIZE_BYTES);
     if (oversized.length > 0) {
-      setError(`ไฟล์ ${oversized.map(f => f.name).join(', ')} มีขนาดเกิน 50MB กรุณาเลือกไฟล์ที่มีขนาดไม่เกิน 50MB`);
+      setError(`ไฟล์ ${oversized.map(f => f.name).join(', ')} มีขนาดเกิน 100MB กรุณาเลือกไฟล์ที่มีขนาดไม่เกิน 100MB`);
       return;
     }
-    if (images.length + validFiles.length > 50) {
-      setError('สามารถเพิ่มรูปภาพได้สูงสุด 50 รูปต่อประกาศ');
+    if (images.length + validFiles.length > 60) {
+      setError('สามารถเพิ่มรูปภาพได้สูงสุด 60 รูปต่อประกาศ');
       return;
     }
 
     setUploadingImages(true);
     setError('');
-    try {
-      const newPhotos = await Promise.all(validFiles.map(file => new Promise<string>((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onerror = () => reject(new Error(`อ่านรูปภาพ ${file.name} ไม่สำเร็จ`));
-        reader.onload = () => {
-          const img = new window.Image();
-          img.onerror = () => reject(new Error(`รูปแบบรูปภาพ ${file.name} ไม่ถูกต้อง`));
-          img.onload = () => {
-            const canvas = document.createElement('canvas');
-            const maxDim = 1920;
-            const scale = Math.min(1, maxDim / Math.max(img.width, img.height));
-            canvas.width = Math.max(1, Math.round(img.width * scale));
-            canvas.height = Math.max(1, Math.round(img.height * scale));
-            const ctx = canvas.getContext('2d');
-            if (!ctx) {
-              reject(new Error('ไม่สามารถประมวลผลรูปภาพได้'));
-              return;
-            }
-            ctx.fillStyle = '#ffffff';
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
-            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-            let quality = 0.85;
-            let resultUrl = canvas.toDataURL('image/jpeg', quality);
-            while (resultUrl.length > 500000 && quality > 0.35) {
-              quality -= 0.1;
-              resultUrl = canvas.toDataURL('image/jpeg', quality);
-            }
-            resolve(resultUrl);
-          };
-          img.src = String(reader.result);
-        };
-        reader.readAsDataURL(file);
-      })));
+    setCompressionProgress({
+      current: 0,
+      total: validFiles.length,
+    });
 
+    try {
+      const results = await compressMultipleImages(validFiles, (curr, total, item) => {
+        setCompressionProgress({
+          current: curr,
+          total,
+          currentName: item.name,
+          originalSize: item.originalSizeFormatted,
+          compressedSize: item.compressedSizeFormatted,
+          percentSaved: item.percentSaved,
+        });
+      });
+
+      const newPhotos = results.map(r => r.dataUrl);
+      const newStats = results.map(r => ({
+        url: r.dataUrl,
+        origSize: r.originalSizeFormatted,
+        compSize: r.compressedSizeFormatted,
+        saved: r.percentSaved,
+      }));
+
+      setUploadStatsList(prev => [...prev, ...newStats]);
       setImages(prev => {
         const updated = [...prev, ...newPhotos];
         if (!coverImage && updated.length > 0) {
@@ -548,10 +602,45 @@ function PropertyEditor() {
         return updated;
       });
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'เกิดข้อผิดพลาดในการโหลดรูปภาพ');
+      setError(err instanceof Error ? err.message : 'เกิดข้อผิดพลาดในการประมวลผลและบีบอัดรูปภาพ');
     } finally {
       setUploadingImages(false);
+      setTimeout(() => setCompressionProgress(null), 4000);
     }
+  };
+
+  // Video File Upload Handler (MP4, WebM, MOV up to 100MB)
+  const handleVideoFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith('video/')) {
+      setError('กรุณาเลือกไฟล์วิดีโอที่ถูกต้อง (MP4, WebM, MOV)');
+      return;
+    }
+    if (file.size > MAX_UPLOAD_VIDEO_SIZE_BYTES) {
+      setError(`ไฟล์วิดีโอมีขนาด ${formatBytes(file.size)} ซึ่งเกินขนาดสูงสุด 100MB`);
+      return;
+    }
+
+    setUploadingVideo(true);
+    setError('');
+    try {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const videoDataUrl = String(reader.result);
+        setVideoUrl(videoDataUrl);
+        setUploadingVideo(false);
+      };
+      reader.onerror = () => {
+        setError('ไม่สามารถอ่านไฟล์วิดีโอได้');
+        setUploadingVideo(false);
+      };
+      reader.readAsDataURL(file);
+    } catch (err) {
+      setError('เกิดข้อผิดพลาดในการโหลดวิดีโอ');
+      setUploadingVideo(false);
+    }
+    e.target.value = '';
   };
 
   const handleFileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -606,6 +695,14 @@ function PropertyEditor() {
       setError('พิกัดละติจูดหรือลองจิจูดไม่ถูกต้อง'); 
       return; 
     }
+
+    // Permission enforcement: only ADMIN and AGENT
+    const current = getStoredUser();
+    if (current && current.role === 'USER') {
+      setError('ขออภัย เฉพาะสมาชิกที่มียศ "แอดมิน" หรือ "นายหน้า" เท่านั้นที่สามารถบันทึกข้อมูลทรัพย์สินได้');
+      return;
+    }
+
     setError('');
 
     setSubmitting(true);
@@ -618,8 +715,9 @@ function PropertyEditor() {
         name: agentProfile?.full_name || 'คุณฉันทากร นวลจันทร์ (เบนซ์)',
         rank: resolvedRank,
         title: resolvedRank,
-        phone: agentProfile?.phone || '081-604-0097',
-        line_id: agentProfile?.line_id || 'LINE Official Account',
+        phone: agentPhone.trim() || agentProfile?.phone || '081-604-0097',
+        line_id: agentLine.trim() || agentProfile?.line_id || '@chantakorn',
+        facebook: agentFacebook.trim() || agentProfile?.facebook || (resolvedRank === 'แอดมิน' ? DEFAULT_OFFICIAL_FACEBOOK : ''),
         email: agentProfile?.email || 'chantakorn@chantakornproperty.com',
         photo_url: agentProfile?.avatar_url || 'https://images.unsplash.com/photo-1560250097-0b93528c311a?auto=format&fit=crop&w=600&q=80',
         bio: agentProfile?.bio || (resolvedRank === 'แอดมิน'
@@ -650,6 +748,7 @@ function PropertyEditor() {
         features: selectedFeatures,
         cover_image: coverImage || images[0],
         images,
+        video_url: videoUrl.trim() || undefined,
         featured,
         published,
         agent_id: resolvedAgent.id,
@@ -708,6 +807,30 @@ function PropertyEditor() {
         </div>
       )}
 
+      {currentUserRole === 'USER' && (
+        <div className="rounded-2xl bg-amber-50 border border-amber-300 p-4 text-xs sm:text-sm text-amber-900 flex items-start space-x-3 shadow-sm">
+          <ShieldAlert className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
+          <div className="space-y-1">
+            <h4 className="font-bold text-amber-950">จำกัดสิทธิ์การลงประกาศทรัพย์สิน (Role Restricted)</h4>
+            <p className="text-xs text-amber-800 leading-relaxed">
+              ขออภัย เฉพาะสมาชิกที่มียศ <strong>แอดมิน (ADMIN)</strong> และ <strong>นายหน้า (AGENT)</strong> เท่านั้นที่สามารถลงประกาศหรือแก้ไขข้อมูลทรัพย์สินได้ หากคุณต้องการลงทรัพย์ กรุณาติดต่อแอดมินเพื่อปรับยศบัญชีของคุณ
+            </p>
+          </div>
+        </div>
+      )}
+
+      {currentUserRole && currentUserRole !== 'USER' && (
+        <div className="bg-emerald-50/90 border border-emerald-200 rounded-2xl px-4 py-2.5 text-xs flex flex-wrap items-center justify-between gap-2 shadow-xs">
+          <div className="flex items-center space-x-2 text-emerald-950 font-medium">
+            <ShieldCheck className="w-4 h-4 text-emerald-600 flex-shrink-0" />
+            <span>เข้าสู่ระบบด้วยยศ: <strong className="text-navy-950">{currentUserRole === 'ADMIN' ? '🛡️ แอดมิน (Admin)' : '👔 นายหน้า (Agent)'}</strong> — สามารถลงข้อมูลทรัพย์สินและระบุ LINE, Facebook และเบอร์โทรของตนเองได้</span>
+          </div>
+          <span className="text-[10px] bg-emerald-100 text-emerald-800 font-bold px-2.5 py-0.5 rounded-full border border-emerald-300">
+            สิทธิ์ได้รับอนุมัติ
+          </span>
+        </div>
+      )}
+
       {/* Sticky Section Jump Navigation Bar */}
       <div className="sticky top-16 z-20 bg-white/95 backdrop-blur-md p-2 rounded-2xl border border-gray-200 shadow-sm flex items-center justify-between gap-2 overflow-x-auto text-xs">
         <div className="flex items-center space-x-1 sm:space-x-2 flex-shrink-0">
@@ -716,7 +839,8 @@ function PropertyEditor() {
             { id: 'section-2-location', label: '2. ทำเล (สงขลา)' },
             { id: 'section-3-specs', label: '3. สเปก & จุดเด่น' },
             { id: 'section-4-images', label: `4. รูปภาพ (${images.length})` },
-            { id: 'section-5-agent', label: '5. นายหน้าผู้ดูแล' },
+            { id: 'section-5-video', label: videoUrl ? '5. วิดีโอพาทัวร์ (มี)' : '5. วิดีโอพาทัวร์' },
+            { id: 'section-6-agent', label: '6. นายหน้าผู้ดูแล' },
           ].map((sec) => (
             <button
               key={sec.id}
@@ -1444,13 +1568,18 @@ function PropertyEditor() {
           </div>
         </div>
 
-        {/* Section 4: Images */}
-        <div id="section-4-images" className="bg-white rounded-2xl p-6 border border-surface-border shadow-sm space-y-4 scroll-mt-28">
-          <div className="border-b border-gray-100 pb-3 flex items-center justify-between">
-            <h3 className="font-bold text-navy-950 text-base flex items-center space-x-2">
-              <ImageIcon className="w-4 h-4 text-gold-600" />
-              <span>4. รูปภาพทรัพย์สิน (Images)</span>
-            </h3>
+        {/* Section 4: Property Images (รองรับสูงสุด 100MB พร้อมระบบบีบอัดอัตโนมัติ Full HD) */}
+        <div id="section-4-images" className="bg-white rounded-2xl p-6 border border-surface-border shadow-sm space-y-5 scroll-mt-28">
+          <div className="border-b border-gray-100 pb-3 flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <h3 className="font-bold text-navy-950 text-base flex items-center space-x-2">
+                <ImageIcon className="w-4 h-4 text-gold-600" />
+                <span>4. รูปภาพทรัพย์สิน & แกลเลอรี (บีบอัดอัตโนมัติ Full HD รองรับไฟล์สูงสุด 100MB)</span>
+              </h3>
+              <p className="text-xs text-gray-500 mt-0.5">
+                เลือกรูปภาพที่มีความคมชัดสูง ระบบจะช่วยบีบอัดให้อัตโนมัติทันทีเพื่อให้เว็บโหลดเร็วและประหยัดพื้นที่
+              </p>
+            </div>
             <div className="flex items-center space-x-2">
               <button
                 type="button"
@@ -1460,13 +1589,71 @@ function PropertyEditor() {
                 }}
                 className="text-[11px] font-semibold text-gold-700 bg-gold-50 hover:bg-gold-100 px-3 py-1.5 rounded-xl border border-gold-200 transition-colors"
               >
-                + ใส่ชุดรูปภาพตัวอย่างทันที
+                + ใส่รูปตัวอย่าง
               </button>
-              <span className="text-xs font-semibold text-gray-500">
+              {images.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setImages([]);
+                    setCoverImage('');
+                  }}
+                  className="text-[11px] font-semibold text-red-600 bg-red-50 hover:bg-red-100 px-2.5 py-1.5 rounded-xl border border-red-200 transition-colors"
+                  title="ล้างรูปทั้งหมด"
+                >
+                  ล้างรูปทั้งหมด
+                </button>
+              )}
+              <span className="text-xs font-bold text-navy-950 bg-gray-100 px-2.5 py-1 rounded-lg">
                 {images.length} รูป
               </span>
             </div>
           </div>
+
+          {/* Auto Compression Feature Banner */}
+          <div className="bg-gradient-to-r from-emerald-50 via-teal-50 to-blue-50 border border-emerald-200/80 rounded-2xl p-4 text-xs text-emerald-950 flex items-start space-x-3 shadow-xs">
+            <Gauge className="w-5 h-5 text-emerald-600 flex-shrink-0 mt-0.5" />
+            <div className="space-y-1">
+              <div className="flex items-center space-x-2">
+                <span className="font-bold text-emerald-900">⚡ ระบบบีบอัดรูปภาพอัตโนมัติ (Smart Auto-Compressor)</span>
+                <span className="bg-emerald-200/80 text-emerald-900 text-[10px] font-extrabold px-2 py-0.5 rounded-full">
+                  รองรับ 100MB/รูป
+                </span>
+              </div>
+              <p className="text-emerald-800 text-[11px] leading-relaxed">
+                คุณสามารถเลือกไฟล์ภาพความละเอียดสูง (DSLR, มือถือ 4K/8K) ขนาดใหญ่สูงสุดถึง <strong>100MB ต่อไฟล์</strong> โดยระบบบนเบราว์เซอร์จะทำการรีไซส์และบีบอัดคุณภาพสูง (Full HD 1920px WebP/JPEG) ให้อัตโนมัติทันที ลดขนาดลงถึง <strong>90-98%</strong> โดยที่ภาพยังคงสวยคมชัด
+              </p>
+            </div>
+          </div>
+
+          {/* Real-time Compression Progress Indicator */}
+          {compressionProgress && (
+            <div className="bg-emerald-50 border-2 border-emerald-400 rounded-2xl p-4 text-xs text-emerald-950 space-y-2.5 shadow-sm animate-in fade-in duration-300">
+              <div className="flex items-center justify-between font-bold">
+                <span className="flex items-center space-x-2 text-emerald-950">
+                  <Loader2 className="w-4 h-4 text-emerald-600 animate-spin" />
+                  <span>กำลังบีบอัดรูปภาพอัตโนมัติ: รูปที่ {compressionProgress.current} จาก {compressionProgress.total}</span>
+                </span>
+                <span className="text-emerald-800 bg-emerald-200 px-2.5 py-0.5 rounded-full text-xs font-black">
+                  {Math.round((compressionProgress.current / compressionProgress.total) * 100)}%
+                </span>
+              </div>
+              <div className="w-full bg-emerald-200 h-2.5 rounded-full overflow-hidden">
+                <div 
+                  className="bg-emerald-600 h-full transition-all duration-300 rounded-full"
+                  style={{ width: `${(compressionProgress.current / compressionProgress.total) * 100}%` }}
+                />
+              </div>
+              {compressionProgress.currentName && (
+                <div className="flex flex-wrap items-center justify-between text-[11px] text-emerald-900 pt-0.5 font-medium">
+                  <span className="truncate max-w-xs">{compressionProgress.currentName}</span>
+                  <span>
+                    ขนาด: <strong className="text-gray-700">{compressionProgress.originalSize}</strong> ➔ <strong className="text-emerald-700">{compressionProgress.compressedSize}</strong> (ประหยัด {compressionProgress.percentSaved}%)
+                  </span>
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Upload Zone */}
           <div
@@ -1490,24 +1677,24 @@ function PropertyEditor() {
             />
             <label
               htmlFor="property-image-upload"
-              className="cursor-pointer flex flex-col items-center justify-center space-y-2"
+              className="cursor-pointer flex flex-col items-center justify-center space-y-2.5"
             >
               {uploadingImages ? (
                 <div className="flex flex-col items-center space-y-2 py-4">
                   <Loader2 className="w-8 h-8 text-gold-600 animate-spin" />
-                  <p className="text-xs font-bold text-navy-950">กำลังประมวลผลรูปภาพ...</p>
+                  <p className="text-xs font-bold text-navy-950">กำลังบีบอัดและปรับคุณภาพรูปภาพ...</p>
                 </div>
               ) : (
                 <>
-                  <div className="w-12 h-12 rounded-full bg-gold-100 text-gold-700 flex items-center justify-center">
+                  <div className="w-12 h-12 rounded-full bg-gold-100 text-gold-700 flex items-center justify-center shadow-sm">
                     <Upload className="w-6 h-6" />
                   </div>
                   <div>
-                    <span className="text-xs font-bold text-navy-950 bg-gold-100 px-3 py-1.5 rounded-lg hover:bg-gold-200 transition-colors">
+                    <span className="text-xs font-bold text-navy-950 bg-gold-100 hover:bg-gold-200 px-4 py-2 rounded-xl transition-colors inline-block shadow-sm">
                       คลิกเลือกไฟล์รูปภาพจากเครื่อง
                     </span>
-                    <span className="text-xs text-gray-500 block mt-1.5">
-                      หรือลากไฟล์รูปภาพมาวางที่นี่ (รองรับ JPG, PNG, WebP ไฟล์ละไม่เกิน 50MB สูงสุด 50 รูป คมชัดระดับ Full HD)
+                    <span className="text-xs text-gray-500 block mt-2">
+                      หรือลากไฟล์รูปภาพมาวางที่นี่ (รองรับ JPG, PNG, WebP สูงสุด <strong>100MB ต่อไฟล์</strong> ระบบจะบีบอัดให้อัตโนมัติ)
                     </span>
                   </div>
                 </>
@@ -1535,10 +1722,16 @@ function PropertyEditor() {
 
           {/* Image Gallery */}
           {images.length > 0 && (
-            <div className="space-y-2 pt-2">
-              <span className="text-xs font-bold text-navy-950 block">
-                รูปภาพทั้งหมด ({images.length}) - คลิกรูปภาพใดเพื่อตั้งเป็นหน้าปก:
-              </span>
+            <div className="space-y-2.5 pt-2">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-navy-950 block">
+                  รูปภาพทั้งหมด ({images.length} รูป) — คลิกปุ่มเพื่อตั้งเป็นรูปปกหลัก:
+                </span>
+                <span className="text-[11px] text-emerald-700 font-semibold flex items-center space-x-1">
+                  <CheckCheck className="w-3.5 h-3.5" />
+                  <span>บีบอัดอัตโนมัติเรียบร้อย</span>
+                </span>
+              </div>
               <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-5 gap-3">
                 {images.map((img, i) => {
                   const isCover = (coverImage === img) || (!coverImage && i === 0);
@@ -1559,7 +1752,7 @@ function PropertyEditor() {
                       />
                       
                       {isCover ? (
-                        <div className="absolute top-1.5 left-1.5 bg-gold-500 text-navy-950 text-[10px] font-black px-2 py-0.5 rounded shadow-sm flex items-center space-x-1">
+                        <div className="absolute top-1.5 left-1.5 bg-gold-500 text-navy-950 text-[10px] font-black px-2 py-0.5 rounded shadow-sm flex items-center space-x-1 z-10">
                           <Star className="w-3 h-3 fill-current" />
                           <span>หน้าปก</span>
                         </div>
@@ -1567,7 +1760,7 @@ function PropertyEditor() {
                         <button
                           type="button"
                           onClick={() => setCoverImage(img)}
-                          className="absolute bottom-1.5 left-1.5 right-1.5 bg-black/75 hover:bg-gold-500 hover:text-navy-950 text-white text-[10px] font-bold py-1 rounded transition-colors text-center opacity-0 group-hover:opacity-100"
+                          className="absolute bottom-1.5 left-1.5 right-1.5 bg-black/75 hover:bg-gold-500 hover:text-navy-950 text-white text-[10px] font-bold py-1 rounded transition-colors text-center opacity-0 group-hover:opacity-100 z-10"
                         >
                           ตั้งเป็นหน้าปก
                         </button>
@@ -1577,7 +1770,7 @@ function PropertyEditor() {
                         type="button"
                         onClick={() => handleRemoveImage(i)}
                         title="ลบรูปภาพนี้"
-                        className="absolute top-1.5 right-1.5 w-6 h-6 bg-black/75 hover:bg-red-600 text-white rounded-full flex items-center justify-center text-xs transition-colors shadow"
+                        className="absolute top-1.5 right-1.5 w-6 h-6 bg-black/75 hover:bg-red-600 text-white rounded-full flex items-center justify-center text-xs transition-colors shadow z-10"
                       >
                         <X className="w-3.5 h-3.5" />
                       </button>
@@ -1589,39 +1782,295 @@ function PropertyEditor() {
           )}
         </div>
 
-        {/* Section 5: Responsible Agent (นายหน้าที่รับผิดชอบทรัพย์นี้ - อ้างอิงจากสมาชิกที่มียศ นายหน้า และ แอดมิน เท่านั้น และแสดงข้อมูลของคนโพสต์) */}
-        <div id="section-5-agent" className="bg-white rounded-2xl p-6 border border-surface-border shadow-sm space-y-4 scroll-mt-28">
-          <div className="border-b border-gray-100 pb-3 flex items-center justify-between">
-            <h3 className="font-bold text-navy-950 text-base flex items-center space-x-2">
-              <UserCheck className="w-4 h-4 text-gold-600" />
-              <span>5. นายหน้าที่รับผิดชอบทรัพย์นี้ (อ้างอิงจากสมาชิกยศ นายหน้า และ แอดมิน)</span>
-            </h3>
-            <span className="text-[11px] text-brand-muted flex items-center space-x-1">
-              <ShieldCheck className="w-3.5 h-3.5 text-gold-600" />
-              <span>เฉพาะสมาชิกสิทธิ์ ADMIN และ AGENT</span>
-            </span>
+        {/* Section 5: Property Video Tour (วิดีโอพาทัวร์อสังหาริมทรัพย์) */}
+        <div id="section-5-video" className="bg-white rounded-2xl p-6 border border-surface-border shadow-sm space-y-5 scroll-mt-28">
+          <div className="border-b border-gray-100 pb-3 flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <h3 className="font-bold text-navy-950 text-base flex items-center space-x-2">
+                <Video className="w-4 h-4 text-red-600" />
+                <span>5. วิดีโอพาทัวร์อสังหาริมทรัพย์ (Video Tour)</span>
+              </h3>
+              <p className="text-xs text-gray-500 mt-0.5">
+                ใส่วิดีโอพาทัวร์สถานที่จริงเพื่อดึงดูดลูกค้าและเพิ่มความน่าสนใจของประกาศ
+              </p>
+            </div>
+            <div className="flex items-center space-x-2">
+              <button
+                type="button"
+                onClick={() => setVideoUrl('https://www.youtube.com/watch?v=ScMzIvxBSi4')}
+                className="text-[11px] font-semibold text-red-700 bg-red-50 hover:bg-red-100 px-3 py-1.5 rounded-xl border border-red-200 transition-colors flex items-center space-x-1"
+              >
+                <Play className="w-3 h-3 fill-red-700" />
+                <span>+ ทดลองใส่วิดีโอตัวอย่าง (YouTube)</span>
+              </button>
+              {videoUrl && (
+                <button
+                  type="button"
+                  onClick={() => setVideoUrl('')}
+                  className="text-[11px] font-semibold text-gray-600 hover:text-red-600 bg-gray-100 px-2.5 py-1.5 rounded-xl transition-colors"
+                >
+                  ลบวิดีโอ
+                </button>
+              )}
+            </div>
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 items-start">
-            {/* Left: Dropdown to select authorized staff */}
-            <div className="space-y-3">
-              <label className="block text-xs font-bold text-gray-700">
-                เลือกนายหน้าผู้ดูแลทรัพย์นี้ *
-              </label>
-              <select
-                value={selectedAgentId}
-                onChange={(e) => setSelectedAgentId(e.target.value)}
-                className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3 text-xs font-bold text-navy-950 focus:bg-white focus:ring-2 focus:ring-gold-500 outline-none"
-              >
-                {eligibleStaff.map((staff) => (
-                  <option key={staff.id} value={staff.id}>
-                    {staff.full_name} ({staff.role === 'ADMIN' ? 'ผู้ดูแลระบบ' : 'นายหน้า'})
-                  </option>
-                ))}
-              </select>
-              <p className="text-[11px] text-gray-500 leading-relaxed">
-                ℹ️ สมาชิกที่แสดงในรายการนี้ได้รับการตรวจสอบสิทธิ์แล้ว (ผู้ใช้งานทั่วไปไม่มีสิทธิ์เป็นผู้ดูแลทรัพย์)
+          {/* Helpful Tip */}
+          <div className="p-3.5 bg-red-50/70 border border-red-200 rounded-xl text-xs text-red-950 leading-relaxed flex items-start gap-2.5">
+            <Film className="w-4 h-4 text-red-600 flex-shrink-0 mt-0.5" />
+            <div>
+              <p className="font-bold">ช่องทางใส่วิดีโอที่รองรับ:</p>
+              <p className="text-red-900 text-[11px] mt-0.5">
+                รองรับลิงก์ <strong>YouTube</strong> (ลิงก์ทั่วไป, youtu.be, YouTube Shorts), <strong>TikTok</strong>, <strong>Facebook Video</strong>, ลิงก์ไฟล์ <strong>MP4</strong> โดยตรง หรือจะ<strong>อัปโหลดไฟล์วิดีโอจากเครื่อง</strong> (สูงสุด 100MB) ก็ได้เช่นกัน
               </p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+            {/* Left 7 Cols: Video inputs */}
+            <div className="lg:col-span-7 space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-navy-950 mb-1.5 flex items-center justify-between">
+                  <span>วางลิงก์วิดีโอ (YouTube / TikTok / Facebook / MP4 URL)</span>
+                  <span className="text-[10px] text-gray-400 font-normal">ระบบจะตรวจจับอัตโนมัติ</span>
+                </label>
+                <div className="relative">
+                  <input
+                    type="url"
+                    value={videoUrl.startsWith('data:video/') ? '' : videoUrl}
+                    onChange={(e) => setVideoUrl(e.target.value)}
+                    placeholder="เช่น https://www.youtube.com/watch?v=... หรือ https://youtu.be/..."
+                    className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3 pr-24 text-xs text-navy-950 focus:bg-white focus:ring-2 focus:ring-red-500 outline-none transition-all shadow-sm"
+                  />
+                  {videoUrl && !videoUrl.startsWith('data:video/') && (
+                    <button
+                      type="button"
+                      onClick={() => setVideoUrl('')}
+                      className="absolute right-2.5 top-2.5 text-xs text-gray-400 hover:text-red-600 px-2 py-1 rounded bg-gray-100 hover:bg-red-50 transition-colors"
+                    >
+                      ล้างลิงก์
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Or Direct Video File Upload */}
+              <div className="pt-2 border-t border-gray-100">
+                <span className="block text-xs font-bold text-navy-950 mb-2">
+                  หรือเลือกอัปโหลดไฟล์คลิปวิดีโอจากเครื่อง (สูงสุด 100MB):
+                </span>
+
+                <div className="flex flex-wrap items-center gap-2">
+                  <input
+                    type="file"
+                    id="property-video-file-upload"
+                    accept="video/mp4,video/webm,video/quicktime,video/ogg"
+                    onChange={handleVideoFileUpload}
+                    disabled={uploadingVideo}
+                    className="sr-only"
+                  />
+                  <label
+                    htmlFor="property-video-file-upload"
+                    className="cursor-pointer inline-flex items-center space-x-2 px-4 py-2.5 bg-navy-950 hover:bg-navy-900 text-white rounded-xl text-xs font-bold shadow-sm transition-all"
+                  >
+                    {uploadingVideo ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin text-gold-400" />
+                        <span>กำลังโหลดไฟล์วิดีโอ...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Upload className="w-4 h-4 text-gold-400" />
+                        <span>เลือกไฟล์วิดีโอจากเครื่อง</span>
+                      </>
+                    )}
+                  </label>
+
+                  {videoUrl.startsWith('data:video/') && (
+                    <span className="text-xs text-emerald-700 font-bold bg-emerald-50 border border-emerald-200 px-3 py-1.5 rounded-xl flex items-center space-x-1.5">
+                      <Check className="w-3.5 h-3.5" />
+                      <span>แนบไฟล์วิดีโอจากเครื่องเรียบร้อย</span>
+                    </span>
+                  )}
+                </div>
+                <p className="text-[11px] text-gray-500 mt-1.5">
+                  รองรับนามสกุล .mp4, .webm, .mov (ขนาดสูงสุด 100MB)
+                </p>
+              </div>
+            </div>
+
+            {/* Right 5 Cols: Live Video Preview */}
+            <div className="lg:col-span-5">
+              <span className="block text-xs font-bold text-navy-950 mb-2">
+                ตัวอย่างการแสดงผลวิดีโอ (Live Preview):
+              </span>
+
+              {videoUrl ? (
+                (() => {
+                  const parsed = parseVideoUrl(videoUrl);
+                  return (
+                    <div className="rounded-2xl overflow-hidden border border-gray-200 bg-black aspect-video shadow-md relative group">
+                      {parsed?.type === 'youtube' && parsed.embedUrl && (
+                        <iframe
+                          src={parsed.embedUrl}
+                          title="YouTube Tour Preview"
+                          className="w-full h-full border-0"
+                          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                          allowFullScreen
+                        />
+                      )}
+
+                      {parsed?.type === 'direct' && (
+                        <video controls preload="metadata" className="w-full h-full object-contain">
+                          <source src={parsed.url} />
+                          เบราว์เซอร์ไม่รองรับการเล่นวิดีโอนี้
+                        </video>
+                      )}
+
+                      {(parsed?.type === 'tiktok' || parsed?.type === 'facebook' || parsed?.type === 'other') && (
+                        <div className="w-full h-full flex flex-col items-center justify-center p-4 text-center text-white bg-slate-900 space-y-2">
+                          <Film className="w-8 h-8 text-gold-400" />
+                          <p className="text-xs font-bold">{parsed?.title || 'วิดีโอจากแพลตฟอร์มภายนอก'}</p>
+                          <a
+                            href={parsed?.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-[11px] bg-gold-500 text-navy-950 px-3 py-1 rounded-lg font-bold"
+                          >
+                            เปิดดูวิดีโอ
+                          </a>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()
+              ) : (
+                <div className="aspect-video rounded-2xl border-2 border-dashed border-gray-200 bg-gray-50 flex flex-col items-center justify-center p-4 text-center text-gray-400 space-y-2">
+                  <Film className="w-8 h-8 text-gray-300" />
+                  <p className="text-xs font-medium">ยังไม่มีวิดีโอพาทัวร์</p>
+                  <p className="text-[10px] text-gray-400 max-w-xs">
+                    วางลิงก์ YouTube หรืออัปโหลดไฟล์วิดีโอเพื่อแสดงตัวอย่างที่นี่
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Section 6: Responsible Agent (นายหน้าที่รับผิดชอบทรัพย์นี้ - อ้างอิงจากสมาชิกที่มียศ นายหน้า และ แอดมิน เท่านั้น และให้ใส่วิธีติดต่อของนายหน้าคนนั้นเอง) */}
+        <div id="section-6-agent" className="bg-white rounded-2xl p-6 border border-surface-border shadow-sm space-y-5 scroll-mt-28">
+          <div className="border-b border-gray-100 pb-3 flex flex-wrap items-center justify-between gap-2">
+            <h3 className="font-bold text-navy-950 text-base flex items-center space-x-2">
+              <UserCheck className="w-4 h-4 text-gold-600" />
+              <span>6. ข้อมูลนายหน้าผู้ลงประกาศ & ช่องทางติดต่อตรง (เฉพาะยศแอดมิน และยศนายหน้า)</span>
+            </h3>
+            <div className="flex items-center gap-2">
+              <span className="px-2.5 py-1 bg-amber-50 text-amber-800 border border-amber-200 rounded-full text-[11px] font-bold flex items-center space-x-1">
+                <ShieldCheck className="w-3.5 h-3.5 text-amber-600" />
+                <span>จำกัดสิทธิ์: ยศแอดมิน & ยศนายหน้า</span>
+              </span>
+            </div>
+          </div>
+
+          <div className="p-3.5 bg-blue-50/70 border border-blue-200 rounded-xl text-xs text-blue-900 leading-relaxed flex items-start gap-2.5">
+            <Sparkles className="w-4 h-4 text-blue-600 flex-shrink-0 mt-0.5" />
+            <div>
+              <p className="font-bold">นโยบายช่องทางติดต่อนายหน้าผู้ลงทรัพย์:</p>
+              <p className="text-blue-800 text-[11px] mt-0.5">
+                เวลานายหน้าหรือแอดมินท่านใดลงข้อมูลทรัพย์ ให้ใส่ <strong>LINE</strong> และ <strong>Facebook</strong> ของนายหน้าคนนั้นเอง เพื่อให้ผู้ซื้อ/ผู้เช่าสามารถคลิกแชทหรือโทรติดต่อตรงกับนายหน้าผู้ดูแลได้ทันที
+              </p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+            {/* Left 7 cols: Inputs for Agent Contact Channels */}
+            <div className="lg:col-span-7 space-y-4">
+              {/* Agent Picker */}
+              <div>
+                <label className="block text-xs font-bold text-navy-950 mb-1.5 flex items-center justify-between">
+                  <span>เลือกนายหน้าผู้ดูแลประกาศนี้ *</span>
+                  <span className="text-[10px] font-normal text-brand-muted">สมาชิกที่มียศ แอดมิน หรือ นายหน้า เท่านั้น</span>
+                </label>
+                <select
+                  value={selectedAgentId}
+                  onChange={(e) => handleSelectAgent(e.target.value)}
+                  className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3 text-xs font-bold text-navy-950 focus:bg-white focus:ring-2 focus:ring-gold-500 outline-none transition-all shadow-sm"
+                >
+                  {eligibleStaff.map((staff) => (
+                    <option key={staff.id} value={staff.id}>
+                      {staff.full_name} ({staff.role === 'ADMIN' ? '🛡️ ยศ: แอดมิน' : '👔 ยศ: นายหน้า'})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Agent Phone */}
+              <div>
+                <label className="block text-xs font-bold text-navy-950 mb-1.5 flex items-center space-x-1.5">
+                  <Phone className="w-3.5 h-3.5 text-gold-600" />
+                  <span>เบอร์โทรศัพท์ของนายหน้าผู้ดูแลทรัพย์ *</span>
+                </label>
+                <input
+                  type="tel"
+                  value={agentPhone}
+                  onChange={(e) => setAgentPhone(e.target.value)}
+                  placeholder="เช่น 081-604-0097 หรือ 082-xxx-xxxx"
+                  className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3 text-xs text-navy-950 focus:bg-white focus:ring-2 focus:ring-gold-500 outline-none transition-all"
+                />
+                <p className="text-[10px] text-gray-500 mt-1">
+                  💡 เบอร์โทรนี้จะเชื่อมต่อกับปุ่ม &quot;โทรด่วน&quot; บนหน้ารายละเอียดทรัพย์ให้ลูกค้ากดโทรหาทันที
+                </p>
+              </div>
+
+              {/* Agent LINE */}
+              <div>
+                <label className="block text-xs font-bold text-navy-950 mb-1.5 flex items-center space-x-1.5">
+                  <MessageCircle className="w-3.5 h-3.5 text-[#06C755]" />
+                  <span>LINE ID หรือ ลิงก์ LINE ของนายหน้าคนนี้ *</span>
+                </label>
+                <div className="relative">
+                  <input
+                    type="text"
+                    value={agentLine}
+                    onChange={(e) => setAgentLine(e.target.value)}
+                    placeholder="เช่น @chantakorn หรือ benz_agent หรือ https://line.me/ti/p/~..."
+                    className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3 pr-20 text-xs text-navy-950 focus:bg-white focus:ring-2 focus:ring-[#06C755] outline-none transition-all"
+                  />
+                  <div className="absolute right-2.5 top-1/2 -translate-y-1/2">
+                    <span className="text-[10px] font-bold bg-[#06C755]/10 text-[#06C755] px-2 py-0.5 rounded-md border border-[#06C755]/30">
+                      LINE
+                    </span>
+                  </div>
+                </div>
+                <p className="text-[10px] text-gray-500 mt-1">
+                  💬 ลูกค้ากดปุ่ม &quot;LINE&quot; ระบบจะเปิดห้องแชทหา LINE ของนายหน้าคนนี้โดยตรง
+                </p>
+              </div>
+
+              {/* Agent Facebook */}
+              <div>
+                <label className="block text-xs font-bold text-navy-950 mb-1.5 flex items-center space-x-1.5">
+                  <Facebook className="w-3.5 h-3.5 text-[#1877F2]" />
+                  <span>ลิงก์ Facebook หรือเพจเฟสบุ๊คของนายหน้าคนนี้ *</span>
+                </label>
+                <div className="relative">
+                  <input
+                    type="url"
+                    value={agentFacebook}
+                    onChange={(e) => setAgentFacebook(e.target.value)}
+                    placeholder="เช่น https://www.facebook.com/yourname หรือ ลิงก์เพจเฟสบุ๊ค"
+                    className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3 pr-20 text-xs text-navy-950 focus:bg-white focus:ring-2 focus:ring-[#1877F2] outline-none transition-all"
+                  />
+                  <div className="absolute right-2.5 top-1/2 -translate-y-1/2">
+                    <span className="text-[10px] font-bold bg-[#1877F2]/10 text-[#1877F2] px-2 py-0.5 rounded-md border border-[#1877F2]/30">
+                      Facebook
+                    </span>
+                  </div>
+                </div>
+                <p className="text-[10px] text-gray-500 mt-1">
+                  🌐 เวลานายหน้าคนไหนลงข้อมูล ให้ใส่ Facebook ของตนเอง หรือปล่อยว่างเพื่อใช้ Facebook เพจหลัก
+                </p>
+              </div>
 
               {/* Publishing & Featured Toggles */}
               <div className="pt-3 border-t border-gray-100 space-y-2.5">
@@ -1632,7 +2081,7 @@ function PropertyEditor() {
                     onChange={e => setPublished(e.target.checked)} 
                     className="w-4 h-4 rounded text-gold-600 focus:ring-gold-500"
                   />
-                  <span>เผยแพร่ประกาศบนเว็บไซต์ทันที</span>
+                  <span>เผยแพร่ประกาศบนเว็บไซต์ทันที (เปิดให้บุคคลทั่วไปเข้าดู)</span>
                 </label>
 
                 <label className="flex items-center space-x-2 text-xs font-bold text-navy-950 cursor-pointer">
@@ -1647,64 +2096,100 @@ function PropertyEditor() {
               </div>
             </div>
 
-            {/* Right: Rich Card Showing Poster / Assigned Agent Details (แสดงข้อมูลของคนโพสต์) */}
-            <div className="lg:col-span-2 bg-gradient-to-br from-gray-50 to-gray-100/80 rounded-2xl p-4 sm:p-5 border border-gray-200 flex flex-col sm:flex-row items-start sm:items-center space-y-3 sm:space-y-0 sm:space-x-4">
-              <div className="relative w-16 h-16 sm:w-20 sm:h-20 rounded-2xl overflow-hidden bg-navy-950 flex-shrink-0 border-2 border-gold-400 shadow-md">
-                {currentAssignedStaff?.avatar_url ? (
-                  <Image
-                    src={currentAssignedStaff.avatar_url}
-                    alt={currentAssignedStaff.full_name || 'Agent'}
-                    fill
-                    unoptimized
-                    className="object-cover"
-                    referrerPolicy="no-referrer"
-                  />
-                ) : (
-                  <div className="w-full h-full flex items-center justify-center text-white font-bold text-2xl">
-                    {currentAssignedStaff?.full_name?.charAt(0) || 'A'}
-                  </div>
-                )}
+            {/* Right 5 cols: Live Preview Card of Agent Contacts as seen on the detail page */}
+            <div className="lg:col-span-5 bg-gradient-to-b from-navy-950 to-navy-900 text-white rounded-2xl p-5 border border-navy-800 shadow-xl space-y-4">
+              <div className="flex items-center justify-between pb-3 border-b border-navy-800/80">
+                <div className="flex items-center space-x-1.5 text-xs font-bold text-gold-400">
+                  <Eye className="w-3.5 h-3.5" />
+                  <span>ตัวอย่างแสดงผลบนหน้าเว็บ (Live Preview)</span>
+                </div>
+                <span className="text-[10px] bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 px-2 py-0.5 rounded-full font-semibold">
+                  แสดงข้อมูลจริง
+                </span>
               </div>
 
-              <div className="flex-grow space-y-1.5">
-                <div className="flex flex-wrap items-center gap-2">
-                  <h4 className="text-sm sm:text-base font-extrabold text-navy-950">
-                    {currentAssignedStaff?.full_name}
+              {/* Agent Profile Header */}
+              <div className="flex items-center space-x-3.5">
+                <div className="relative w-16 h-16 rounded-2xl overflow-hidden bg-navy-800 flex-shrink-0 border-2 border-gold-400 shadow-md">
+                  {currentAssignedStaff?.avatar_url ? (
+                    <Image
+                      src={currentAssignedStaff.avatar_url}
+                      alt={currentAssignedStaff.full_name || 'Agent'}
+                      fill
+                      unoptimized
+                      className="object-cover"
+                      referrerPolicy="no-referrer"
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center text-white font-bold text-2xl">
+                      {currentAssignedStaff?.full_name?.charAt(0) || 'A'}
+                    </div>
+                  )}
+                </div>
+
+                <div className="space-y-1">
+                  <h4 className="text-sm font-black text-white">
+                    {currentAssignedStaff?.full_name || 'คุณฉันทากร นวลจันทร์ (เบนซ์)'}
                   </h4>
-                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                  <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold ${
                     currentAssignedStaff?.role === 'ADMIN'
-                      ? 'bg-gold-100 text-gold-800 border border-gold-300'
-                      : 'bg-navy-100 text-navy-800 border border-navy-300'
+                      ? 'bg-gold-500/20 text-gold-300 border border-gold-500/40'
+                      : 'bg-blue-500/20 text-blue-300 border border-blue-500/40'
                   }`}>
                     {currentAssignedStaff?.role === 'ADMIN' ? '🛡️ ยศ: แอดมิน (Admin)' : '👔 ยศ: นายหน้า (Agent)'}
                   </span>
+                  <p className="text-[11px] text-gray-400">
+                    {currentAssignedStaff?.role === 'ADMIN' ? 'ผู้ดูแลระบบและที่ปรึกษา' : 'ตัวแทนนายหน้าผู้รับผิดชอบทรัพย์นี้'}
+                  </p>
+                </div>
+              </div>
+
+              {/* Contact Buttons as seen by customers */}
+              <div className="grid grid-cols-3 gap-1.5 pt-1">
+                <div className="p-2 rounded-xl bg-navy-800/90 border border-navy-700 text-center">
+                  <Phone className="w-3.5 h-3.5 text-gold-400 mx-auto mb-1" />
+                  <span className="block text-[10px] font-bold text-white">โทร</span>
+                  <span className="block text-[9px] text-gray-400 truncate" title={agentPhone}>
+                    {agentPhone || '081-604-0097'}
+                  </span>
                 </div>
 
-                <p className="text-xs text-brand-muted">
-                  {currentAssignedStaff?.role === 'ADMIN' 
-                    ? 'ยศ: แอดมิน ผู้ดูแลระบบและที่ปรึกษาอสังหาริมทรัพย์ Chantakorn Property' 
-                    : 'ยศ: นายหน้า ตัวแทนนายหน้าอสังหาริมทรัพย์ประจำจังหวัดสงขลา'}
-                </p>
+                <div className="p-2 rounded-xl bg-[#06C755]/15 border border-[#06C755]/30 text-center">
+                  <MessageCircle className="w-3.5 h-3.5 text-[#06C755] mx-auto mb-1" />
+                  <span className="block text-[10px] font-bold text-[#06C755]">LINE</span>
+                  <span className="block text-[9px] text-gray-300 truncate" title={agentLine}>
+                    {agentLine || '@chantakorn'}
+                  </span>
+                </div>
 
-                <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-navy-900 pt-1">
-                  {currentAssignedStaff?.phone && (
-                    <span className="flex items-center space-x-1 font-semibold">
-                      <Phone className="w-3.5 h-3.5 text-gold-600" />
-                      <span>{currentAssignedStaff.phone}</span>
-                    </span>
-                  )}
-                  {currentAssignedStaff?.line_id && (
-                    <span className="flex items-center space-x-1 text-emerald-600 font-semibold">
-                      <MessageCircle className="w-3.5 h-3.5" />
-                      <span>LINE: {currentAssignedStaff.line_id}</span>
-                    </span>
-                  )}
-                  {currentAssignedStaff?.email && (
-                    <span className="flex items-center space-x-1 text-gray-500">
-                      <Mail className="w-3.5 h-3.5" />
-                      <span>{currentAssignedStaff.email}</span>
-                    </span>
-                  )}
+                <div className="p-2 rounded-xl bg-[#1877F2]/15 border border-[#1877F2]/30 text-center">
+                  <Facebook className="w-3.5 h-3.5 text-[#1877F2] mx-auto mb-1" />
+                  <span className="block text-[10px] font-bold text-[#1877F2]">Facebook</span>
+                  <span className="block text-[9px] text-gray-300 truncate" title={agentFacebook || 'เพจหลัก'}>
+                    {agentFacebook ? 'เฟสนายหน้า' : 'เพจหลัก'}
+                  </span>
+                </div>
+              </div>
+
+              {/* Contact Detail Card */}
+              <div className="bg-navy-900/90 rounded-xl p-3 border border-navy-800 text-[11px] space-y-1.5 text-gray-300">
+                <div className="flex justify-between items-center text-[10px] text-gold-400 font-bold uppercase tracking-wider pb-1 border-b border-navy-800">
+                  <span>ข้อมูลติดต่อที่จะแสดงบนประกาศ</span>
+                  <ShieldCheck className="w-3 h-3 text-gold-400" />
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-400">📞 เบอร์โทร:</span>
+                  <span className="font-bold text-white">{agentPhone || '081-604-0097'}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-400">💬 LINE:</span>
+                  <span className="font-semibold text-emerald-400 max-w-[140px] truncate">{agentLine || '@chantakorn'}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-400">🌐 Facebook:</span>
+                  <span className="font-semibold text-blue-400 max-w-[140px] truncate">
+                    {agentFacebook ? 'ลิงก์เฟสบุ๊คนายหน้า' : 'Chantakorn Property'}
+                  </span>
                 </div>
               </div>
             </div>

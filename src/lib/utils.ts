@@ -288,4 +288,31 @@ export const DISTRICTS_LIST = [
   'ควนเนียง'
 ];
 
+export const DEFAULT_OFFICIAL_FACEBOOK = 'https://www.facebook.com/people/Chantakorn-Property-%E0%B8%99%E0%B8%B2%E0%B8%A2%E0%B8%AB%E0%B8%99%E0%B9%89%E0%B8%B2-%E0%B8%9A%E0%B9%89%E0%B8%B2%E0%B8%99-%E0%B8%97%E0%B8%B5%E0%B9%88%E0%B8%94%E0%B8%B4%E0%B8%99-%E0%B8%84%E0%B8%AD%E0%B8%99%E0%B9%82%E0%B8%94-%E0%B8%AB%E0%B8%B2%E0%B8%94%E0%B9%83%E0%B8%AB%E0%B8%8D%E0%B9%88-%E0%B8%AA%E0%B8%87%E0%B8%82%E0%B8%A5%E0%B8%B2/61593092347613/';
+export const DEFAULT_OFFICIAL_LINE_URL = 'https://lin.ee/NMSe28T3';
+
+export function formatLineUrl(lineId?: string): string {
+  if (!lineId) return DEFAULT_OFFICIAL_LINE_URL;
+  const trimmed = lineId.trim();
+  if (/^https?:\/\//i.test(trimmed)) {
+    return trimmed;
+  }
+  if (trimmed.startsWith('@')) {
+    return `https://line.me/R/ti/p/${encodeURIComponent(trimmed)}`;
+  }
+  if (trimmed === 'LINE Official Account' || trimmed.toLowerCase() === 'line') {
+    return DEFAULT_OFFICIAL_LINE_URL;
+  }
+  return `https://line.me/ti/p/~${encodeURIComponent(trimmed)}`;
+}
+
+export function formatFacebookUrl(facebookUrl?: string): string {
+  if (!facebookUrl) return DEFAULT_OFFICIAL_FACEBOOK;
+  const trimmed = facebookUrl.trim();
+  if (/^https?:\/\//i.test(trimmed)) {
+    return trimmed;
+  }
+  return `https://www.facebook.com/${encodeURIComponent(trimmed.replace(/^@/, ''))}`;
+}
+
 

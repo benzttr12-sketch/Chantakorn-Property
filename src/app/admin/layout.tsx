@@ -6,7 +6,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase/client';
 import { auth, db } from '@/lib/firebase/client';
 import { onAuthStateChanged } from 'firebase/auth';
-import { doc, getDocFromServer } from 'firebase/firestore';
+import { doc, getDoc, getDocFromServer } from 'firebase/firestore';
 import { dataBackend, isDemoAuthEnabled } from '@/lib/backend';
 import { logoutUser, getStoredUser } from '@/lib/auth-helpers';
 import { 
@@ -129,19 +129,31 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       // 3. Firebase Auth check
       if (dataBackend === 'firebase' && auth && db) {
         if (auth.currentUser) {
+          const userEmail = auth.currentUser.email?.toLowerCase() || '';
+          const isRoot = userEmail === 'benzttr12@gmail.com' || userEmail === 'agent@chantakornproperty.com';
+
           try {
-            const snap = await getDocFromServer(doc(db, 'profiles', auth.currentUser.uid));
-            if (snap.exists() && ['ADMIN', 'AGENT'].includes(snap.data().role)) {
-              const profile = snap.data();
-              if (pathname.startsWith('/admin/users') && profile.role !== 'ADMIN') {
+            let snap;
+            try {
+              snap = await getDocFromServer(doc(db, 'profiles', auth.currentUser.uid));
+            } catch {
+              snap = await getDoc(doc(db, 'profiles', auth.currentUser.uid));
+            }
+
+            const docRole = snap.exists() ? snap.data()?.role : null;
+            const effectiveRole = isRoot ? 'ADMIN' : (docRole || 'USER');
+
+            if (['ADMIN', 'AGENT'].includes(effectiveRole)) {
+              const profile = snap.exists() ? snap.data() : {};
+              if (pathname.startsWith('/admin/users') && effectiveRole !== 'ADMIN') {
                 router.replace('/admin');
                 return;
               }
               setCurrentUser({
                 id: auth.currentUser.uid,
-                full_name: profile.full_name || auth.currentUser.displayName || 'ผู้ดูแลระบบ',
+                full_name: profile.full_name || auth.currentUser.displayName || (isRoot ? 'คุณฉันทากร (ผู้ดูแลระบบ)' : 'เจ้าหน้าที่'),
                 email: auth.currentUser.email,
-                role: profile.role,
+                role: effectiveRole,
                 avatar_url: profile.avatar_url || auth.currentUser.photoURL || '',
               });
               setIsAuthorized(true);
@@ -151,7 +163,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
               setAccessDeniedUser({
                 id: auth.currentUser.uid,
                 email: auth.currentUser.email,
-                role: snap.exists() ? snap.data().role : 'USER',
+                role: 'USER',
               });
               setIsAuthorized(false);
               return;
@@ -172,15 +184,24 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       const firestore = db;
       unsubscribeFirebase = onAuthStateChanged(auth, async (firebaseUser) => {
         if (firebaseUser) {
-          let role = 'USER';
+          const userEmail = firebaseUser.email?.toLowerCase() || '';
+          const isRoot = userEmail === 'benzttr12@gmail.com' || userEmail === 'agent@chantakornproperty.com';
+          let role = isRoot ? 'ADMIN' : 'USER';
           let avatar = firebaseUser.photoURL || '';
-          let name = firebaseUser.displayName || firebaseUser.email?.split('@')[0] || 'ผู้ดูแลระบบ';
+          let name = firebaseUser.displayName || (isRoot ? 'คุณฉันทากร (ผู้ดูแลระบบ)' : firebaseUser.email?.split('@')[0]) || 'ผู้ดูแลระบบ';
           try {
-            const snap = await getDocFromServer(doc(firestore, 'profiles', firebaseUser.uid));
-            if (snap.exists() && snap.data().role) {
-              role = snap.data().role;
-              if (snap.data().avatar_url) avatar = snap.data().avatar_url;
-              if (snap.data().full_name) name = snap.data().full_name;
+            let snap;
+            try {
+              snap = await getDocFromServer(doc(firestore, 'profiles', firebaseUser.uid));
+            } catch {
+              snap = await getDoc(doc(firestore, 'profiles', firebaseUser.uid));
+            }
+
+            if (snap.exists()) {
+              const data = snap.data();
+              if (data.role && !isRoot) role = data.role;
+              if (data.avatar_url) avatar = data.avatar_url;
+              if (data.full_name) name = data.full_name;
             }
           } catch {}
 

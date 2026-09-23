@@ -11,9 +11,11 @@ import {
   MapPin, 
   Phone, 
   MessageCircle,
+  Facebook,
   Clock
 } from 'lucide-react';
 import { AGENTS } from '@/data/agents';
+import { formatFacebookUrl, formatLineUrl } from '@/lib/utils';
 
 export default function AboutPage() {
   const coreValues = [
@@ -217,12 +219,33 @@ export default function AboutPage() {
                   <div className="mt-5 pt-3.5 border-t border-gray-100 flex flex-wrap items-center justify-between text-xs gap-2">
                     <a
                       href={`tel:${agent.phone}`}
-                      className="font-bold text-navy-950 hover:text-gold-600 flex items-center space-x-1"
+                      className="font-bold text-navy-950 hover:text-gold-600 flex items-center space-x-1 py-1"
                     >
                       <Phone className="w-3.5 h-3.5 text-gold-600" />
                       <span>{agent.phone}</span>
                     </a>
-                    <span className="text-gray-500">LINE: <strong className="text-emerald-600">{agent.line_id}</strong></span>
+
+                    <div className="flex items-center space-x-2">
+                      <a
+                        href={formatLineUrl(agent.line_id)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="px-2.5 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 font-bold rounded-lg border border-emerald-200 flex items-center space-x-1 transition-colors"
+                      >
+                        <MessageCircle className="w-3.5 h-3.5 text-emerald-600" />
+                        <span>LINE</span>
+                      </a>
+
+                      <a
+                        href={formatFacebookUrl(agent.facebook)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="px-2.5 py-1 bg-blue-50 hover:bg-blue-100 text-blue-700 font-bold rounded-lg border border-blue-200 flex items-center space-x-1 transition-colors"
+                      >
+                        <Facebook className="w-3.5 h-3.5 text-blue-600" />
+                        <span>Facebook</span>
+                      </a>
+                    </div>
                   </div>
                 </div>
               );

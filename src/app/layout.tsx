@@ -4,6 +4,7 @@ import Header from '@/components/layout/Header';
 import Footer from '@/components/layout/Footer';
 import MobileBottomNav from '@/components/layout/MobileBottomNav';
 import FloatingLineButton from '@/components/layout/FloatingLineButton';
+import CompareBar from '@/components/compare/CompareBar';
 
 const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
 
@@ -54,6 +55,7 @@ export default function RootLayout({
           {children}
         </main>
         <Footer />
+        <CompareBar />
         <MobileBottomNav />
         <FloatingLineButton />
       </body>

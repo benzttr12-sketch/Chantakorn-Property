@@ -3,11 +3,12 @@ import { Property } from "@/lib/types";
 // ข้อมูลอสังหาริมทรัพย์จริงจากฐานข้อมูล
 export const SAMPLE_PROPERTIES: Property[] = [
   {
-  "status": "sale",
-  "longitude": 100.4705,
-  "title": "ขายที่ดิน สิงหนคร 2ไร่ 3งาน 26.5ตรว.",
-  "featured": true,
-  "year_built": 2024,
+    "status": "sale",
+    "longitude": 100.4705,
+    "title": "ขายที่ดิน สิงหนคร 2ไร่ 3งาน 26.5ตรว.",
+    "featured": true,
+    "video_url": "https://www.youtube.com/watch?v=ScMzIvxBSi4",
+    "year_built": 2024,
   "usable_area": 0,
   "address": "สิงหนคร, สงขลา",
   "description": "อสังหาริมทรัพย์คุณภาพจาก Chantakorn Property",

@@ -64,6 +64,10 @@
         "email": { "type": "string" },
         "role": { "type": "string", "enum": ["ADMIN", "AGENT", "USER"] },
         "phone": { "type": "string" },
+        "line_id": { "type": "string" },
+        "facebook": { "type": "string" },
+        "avatar_url": { "type": "string" },
+        "bio": { "type": "string" },
         "created_at": { "type": "string" }
       },
       "required": ["id", "full_name", "email", "role"]

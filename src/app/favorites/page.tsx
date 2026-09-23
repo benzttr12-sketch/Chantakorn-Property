@@ -134,6 +134,7 @@ export default function FavoritesPage() {
                   landSize={prop.land_size}
                   usableArea={prop.usable_area}
                   featured={prop.featured}
+                  video_url={prop.video_url}
                   slug={prop.slug}
                   createdAt={prop.created_at}
                 />

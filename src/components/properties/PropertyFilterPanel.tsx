@@ -11,7 +11,8 @@ import {
   Bed, 
   Bath, 
   CheckSquare, 
-  Square 
+  Square,
+  Video
 } from 'lucide-react';
 import { PropertyFilters, PropertyType, PropertyStatus } from '@/lib/types';
 import { DISTRICTS_LIST } from '@/data/locations';
@@ -274,6 +275,29 @@ export default function PropertyFilterPanel({
             );
           })}
         </div>
+      </div>
+
+      {/* 6.5 Video Tour Filter */}
+      <div className="pt-2 border-t border-gray-100">
+        <button
+          type="button"
+          onClick={() => onChange({ ...filters, hasVideo: !filters.hasVideo })}
+          className={`w-full py-2.5 px-3 rounded-xl border flex items-center justify-between text-xs font-bold transition-all ${
+            filters.hasVideo
+              ? 'bg-red-50 border-red-300 text-red-700 shadow-sm'
+              : 'bg-gray-50 border-gray-200 text-gray-700 hover:bg-gray-100'
+          }`}
+        >
+          <span className="flex items-center space-x-2">
+            <Video className={`w-4 h-4 ${filters.hasVideo ? 'text-red-600 animate-pulse' : 'text-gray-400'}`} />
+            <span>เฉพาะที่มีวิดีโอพาทัวร์</span>
+          </span>
+          <span className={`w-4 h-4 rounded-md flex items-center justify-center text-[10px] ${
+            filters.hasVideo ? 'bg-red-600 text-white' : 'bg-gray-200 text-transparent'
+          }`}>
+            ✓
+          </span>
+        </button>
       </div>
 
       {/* 7. Features & Amenities */}

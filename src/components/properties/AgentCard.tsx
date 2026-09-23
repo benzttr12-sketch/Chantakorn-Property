@@ -11,9 +11,13 @@ import {
   Calendar, 
   ShieldCheck, 
   CheckCircle,
+  Check,
+  Copy,
+  ExternalLink,
   X 
 } from 'lucide-react';
 import { submitInquiry } from '@/lib/store/properties-store';
+import { formatLineUrl, formatFacebookUrl } from '@/lib/utils';
 
 interface AgentCardProps {
   agent?: Agent;
@@ -28,6 +32,18 @@ export default function AgentCard({ agent = DEFAULT_AGENT, property }: AgentCard
   const [visitorPhone, setVisitorPhone] = useState('');
   const [submitted, setSubmitted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [copiedLine, setCopiedLine] = useState(false);
+
+  const handleCopyLine = () => {
+    if (agent?.line_id && navigator.clipboard) {
+      navigator.clipboard.writeText(agent.line_id);
+      setCopiedLine(true);
+      setTimeout(() => setCopiedLine(false), 2000);
+    }
+  };
+
+  const lineTargetUrl = formatLineUrl(agent?.line_id);
+  const fbTargetUrl = formatFacebookUrl(agent?.facebook);
   const [error, setError] = useState('');
 
   const handleBookViewing = async (e: React.FormEvent) => {
@@ -109,32 +125,113 @@ export default function AgentCard({ agent = DEFAULT_AGENT, property }: AgentCard
         {/* Fast Action Buttons */}
         <div className="grid grid-cols-3 gap-2">
           <a
-            href={`tel:${agent.phone}`}
+            href={`tel:${agent.phone || '0816040097'}`}
             className="py-2.5 px-3 bg-navy-950 hover:bg-navy-900 text-white rounded-xl text-xs font-semibold flex items-center justify-center space-x-1.5 shadow-sm transition-all"
+            title={`โทรหานายหน้า: ${agent.phone}`}
           >
             <Phone className="w-3.5 h-3.5 text-gold-400" />
             <span>โทร</span>
           </a>
 
           <a
-            href="https://lin.ee/NMSe28T3"
+            href={lineTargetUrl}
             target="_blank"
             rel="noreferrer"
             className="py-2.5 px-3 bg-[#06C755] hover:bg-[#05b34c] text-white rounded-xl text-xs font-semibold flex items-center justify-center space-x-1.5 shadow-sm transition-all"
+            title={`ทัก LINE นายหน้า: ${agent.line_id}`}
           >
             <MessageCircle className="w-3.5 h-3.5 fill-current" />
             <span>LINE</span>
           </a>
 
           <a
-            href={agent.facebook && agent.facebook.startsWith('http') ? agent.facebook : "https://www.facebook.com/people/Chantakorn-Property-%E0%B8%99%E0%B8%B2%E0%B8%A2%E0%B8%AB%E0%B8%99%E0%B9%89%E0%B8%B2-%E0%B8%9A%E0%B9%89%E0%B8%B2%E0%B8%99-%E0%B8%97%E0%B8%B5%E0%B9%88%E0%B8%94%E0%B8%B4%E0%B8%99-%E0%B8%84%E0%B8%AD%E0%B8%99%E0%B9%82%E0%B8%94-%E0%B8%AB%E0%B8%B2%E0%B8%94%E0%B9%83%E0%B8%AB%E0%B8%8D%E0%B9%88-%E0%B8%AA%E0%B8%87%E0%B8%82%E0%B8%A5%E0%B8%B2/61593092347613/"}
+            href={fbTargetUrl}
             target="_blank"
             rel="noreferrer"
             className="py-2.5 px-3 bg-[#1877F2] hover:bg-[#166fe5] text-white rounded-xl text-xs font-semibold flex items-center justify-center space-x-1.5 shadow-sm transition-all"
+            title="เปิด Facebook นายหน้า"
           >
             <Facebook className="w-3.5 h-3.5 fill-current" />
             <span>Facebook</span>
           </a>
+        </div>
+
+        {/* Detailed Direct Channels of this Agent (แสดงข้อมูลติดต่อเฉพาะของนายหน้า) */}
+        <div className="bg-gray-50/90 rounded-xl p-3 border border-gray-200 text-xs space-y-2">
+          <div className="text-[11px] font-bold text-gray-500 uppercase tracking-wider flex items-center justify-between">
+            <span>ช่องทางติดต่อตรงของนายหน้า</span>
+            <span className="text-[10px] text-emerald-600 font-semibold bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
+              ติดต่อสะดวก
+            </span>
+          </div>
+
+          <div className="space-y-1.5 divide-y divide-gray-100 text-navy-950">
+            {/* Phone row */}
+            <div className="flex items-center justify-between pt-1">
+              <span className="text-gray-500 flex items-center gap-1.5">
+                <Phone className="w-3.5 h-3.5 text-gold-600" />
+                <span>เบอร์โทร:</span>
+              </span>
+              <a 
+                href={`tel:${agent.phone || '0816040097'}`}
+                className="font-bold hover:text-gold-600 transition-colors"
+              >
+                {agent.phone || '081-604-0097'}
+              </a>
+            </div>
+
+            {/* LINE row */}
+            <div className="flex items-center justify-between pt-1.5">
+              <span className="text-gray-500 flex items-center gap-1.5">
+                <MessageCircle className="w-3.5 h-3.5 text-[#06C755]" />
+                <span>LINE:</span>
+              </span>
+              <div className="flex items-center gap-1.5">
+                <span className="font-semibold text-gray-800 max-w-[130px] truncate" title={agent.line_id}>
+                  {agent.line_id || '@chantakorn'}
+                </span>
+                {agent.line_id && (
+                  <button
+                    type="button"
+                    onClick={handleCopyLine}
+                    className="p-1 rounded bg-white hover:bg-gray-100 border border-gray-200 text-gray-500 hover:text-navy-950 text-[10px]"
+                    title="คัดลอก LINE ID"
+                  >
+                    {copiedLine ? (
+                      <Check className="w-3 h-3 text-emerald-600" />
+                    ) : (
+                      <Copy className="w-3 h-3" />
+                    )}
+                  </button>
+                )}
+                <a
+                  href={lineTargetUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-[10px] text-[#06C755] hover:underline font-bold"
+                >
+                  แชท
+                </a>
+              </div>
+            </div>
+
+            {/* Facebook row */}
+            <div className="flex items-center justify-between pt-1.5">
+              <span className="text-gray-500 flex items-center gap-1.5">
+                <Facebook className="w-3.5 h-3.5 text-[#1877F2]" />
+                <span>Facebook:</span>
+              </span>
+              <a
+                href={fbTargetUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-1 font-semibold text-[#1877F2] hover:underline max-w-[150px] truncate text-xs"
+              >
+                <span className="truncate">{agent.facebook ? 'โปรไฟล์/เพจนายหน้า' : 'Chantakorn Property'}</span>
+                <ExternalLink className="w-3 h-3 flex-shrink-0" />
+              </a>
+            </div>
+          </div>
         </div>
 
         {/* Primary CTA: นัดหมายเข้าชม */}

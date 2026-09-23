@@ -13,7 +13,9 @@ import {
   Shield,
   Trash2,
   Pencil,
-  X
+  X,
+  MessageCircle,
+  Facebook
 } from 'lucide-react';
 import { UserProfile } from '@/lib/types';
 import { dataBackend, isDemoAuthEnabled } from '@/lib/backend';
@@ -38,11 +40,15 @@ export default function AdminUsersPage() {
   const [editFullName, setEditFullName] = useState('');
   const [editEmail, setEditEmail] = useState('');
   const [editPhone, setEditPhone] = useState('');
+  const [editLineId, setEditLineId] = useState('');
+  const [editFacebook, setEditFacebook] = useState('');
 
   // New user form state
   const [newFullName, setNewFullName] = useState('');
   const [newEmail, setNewEmail] = useState('');
   const [newPhone, setNewPhone] = useState('');
+  const [newLineId, setNewLineId] = useState('');
+  const [newFacebook, setNewFacebook] = useState('');
   const [newRole, setNewRole] = useState<'ADMIN' | 'AGENT' | 'USER'>('AGENT');
 
   useEffect(() => {
@@ -61,6 +67,8 @@ export default function AdminUsersPage() {
     setEditFullName(user.full_name);
     setEditEmail(user.email || '');
     setEditPhone(user.phone || '');
+    setEditLineId(user.line_id || '');
+    setEditFacebook(user.facebook || '');
   };
 
   const handleSaveEdit = async (e: React.FormEvent) => {
@@ -69,15 +77,17 @@ export default function AdminUsersPage() {
 
     setError('');
     try {
-    const updated = await updateUserProfile(editingUser.id, {
-      full_name: editFullName.trim(),
-      ...(isDemoAuthEnabled ? { email: editEmail.trim() || undefined } : {}),
-      phone: editPhone.trim() || undefined,
-    });
+      const updated = await updateUserProfile(editingUser.id, {
+        full_name: editFullName.trim(),
+        ...(isDemoAuthEnabled ? { email: editEmail.trim() || undefined } : {}),
+        phone: editPhone.trim() || undefined,
+        line_id: editLineId.trim() || undefined,
+        facebook: editFacebook.trim() || undefined,
+      });
 
-    setUsers(updated);
-    setEditingUser(null);
-    triggerNotification(`บันทึกข้อมูล "${editFullName}" สำเร็จ`);
+      setUsers(updated);
+      setEditingUser(null);
+      triggerNotification(`บันทึกข้อมูล "${editFullName}" สำเร็จ`);
     } catch {
       setError('บันทึกข้อมูลผู้ใช้ไม่สำเร็จ กรุณาตรวจสอบสิทธิ์และลองใหม่');
     }
@@ -116,6 +126,8 @@ export default function AdminUsersPage() {
       full_name: newFullName.trim(),
       email: newEmail.trim(),
       phone: newPhone.trim() || undefined,
+      line_id: newLineId.trim() || undefined,
+      facebook: newFacebook.trim() || undefined,
       role: newRole,
     };
 
@@ -126,6 +138,8 @@ export default function AdminUsersPage() {
       setNewFullName('');
       setNewEmail('');
       setNewPhone('');
+      setNewLineId('');
+      setNewFacebook('');
       setNewRole('AGENT');
       triggerNotification(`เพิ่มสมาชิก "${newUser.full_name}" สำเร็จ`);
     } catch (err) {
@@ -335,9 +349,21 @@ export default function AdminUsersPage() {
                           <span>{u.email || '-'}</span>
                         </div>
                         {u.phone && (
-                          <div className="flex items-center space-x-1.5 text-[11px] text-gray-500 mt-0.5">
-                            <Phone className="w-3 h-3 text-gray-400 flex-shrink-0" />
+                          <div className="flex items-center space-x-1.5 text-[11px] text-gray-600 mt-0.5">
+                            <Phone className="w-3 h-3 text-gold-600 flex-shrink-0" />
                             <span>{u.phone}</span>
+                          </div>
+                        )}
+                        {u.line_id && (
+                          <div className="flex items-center space-x-1.5 text-[11px] text-emerald-600 font-semibold mt-0.5">
+                            <MessageCircle className="w-3 h-3 text-emerald-500 flex-shrink-0" />
+                            <span>LINE: {u.line_id}</span>
+                          </div>
+                        )}
+                        {u.facebook && (
+                          <div className="flex items-center space-x-1.5 text-[11px] text-blue-600 font-medium mt-0.5 truncate max-w-[190px]">
+                            <Facebook className="w-3 h-3 text-blue-500 flex-shrink-0" />
+                            <span className="truncate">FB: {u.facebook}</span>
                           </div>
                         )}
                       </td>
@@ -485,6 +511,34 @@ export default function AdminUsersPage() {
               </div>
 
               <div>
+                <label className="block text-xs font-semibold text-gray-700 mb-1 flex items-center space-x-1">
+                  <MessageCircle className="w-3.5 h-3.5 text-emerald-500" />
+                  <span>LINE ID ของนายหน้า</span>
+                </label>
+                <input
+                  type="text"
+                  placeholder="เช่น @chantakorn หรือ somchai_agent"
+                  value={newLineId}
+                  onChange={(e) => setNewLineId(e.target.value)}
+                  className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3 text-xs text-gray-900 focus:bg-white focus:ring-2 focus:ring-emerald-500 outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-gray-700 mb-1 flex items-center space-x-1">
+                  <Facebook className="w-3.5 h-3.5 text-blue-500" />
+                  <span>Facebook Profile / Page ของนายหน้า</span>
+                </label>
+                <input
+                  type="url"
+                  placeholder="เช่น https://www.facebook.com/yourprofile"
+                  value={newFacebook}
+                  onChange={(e) => setNewFacebook(e.target.value)}
+                  className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3 text-xs text-gray-900 focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none"
+                />
+              </div>
+
+              <div>
                 <label className="block text-xs font-semibold text-gray-700 mb-1">
                   ระดับสิทธิ์ในระบบ (Role) *
                 </label>
@@ -614,6 +668,36 @@ export default function AdminUsersPage() {
                   onChange={(e) => setEditPhone(e.target.value)}
                   className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3 text-xs text-gray-900 focus:bg-white focus:ring-2 focus:ring-gold-500 outline-none"
                   placeholder="081-xxx-xxxx"
+                />
+              </div>
+
+              {/* LINE ID */}
+              <div>
+                <label className="block text-xs font-semibold text-gray-700 mb-1 flex items-center space-x-1">
+                  <MessageCircle className="w-3.5 h-3.5 text-emerald-500" />
+                  <span>LINE ID ของนายหน้า</span>
+                </label>
+                <input
+                  type="text"
+                  value={editLineId}
+                  onChange={(e) => setEditLineId(e.target.value)}
+                  className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3 text-xs text-gray-900 focus:bg-white focus:ring-2 focus:ring-emerald-500 outline-none"
+                  placeholder="เช่น @chantakorn หรือ benz_agent"
+                />
+              </div>
+
+              {/* Facebook */}
+              <div>
+                <label className="block text-xs font-semibold text-gray-700 mb-1 flex items-center space-x-1">
+                  <Facebook className="w-3.5 h-3.5 text-blue-500" />
+                  <span>Facebook Profile / Page ของนายหน้า</span>
+                </label>
+                <input
+                  type="url"
+                  value={editFacebook}
+                  onChange={(e) => setEditFacebook(e.target.value)}
+                  className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3 text-xs text-gray-900 focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none"
+                  placeholder="เช่น https://www.facebook.com/yourprofile"
                 />
               </div>
 

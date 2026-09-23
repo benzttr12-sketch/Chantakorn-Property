@@ -1,4 +1,6 @@
-import React from 'react';
+'use client';
+
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { 
   Building2, 
@@ -11,8 +13,53 @@ import {
   Facebook,
   ExternalLink
 } from 'lucide-react';
+import { fetchProperties } from '@/lib/store/properties-store';
+import { SAMPLE_PROPERTIES } from '@/data/sample-properties';
+
+// คำนวณทำเลเริ่มต้นจากข้อมูลจริง
+function getInitialDistricts() {
+  const map: Record<string, number> = {};
+  SAMPLE_PROPERTIES.forEach((p) => {
+    if (p.published !== false && p.district?.trim()) {
+      const d = p.district.trim();
+      map[d] = (map[d] || 0) + 1;
+    }
+  });
+  return Object.entries(map).map(([district, count]) => ({ district, count }));
+}
 
 export default function Footer() {
+  const [districts, setDistricts] = useState<{ district: string; count: number }[]>(getInitialDistricts);
+  const [totalProperties, setTotalProperties] = useState<number>(SAMPLE_PROPERTIES.length);
+
+  useEffect(() => {
+    let isMounted = true;
+    async function loadRealData() {
+      try {
+        const props = await fetchProperties();
+        if (!isMounted) return;
+        const countsMap: Record<string, number> = {};
+        props.forEach((p) => {
+          const d = p.district?.trim();
+          if (d) {
+            countsMap[d] = (countsMap[d] || 0) + 1;
+          }
+        });
+        const list = Object.entries(countsMap)
+          .map(([district, count]) => ({ district, count }))
+          .sort((a, b) => b.count - a.count);
+
+        setDistricts(list);
+        setTotalProperties(props.length);
+      } catch {
+        // ใช้ข้อมูลเริ่มต้น
+      }
+    }
+    loadRealData();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
   return (
     <footer className="bg-navy-950 text-gray-300 pt-16 pb-24 md:pb-12 border-t border-navy-800">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -112,46 +159,36 @@ export default function Footer() {
             </ul>
           </div>
 
-          {/* Col 3: Areas in Songkhla */}
+          {/* Col 3: Areas in Songkhla (แสดงเฉพาะข้อมูลจริงที่มีอยู่) */}
           <div>
             <h3 className="text-white font-semibold text-sm uppercase tracking-wider mb-4 border-l-2 border-gold-500 pl-2">
               ทำเลยอดนิยม
             </h3>
             <ul className="space-y-2 text-sm">
-              <li>
-                <Link href="/properties?district=หาดใหญ่" className="hover:text-gold-400 transition-colors flex justify-between">
-                  <span>ตัวเมืองหาดใหญ่</span>
-                  <span className="text-gray-500 text-xs">85 รายการ</span>
-                </Link>
-              </li>
-              <li>
-                <Link href="/properties?district=เมืองสงขลา" className="hover:text-gold-400 transition-colors flex justify-between">
-                  <span>เมืองสงขลา (สมิหลา)</span>
-                  <span className="text-gray-500 text-xs">38 รายการ</span>
-                </Link>
-              </li>
-              <li>
-                <Link href="/properties?district=ควนลัง" className="hover:text-gold-400 transition-colors flex justify-between">
-                  <span>ควนลัง (สนามบิน)</span>
-                  <span className="text-gray-500 text-xs">42 รายการ</span>
-                </Link>
-              </li>
-              <li>
-                <Link href="/properties?district=คลองแห" className="hover:text-gold-400 transition-colors flex justify-between">
-                  <span>คลองแห</span>
-                  <span className="text-gray-500 text-xs">29 รายการ</span>
-                </Link>
-              </li>
-              <li>
-                <Link href="/properties?district=บ้านพรุ" className="hover:text-gold-400 transition-colors flex justify-between">
-                  <span>บ้านพรุ</span>
-                  <span className="text-gray-500 text-xs">24 รายการ</span>
-                </Link>
-              </li>
-              <li>
-                <Link href="/properties?district=ทุ่งลุง" className="hover:text-gold-400 transition-colors flex justify-between">
-                  <span>ทุ่งลุง – พะตง</span>
-                  <span className="text-gray-500 text-xs">16 รายการ</span>
+              {districts.length > 0 ? (
+                districts.map((item) => (
+                  <li key={item.district}>
+                    <Link
+                      href={`/properties?district=${encodeURIComponent(item.district)}`}
+                      className="hover:text-gold-400 transition-colors flex justify-between items-center"
+                    >
+                      <span>{item.district}</span>
+                      <span className="text-gray-400 text-xs font-semibold">{item.count} รายการ</span>
+                    </Link>
+                  </li>
+                ))
+              ) : (
+                <li className="text-gray-500 text-xs py-1">
+                  <span>ยังไม่มีรายการในขณะนี้</span>
+                </li>
+              )}
+              <li className="pt-2 border-t border-navy-800/80">
+                <Link
+                  href="/properties"
+                  className="text-gold-400 hover:text-gold-300 transition-colors flex justify-between items-center text-xs font-medium"
+                >
+                  <span>ดูทรัพย์สินทั้งหมด</span>
+                  <span className="text-gold-400/90 font-bold">{totalProperties} รายการ</span>
                 </Link>
               </li>
             </ul>

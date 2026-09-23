@@ -166,6 +166,7 @@ function filterProperties(properties: Property[], filters?: PropertyFilters): Pr
       formatPropertyCode(property.id)
     ].some(value => contains(value, filters.searchQuery!))) return false;
     if (filters?.features?.length && !filters.features.every(feature => property.features.some(value => contains(value, feature)))) return false;
+    if (filters?.hasVideo && !property.video_url) return false;
     return true;
   });
   return results.sort((a, b) => {
@@ -512,6 +513,12 @@ export async function updateUserRole(userId: string, role: UserProfile['role']):
 }
 
 export async function addUser(user: UserProfile): Promise<UserProfile[]> {
+  if (dataBackend === 'firebase' && db) {
+    const newId = user.id || `user-${Date.now()}`;
+    const newUser = { ...user, id: newId, created_at: new Date().toISOString() };
+    await setDoc(doc(db, 'profiles', newId), JSON.parse(JSON.stringify(newUser)));
+    return fetchUsers();
+  }
   requireDemoAuth();
   return addLocalUser(user);
 }
@@ -547,6 +554,10 @@ export async function updateUserProfile(userId: string, updates: Partial<UserPro
 }
 
 export async function deleteUser(userId: string): Promise<UserProfile[]> {
+  if (dataBackend === 'firebase' && db) {
+    await deleteDoc(doc(db, 'profiles', userId));
+    return fetchUsers();
+  }
   requireDemoAuth();
   return deleteLocalUser(userId);
 }

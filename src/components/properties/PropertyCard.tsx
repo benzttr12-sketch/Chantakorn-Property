@@ -4,10 +4,11 @@ import React, { useState, useEffect } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { propertyHref } from '@/components/properties/property-link';
-import { Heart, MapPin, Bed, Bath, Maximize, Images, ArrowRight } from 'lucide-react';
+import { Heart, MapPin, Bed, Bath, Maximize, Images, ArrowRight, Video, Scale } from 'lucide-react';
 import { PropertyCardProps } from '@/lib/types';
 import { formatPrice, getPropertyStatusBadge, formatThaiNumber, formatPropertyCode } from '@/lib/utils';
 import { getFavoriteIds, toggleFavoriteId } from '@/lib/store/properties-store';
+import { getCompareIds, toggleCompareId } from '@/lib/store/compare-store';
 
 export default function PropertyCard({
   id,
@@ -25,20 +26,31 @@ export default function PropertyCard({
   landSize,
   usableArea,
   featured = false,
+  video_url,
   slug,
 }: PropertyCardProps) {
   const [isFavorite, setIsFavorite] = useState(false);
+  const [isComparing, setIsComparing] = useState(false);
   const [imageError, setImageError] = useState(false);
 
   useEffect(() => {
     const favs = getFavoriteIds();
     setIsFavorite(favs.includes(id));
+    setIsComparing(getCompareIds().includes(id));
 
-    const handleUpdate = () => {
+    const handleFavUpdate = () => {
       setIsFavorite(getFavoriteIds().includes(id));
     };
-    window.addEventListener('favorites-updated', handleUpdate);
-    return () => window.removeEventListener('favorites-updated', handleUpdate);
+    const handleCompareUpdate = () => {
+      setIsComparing(getCompareIds().includes(id));
+    };
+
+    window.addEventListener('favorites-updated', handleFavUpdate);
+    window.addEventListener('compare-updated', handleCompareUpdate);
+    return () => {
+      window.removeEventListener('favorites-updated', handleFavUpdate);
+      window.removeEventListener('compare-updated', handleCompareUpdate);
+    };
   }, [id]);
 
   const handleToggleFav = (e: React.MouseEvent) => {
@@ -46,6 +58,17 @@ export default function PropertyCard({
     e.stopPropagation();
     const newState = toggleFavoriteId(id);
     setIsFavorite(newState);
+  };
+
+  const handleToggleCompare = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const result = toggleCompareId(id);
+    setIsComparing(result.added);
+    if (result.message) {
+      // In case maximum compare reached
+      alert(result.message);
+    }
   };
 
   const statusBadge = getPropertyStatusBadge(status);
@@ -85,25 +108,50 @@ export default function PropertyCard({
           )}
         </div>
 
-        {/* Top-Right: Favorite Button */}
-        <button
-          onClick={handleToggleFav}
-          aria-label={isFavorite ? 'ลบออกจากรายการโปรด' : 'บันทึกในรายการโปรด'}
-          className="absolute top-3.5 right-3.5 z-10 w-9 h-9 rounded-full bg-white/90 backdrop-blur-md flex items-center justify-center text-gray-700 hover:text-red-500 shadow-md hover:scale-110 active:scale-95 transition-all"
-        >
-          <Heart
-            className={`w-5 h-5 transition-colors ${
-              isFavorite ? 'fill-red-500 text-red-500' : 'text-gray-600 stroke-[2]'
+        {/* Top-Right: Compare & Favorite Buttons */}
+        <div className="absolute top-3.5 right-3.5 z-10 flex items-center space-x-1.5">
+          <button
+            type="button"
+            onClick={handleToggleCompare}
+            aria-label={isComparing ? 'ยกเลิกการเปรียบเทียบ' : 'เลือกเปรียบเทียบ'}
+            title={isComparing ? 'คลิกเพื่อนำออกจากการเปรียบเทียบ' : 'คลิกเพื่อเลือกเปรียบเทียบ (สูงสุด 4 หลัง)'}
+            className={`w-9 h-9 rounded-full backdrop-blur-md flex items-center justify-center shadow-md hover:scale-110 active:scale-95 transition-all ${
+              isComparing
+                ? 'bg-navy-950 text-gold-400 ring-2 ring-gold-400 font-bold'
+                : 'bg-white/90 text-gray-700 hover:text-navy-950'
             }`}
-          />
-        </button>
+          >
+            <Scale className={`w-4 h-4 ${isComparing ? 'stroke-[2.5]' : 'stroke-[2]'}`} />
+          </button>
 
-        {/* Bottom Image Overlay: Image Count & Property Code */}
+          <button
+            type="button"
+            onClick={handleToggleFav}
+            aria-label={isFavorite ? 'ลบออกจากรายการโปรด' : 'บันทึกในรายการโปรด'}
+            className="w-9 h-9 rounded-full bg-white/90 backdrop-blur-md flex items-center justify-center text-gray-700 hover:text-red-500 shadow-md hover:scale-110 active:scale-95 transition-all"
+          >
+            <Heart
+              className={`w-5 h-5 transition-colors ${
+                isFavorite ? 'fill-red-500 text-red-500' : 'text-gray-600 stroke-[2]'
+              }`}
+            />
+          </button>
+        </div>
+
+        {/* Bottom Image Overlay: Image Count, Video Badge & Property Code */}
         <div className="absolute bottom-3 left-3.5 right-3.5 flex items-center justify-between text-xs text-white z-10 pointer-events-none">
-          <span className="px-2.5 py-1 bg-black/60 backdrop-blur-md rounded-md flex items-center space-x-1">
-            <Images className="w-3.5 h-3.5 text-gold-400" />
-            <span>{imageCount} รูป</span>
-          </span>
+          <div className="flex items-center space-x-1.5">
+            <span className="px-2.5 py-1 bg-black/60 backdrop-blur-md rounded-md flex items-center space-x-1">
+              <Images className="w-3.5 h-3.5 text-gold-400" />
+              <span>{imageCount} รูป</span>
+            </span>
+            {video_url && (
+              <span className="px-2 py-1 bg-red-600/90 text-white font-bold backdrop-blur-md rounded-md flex items-center space-x-1 text-[11px] shadow-sm animate-pulse">
+                <Video className="w-3 h-3 text-white" />
+                <span>วิดีโอ</span>
+              </span>
+            )}
+          </div>
           <span className="px-2.5 py-1 bg-black/60 backdrop-blur-md rounded-md font-mono text-[11px] font-bold text-gold-300 tracking-wider">
             {formatPropertyCode(id)}
           </span>
