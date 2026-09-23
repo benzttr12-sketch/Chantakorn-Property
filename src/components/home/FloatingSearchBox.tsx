@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Search, Home, Building, MapPin, Coins, ArrowRight } from 'lucide-react';
+import { Search, Home, Building, MapPin, Coins, ArrowRight, HandCoins } from 'lucide-react';
 import { DISTRICTS_LIST } from '@/data/locations';
 
 export default function FloatingSearchBox() {
@@ -34,16 +34,16 @@ export default function FloatingSearchBox() {
   };
 
   return (
-    <div className="w-full max-w-5xl mx-auto bg-white/95 backdrop-blur-xl rounded-2xl shadow-float border border-surface-border p-4 md:p-6 transition-all">
+    <div className="w-full max-w-5xl mx-auto bg-white/95 backdrop-blur-2xl rounded-3xl shadow-2xl border border-slate-200/80 p-5 sm:p-7 transition-all">
       {/* Tabs: ซื้อ / เช่า */}
-      <div className="flex items-center space-x-2 border-b border-gray-100 pb-4 mb-5">
+      <div className="flex items-center space-x-2 border-b border-slate-100 pb-4 mb-5">
         <button
           type="button"
           onClick={() => setTab('sale')}
-          className={`flex items-center space-x-2 px-6 py-2.5 rounded-xl text-sm font-bold transition-all ${
+          className={`flex items-center space-x-2 px-6 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all ${
             tab === 'sale'
-              ? 'bg-navy-950 text-gold-400 shadow-md ring-1 ring-gold-400/30'
-              : 'text-gray-700 hover:text-navy-950 hover:bg-gray-100 bg-gray-50'
+              ? 'bg-navy-950 text-gold-400 shadow-md ring-1 ring-gold-400/40'
+              : 'text-slate-600 hover:text-navy-950 hover:bg-slate-100 bg-slate-50'
           }`}
         >
           <Home className="w-4 h-4" />
@@ -53,10 +53,10 @@ export default function FloatingSearchBox() {
         <button
           type="button"
           onClick={() => setTab('rent')}
-          className={`flex items-center space-x-2 px-6 py-2.5 rounded-xl text-sm font-bold transition-all ${
+          className={`flex items-center space-x-2 px-6 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all ${
             tab === 'rent'
-              ? 'bg-navy-950 text-gold-400 shadow-md ring-1 ring-gold-400/30'
-              : 'text-gray-700 hover:text-navy-950 hover:bg-gray-100 bg-gray-50'
+              ? 'bg-navy-950 text-gold-400 shadow-md ring-1 ring-gold-400/40'
+              : 'text-slate-600 hover:text-navy-950 hover:bg-slate-100 bg-slate-50'
           }`}
         >
           <Building className="w-4 h-4" />
@@ -65,40 +65,40 @@ export default function FloatingSearchBox() {
       </div>
 
       {/* Filter Form */}
-      <form onSubmit={handleSearch} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4 items-end">
+      <form onSubmit={handleSearch} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5 sm:gap-4 items-end">
         {/* Field 1: ประเภททรัพย์ */}
         <div>
-          <label className="block text-xs font-semibold text-gray-700 mb-1.5 flex items-center">
-            <Home className="w-3.5 h-3.5 mr-1 text-gold-600" />
+          <label className="block text-xs font-bold text-slate-800 mb-1.5 flex items-center">
+            <Home className="w-3.5 h-3.5 mr-1.5 text-gold-600" />
             ประเภททรัพย์
           </label>
           <select
             value={propertyType}
             onChange={(e) => setPropertyType(e.target.value)}
-            className="w-full bg-gray-50 hover:bg-white border border-gray-200 rounded-lg py-2.5 px-3 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-gold-500 focus:bg-white transition-all cursor-pointer"
+            className="w-full bg-slate-50 hover:bg-white border border-slate-200 rounded-xl py-3 px-3.5 text-xs sm:text-sm text-slate-900 font-medium focus:outline-none focus:ring-2 focus:ring-gold-500 focus:bg-white transition-all cursor-pointer"
           >
             <option value="all">ทุกประเภททรัพย์</option>
             <option value="house">บ้านเดี่ยว / ทาวน์โฮม</option>
             <option value="land">ที่ดิน</option>
             <option value="condo">คอนโดมิเนียม</option>
             <option value="commercial">อาคารพาณิชย์</option>
-            <option value="investment">อสังหาฯ ลงทุน</option>
+            <option value="investment">อสังหาฯ เพื่อการลงทุน</option>
             <option value="consignment">ขายฝาก / จำนอง</option>
           </select>
         </div>
 
         {/* Field 2: ทำเล */}
         <div>
-          <label className="block text-xs font-semibold text-gray-700 mb-1.5 flex items-center">
-            <MapPin className="w-3.5 h-3.5 mr-1 text-gold-600" />
+          <label className="block text-xs font-bold text-slate-800 mb-1.5 flex items-center">
+            <MapPin className="w-3.5 h-3.5 mr-1.5 text-gold-600" />
             ทำเล (หาดใหญ่-สงขลา)
           </label>
           <select
             value={district}
             onChange={(e) => setDistrict(e.target.value)}
-            className="w-full bg-gray-50 hover:bg-white border border-gray-200 rounded-lg py-2.5 px-3 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-gold-500 focus:bg-white transition-all cursor-pointer"
+            className="w-full bg-slate-50 hover:bg-white border border-slate-200 rounded-xl py-3 px-3.5 text-xs sm:text-sm text-slate-900 font-medium focus:outline-none focus:ring-2 focus:ring-gold-500 focus:bg-white transition-all cursor-pointer"
           >
-            <option value="">ทุกทำเลในสงขลา</option>
+            <option value="">ทุกทำเลในหาดใหญ่–สงขลา</option>
             {DISTRICTS_LIST.map((dist) => (
               <option key={dist} value={dist}>
                 {dist}
@@ -109,173 +109,46 @@ export default function FloatingSearchBox() {
 
         {/* Field 3: ช่วงราคา */}
         <div>
-          <label className="block text-xs font-semibold text-gray-700 mb-1.5 flex items-center">
-            <Coins className="w-3.5 h-3.5 mr-1 text-gold-600" />
-            ช่วงราคา {tab === 'rent' ? '(บาท/เดือน)' : '(บาท)'}
+          <label className="block text-xs font-bold text-slate-800 mb-1.5 flex items-center">
+            <Coins className="w-3.5 h-3.5 mr-1.5 text-gold-600" />
+            งบประมาณ
           </label>
-          <div className="grid grid-cols-2 gap-1.5">
-            <input
-              type="number"
-              min="0"
-              placeholder="ราคาต่ำสุด"
-              value={minPrice}
-              onChange={(e) => setMinPrice(e.target.value)}
-              className="w-full bg-gray-50 hover:bg-white border border-gray-200 rounded-lg py-2 px-2.5 text-xs text-gray-800 focus:outline-none focus:ring-2 focus:ring-gold-500 focus:bg-white transition-all"
-            />
-            <input
-              type="number"
-              min="0"
-              placeholder="ราคาสูงสุด"
-              value={maxPrice}
-              onChange={(e) => setMaxPrice(e.target.value)}
-              className="w-full bg-gray-50 hover:bg-white border border-gray-200 rounded-lg py-2 px-2.5 text-xs text-gray-800 focus:outline-none focus:ring-2 focus:ring-gold-500 focus:bg-white transition-all"
-            />
-          </div>
+          <select
+            value={maxPrice}
+            onChange={(e) => setMaxPrice(e.target.value)}
+            className="w-full bg-slate-50 hover:bg-white border border-slate-200 rounded-xl py-3 px-3.5 text-xs sm:text-sm text-slate-900 font-medium focus:outline-none focus:ring-2 focus:ring-gold-500 focus:bg-white transition-all cursor-pointer"
+          >
+            <option value="">ทุกช่วงราคา</option>
+            {tab === 'sale' ? (
+              <>
+                <option value="2000000">ไม่เกิน 2 ล้านบาท</option>
+                <option value="3500000">ไม่เกิน 3.5 ล้านบาท</option>
+                <option value="5000000">ไม่เกิน 5 ล้านบาท</option>
+                <option value="10000000">ไม่เกิน 10 ล้านบาท</option>
+                <option value="20000000">ไม่เกิน 20 ล้านบาท</option>
+              </>
+            ) : (
+              <>
+                <option value="10000">ไม่เกิน 10,000 บาท/ด.</option>
+                <option value="20000">ไม่เกิน 20,000 บาท/ด.</option>
+                <option value="35000">ไม่เกิน 35,000 บาท/ด.</option>
+                <option value="50000">ไม่เกิน 50,000 บาท/ด.</option>
+              </>
+            )}
+          </select>
         </div>
 
-        {/* Field 4: Search Button */}
+        {/* Submit Button */}
         <div>
           <button
             type="submit"
-            className="w-full py-2.5 px-4 bg-navy-950 hover:bg-navy-900 text-gold-400 hover:text-white rounded-lg font-semibold text-sm flex items-center justify-center space-x-2 shadow-md hover:shadow-lg transition-all duration-200 cursor-pointer"
+            className="w-full py-3 px-5 bg-gradient-to-r from-gold-400 via-gold-500 to-amber-500 hover:from-gold-300 hover:to-gold-400 text-navy-950 font-black text-xs sm:text-sm rounded-xl shadow-lg hover:shadow-gold-500/25 flex items-center justify-center space-x-2 transition-all transform hover:-translate-y-0.5 active:translate-y-0 cursor-pointer"
           >
-            <Search className="w-4 h-4 text-gold-400" />
-            <span>ค้นหาอสังหาฯ</span>
-            <ArrowRight className="w-3.5 h-3.5 ml-1 opacity-70" />
+            <Search className="w-4 h-4 text-navy-950 stroke-[2.5]" />
+            <span>ค้นหาทันที</span>
           </button>
         </div>
       </form>
-
-      {/* Quick Search Chips for Easy UX */}
-      <div className="mt-4 pt-3.5 border-t border-gray-100 flex flex-wrap items-center justify-between gap-2.5 text-xs">
-        <div className="flex flex-wrap items-center gap-1.5">
-          <span className="text-gray-600 font-semibold flex items-center mr-1">
-            <span className="text-gold-600 mr-1">📍</span> ทำเลยอดนิยม:
-          </span>
-          {['หาดใหญ่', 'เมืองสงขลา', 'คลองหอยโข่ง', 'สะเดา', 'สิงหนคร', 'นาหม่อม'].map((loc) => {
-            const isActive = district === loc;
-            return (
-              <button
-                key={loc}
-                type="button"
-                onClick={() => setDistrict(isActive ? '' : loc)}
-                className={`px-2.5 py-1 rounded-full text-[11px] font-medium transition-all ${
-                  isActive
-                    ? 'bg-gold-500 text-navy-950 font-bold shadow-xs'
-                    : 'bg-gray-100/90 hover:bg-gray-200 text-gray-700'
-                }`}
-              >
-                {loc}
-              </button>
-            );
-          })}
-        </div>
-
-        <div className="flex flex-wrap items-center gap-1.5">
-          <span className="text-gray-600 font-semibold flex items-center mr-1">
-            <span className="text-gold-600 mr-1">💰</span> ราคายอดนิยม:
-          </span>
-          {tab === 'sale' ? (
-            <>
-              <button
-                type="button"
-                onClick={() => { setMinPrice(''); setMaxPrice('2000000'); }}
-                className={`px-2 py-0.5 rounded-md text-[11px] font-medium transition-all ${
-                  maxPrice === '2000000' && !minPrice
-                    ? 'bg-navy-950 text-gold-400 font-bold'
-                    : 'bg-gray-100 hover:bg-gray-200 text-gray-700'
-                }`}
-              >
-                &lt; 2 ล้าน
-              </button>
-              <button
-                type="button"
-                onClick={() => { setMinPrice('2000000'); setMaxPrice('4000000'); }}
-                className={`px-2 py-0.5 rounded-md text-[11px] font-medium transition-all ${
-                  minPrice === '2000000' && maxPrice === '4000000'
-                    ? 'bg-navy-950 text-gold-400 font-bold'
-                    : 'bg-gray-100 hover:bg-gray-200 text-gray-700'
-                }`}
-              >
-                2 - 4 ล้าน
-              </button>
-              <button
-                type="button"
-                onClick={() => { setMinPrice('4000000'); setMaxPrice('8000000'); }}
-                className={`px-2 py-0.5 rounded-md text-[11px] font-medium transition-all ${
-                  minPrice === '4000000' && maxPrice === '8000000'
-                    ? 'bg-navy-950 text-gold-400 font-bold'
-                    : 'bg-gray-100 hover:bg-gray-200 text-gray-700'
-                }`}
-              >
-                4 - 8 ล้าน
-              </button>
-              <button
-                type="button"
-                onClick={() => { setMinPrice('8000000'); setMaxPrice(''); }}
-                className={`px-2 py-0.5 rounded-md text-[11px] font-medium transition-all ${
-                  minPrice === '8000000' && !maxPrice
-                    ? 'bg-navy-950 text-gold-400 font-bold'
-                    : 'bg-gray-100 hover:bg-gray-200 text-gray-700'
-                }`}
-              >
-                8 ล้าน+
-              </button>
-            </>
-          ) : (
-            <>
-              <button
-                type="button"
-                onClick={() => { setMinPrice(''); setMaxPrice('10000'); }}
-                className={`px-2 py-0.5 rounded-md text-[11px] font-medium transition-all ${
-                  maxPrice === '10000' && !minPrice
-                    ? 'bg-navy-950 text-gold-400 font-bold'
-                    : 'bg-gray-100 hover:bg-gray-200 text-gray-700'
-                }`}
-              >
-                &lt; 1 หมื่น
-              </button>
-              <button
-                type="button"
-                onClick={() => { setMinPrice('10000'); setMaxPrice('25000'); }}
-                className={`px-2 py-0.5 rounded-md text-[11px] font-medium transition-all ${
-                  minPrice === '10000' && maxPrice === '25000'
-                    ? 'bg-navy-950 text-gold-400 font-bold'
-                    : 'bg-gray-100 hover:bg-gray-200 text-gray-700'
-                }`}
-              >
-                1 - 2.5 หมื่น
-              </button>
-              <button
-                type="button"
-                onClick={() => { setMinPrice('25000'); setMaxPrice(''); }}
-                className={`px-2 py-0.5 rounded-md text-[11px] font-medium transition-all ${
-                  minPrice === '25000' && !maxPrice
-                    ? 'bg-navy-950 text-gold-400 font-bold'
-                    : 'bg-gray-100 hover:bg-gray-200 text-gray-700'
-                }`}
-              >
-                2.5 หมื่น+
-              </button>
-            </>
-          )}
-
-          {(district || minPrice || maxPrice || propertyType !== 'all') && (
-            <button
-              type="button"
-              onClick={() => {
-                setDistrict('');
-                setMinPrice('');
-                setMaxPrice('');
-                setPropertyType('all');
-              }}
-              className="text-[11px] text-red-600 hover:underline font-semibold ml-1"
-            >
-              ล้างค่า
-            </button>
-          )}
-        </div>
-      </div>
     </div>
   );
 }

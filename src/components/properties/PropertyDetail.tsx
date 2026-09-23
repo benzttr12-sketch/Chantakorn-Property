@@ -271,14 +271,14 @@ export default function PropertyDetail({ slug, initialProperty = null }: { slug:
             {/* 5. Property Information Specifications */}
             <PropertySpecs property={property} />
 
-            {/* 5.1 Mortgage & Loan Calculator for For-Sale Properties */}
-            {property.status === 'sale' && property.price > 0 && (
+            {/* 5.1 Consignment & Loan Calculator for Properties */}
+            {property.price > 0 && (
               <div className="scroll-mt-24">
                 <MortgageCalculator
                   initialPrice={property.price}
                   compact={true}
-                  title={`ประมาณการค่างวดผ่อนธนาคารสำหรับ ${property.title}`}
-                  subtitle={`คำนวณค่างวดผ่อนรายเดือนเบื้องต้นจากราคาเสนอขาย ฿${formatThaiNumber(property.price)} เพื่อวางแผนการยื่นกู้สินเชื่อ`}
+                  title={`ประมาณการวงเงินขายฝาก-จำนองสำหรับ ${property.title}`}
+                  subtitle={`คำนวณวงเงินรับขายฝาก ดอกเบี้ยรายเดือน และค่าใช้จ่ายกรมที่ดินจากมูลค่าทรัพย์ ฿${formatThaiNumber(property.price)}`}
                 />
               </div>
             )}

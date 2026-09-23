@@ -22,7 +22,9 @@ import {
   ShieldCheck,
   ShieldAlert,
   Menu,
-  X
+  X,
+  UserCheck,
+  Star
 } from 'lucide-react';
 import Image from 'next/image';
 import ProfileHeader from '@/components/admin/ProfileHeader';
@@ -249,6 +251,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     { label: 'แดชบอร์ดภาพรวม', href: '/admin', icon: LayoutDashboard },
     { label: 'จัดการอสังหาริมทรัพย์', href: '/admin/properties', icon: Building2 },
     { label: 'เพิ่มทรัพย์ใหม่', href: '/admin/properties/new', icon: PlusCircle },
+    { label: 'จัดการนายหน้าแนะนำ', href: '/admin/agents', icon: UserCheck },
+    { label: 'จัดการรีวิวจากลูกค้า', href: '/admin/reviews', icon: Star },
     { label: 'รายการผู้ติดต่อ & ฝากขาย', href: '/admin/inquiries', icon: MessageSquare },
     { label: 'จัดการสมาชิก & สิทธิ์', href: '/admin/users', icon: Users },
     { label: 'ตั้งค่าระบบ', href: '/admin/settings', icon: Settings },

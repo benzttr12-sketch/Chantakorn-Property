@@ -141,8 +141,16 @@ export async function signInWithGoogle(): Promise<UserProfile> {
   if (dataBackend !== 'firebase' || !auth) {
     throw new Error('Firebase Auth is not configured for this backend');
   }
-  const result = await signInWithPopup(auth, googleProvider);
-  return syncFirebaseUserProfile(result.user);
+  try {
+    const result = await signInWithPopup(auth, googleProvider);
+    return syncFirebaseUserProfile(result.user);
+  } catch (err: any) {
+    if (err?.code === 'auth/unauthorized-domain') {
+      // Fallback or friendly prompt for unauthorized domain in preview
+      throw new Error(`โดเมนนี้ยังไม่ได้รับอนุญาตใน Firebase Console (auth/unauthorized-domain: ${window.location.hostname}). กรุณาเข้าสู่ระบบด้วยอีเมลและรหัสผ่าน หรือเพิ่มโดเมน ${window.location.hostname} ใน Firebase Console > Authentication > Settings > Authorized domains`);
+    }
+    throw err;
+  }
 }
 
 export async function loginWithEmail(email: string, pass: string): Promise<UserProfile> {

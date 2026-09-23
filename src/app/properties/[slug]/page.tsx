@@ -1,17 +1,12 @@
-'use client';
-
-import React, { use } from 'react';
+import React from 'react';
 import PropertyDetail from '@/components/properties/PropertyDetail';
 
 interface PageProps {
-  params: Promise<{ slug: string }> | { slug: string };
+  params: Promise<{ slug: string }>;
 }
 
-export default function PropertyDetailPage({ params }: PageProps) {
-  const resolvedParams = typeof (params as any)?.then === 'function' 
-    ? use(params as Promise<{ slug: string }>) 
-    : (params as { slug: string });
-
+export default async function PropertyDetailPage({ params }: PageProps) {
+  const resolvedParams = await params;
   const rawSlug = resolvedParams?.slug || '';
   let decodedSlug = rawSlug;
   try {

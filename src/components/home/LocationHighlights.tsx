@@ -29,17 +29,17 @@ export default function LocationHighlights() {
   }, []);
 
   return (
-    <section className="py-16 md:py-24 bg-surface-bg">
+    <section className="py-16 md:py-24 bg-[#F8FAFC]">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Section Header */}
-        <div className="text-center max-w-2xl mx-auto mb-12">
-          <span className="text-xs font-bold text-gold-600 uppercase tracking-widest bg-gold-50 px-3.5 py-1 rounded-full border border-gold-200">
-            พื้นที่ให้บริการ
-          </span>
-          <h2 className="text-3xl sm:text-4xl font-extrabold text-navy-950 mt-3 mb-3">
+        <div className="text-center max-w-2xl mx-auto mb-14">
+          <div className="inline-flex items-center space-x-2 px-3.5 py-1 rounded-full bg-gold-50 border border-gold-200 text-gold-800 text-xs font-bold mb-3">
+            <span>ทำเลศักยภาพ</span>
+          </div>
+          <h2 className="text-3xl sm:text-4xl font-black text-navy-950 tracking-tight">
             อสังหาริมทรัพย์ในหาดใหญ่–สงขลา
           </h2>
-          <p className="text-brand-muted text-sm sm:text-base">
+          <p className="text-slate-500 text-sm sm:text-base mt-2">
             สำรวจทรัพย์ในทำเลยอดนิยม ศูนย์กลางการค้า สถาบันการศึกษา และแหล่งที่อยู่อาศัยคุณภาพ
           </p>
         </div>
@@ -52,7 +52,7 @@ export default function LocationHighlights() {
               <Link
                 key={loc.id}
                 href={`/properties?district=${encodeURIComponent(loc.name)}`}
-                className="group relative h-56 rounded-2xl overflow-hidden shadow-card hover:shadow-card-hover border border-surface-border transition-all duration-300 transform hover:-translate-y-1 block"
+                className="group relative h-60 rounded-3xl overflow-hidden shadow-md hover:shadow-2xl border border-slate-200/80 hover:border-gold-400/50 transition-all duration-300 transform hover:-translate-y-1 block"
               >
                 {/* Location Image */}
                 <Image
@@ -64,29 +64,29 @@ export default function LocationHighlights() {
                 />
 
                 {/* Gradient Overlay */}
-                <div className="absolute inset-0 bg-gradient-to-t from-navy-950/90 via-navy-950/40 to-transparent group-hover:via-navy-950/50 transition-colors" />
+                <div className="absolute inset-0 bg-gradient-to-t from-[#020812] via-[#020812]/50 to-transparent group-hover:via-[#020812]/60 transition-colors" />
 
                 {/* Content Box */}
                 <div className="absolute inset-0 p-6 flex flex-col justify-end z-10">
-                  <div className="flex items-center space-x-1 text-gold-400 text-xs font-medium mb-1">
-                    <MapPin className="w-3.5 h-3.5" />
+                  <div className="flex items-center space-x-1 text-gold-400 text-xs font-bold mb-1">
+                    <MapPin className="w-3.5 h-3.5 text-gold-400" />
                     <span>{loc.nameEn}</span>
                   </div>
 
                   <div className="flex items-center justify-between">
-                    <h3 className="text-2xl font-bold text-white group-hover:text-gold-300 transition-colors">
+                    <h3 className="text-2xl font-black text-white group-hover:text-gold-300 transition-colors">
                       {loc.name}
                     </h3>
-                    <div className="w-8 h-8 rounded-full bg-white/20 backdrop-blur-md flex items-center justify-center text-white group-hover:bg-gold-500 group-hover:text-navy-950 transition-all">
+                    <div className="w-9 h-9 rounded-full bg-white/10 backdrop-blur-md flex items-center justify-center text-white group-hover:bg-gold-400 group-hover:text-navy-950 transition-all">
                       <ArrowRight className="w-4 h-4 transform group-hover:translate-x-0.5 transition-transform" />
                     </div>
                   </div>
 
-                  <p className="text-xs text-gray-300 mt-2 line-clamp-1">
+                  <p className="text-xs text-slate-300 mt-1.5 line-clamp-1 font-normal">
                     {loc.description}
                   </p>
 
-                  <div className="mt-2 text-xs font-semibold text-gold-300">
+                  <div className="mt-2 text-xs font-bold text-gold-300">
                     {count > 0 ? `${count} ทรัพย์ที่เปิดขายจริง` : 'สำรวจทำเลนี้'}
                   </div>
                 </div>

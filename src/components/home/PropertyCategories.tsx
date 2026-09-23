@@ -19,7 +19,7 @@ export default function PropertyCategories() {
         });
         setCounts(map);
       } catch {
-        // Ignore fallback
+        // Fallback
       }
     }
     loadCounts();
@@ -36,7 +36,7 @@ export default function PropertyCategories() {
     {
       name: 'ที่ดิน',
       type: 'land',
-      description: 'ที่ดินเปล่าถมแล้ว ที่ดินติดถนนใหญ่ แปลงสร้างบ้านหรือจัดสรร',
+      description: 'ที่ดินเปล่าถมแล้ว ติดถนนใหญ่ แปลงสร้างบ้านหรือจัดสรร',
       icon: Trees,
       image: 'https://images.unsplash.com/photo-1500382017468-9049fed747ef?auto=format&fit=crop&w=600&q=80',
     },
@@ -55,9 +55,9 @@ export default function PropertyCategories() {
       image: 'https://images.unsplash.com/photo-1577495508048-b635879837f1?auto=format&fit=crop&w=600&q=80',
     },
     {
-      name: 'อสังหาริมทรัพย์เพื่อการลงทุน',
+      name: 'อสังหาฯ เพื่อการลงทุน',
       type: 'investment',
-      description: 'อพาร์ทเมนท์ หอพัก และอาคารพร้อมผู้เช่า ผลตอบแทนสูง',
+      description: 'อพาร์ทเมนท์ หอพัก และอาคารพร้อมผู้เช่า ผลตอบแทนสม่ำเสมอ',
       icon: TrendingUp,
       image: 'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?auto=format&fit=crop&w=600&q=80',
     },
@@ -71,18 +71,18 @@ export default function PropertyCategories() {
   ];
 
   return (
-    <section className="py-16 md:py-24 bg-surface-bg">
+    <section className="py-16 md:py-24 bg-[#F8FAFC]">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Section Header */}
-        <div className="text-center max-w-2xl mx-auto mb-12">
-          <span className="text-xs font-bold text-gold-600 uppercase tracking-widest bg-gold-50 px-3.5 py-1 rounded-full border border-gold-200">
-            ประเภทอสังหาริมทรัพย์
-          </span>
-          <h2 className="text-3xl sm:text-4xl font-extrabold text-navy-950 mt-3 mb-3">
+        <div className="text-center max-w-2xl mx-auto mb-14">
+          <div className="inline-flex items-center space-x-2 px-3.5 py-1 rounded-full bg-gold-50 border border-gold-200 text-gold-800 text-xs font-bold mb-3">
+            <span>หมวดหมู่อสังหาริมทรัพย์</span>
+          </div>
+          <h2 className="text-3xl sm:text-4xl font-black text-navy-950 tracking-tight">
             ค้นหาอสังหาริมทรัพย์ตามประเภท
           </h2>
-          <p className="text-brand-muted text-sm sm:text-base">
-            เลือกอสังหาริมทรัพย์ที่เหมาะกับความต้องการของคุณ พร้อมข้อมูลครบถ้วนจาก Chantakorn Property
+          <p className="text-slate-500 text-sm sm:text-base mt-2">
+            เลือกประเภทอสังหาริมทรัพย์ที่ตอบโจทย์การอยู่อาศัยและการลงทุนของคุณในหาดใหญ่–สงขลา
           </p>
         </div>
 
@@ -95,7 +95,7 @@ export default function PropertyCategories() {
               <Link
                 key={cat.name}
                 href={`/properties?type=${cat.type}`}
-                className="group relative h-64 rounded-2xl overflow-hidden shadow-card hover:shadow-card-hover border border-surface-border transition-all duration-300 transform hover:-translate-y-1 block"
+                className="group relative h-64 rounded-3xl overflow-hidden shadow-md hover:shadow-2xl border border-slate-200/80 hover:border-gold-400/50 transition-all duration-300 transform hover:-translate-y-1 block"
               >
                 {/* Background Image */}
                 <Image
@@ -106,31 +106,36 @@ export default function PropertyCategories() {
                   className="object-cover group-hover:scale-110 transition-transform duration-700 ease-out"
                 />
 
-                {/* Dark Vignette Overlay */}
-                <div className="absolute inset-0 bg-gradient-to-t from-navy-950/95 via-navy-950/50 to-navy-950/20 group-hover:via-navy-950/60 transition-colors" />
+                {/* Dark Gradient Overlay */}
+                <div className="absolute inset-0 bg-gradient-to-t from-[#020812] via-[#020812]/50 to-transparent group-hover:via-[#020812]/60 transition-colors" />
 
-                {/* Content Overlay */}
-                <div className="absolute inset-0 p-6 flex flex-col justify-between z-10">
-                  {/* Top Badge: Icon & Real Count */}
-                  <div className="flex items-center justify-between">
-                    <div className="w-12 h-12 rounded-xl bg-white/90 backdrop-blur-md flex items-center justify-center text-navy-900 group-hover:bg-gold-500 group-hover:text-navy-950 transition-colors shadow-md">
-                      <Icon className="w-6 h-6" />
-                    </div>
-                    <span className="px-3 py-1 bg-navy-900/80 backdrop-blur-md border border-white/10 rounded-full text-xs font-semibold text-gold-300">
-                      {realCount > 0 ? `${realCount} รายการจริง` : 'ดูรายการ'}
+                {/* Live Count Pill */}
+                {realCount > 0 && (
+                  <div className="absolute top-4 right-4 z-10">
+                    <span className="px-3 py-1 bg-white/20 backdrop-blur-md text-white text-xs font-bold rounded-full border border-white/20 shadow-sm">
+                      {realCount} รายการ
                     </span>
                   </div>
+                )}
 
-                  {/* Bottom Info */}
-                  <div>
-                    <h3 className="text-xl font-bold text-white mb-1 group-hover:text-gold-300 transition-colors flex items-center justify-between">
-                      <span>{cat.name}</span>
-                      <ArrowRight className="w-4 h-4 opacity-0 group-hover:opacity-100 transform -translate-x-2 group-hover:translate-x-0 transition-all text-gold-400" />
-                    </h3>
-                    <p className="text-xs text-gray-300 line-clamp-2 leading-relaxed">
-                      {cat.description}
-                    </p>
+                {/* Card Content */}
+                <div className="absolute inset-0 p-6 flex flex-col justify-end z-10">
+                  <div className="w-10 h-10 rounded-2xl bg-gold-400/20 backdrop-blur-md border border-gold-400/40 flex items-center justify-center text-gold-300 mb-3 group-hover:bg-gold-400 group-hover:text-navy-950 transition-all">
+                    <Icon className="w-5 h-5" />
                   </div>
+
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-xl font-bold text-white group-hover:text-gold-300 transition-colors">
+                      {cat.name}
+                    </h3>
+                    <div className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center text-white group-hover:bg-gold-400 group-hover:text-navy-950 transition-all">
+                      <ArrowRight className="w-4 h-4 transform group-hover:translate-x-0.5 transition-transform" />
+                    </div>
+                  </div>
+
+                  <p className="text-xs text-slate-300 mt-2 line-clamp-1 font-normal">
+                    {cat.description}
+                  </p>
                 </div>
               </Link>
             );
