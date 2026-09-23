@@ -12,6 +12,7 @@ import {
   X, 
   Phone, 
   MessageSquare, 
+  Facebook,
   MapPin, 
   Star, 
   Award, 
@@ -25,9 +26,10 @@ import {
   CheckCircle2
 } from 'lucide-react';
 import { ExtendedAgent } from '@/data/agents';
-import { getAgents, saveAgents, updateAgent, deleteAgent, resetAgentsToDefault } from '@/lib/store/agents-store';
-import { fetchUsers } from '@/lib/store/properties-store';
+import { getAgents, fetchAgents, saveAgents, updateAgent, deleteAgent, resetAgentsToDefault } from '@/lib/store/agents-store';
+import { fetchUsers, updateUserProfile, addUser } from '@/lib/store/properties-store';
 import { UserProfile } from '@/lib/types';
+import { formatFacebookUrl, formatLineUrl } from '@/lib/utils';
 
 export default function AdminAgentsPage() {
   const [agents, setAgents] = useState<ExtendedAgent[]>([]);
@@ -46,7 +48,7 @@ export default function AdminAgentsPage() {
   };
 
   useEffect(() => {
-    setAgents(getAgents());
+    fetchAgents().then(setAgents).catch(() => setAgents(getAgents()));
     fetchUsers().then(setUsers).catch(() => {});
 
     const handleUpdate = (e: any) => {
@@ -113,7 +115,7 @@ export default function AdminAgentsPage() {
     }
   };
 
-  const handleSave = (e: React.FormEvent) => {
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingAgent) return;
 
@@ -122,14 +124,52 @@ export default function AdminAgentsPage() {
       return;
     }
 
-    if (isCreating) {
+    try {
       const updated = updateAgent(editingAgent.id, editingAgent);
       setAgents(updated);
-      showNotification(`เพิ่ม "${editingAgent.name}" เป็นนายหน้าแนะนำสำเร็จ!`);
-    } else {
-      const updated = updateAgent(editingAgent.id, editingAgent);
-      setAgents(updated);
-      showNotification(`บันทึกการแก้ไขข้อมูลของ "${editingAgent.name}" สำเร็จ!`);
+
+      // Bidirectionally sync with user profile in DB
+      const targetUserId = editingAgent.user_id || selectedMemberId;
+      if (targetUserId) {
+        await updateUserProfile(targetUserId, {
+          full_name: editingAgent.name,
+          phone: editingAgent.phone,
+          email: editingAgent.email,
+          line_id: editingAgent.line_id,
+          facebook: editingAgent.facebook,
+          avatar_url: editingAgent.photo_url,
+          bio: editingAgent.bio,
+          role: editingAgent.rank === 'แอดมิน' ? 'ADMIN' : 'AGENT',
+        });
+      } else if (isCreating) {
+        // Create user profile for this agent
+        const newUid = `user-${Date.now()}`;
+        editingAgent.user_id = newUid;
+        await addUser({
+          id: newUid,
+          full_name: editingAgent.name,
+          phone: editingAgent.phone,
+          email: editingAgent.email,
+          line_id: editingAgent.line_id,
+          facebook: editingAgent.facebook,
+          avatar_url: editingAgent.photo_url,
+          bio: editingAgent.bio,
+          role: editingAgent.rank === 'แอดมิน' ? 'ADMIN' : 'AGENT',
+        });
+      }
+
+      // Re-fetch users to keep everything fresh
+      const latestUsers = await fetchUsers();
+      setUsers(latestUsers);
+
+      if (isCreating) {
+        showNotification(`เพิ่ม "${editingAgent.name}" เป็นนายหน้าแนะนำและเชื่อมโยงบัญชีสมาชิกสำเร็จ!`);
+      } else {
+        showNotification(`บันทึกข้อมูล "${editingAgent.name}" และอัปเดตข้อมูลที่เชื่อมโยงกันสำเร็จ!`);
+      }
+    } catch (err) {
+      console.error('Error saving agent and syncing user:', err);
+      showNotification(`บันทึกข้อมูลเรียบร้อยแล้ว`);
     }
 
     setEditingAgent(null);
@@ -264,15 +304,25 @@ export default function AdminAgentsPage() {
                   {agent.bio}
                 </p>
 
-                <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-slate-500 text-[11px]">
-                  <div className="flex items-center space-x-1">
-                    <Phone className="w-3 h-3 text-navy-900" />
-                    <span className="font-mono font-medium">{agent.phone}</span>
+                <div className="pt-2 border-t border-slate-100 grid grid-cols-3 gap-1 text-[10px] font-bold">
+                  <div className="flex items-center space-x-1 text-slate-700 truncate" title={`โทร: ${agent.phone}`}>
+                    <Phone className="w-3 h-3 text-navy-900 shrink-0" />
+                    <span className="font-mono truncate">{agent.phone}</span>
                   </div>
-                  <div className="flex items-center space-x-1 text-[#06C755]">
-                    <MessageSquare className="w-3 h-3" />
-                    <span>{agent.line_id || '@chantakorn'}</span>
+                  <div className="flex items-center space-x-1 text-[#06C755] truncate" title={`LINE: ${agent.line_id || '@chantakorn'}`}>
+                    <MessageSquare className="w-3 h-3 shrink-0" />
+                    <span className="truncate">{agent.line_id || '@chantakorn'}</span>
                   </div>
+                  <a 
+                    href={formatFacebookUrl(agent.facebook)} 
+                    target="_blank" 
+                    rel="noopener noreferrer" 
+                    className="flex items-center space-x-1 text-[#1877F2] hover:underline truncate"
+                    title="เปิด Facebook นายหน้า"
+                  >
+                    <Facebook className="w-3 h-3 shrink-0 fill-current" />
+                    <span className="truncate">Facebook</span>
+                  </a>
                 </div>
               </div>
             </div>
@@ -442,6 +492,19 @@ export default function AdminAgentsPage() {
                     onChange={(e) => setEditingAgent({ ...editingAgent, email: e.target.value })}
                     className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs sm:text-sm text-navy-950 focus:ring-2 focus:ring-gold-400 outline-none"
                     placeholder="contact@chantakornproperty.com"
+                  />
+                </div>
+
+                <div className="sm:col-span-2">
+                  <label className="block text-xs font-bold text-navy-950 mb-1">
+                    ลิงก์ Facebook (Facebook Profile / Page URL)
+                  </label>
+                  <input
+                    type="text"
+                    value={editingAgent.facebook || ''}
+                    onChange={(e) => setEditingAgent({ ...editingAgent, facebook: e.target.value })}
+                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs sm:text-sm text-navy-950 focus:ring-2 focus:ring-gold-400 outline-none"
+                    placeholder="https://www.facebook.com/..."
                   />
                 </div>
 

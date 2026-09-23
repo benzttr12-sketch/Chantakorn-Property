@@ -19,8 +19,8 @@ import {
   RotateCcw
 } from 'lucide-react';
 import { ExtendedAgent } from '@/data/agents';
-import { getAgents } from '@/lib/store/agents-store';
-import { fetchProperties } from '@/lib/store/properties-store';
+import { getAgents, fetchAgents } from '@/lib/store/agents-store';
+import { fetchProperties, fetchUsers } from '@/lib/store/properties-store';
 import { Property } from '@/lib/types';
 
 interface ViewingBookingSectionProps {
@@ -60,7 +60,16 @@ export default function ViewingBookingSection({ initialAgent, initialPropertyTit
 
     async function loadProps() {
       try {
-        const list = await fetchProperties();
+        const [cloudAgents, cloudUsers, list] = await Promise.all([
+          fetchAgents().catch(() => getAgents()),
+          fetchUsers().catch(() => []),
+          fetchProperties().catch(() => [])
+        ]);
+        const finalAgents = cloudAgents && cloudAgents.length > 0 ? cloudAgents : getAgents();
+        setAgents(finalAgents);
+        if (finalAgents.length > 0 && !selectedAgent) {
+          setSelectedAgent(finalAgents[0].name);
+        }
         setProperties(list.slice(0, 15));
       } catch {
         // Fallback

@@ -6,6 +6,7 @@ import {
   Users, 
   Phone, 
   MessageSquare, 
+  Facebook,
   ShieldCheck, 
   Star, 
   Award, 
@@ -15,7 +16,9 @@ import {
   ChevronRight
 } from 'lucide-react';
 import { ExtendedAgent } from '@/data/agents';
-import { getAgents } from '@/lib/store/agents-store';
+import { getAgents, fetchAgents } from '@/lib/store/agents-store';
+import { fetchUsers } from '@/lib/store/properties-store';
+import { formatFacebookUrl, formatLineUrl } from '@/lib/utils';
 
 interface FeaturedAgentsProps {
   onSelectAgentForBooking?: (agentName: string) => void;
@@ -29,7 +32,13 @@ export default function FeaturedAgents({ onSelectAgentForBooking }: FeaturedAgen
   const [activeIndex, setActiveIndex] = useState(0);
 
   useEffect(() => {
-    setAgents(getAgents());
+    fetchAgents().then(list => {
+      if (list && list.length > 0) setAgents(list);
+    }).catch(() => {});
+
+    fetchUsers().then(() => {
+      setAgents(getAgents());
+    }).catch(() => {});
 
     const handleUpdate = (e: any) => {
       if (e.detail && Array.isArray(e.detail)) setAgents(e.detail);
@@ -203,24 +212,37 @@ export default function FeaturedAgents({ onSelectAgentForBooking }: FeaturedAgen
               </div>
 
               {/* Compact Footer Actions */}
-              <div className="p-3 bg-slate-50/60 border-t border-slate-100 space-y-1.5">
-                <div className="grid grid-cols-2 gap-1.5">
+              <div className="p-3 bg-slate-50/60 border-t border-slate-100 space-y-2">
+                <div className="grid grid-cols-3 gap-1.5">
                   <a
-                    href={`tel:${agent.phone.replace(/[^0-9]/g, '')}`}
-                    className="flex items-center justify-center space-x-1 py-1.5 px-2 rounded-lg bg-white hover:bg-slate-100 text-slate-800 text-[11px] font-bold border border-slate-200 transition-colors"
+                    href={`tel:${(agent.phone || '0816040097').replace(/[^0-9]/g, '')}`}
+                    className="flex items-center justify-center space-x-1 py-1.5 px-1.5 rounded-lg bg-white hover:bg-slate-100 text-slate-800 text-[11px] font-bold border border-slate-200 transition-colors shadow-2xs"
+                    title={`โทร: ${agent.phone || '081-604-0097'}`}
                   >
-                    <Phone className="w-3 h-3 text-navy-900" />
-                    <span className="truncate">{agent.phone}</span>
+                    <Phone className="w-3 h-3 text-navy-900 shrink-0" />
+                    <span className="truncate">โทร</span>
                   </a>
 
                   <a
-                    href="https://line.me/R/ti/p/@chantakorn"
+                    href={formatLineUrl(agent.line_id)}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="flex items-center justify-center space-x-1 py-1.5 px-2 rounded-lg bg-[#06C755]/10 hover:bg-[#06C755]/20 text-[#06C755] text-[11px] font-bold border border-[#06C755]/30 transition-colors"
+                    className="flex items-center justify-center space-x-1 py-1.5 px-1.5 rounded-lg bg-[#06C755]/10 hover:bg-[#06C755]/20 text-[#06C755] text-[11px] font-bold border border-[#06C755]/30 transition-colors shadow-2xs"
+                    title="ทัก LINE นายหน้า"
                   >
-                    <MessageSquare className="w-3 h-3" />
-                    <span>ทัก LINE</span>
+                    <MessageSquare className="w-3 h-3 shrink-0" />
+                    <span className="truncate">LINE</span>
+                  </a>
+
+                  <a
+                    href={formatFacebookUrl(agent.facebook)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center justify-center space-x-1 py-1.5 px-1.5 rounded-lg bg-[#1877F2]/10 hover:bg-[#1877F2]/20 text-[#1877F2] text-[11px] font-bold border border-[#1877F2]/30 transition-colors shadow-2xs"
+                    title="เปิด Facebook นายหน้า"
+                  >
+                    <Facebook className="w-3 h-3 shrink-0 fill-current" />
+                    <span className="truncate">Facebook</span>
                   </a>
                 </div>
 

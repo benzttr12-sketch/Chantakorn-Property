@@ -51,6 +51,7 @@ import {
   fetchAdminProperties, 
   fetchUsers 
 } from '@/lib/store/properties-store';
+import { getAgents } from '@/lib/store/agents-store';
 import { PropertyType, PropertyStatus, UserProfile, Agent, AgentRank } from '@/lib/types';
 import { 
   slugify, 
@@ -277,9 +278,34 @@ function PropertyEditor() {
         }
 
         const users = await fetchUsers();
-        // Filter strictly to ADMIN and AGENT
+        const customAgents = getAgents();
+
+        // Convert custom agents to staff list if not already present
         const staffOnly = users.filter(u => u.role === 'ADMIN' || u.role === 'AGENT');
         
+        customAgents.forEach(agent => {
+          const alreadyExists = staffOnly.some(s => 
+            s.id === agent.id || 
+            s.id === agent.user_id || 
+            (agent.email && s.email && s.email.toLowerCase() === agent.email.toLowerCase()) ||
+            s.full_name.trim() === agent.name.trim()
+          );
+
+          if (!alreadyExists) {
+            staffOnly.push({
+              id: agent.id,
+              full_name: agent.name,
+              role: agent.rank === 'แอดมิน' ? 'ADMIN' : 'AGENT',
+              email: agent.email,
+              phone: agent.phone,
+              line_id: agent.line_id,
+              facebook: agent.facebook,
+              avatar_url: agent.photo_url,
+              bio: agent.bio
+            });
+          }
+        });
+
         // Also ensure current user is represented if they are staff
         if (current && (current.role === 'ADMIN' || current.role === 'AGENT')) {
           if (!staffOnly.some(s => s.id === current.id || s.email === current.email)) {

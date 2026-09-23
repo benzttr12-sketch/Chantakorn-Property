@@ -21,6 +21,7 @@ export interface Agent {
   email: string;
   photo_url: string;
   bio: string;
+  user_id?: string;
 }
 
 export interface Property {

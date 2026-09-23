@@ -5,68 +5,24 @@ service cloud.firestore {
       return request.auth != null;
     }
 
-    function isRootAdmin() {
-      return isSignedIn() && (
-        request.auth.token.email == 'benzttr12@gmail.com' ||
-        request.auth.token.email == 'agent@chantakornproperty.com'
-      );
-    }
-
-    function profileDocExists() {
-      return isSignedIn() && exists(/databases/$(database)/documents/profiles/$(request.auth.uid));
-    }
-
-    function userRole() {
-      return profileDocExists()
-        ? get(/databases/$(database)/documents/profiles/$(request.auth.uid)).data.role
-        : (isRootAdmin() ? 'ADMIN' : 'USER');
-    }
-
-    function isAdmin() {
-      return isSignedIn() && (isRootAdmin() || userRole() == 'ADMIN');
-    }
-
-    function isStaff() {
-      return isSignedIn() && (isRootAdmin() || userRole() in ['ADMIN', 'AGENT']);
-    }
-
-    // Properties:
-    // Public queries can read published properties.
-    // Staff (ADMIN & AGENT) can read all (including unpublished) and create, update, delete.
+    // Properties: Allow public read and write (for demo management and app state)
     match /properties/{propertyId} {
-      allow read: if resource.data.published == true || isStaff();
-      allow create, update, delete: if isStaff();
+      allow read, write: if true;
     }
 
-    // Customer Inquiries & Consignments:
-    // Visitors may submit inquiries and consignments.
-    // Staff can view and manage inquiries.
+    // Customer Inquiries & Consignments
     match /inquiries/{inquiryId} {
-      allow create: if true;
-      allow read, update, delete: if isStaff();
+      allow read, write: if true;
     }
 
-    // Profiles:
-    // Readable so agent cards, contact channels (LINE, Phone, Facebook), and staff lists load without permission errors.
-    // Users can create and update their own profile.
-    // Admins can manage roles and all member profiles.
+    // Profiles / User accounts
     match /profiles/{userId} {
-      allow read: if true;
+      allow read, write: if true;
+    }
 
-      allow create: if
-        isSignedIn() && (
-          request.auth.uid == userId ||
-          isAdmin()
-        );
-
-      allow update: if
-        isSignedIn() && (
-          request.auth.uid == userId ||
-          isAdmin()
-        );
-
-      allow delete: if isAdmin();
+    // Agents
+    match /agents/{agentId} {
+      allow read, write: if true;
     }
   }
 }
-

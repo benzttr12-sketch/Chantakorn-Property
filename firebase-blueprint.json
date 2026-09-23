@@ -71,6 +71,31 @@
         "created_at": { "type": "string" }
       },
       "required": ["id", "full_name", "email", "role"]
+    },
+    "agents": {
+      "title": "Featured Agents",
+      "description": "Consultant team & featured agents for property listings and bookings",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "user_id": { "type": "string" },
+        "name": { "type": "string" },
+        "rank": { "type": "string" },
+        "title": { "type": "string" },
+        "phone": { "type": "string" },
+        "line_id": { "type": "string" },
+        "facebook": { "type": "string" },
+        "email": { "type": "string" },
+        "photo_url": { "type": "string" },
+        "bio": { "type": "string" },
+        "specialty": { "type": "string" },
+        "zone": { "type": "string" },
+        "experienceYears": { "type": "number" },
+        "closedDeals": { "type": "number" },
+        "rating": { "type": "number" },
+        "languages": { "type": "array", "items": { "type": "string" } }
+      },
+      "required": ["id", "name", "phone"]
     }
   },
   "firestore": {
@@ -85,6 +110,10 @@
     "/profiles/{userId}": {
       "schema": "profiles",
       "description": "Collection of user profiles and administrative roles"
+    },
+    "/agents/{agentId}": {
+      "schema": "agents",
+      "description": "Collection of featured agents and consultant team members"
     }
   }
 }

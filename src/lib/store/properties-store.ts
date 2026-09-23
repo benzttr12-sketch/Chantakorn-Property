@@ -13,8 +13,10 @@ import {
   setDoc, 
   deleteDoc, 
   query, 
-  where 
+  where,
+  Firestore
 } from 'firebase/firestore';
+import { getAgents, syncAgentsFromUsers } from '@/lib/store/agents-store';
 
 const STORAGE_KEY_PROPERTIES = 'chantakorn_properties';
 const STORAGE_KEY_FAVORITES = 'chantakorn_favorites';
@@ -108,19 +110,30 @@ function rowToProperty(row: PropertyRow): Property {
   const validLng = Number.isFinite(parsedLng) && Math.abs(parsedLng) <= 180;
 
   let resolvedAgent = agents || property.agent || undefined;
-  if (typeof window !== 'undefined' && resolvedAgent) {
+  if (typeof window !== 'undefined') {
     try {
-      const stored = localStorage.getItem('chantakorn_auth_user');
-      if (stored) {
-        const u = JSON.parse(stored);
-        if (u && (u.id === property.agent_id || (u.email && u.email.toLowerCase() === resolvedAgent.email?.toLowerCase()) || u.id === resolvedAgent.id)) {
-          resolvedAgent = {
-            ...resolvedAgent,
-            photo_url: u.avatar_url || resolvedAgent.photo_url,
-            name: u.full_name || resolvedAgent.name,
-            phone: u.phone || resolvedAgent.phone,
-            line_id: u.line_id || resolvedAgent.line_id,
-          };
+      const allAgents = getAgents();
+      // Match by agent_id, agent.id, or user id
+      const matched = allAgents.find(a => 
+        (property.agent_id && (a.id === property.agent_id || a.user_id === property.agent_id)) ||
+        (resolvedAgent && (a.id === resolvedAgent.id || a.user_id === resolvedAgent.user_id || (a.email && a.email.toLowerCase() === resolvedAgent.email?.toLowerCase())))
+      );
+
+      if (matched) {
+        resolvedAgent = matched;
+      } else if (resolvedAgent) {
+        const stored = localStorage.getItem('chantakorn_auth_user');
+        if (stored) {
+          const u = JSON.parse(stored);
+          if (u && (u.id === property.agent_id || (u.email && u.email.toLowerCase() === resolvedAgent.email?.toLowerCase()) || u.id === resolvedAgent.id)) {
+            resolvedAgent = {
+              ...resolvedAgent,
+              photo_url: u.avatar_url || resolvedAgent.photo_url,
+              name: u.full_name || resolvedAgent.name,
+              phone: u.phone || resolvedAgent.phone,
+              line_id: u.line_id || resolvedAgent.line_id,
+            };
+          }
         }
       }
     } catch {}
@@ -186,11 +199,26 @@ async function loadProperties(includeUnpublished: boolean): Promise<Property[]> 
     if (error) throw error;
     return (data || []).map(row => rowToProperty(row as PropertyRow));
   }
-  if (dataBackend === 'firebase' && db) {
+  const firestore: Firestore | null = db;
+  if (dataBackend === 'firebase' && firestore) {
     const q = includeUnpublished
-      ? query(collection(db, 'properties'))
-      : query(collection(db, 'properties'), where('published', '==', true));
+      ? query(collection(firestore, 'properties'))
+      : query(collection(firestore, 'properties'), where('published', '==', true));
     const snapshot = await getDocs(q);
+    
+    // If Firestore properties collection is empty on first setup, seed SAMPLE_PROPERTIES to Firestore
+    if (snapshot.empty && !includeUnpublished) {
+      try {
+        const seedPromises = SAMPLE_PROPERTIES.map(p => 
+          setDoc(doc(firestore, 'properties', p.id), JSON.parse(JSON.stringify(p)))
+        );
+        await Promise.all(seedPromises);
+        return SAMPLE_PROPERTIES.filter(property => includeUnpublished || property.published);
+      } catch (seedErr) {
+        console.warn('Auto-seed properties to Firestore warning:', seedErr);
+      }
+    }
+
     return snapshot.docs.map(item => rowToProperty({ ...item.data(), id: item.id } as PropertyRow));
   }
   return getLocalProperties().filter(property => includeUnpublished || property.published);
@@ -219,7 +247,8 @@ export async function fetchPropertyBySlug(slug: string): Promise<Property | null
       return all.find(property => property.slug === slug) || null;
     }
   }
-  if (dataBackend === 'firebase' && db) {
+  const firestore: Firestore | null = db;
+  if (dataBackend === 'firebase' && firestore) {
     const all = await loadProperties(false);
     return all.find(property => property.slug === slug) || null;
   }
@@ -244,14 +273,15 @@ export async function createProperty(property: Omit<Property, 'id' | 'created_at
     if (error) throw error;
     return { ...(data as Property), images, agent };
   }
-  if (dataBackend === 'firebase' && db) {
+  const firestore: Firestore | null = db;
+  if (dataBackend === 'firebase' && firestore) {
     const newId = generateShortPropertyId();
     const newProperty: Property = {
       ...property,
       id: newId,
       created_at: new Date().toISOString()
     };
-    await setDoc(doc(db, 'properties', newId), JSON.parse(JSON.stringify(newProperty)));
+    await setDoc(doc(firestore, 'properties', newId), JSON.parse(JSON.stringify(newProperty)));
     return newProperty;
   }
   const properties = getLocalProperties();
@@ -273,7 +303,8 @@ export async function updateProperty(id: string, updates: Partial<Property>): Pr
     if (!data) throw new Error('ไม่พบประกาศหรือไม่มีสิทธิ์แก้ไข');
     return rowToProperty(data as PropertyRow);
   }
-  if (dataBackend === 'firebase' && db) {
+  const firestore: Firestore | null = db;
+  if (dataBackend === 'firebase' && firestore) {
     const current = (await loadProperties(true)).find(p => p.id === id);
     if (!current) throw new Error('ไม่พบประกาศที่ต้องการแก้ไข');
     const updated = {
@@ -282,7 +313,7 @@ export async function updateProperty(id: string, updates: Partial<Property>): Pr
       ...(images ? { images } : {}),
       ...(agent ? { agent } : {})
     };
-    await setDoc(doc(db, 'properties', id), JSON.parse(JSON.stringify(updated)), { merge: true });
+    await setDoc(doc(firestore, 'properties', id), JSON.parse(JSON.stringify(updated)), { merge: true });
     return updated;
   }
   const properties = getLocalProperties();
@@ -304,8 +335,9 @@ export async function deleteProperty(id: string): Promise<boolean> {
     if (error) throw error;
     return Boolean(data?.length);
   }
-  if (dataBackend === 'firebase' && db) {
-    await deleteDoc(doc(db, 'properties', id));
+  const firestore: Firestore | null = db;
+  if (dataBackend === 'firebase' && firestore) {
+    await deleteDoc(doc(firestore, 'properties', id));
     return true;
   }
   const properties = getLocalProperties();
@@ -430,9 +462,10 @@ export async function submitInquiry(inquiry: Omit<Inquiry, 'id' | 'created_at'>)
     if (error) throw error;
     return result;
   }
-  if (dataBackend === 'firebase' && db) {
+  const firestore: Firestore | null = db;
+  if (dataBackend === 'firebase' && firestore) {
     // Firestore rejects undefined optional fields. JSON also strips them recursively.
-    await setDoc(doc(db, 'inquiries', result.id), JSON.parse(JSON.stringify(result)));
+    await setDoc(doc(firestore, 'inquiries', result.id), JSON.parse(JSON.stringify(result)));
     return result;
   }
   throw new Error('ไม่สามารถเชื่อมต่อระบบรับข้อความ กรุณาติดต่อทางโทรศัพท์หรือ LINE');
@@ -449,8 +482,9 @@ export async function fetchInquiries(): Promise<Inquiry[]> {
     if (error) throw error;
     return (data || []) as Inquiry[];
   }
-  if (dataBackend === 'firebase' && db) {
-    const snap = await getDocs(collection(db, 'inquiries'));
+  const firestore: Firestore | null = db;
+  if (dataBackend === 'firebase' && firestore) {
+    const snap = await getDocs(collection(firestore, 'inquiries'));
     const inqs = snap.docs.map(d => ({ ...d.data(), id: d.id } as Inquiry));
     return inqs.sort((a, b) => b.created_at.localeCompare(a.created_at));
   }
@@ -464,10 +498,11 @@ export async function updateInquiryStatus(id: string, status: Inquiry['status'])
     if (error) throw error;
     return data as Inquiry | null;
   }
-  if (dataBackend === 'firebase' && db) {
+  const firestore: Firestore | null = db;
+  if (dataBackend === 'firebase' && firestore) {
     try {
-      await setDoc(doc(db, 'inquiries', id), { status }, { merge: true });
-      const snap = await getDocs(collection(db, 'inquiries'));
+      await setDoc(doc(firestore, 'inquiries', id), { status }, { merge: true });
+      const snap = await getDocs(collection(firestore, 'inquiries'));
       const found = snap.docs.find(d => d.id === id);
       return found ? ({ ...found.data(), id: found.id } as Inquiry) : null;
     } catch (err) {
@@ -496,16 +531,58 @@ export function saveLocalUsers(users: UserProfile[]) {
 
 export async function fetchUsers(): Promise<UserProfile[]> {
   requireStaffBackend();
+  let usersList: UserProfile[] = [];
+  const firestore: Firestore | null = db;
   if (dataBackend === 'supabase' && supabase) {
     const { data, error } = await supabase.from('profiles').select('*').order('full_name');
     if (error) throw error;
-    return (data || []) as UserProfile[];
+    usersList = (data || []) as UserProfile[];
+  } else if (dataBackend === 'firebase' && firestore) {
+    const snap = await getDocs(collection(firestore, 'profiles'));
+    if (!snap.empty) {
+      usersList = snap.docs.map(d => ({ ...d.data(), id: d.id } as UserProfile));
+    } else {
+      const defaultUsers: UserProfile[] = [
+        { 
+          id: 'user-benz', 
+          full_name: 'คุณเบนซ์ (ผู้บริหาร & แอดมิน)', 
+          email: 'benzttr12@gmail.com', 
+          role: 'ADMIN',
+          phone: '081-604-0097',
+          line_id: '@chantakorn',
+          facebook: 'https://www.facebook.com/chantakornproperty',
+          avatar_url: 'https://images.unsplash.com/photo-1560250097-0b93528c311a?auto=format&fit=crop&w=600&q=80',
+          bio: 'ผู้ก่อตั้งและผู้บริหาร Chantakorn Property ยินดีให้คำปรึกษาอสังหาริมทรัพย์ระดับมืออาชีพในหาดใหญ่และสงขลา'
+        },
+        { 
+          id: 'user-pim', 
+          full_name: 'คุณพิมลภัส รัตนวิจิตร', 
+          email: 'agent@chantakornproperty.com', 
+          role: 'AGENT',
+          phone: '082-456-7890',
+          line_id: 'pim_realty',
+          facebook: 'https://www.facebook.com/chantakornproperty',
+          avatar_url: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&w=600&q=80',
+          bio: 'เชี่ยวชาญคอนโดและบ้านเดี่ยวโซน ม.อ. – คอหงส์ ประสบการณ์กว่า 4 ปี'
+        },
+      ];
+      try {
+        const promises = defaultUsers.map(u => 
+          setDoc(doc(firestore, 'profiles', u.id), JSON.parse(JSON.stringify(u)))
+        );
+        await Promise.all(promises);
+      } catch (seedErr) {
+        console.warn('Seed profiles to Firestore warning:', seedErr);
+      }
+      usersList = defaultUsers;
+    }
+  } else {
+    usersList = getLocalUsers();
   }
-  if (dataBackend === 'firebase' && db) {
-    const snap = await getDocs(collection(db, 'profiles'));
-    return snap.docs.map(d => ({ ...d.data(), id: d.id } as UserProfile));
-  }
-  return getLocalUsers();
+
+  // Automatically sync to agents store
+  syncAgentsFromUsers(usersList);
+  return usersList;
 }
 
 export async function updateUserRole(userId: string, role: UserProfile['role']): Promise<UserProfile[]> {
@@ -513,14 +590,19 @@ export async function updateUserRole(userId: string, role: UserProfile['role']):
 }
 
 export async function addUser(user: UserProfile): Promise<UserProfile[]> {
-  if (dataBackend === 'firebase' && db) {
+  const firestore: Firestore | null = db;
+  if (dataBackend === 'firebase' && firestore) {
     const newId = user.id || `user-${Date.now()}`;
     const newUser = { ...user, id: newId, created_at: new Date().toISOString() };
-    await setDoc(doc(db, 'profiles', newId), JSON.parse(JSON.stringify(newUser)));
-    return fetchUsers();
+    await setDoc(doc(firestore, 'profiles', newId), JSON.parse(JSON.stringify(newUser)));
+    const all = await fetchUsers();
+    syncAgentsFromUsers(all);
+    return all;
   }
   requireDemoAuth();
-  return addLocalUser(user);
+  const updated = addLocalUser(user);
+  syncAgentsFromUsers(updated);
+  return updated;
 }
 
 export function addLocalUser(user: UserProfile): UserProfile[] {
@@ -531,6 +613,7 @@ export function addLocalUser(user: UserProfile): UserProfile[] {
   }
   const updated = [user, ...users];
   saveLocalUsers(updated);
+  syncAgentsFromUsers(updated);
   return updated;
 }
 
@@ -541,30 +624,42 @@ export async function updateUserProfile(userId: string, updates: Partial<UserPro
     const { data, error } = await supabase.from('profiles').update(fields).eq('id', userId).select('id');
     if (error) throw error;
     if (!data?.length) throw new Error('ไม่สามารถแก้ไขผู้ใช้นี้ได้ กรุณาตรวจสอบสิทธิ์');
-    return fetchUsers();
+    const all = await fetchUsers();
+    syncAgentsFromUsers(all);
+    return all;
   }
-  if (dataBackend === 'firebase' && db) {
-    await setDoc(doc(db, 'profiles', userId), fields, { merge: true });
-    return fetchUsers();
+  const firestore: Firestore | null = db;
+  if (dataBackend === 'firebase' && firestore) {
+    await setDoc(doc(firestore, 'profiles', userId), fields, { merge: true });
+    const all = await fetchUsers();
+    syncAgentsFromUsers(all);
+    return all;
   }
   const users = getLocalUsers();
   const updated = users.map(user => user.id === userId ? { ...user, ...fields } : user);
   saveLocalUsers(updated);
+  syncAgentsFromUsers(updated);
   return updated;
 }
 
 export async function deleteUser(userId: string): Promise<UserProfile[]> {
-  if (dataBackend === 'firebase' && db) {
-    await deleteDoc(doc(db, 'profiles', userId));
-    return fetchUsers();
+  const firestore: Firestore | null = db;
+  if (dataBackend === 'firebase' && firestore) {
+    await deleteDoc(doc(firestore, 'profiles', userId));
+    const all = await fetchUsers();
+    syncAgentsFromUsers(all);
+    return all;
   }
   requireDemoAuth();
-  return deleteLocalUser(userId);
+  const updated = deleteLocalUser(userId);
+  syncAgentsFromUsers(updated);
+  return updated;
 }
 
 export function deleteLocalUser(userId: string): UserProfile[] {
   requireDemo();
   const updated = getLocalUsers().filter(user => user.id !== userId);
   saveLocalUsers(updated);
+  syncAgentsFromUsers(updated);
   return updated;
 }
