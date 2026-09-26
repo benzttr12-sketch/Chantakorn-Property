@@ -26,8 +26,18 @@ import {
   ArrowUpDown,
   Check,
   RotateCcw,
-  Sparkles
+  Sparkles,
+  Zap,
+  Wand2,
+  X,
+  ChevronDown,
+  Loader2,
+  Tag,
+  History
 } from 'lucide-react';
+import QuickPropertyModal from '@/components/admin/QuickPropertyModal';
+import PropertyHistoryModal from '@/components/admin/PropertyHistoryModal';
+import AdminLandsMapsOverlayModal from '@/components/admin/AdminLandsMapsOverlayModal';
 import { 
   fetchAdminProperties, 
   updateProperty, 
@@ -63,6 +73,90 @@ export default function AdminPropertiesPage() {
   // Bulk Selection State
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [bulkConfirmDelete, setBulkConfirmDelete] = useState(false);
+  const [quickModalOpen, setQuickModalOpen] = useState(false);
+
+  // Property History Modal State
+  const [historyModalProperty, setHistoryModalProperty] = useState<Property | null>(null);
+  const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
+
+  // DOL LandsMaps Overlay Modal State
+  const [landsMapsModalProperty, setLandsMapsModalProperty] = useState<Property | null>(null);
+  const [isLandsMapsModalOpen, setIsLandsMapsModalOpen] = useState(false);
+
+  const handleOpenHistory = (prop: Property) => {
+    setHistoryModalProperty(prop);
+    setIsHistoryModalOpen(true);
+  };
+
+  const handleOpenLandsMapsOverlay = (prop: Property) => {
+    setLandsMapsModalProperty(prop);
+    setIsLandsMapsModalOpen(true);
+  };
+
+  // Inline Edit State
+  const [editingPriceId, setEditingPriceId] = useState<string | null>(null);
+  const [inlinePriceInput, setInlinePriceInput] = useState<string>('');
+  const [inlineUpdatingId, setInlineUpdatingId] = useState<string | null>(null);
+  const [inlineSuccessToast, setInlineSuccessToast] = useState<{ id: string; message: string } | null>(null);
+  const [activeStatusDropdownId, setActiveStatusDropdownId] = useState<string | null>(null);
+  const [highlightedRowId, setHighlightedRowId] = useState<string | null>(null);
+
+  const handleStartEditPrice = (prop: Property) => {
+    setEditingPriceId(prop.id);
+    setInlinePriceInput(String(prop.price || ''));
+  };
+
+  const handleCancelEditPrice = () => {
+    setEditingPriceId(null);
+    setInlinePriceInput('');
+  };
+
+  const handleSaveInlinePrice = async (propId: string) => {
+    const rawClean = inlinePriceInput.replace(/,/g, '').trim();
+    const numPrice = parseFloat(rawClean);
+    if (isNaN(numPrice) || numPrice < 0) {
+      setError('กรุณาระบุตัวเลขราคาที่ถูกต้อง');
+      return;
+    }
+
+    setInlineUpdatingId(propId);
+    setError('');
+    try {
+      await updateProperty(propId, { price: numPrice });
+      setEditingPriceId(null);
+      setInlinePriceInput('');
+      setHighlightedRowId(propId);
+      setTimeout(() => setHighlightedRowId(null), 3500);
+      setInlineSuccessToast({ id: propId, message: 'บันทึกราคาใหม่สำเร็จ' });
+      setTimeout(() => setInlineSuccessToast(null), 3000);
+      await loadData();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'ไม่สามารถบันทึกราคาได้');
+    } finally {
+      setInlineUpdatingId(null);
+    }
+  };
+
+  const handleInlineUpdateStatus = async (propId: string, newStatus: PropertyStatus) => {
+    setInlineUpdatingId(propId);
+    setActiveStatusDropdownId(null);
+    setError('');
+    try {
+      await updateProperty(propId, { status: newStatus });
+      setHighlightedRowId(propId);
+      setTimeout(() => setHighlightedRowId(null), 3500);
+      setInlineSuccessToast({ 
+        id: propId, 
+        message: `เปลี่ยนสถานะเป็น "${newStatus === 'rent' ? 'เช่า' : 'ขาย'}" เรียบร้อยแล้ว` 
+      });
+      setTimeout(() => setInlineSuccessToast(null), 3000);
+      await loadData();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'ไม่สามารถเปลี่ยนสถานะได้');
+    } finally {
+      setInlineUpdatingId(null);
+    }
+  };
 
   const loadData = async () => {
     setLoading(true);
@@ -79,6 +173,22 @@ export default function AdminPropertiesPage() {
   useEffect(() => {
     loadData();
   }, []);
+
+  // Close active status dropdown on outside click
+  useEffect(() => {
+    const handleDocumentClick = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      if (!target.closest('.inline-status-dropdown-container')) {
+        setActiveStatusDropdownId(null);
+      }
+    };
+    if (activeStatusDropdownId) {
+      document.addEventListener('click', handleDocumentClick);
+    }
+    return () => {
+      document.removeEventListener('click', handleDocumentClick);
+    };
+  }, [activeStatusDropdownId]);
 
   const handleToggleFeatured = async (prop: Property) => {
     if (busy) return;
@@ -499,12 +609,31 @@ export default function AdminPropertiesPage() {
           </button>
 
           <Link
+            href="/admin/automation"
+            className="px-3.5 py-2 bg-gradient-to-r from-navy-950 to-blue-900 hover:from-navy-900 hover:to-blue-800 text-gold-300 border border-gold-500/30 font-bold text-xs rounded-xl shadow-md flex items-center space-x-1.5 transition-all cursor-pointer"
+            title="เข้าสู่ศูนย์ระบบอัตโนมัติ AI (สร้างโพสต์/จับคู่ลูกค้า/ร่างสัญญา/วิเคราะห์ Yield)"
+          >
+            <Sparkles className="w-4 h-4 text-gold-400" />
+            <span>ระบบอัตโนมัติ AI</span>
+          </Link>
+
+          <button
+            type="button"
+            onClick={() => setQuickModalOpen(true)}
+            className="px-4 py-2 bg-gradient-to-r from-amber-500 to-gold-500 hover:from-amber-400 hover:to-gold-400 text-navy-950 font-black text-xs rounded-xl shadow-md flex items-center space-x-1.5 transition-all cursor-pointer active:scale-95 border border-gold-300"
+            title="วางข้อความจาก LINE หรือ Facebook เพื่อลงทรัพย์ได้ทันที 1-Click"
+          >
+            <Zap className="w-4 h-4 text-navy-950 fill-navy-950" />
+            <span>⚡ ลงทรัพย์ด่วน 1-Click</span>
+          </button>
+
+          <Link
             id="add-new-property-btn"
             href="/admin/properties/new"
             className="px-4 py-2 bg-navy-950 hover:bg-navy-900 text-gold-400 font-black text-xs rounded-xl shadow-md flex items-center space-x-1.5 transition-all cursor-pointer active:scale-95"
           >
             <PlusCircle className="w-4 h-4 text-gold-400" />
-            <span>+ เพิ่มทรัพย์ใหม่</span>
+            <span>+ ฟอร์มเต็ม</span>
           </Link>
         </div>
       </div>
@@ -635,13 +764,20 @@ export default function AdminPropertiesPage() {
             ไม่พบข้อมูลอสังหาริมทรัพย์ที่ค้นหา
           </div>
         ) : (
-          sortedProperties.map((prop) => (
-            <div 
-              key={prop.id} 
-              className={`bg-white rounded-2xl border p-4 shadow-xs space-y-3 transition-all ${
-                selectedIds.includes(prop.id) ? 'border-gold-500 bg-gold-50/20' : 'border-gray-200'
-              }`}
-            >
+          sortedProperties.map((prop) => {
+            const isHighlighted = highlightedRowId === prop.id;
+            const isSelected = selectedIds.includes(prop.id);
+            return (
+              <div 
+                key={prop.id} 
+                className={`rounded-2xl border p-4 shadow-xs space-y-3 transition-all duration-700 ease-in-out ${
+                  isHighlighted 
+                    ? 'border-gold-500 bg-amber-50/90 ring-2 ring-gold-400 shadow-md animate-pulse' 
+                    : isSelected 
+                      ? 'border-gold-500 bg-gold-50/20' 
+                      : 'bg-white border-gray-200'
+                }`}
+              >
               <div className="flex items-start gap-3">
                 <button
                   type="button"
@@ -664,11 +800,48 @@ export default function AdminPropertiesPage() {
                     referrerPolicy="no-referrer"
                     className="object-cover"
                   />
-                  <span className={`absolute top-1 left-1 px-1.5 py-0.5 rounded text-[9px] font-bold ${
-                    prop.status === 'rent' ? 'bg-emerald-600 text-white' : 'bg-gold-500 text-navy-950'
-                  }`}>
-                    {prop.status === 'rent' ? 'เช่า' : 'ขาย'}
-                  </span>
+                  <div className="absolute top-1 left-1 inline-status-dropdown-container">
+                    <button
+                      type="button"
+                      onClick={() => setActiveStatusDropdownId(activeStatusDropdownId === `m-${prop.id}` ? null : `m-${prop.id}`)}
+                      disabled={inlineUpdatingId === prop.id}
+                      className={`px-1.5 py-0.5 rounded text-[9px] font-bold shadow-xs flex items-center gap-0.5 cursor-pointer border ${
+                        prop.status === 'rent' ? 'bg-emerald-600 text-white border-emerald-700' : 'bg-gold-500 text-navy-950 border-gold-600'
+                      }`}
+                      title="แตะเพื่อสลับสถานะ ขาย/เช่า"
+                    >
+                      {inlineUpdatingId === prop.id ? (
+                        <Loader2 className="w-2.5 h-2.5 animate-spin" />
+                      ) : (
+                        <span>{prop.status === 'rent' ? 'เช่า' : 'ขาย'}</span>
+                      )}
+                      <ChevronDown className="w-2.5 h-2.5" />
+                    </button>
+                    {activeStatusDropdownId === `m-${prop.id}` && (
+                      <div className="absolute top-full left-0 mt-1 z-30 w-28 bg-white rounded-lg shadow-xl border border-gray-200 py-1 overflow-hidden">
+                        <button
+                          type="button"
+                          onClick={() => handleInlineUpdateStatus(prop.id, 'sale')}
+                          className={`w-full px-2 py-1 text-left text-[11px] font-bold flex items-center justify-between ${
+                            prop.status === 'sale' ? 'bg-gold-50 text-navy-950' : 'text-gray-700 hover:bg-gray-50'
+                          }`}
+                        >
+                          <span>🏷️ ขาย</span>
+                          {prop.status === 'sale' && <Check className="w-3 h-3 text-gold-600" />}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleInlineUpdateStatus(prop.id, 'rent')}
+                          className={`w-full px-2 py-1 text-left text-[11px] font-bold flex items-center justify-between ${
+                            prop.status === 'rent' ? 'bg-emerald-50 text-emerald-800' : 'text-gray-700 hover:bg-gray-50'
+                          }`}
+                        >
+                          <span>🔑 เช่า</span>
+                          {prop.status === 'rent' && <Check className="w-3 h-3 text-emerald-600" />}
+                        </button>
+                      </div>
+                    )}
+                  </div>
                 </div>
 
                 <div className="flex-1 min-w-0">
@@ -690,14 +863,92 @@ export default function AdminPropertiesPage() {
                     </button>
                   </div>
 
-                  <div className="text-sm font-extrabold text-navy-950 mt-1">
-                    {formatPrice(prop.price, prop.status)}
-                  </div>
+                  {/* Inline Price on Mobile */}
+                  {editingPriceId === prop.id ? (
+                    <div className="mt-1 p-2 bg-amber-50/90 border border-gold-400 rounded-xl shadow-xs space-y-1.5">
+                      <div className="flex items-center justify-between text-[10px] font-bold text-navy-950">
+                        <span>แก้ไขราคาด่วน</span>
+                        <button
+                          type="button"
+                          onClick={handleCancelEditPrice}
+                          className="text-gray-400 hover:text-gray-600"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                      <div className="relative flex items-center">
+                        <span className="absolute left-2 text-gray-500 font-bold text-xs">฿</span>
+                        <input
+                          type="text"
+                          autoFocus
+                          value={inlinePriceInput}
+                          onChange={(e) => setInlinePriceInput(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') handleSaveInlinePrice(prop.id);
+                            if (e.key === 'Escape') handleCancelEditPrice();
+                          }}
+                          disabled={inlineUpdatingId === prop.id}
+                          className="w-full pl-5 pr-2 py-1 text-xs font-bold text-navy-950 bg-white border border-gray-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-gold-500"
+                          placeholder="ระบุราคา..."
+                        />
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const cur = parseFloat(inlinePriceInput.replace(/,/g, '') || '0') || 0;
+                            setInlinePriceInput(String(cur + 100000));
+                          }}
+                          className="px-1.5 py-0.5 text-[9px] bg-white text-gray-700 rounded border border-gray-200"
+                        >
+                          +100k
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const cur = parseFloat(inlinePriceInput.replace(/,/g, '') || '0') || 0;
+                            setInlinePriceInput(String(cur + 500000));
+                          }}
+                          className="px-1.5 py-0.5 text-[9px] bg-white text-gray-700 rounded border border-gray-200"
+                        >
+                          +500k
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleSaveInlinePrice(prop.id)}
+                          disabled={inlineUpdatingId === prop.id}
+                          className="ml-auto px-2 py-0.5 bg-navy-950 text-gold-400 text-[10px] font-bold rounded flex items-center gap-0.5 cursor-pointer"
+                        >
+                          {inlineUpdatingId === prop.id ? <Loader2 className="w-2.5 h-2.5 animate-spin" /> : <Check className="w-2.5 h-2.5" />}
+                          <span>บันทึก</span>
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-1.5 mt-1">
+                      <div className="text-sm font-extrabold text-navy-950">
+                        {formatPrice(prop.price, prop.status)}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => handleStartEditPrice(prop)}
+                        className="p-1 text-gray-400 hover:text-navy-950 hover:bg-gold-50 rounded border border-transparent hover:border-gold-300"
+                        title="แก้ไขราคาด่วน"
+                      >
+                        <Edit3 className="w-3 h-3 text-gold-600" />
+                      </button>
+                    </div>
+                  )}
 
                   <div className="text-[11px] text-gray-500 flex items-center justify-between mt-0.5">
                     <span className="flex items-center truncate">
                       <MapPin className="w-3 h-3 mr-1 text-gray-400 flex-shrink-0" />
                       <span className="truncate">{prop.district}</span>
+                      {prop.facing_direction && (
+                        <span className="ml-1.5 text-[9px] font-semibold text-amber-800 bg-amber-50 px-1 py-0.2 rounded border border-amber-200">
+                          ☯ {prop.facing_direction}
+                        </span>
+                      )}
                     </span>
                     <button
                       type="button"
@@ -755,6 +1006,24 @@ export default function AdminPropertiesPage() {
 
                   <button
                     type="button"
+                    onClick={() => handleOpenLandsMapsOverlay(prop)}
+                    className="p-1.5 text-navy-800 hover:bg-emerald-50 hover:text-emerald-700 rounded-lg border border-emerald-200"
+                    title="ตรวจสอบระวาง & โฉนดกรมที่ดิน (DOL LandsMaps Overlay)"
+                  >
+                    <Building2 className="w-3.5 h-3.5 text-emerald-600" />
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => handleOpenHistory(prop)}
+                    className="p-1.5 text-navy-800 hover:bg-gold-50 hover:text-gold-700 rounded-lg border border-gold-200"
+                    title="ดูประวัติการแก้ไขและปรับราคา (Property History)"
+                  >
+                    <History className="w-3.5 h-3.5 text-gold-600" />
+                  </button>
+
+                  <button
+                    type="button"
                     disabled={busy}
                     onClick={() => handleDuplicate(prop)}
                     className="p-1.5 text-navy-700 hover:bg-navy-50 rounded-lg border border-gray-200"
@@ -762,6 +1031,14 @@ export default function AdminPropertiesPage() {
                   >
                     <CopyPlus className="w-3.5 h-3.5 text-navy-800" />
                   </button>
+
+                  <Link
+                    href={`/admin/automation?propertyId=${encodeURIComponent(prop.id)}`}
+                    className="p-1.5 text-gold-600 hover:text-gold-700 hover:bg-gold-50 rounded-lg border border-gold-200"
+                    title="ระบบอัตโนมัติ AI"
+                  >
+                    <Sparkles className="w-3.5 h-3.5" />
+                  </Link>
 
                   <Link
                     href={propertyHref(prop.slug)}
@@ -792,8 +1069,9 @@ export default function AdminPropertiesPage() {
                 </div>
               </div>
             </div>
-          ))
-        )}
+          );
+        })
+      )}
       </div>
 
       {/* Desktop Property Table (Screens >= md) */}
@@ -844,12 +1122,17 @@ export default function AdminPropertiesPage() {
                 </tr>
               ) : (
                 sortedProperties.map((prop) => {
+                  const isHighlighted = highlightedRowId === prop.id;
                   const isSelected = selectedIds.includes(prop.id);
                   return (
                     <tr 
                       key={prop.id} 
-                      className={`transition-colors ${
-                        isSelected ? 'bg-gold-50/40 hover:bg-gold-50/70' : 'hover:bg-gray-50/80'
+                      className={`transition-all duration-700 ease-in-out ${
+                        isHighlighted
+                          ? 'bg-amber-100/90 border-l-4 border-l-gold-500 shadow-sm animate-pulse'
+                          : isSelected 
+                            ? 'bg-gold-50/40 hover:bg-gold-50/70' 
+                            : 'hover:bg-gray-50/80'
                       }`}
                     >
                       <td className="p-3 text-center">
@@ -895,23 +1178,192 @@ export default function AdminPropertiesPage() {
                             <span>รหัส: <strong className="font-bold">{formatPropertyCode(prop.id)}</strong></span>
                             {copiedCodeId === prop.id && <Check className="w-2.5 h-2.5 text-emerald-600" />}
                           </button>
+                          {prop.facing_direction && (
+                            <span className="text-[10px] text-amber-800 bg-amber-50 px-1.5 py-0.2 rounded border border-amber-200">
+                              ☯ {prop.facing_direction}
+                            </span>
+                          )}
+                          {prop.internal_notes && (
+                            <span 
+                              className="text-[10px] font-bold text-amber-950 bg-amber-100/90 border border-amber-300 px-1.5 py-0.2 rounded-md truncate max-w-[180px]"
+                              title={`บันทึกภายใน: ${prop.internal_notes}`}
+                            >
+                              🔒 บันทึกลับ: {prop.internal_notes}
+                            </span>
+                          )}
                         </div>
                       </td>
                       <td className="p-3.5 text-gray-700 font-medium">
                         {getPropertyTypeName(prop.property_type)}
                       </td>
-                      <td className="p-3.5 font-bold text-navy-950">
-                        {formatPrice(prop.price, prop.status)}
+                      <td className="p-3.5">
+                        {editingPriceId === prop.id ? (
+                          <div className="relative z-20 flex flex-col gap-1.5 p-2 bg-amber-50/95 border border-gold-400 rounded-xl shadow-lg min-w-[190px]">
+                            <div className="flex items-center justify-between text-[11px] font-bold text-navy-950">
+                              <span className="flex items-center gap-1">
+                                <Tag className="w-3 h-3 text-gold-600" />
+                                <span>แก้ไขราคา</span>
+                              </span>
+                              <span className="text-[9px] text-gray-500 font-normal">Enter: บันทึก</span>
+                            </div>
+
+                            <div className="relative flex items-center">
+                              <span className="absolute left-2.5 text-gray-500 font-bold text-xs">฿</span>
+                              <input
+                                type="text"
+                                autoFocus
+                                value={inlinePriceInput}
+                                onChange={(e) => setInlinePriceInput(e.target.value)}
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter') handleSaveInlinePrice(prop.id);
+                                  if (e.key === 'Escape') handleCancelEditPrice();
+                                }}
+                                disabled={inlineUpdatingId === prop.id}
+                                className="w-full pl-6 pr-2 py-1 text-xs font-bold text-navy-950 bg-white border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-gold-500 shadow-inner"
+                                placeholder="ระบุราคา..."
+                              />
+                            </div>
+
+                            {/* Quick adjustment pills */}
+                            <div className="flex items-center gap-1">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const cur = parseFloat(inlinePriceInput.replace(/,/g, '') || '0') || 0;
+                                  setInlinePriceInput(String(Math.max(0, cur - 100000)));
+                                }}
+                                className="px-1.5 py-0.5 text-[10px] bg-white hover:bg-gray-100 text-gray-700 rounded border border-gray-200 cursor-pointer"
+                              >
+                                -100k
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const cur = parseFloat(inlinePriceInput.replace(/,/g, '') || '0') || 0;
+                                  setInlinePriceInput(String(cur + 100000));
+                                }}
+                                className="px-1.5 py-0.5 text-[10px] bg-white hover:bg-gray-100 text-gray-700 rounded border border-gray-200 cursor-pointer"
+                              >
+                                +100k
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const cur = parseFloat(inlinePriceInput.replace(/,/g, '') || '0') || 0;
+                                  setInlinePriceInput(String(cur + 500000));
+                                }}
+                                className="px-1.5 py-0.5 text-[10px] bg-white hover:bg-gray-100 text-gray-700 rounded border border-gray-200 cursor-pointer"
+                              >
+                                +500k
+                              </button>
+                            </div>
+
+                            <div className="flex items-center gap-1.5 pt-1 border-t border-gold-200">
+                              <button
+                                type="button"
+                                onClick={() => handleSaveInlinePrice(prop.id)}
+                                disabled={inlineUpdatingId === prop.id}
+                                className="flex-1 py-1 px-2 bg-navy-950 hover:bg-navy-900 text-gold-400 font-bold text-[11px] rounded-lg shadow-xs flex items-center justify-center gap-1 cursor-pointer disabled:opacity-50"
+                              >
+                                {inlineUpdatingId === prop.id ? (
+                                  <Loader2 className="w-3 h-3 animate-spin" />
+                                ) : (
+                                  <Check className="w-3 h-3 text-gold-400" />
+                                )}
+                                <span>บันทึก</span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={handleCancelEditPrice}
+                                disabled={inlineUpdatingId === prop.id}
+                                className="py-1 px-2 bg-white hover:bg-gray-100 text-gray-600 font-semibold text-[11px] rounded-lg border border-gray-200 flex items-center justify-center gap-0.5 cursor-pointer"
+                              >
+                                <X className="w-3 h-3" />
+                                <span>ยกเลิก</span>
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="group/price relative flex items-center gap-1.5">
+                            <span className="font-bold text-navy-950 text-xs">
+                              {formatPrice(prop.price, prop.status)}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => handleStartEditPrice(prop)}
+                              title="คลิกเพื่อแก้ไขราคาโดยตรง (Inline Edit)"
+                              className="opacity-0 group-hover/price:opacity-100 transition-opacity p-1 text-gray-400 hover:text-navy-950 hover:bg-gold-100 rounded-md border border-transparent hover:border-gold-300 cursor-pointer"
+                            >
+                              <Edit3 className="w-3 h-3 text-gold-600" />
+                            </button>
+                          </div>
+                        )}
                       </td>
                       <td className="p-3.5 text-gray-600">
                         {prop.district}, {prop.province}
                       </td>
                       <td className="p-3.5">
-                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                          prop.status === 'rent' ? 'bg-emerald-100 text-emerald-800' : 'bg-gold-100 text-gold-900'
-                        }`}>
-                          {prop.status === 'rent' ? 'เช่า' : 'ขาย'}
-                        </span>
+                        <div className="relative inline-status-dropdown-container">
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setActiveStatusDropdownId(activeStatusDropdownId === prop.id ? null : prop.id);
+                            }}
+                            disabled={inlineUpdatingId === prop.id}
+                            title="คลิกเพื่อเปลี่ยนสถานะ ขาย/เช่า ทันที"
+                            className={`px-2.5 py-1 rounded-full text-[10px] font-extrabold flex items-center gap-1 transition-all shadow-2xs cursor-pointer border ${
+                              prop.status === 'rent'
+                                ? 'bg-emerald-50 text-emerald-700 border-emerald-300 hover:bg-emerald-100 hover:border-emerald-400'
+                                : 'bg-gold-50 text-navy-950 border-gold-300 hover:bg-gold-100 hover:border-gold-400'
+                            }`}
+                          >
+                            {inlineUpdatingId === prop.id ? (
+                              <Loader2 className="w-3 h-3 animate-spin text-gray-600" />
+                            ) : (
+                              <span>{prop.status === 'rent' ? '🔑 เช่า' : '🏷️ ขาย'}</span>
+                            )}
+                            <ChevronDown className={`w-3 h-3 transition-transform ${activeStatusDropdownId === prop.id ? 'rotate-180' : ''}`} />
+                          </button>
+
+                          {activeStatusDropdownId === prop.id && (
+                            <div className="absolute top-full left-0 mt-1 z-30 w-32 bg-white rounded-xl shadow-xl border border-gray-200 py-1 overflow-hidden">
+                              <div className="px-2 py-1 text-[9px] font-bold text-gray-400 uppercase tracking-wider border-b border-gray-100">
+                                สลับสถานะ
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => handleInlineUpdateStatus(prop.id, 'sale')}
+                                className={`w-full px-2.5 py-1.5 text-left text-xs font-bold flex items-center justify-between cursor-pointer ${
+                                  prop.status === 'sale'
+                                    ? 'bg-gold-50 text-navy-950'
+                                    : 'text-gray-700 hover:bg-gray-50'
+                                }`}
+                              >
+                                <span className="flex items-center gap-1.5">
+                                  <span>🏷️</span>
+                                  <span>ขาย (Sale)</span>
+                                </span>
+                                {prop.status === 'sale' && <Check className="w-3 h-3 text-gold-600" />}
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleInlineUpdateStatus(prop.id, 'rent')}
+                                className={`w-full px-2.5 py-1.5 text-left text-xs font-bold flex items-center justify-between cursor-pointer ${
+                                  prop.status === 'rent'
+                                    ? 'bg-emerald-50 text-emerald-800'
+                                    : 'text-gray-700 hover:bg-gray-50'
+                                }`}
+                              >
+                                <span className="flex items-center gap-1.5">
+                                  <span>🔑</span>
+                                  <span>เช่า (Rent)</span>
+                                </span>
+                                {prop.status === 'rent' && <Check className="w-3 h-3 text-emerald-600" />}
+                              </button>
+                            </div>
+                          )}
+                        </div>
                       </td>
                       <td className="p-3.5">
                         <div className="space-y-0.5 min-w-[130px]">
@@ -983,6 +1435,24 @@ export default function AdminPropertiesPage() {
                           
                           <button
                             type="button"
+                            onClick={() => handleOpenLandsMapsOverlay(prop)}
+                            className="p-1.5 text-navy-800 hover:text-emerald-700 hover:bg-emerald-50 rounded-lg cursor-pointer border border-transparent hover:border-emerald-300 transition-colors"
+                            title="ตรวจสอบระวาง & โฉนดกรมที่ดิน (DOL LandsMaps Overlay)"
+                          >
+                            <Building2 className="w-4 h-4 text-emerald-600" />
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => handleOpenHistory(prop)}
+                            className="p-1.5 text-navy-800 hover:text-gold-700 hover:bg-gold-50 rounded-lg cursor-pointer border border-transparent hover:border-gold-300 transition-colors"
+                            title="ดูประวัติการแก้ไขและปรับราคา (Property History)"
+                          >
+                            <History className="w-4 h-4 text-gold-600" />
+                          </button>
+
+                          <button
+                            type="button"
                             disabled={busy}
                             onClick={() => handleDuplicate(prop)}
                             className="p-1.5 text-gray-500 hover:text-navy-950 hover:bg-gray-100 rounded-lg cursor-pointer"
@@ -990,6 +1460,14 @@ export default function AdminPropertiesPage() {
                           >
                             <CopyPlus className="w-4 h-4" />
                           </button>
+
+                          <Link
+                            href={`/admin/automation?propertyId=${encodeURIComponent(prop.id)}`}
+                            className="p-1.5 text-gold-600 hover:text-gold-700 hover:bg-gold-50 rounded-lg cursor-pointer"
+                            title="ระบบอัตโนมัติ AI (สร้างโพสต์/ร่างสัญญา/คำนวณ Yield)"
+                          >
+                            <Sparkles className="w-4 h-4 text-gold-600" />
+                          </Link>
 
                           <Link
                             href={propertyHref(prop.slug)}
@@ -1135,6 +1613,44 @@ export default function AdminPropertiesPage() {
                 ยืนยันลบทั้งหมด
               </button>
             </div>
+          </div>
+        </div>
+      )}
+      {/* Quick Add Modal */}
+      <QuickPropertyModal
+        isOpen={quickModalOpen}
+        onClose={() => setQuickModalOpen(false)}
+        onSuccess={(newProp) => {
+          setDuplicateSuccessMessage(`🎉 ลงทรัพย์ "${newProp.title}" เรียบร้อยแล้ว!`);
+          setTimeout(() => setDuplicateSuccessMessage(null), 5000);
+          loadData();
+        }}
+      />
+
+      {/* Property History & Audit Trail Modal */}
+      <PropertyHistoryModal
+        isOpen={isHistoryModalOpen}
+        onClose={() => setIsHistoryModalOpen(false)}
+        property={historyModalProperty}
+        onRefreshProperty={loadData}
+      />
+
+      {/* DOL LandsMaps Integration Overlay Modal */}
+      <AdminLandsMapsOverlayModal
+        isOpen={isLandsMapsModalOpen}
+        onClose={() => setIsLandsMapsModalOpen(false)}
+        property={landsMapsModalProperty}
+        onPropertyUpdated={loadData}
+      />
+
+      {/* Inline Update Success Toast Notification */}
+      {inlineSuccessToast && (
+        <div className="fixed bottom-6 right-6 z-50 bg-navy-950 text-gold-300 px-4 py-3 rounded-2xl shadow-2xl border border-gold-500/40 flex items-center space-x-2.5 animate-in slide-in-from-bottom-3 duration-200">
+          <div className="w-6 h-6 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center flex-shrink-0">
+            <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+          </div>
+          <div className="text-xs font-bold text-white">
+            {inlineSuccessToast.message}
           </div>
         </div>
       )}

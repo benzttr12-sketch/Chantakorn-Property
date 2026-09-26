@@ -5,7 +5,7 @@ import { SAMPLE_PROPERTIES } from '@/data/sample-properties';
 import { formatPropertyCode } from '@/lib/format-code';
 import { supabase } from '@/lib/supabase/client';
 import { db } from '@/lib/firebase/client';
-import { dataBackend, isDemoAuthEnabled, isDemoMode } from '@/lib/backend';
+import { dataBackend } from '@/lib/backend';
 import { 
   collection, 
   getDocs, 
@@ -17,6 +17,8 @@ import {
   Firestore
 } from 'firebase/firestore';
 import { getAgents, syncAgentsFromUsers } from '@/lib/store/agents-store';
+import { logPropertyChanges, recordPropertyHistory } from '@/lib/store/property-history-store';
+import { logSystemActivity } from '@/lib/store/activity-store';
 
 const STORAGE_KEY_PROPERTIES = 'chantakorn_properties';
 const STORAGE_KEY_FAVORITES = 'chantakorn_favorites';
@@ -76,14 +78,6 @@ function requireConnection() {
   }
 }
 
-function requireDemo() {
-  if (!isDemoMode) throw new Error('ข้อมูลนี้ต้องจัดการผ่านฐานข้อมูลที่เชื่อมต่ออยู่');
-}
-
-function requireDemoAuth() {
-  if (!isDemoAuthEnabled) throw new Error('เปิดใช้การจัดการบัญชีทดลองเฉพาะในโหมด demo auth เท่านั้น');
-}
-
 function requireStaffBackend() {
   requireConnection();
 }
@@ -93,7 +87,6 @@ export function getLocalProperties(): Property[] {
 }
 
 export function saveLocalProperties(properties: Property[]) {
-  requireDemo();
   writeArray(STORAGE_KEY_PROPERTIES, properties);
 }
 
@@ -271,7 +264,15 @@ export async function createProperty(property: Omit<Property, 'id' | 'created_at
     const { images, agent, ...row } = property;
     const { data, error } = await supabase.rpc('save_property', { p_property: row, p_images: images });
     if (error) throw error;
-    return { ...(data as Property), images, agent };
+    const created = { ...(data as Property), images, agent };
+    recordPropertyHistory({
+      property_id: created.id,
+      property_title: created.title,
+      change_type: 'created',
+      new_value: created.price,
+      diff_summary: `สร้างประกาศทรัพย์ใหม่ "${created.title}" ในระบบ`,
+    }).catch(() => undefined);
+    return created;
   }
   const firestore: Firestore | null = db;
   if (dataBackend === 'firebase' && firestore) {
@@ -282,12 +283,35 @@ export async function createProperty(property: Omit<Property, 'id' | 'created_at
       created_at: new Date().toISOString()
     };
     await setDoc(doc(firestore, 'properties', newId), JSON.parse(JSON.stringify(newProperty)));
+    recordPropertyHistory({
+      property_id: newProperty.id,
+      property_title: newProperty.title,
+      change_type: 'created',
+      new_value: newProperty.price,
+      diff_summary: `สร้างประกาศทรัพย์ใหม่ "${newProperty.title}" ในระบบ Cloud Firestore`,
+    }).catch(() => undefined);
+    logSystemActivity({
+      category: 'property',
+      action: 'property_created',
+      title: 'เพิ่มทรัพย์ใหม่ในระบบ',
+      description: `เพิ่มอสังหาริมทรัพย์ใหม่ "${newProperty.title}" มูลค่า ฿${newProperty.price?.toLocaleString() || 0}`,
+      target_id: newProperty.id,
+      target_name: newProperty.title,
+      actor_name: 'ผู้ดูแลระบบ',
+    }).catch(() => undefined);
     return newProperty;
   }
   const properties = getLocalProperties();
   if (properties.some(item => item.slug === property.slug)) throw new Error('ที่อยู่ประกาศ (Slug) นี้มีอยู่แล้ว กรุณาใช้ชื่ออื่น');
   const newProperty: Property = { ...property, id: generateShortPropertyId(), created_at: new Date().toISOString() };
   saveLocalProperties([newProperty, ...properties]);
+  recordPropertyHistory({
+    property_id: newProperty.id,
+    property_title: newProperty.title,
+    change_type: 'created',
+    new_value: newProperty.price,
+    diff_summary: `สร้างประกาศทรัพย์ใหม่ "${newProperty.title}" ในระบบ`,
+  }).catch(() => undefined);
   return newProperty;
 }
 
@@ -301,7 +325,9 @@ export async function updateProperty(id: string, updates: Partial<Property>): Pr
     const { data, error: readError } = await supabase.from('properties').select(PROPERTY_SELECT).eq('id', id).maybeSingle();
     if (readError) throw readError;
     if (!data) throw new Error('ไม่พบประกาศหรือไม่มีสิทธิ์แก้ไข');
-    return rowToProperty(data as PropertyRow);
+    const result = rowToProperty(data as PropertyRow);
+    logPropertyChanges(result, updates).catch(() => undefined);
+    return result;
   }
   const firestore: Firestore | null = db;
   if (dataBackend === 'firebase' && firestore) {
@@ -314,6 +340,7 @@ export async function updateProperty(id: string, updates: Partial<Property>): Pr
       ...(agent ? { agent } : {})
     };
     await setDoc(doc(firestore, 'properties', id), JSON.parse(JSON.stringify(updated)), { merge: true });
+    logPropertyChanges(current, updates).catch(() => undefined);
     return updated;
   }
   const properties = getLocalProperties();
@@ -322,9 +349,11 @@ export async function updateProperty(id: string, updates: Partial<Property>): Pr
   if (fields.slug && properties.some(property => property.id !== id && property.slug === fields.slug)) {
     throw new Error('ที่อยู่ประกาศ (Slug) นี้มีอยู่แล้ว กรุณาใช้ชื่ออื่น');
   }
-  const updated = { ...properties[index], ...changes, ...(images ? { images } : {}), ...(agent ? { agent } : {}) };
+  const current = properties[index];
+  const updated = { ...current, ...changes, ...(images ? { images } : {}), ...(agent ? { agent } : {}) };
   properties[index] = updated;
   saveLocalProperties(properties);
+  logPropertyChanges(current, updates).catch(() => undefined);
   return updated;
 }
 
@@ -449,9 +478,6 @@ export function toggleFavoriteId(propertyId: string): boolean {
 
 export async function submitInquiry(inquiry: Omit<Inquiry, 'id' | 'created_at'>): Promise<Inquiry> {
   requireConnection();
-  if (isDemoMode) {
-    throw new Error('เว็บไซต์ตัวอย่างยังไม่เชื่อมต่อระบบรับข้อความ กรุณาติดต่อทีมงานทางโทรศัพท์หรือ LINE');
-  }
   if (!inquiry.name.trim() || !inquiry.phone.trim() || !inquiry.message.trim()) {
     throw new Error('กรุณากรอกชื่อ เบอร์โทรศัพท์ และข้อความให้ครบถ้วน');
   }
@@ -525,7 +551,6 @@ export function getLocalUsers(): UserProfile[] {
 }
 
 export function saveLocalUsers(users: UserProfile[]) {
-  requireDemo();
   writeArray(STORAGE_KEY_USERS, users);
 }
 
@@ -599,14 +624,12 @@ export async function addUser(user: UserProfile): Promise<UserProfile[]> {
     syncAgentsFromUsers(all);
     return all;
   }
-  requireDemoAuth();
   const updated = addLocalUser(user);
   syncAgentsFromUsers(updated);
   return updated;
 }
 
 export function addLocalUser(user: UserProfile): UserProfile[] {
-  requireDemo();
   const users = getLocalUsers();
   if (user.email && users.some(item => item.email?.toLowerCase() === user.email!.toLowerCase())) {
     throw new Error('อีเมลนี้มีอยู่แล้ว');
@@ -650,14 +673,12 @@ export async function deleteUser(userId: string): Promise<UserProfile[]> {
     syncAgentsFromUsers(all);
     return all;
   }
-  requireDemoAuth();
   const updated = deleteLocalUser(userId);
   syncAgentsFromUsers(updated);
   return updated;
 }
 
 export function deleteLocalUser(userId: string): UserProfile[] {
-  requireDemo();
   const updated = getLocalUsers().filter(user => user.id !== userId);
   saveLocalUsers(updated);
   syncAgentsFromUsers(updated);

@@ -43,7 +43,10 @@ import {
   Gauge,
   Sliders,
   CheckCheck,
-  Trash2
+  Trash2,
+  ChevronDown,
+  ChevronUp,
+  RotateCcw
 } from 'lucide-react';
 import { 
   createProperty, 
@@ -52,7 +55,7 @@ import {
   fetchUsers 
 } from '@/lib/store/properties-store';
 import { getAgents } from '@/lib/store/agents-store';
-import { PropertyType, PropertyStatus, UserProfile, Agent, AgentRank } from '@/lib/types';
+import { PropertyType, PropertyStatus, UserProfile, Agent, AgentRank, FacingDirection } from '@/lib/types';
 import { 
   slugify, 
   formatPrice, 
@@ -78,6 +81,10 @@ import {
   MAX_UPLOAD_VIDEO_SIZE_BYTES
 } from '@/lib/image-compressor';
 import { calculateNearbyLandmarks } from '@/lib/nearby-landmarks';
+import { calculateFengShui, formatFengShuiText, ALL_FACING_DIRECTIONS, FENG_SHUI_DIRECTIONS } from '@/lib/feng-shui';
+import { parseRawPropertyText, generateProfessionalDescription } from '@/lib/property-text-parser';
+import SmartDescriptionGeneratorModal, { PropertySpecsForAI } from '@/components/admin/SmartDescriptionGeneratorModal';
+import VoiceDictationBar from '@/components/ui/VoiceDictationBar';
 
 // ตัวอย่างรูปภาพคุณภาพสูง สำหรับปุ่ม "ใส่รูปภาพตัวอย่างทันที 1 คลิก"
 const SAMPLE_HOUSE_PHOTOS = [
@@ -128,6 +135,7 @@ function PropertyEditor() {
   const [yearBuilt, setYearBuilt] = useState('');
   const [furniture, setFurniture] = useState('');
   const [description, setDescription] = useState('');
+  const [internalNotes, setInternalNotes] = useState('');
   const [coverImage, setCoverImage] = useState('');
   const [images, setImages] = useState<string[]>([]);
   const [videoUrl, setVideoUrl] = useState('');
@@ -161,6 +169,25 @@ function PropertyEditor() {
     setDescription(prev => (prev ? `${prev.trim()}${landmarkText}` : landmarkText.trim()));
   };
 
+  // Facing Direction & Automated Feng Shui Engine
+  const [facingDirection, setFacingDirection] = useState<FacingDirection | 'auto'>('auto');
+
+  const autoFengShui = calculateFengShui(
+    facingDirection === 'auto' ? undefined : facingDirection,
+    {
+      lat: Number(latitude),
+      lng: Number(longitude),
+      propertyId: editId || '',
+      propertyType
+    }
+  );
+
+  const handleAppendFengShuiToDescription = () => {
+    if (!autoFengShui) return;
+    const fengShuiText = `\n\n` + formatFengShuiText(autoFengShui);
+    setDescription(prev => (prev ? `${prev.trim()}${fengShuiText}` : fengShuiText.trim()));
+  };
+
   // Staff (Agent & Admin) List & Specific Contact Channels
   const [eligibleStaff, setEligibleStaff] = useState<UserProfile[]>([]);
   const [selectedAgentId, setSelectedAgentId] = useState<string>('');
@@ -173,12 +200,195 @@ function PropertyEditor() {
   const [uploadingImages, setUploadingImages] = useState(false);
   const [isDragOver, setIsDragOver] = useState(false);
 
+  // AI Smart Description Generator State
+  const [showAiDescModal, setShowAiDescModal] = useState(false);
+  const [quickAiGenerating, setQuickAiGenerating] = useState(false);
+  const [aiGenSuccessToast, setAiGenSuccessToast] = useState<string | null>(null);
+
+  const getPropertySpecsForAI = (): PropertySpecsForAI => {
+    const chosenAgent = eligibleStaff.find(s => s.id === selectedAgentId);
+    return {
+      title,
+      propertyType,
+      status,
+      price,
+      district,
+      subdistrict,
+      address,
+      bedrooms,
+      bathrooms,
+      parking,
+      landSize,
+      usableArea,
+      furniture,
+      facingDirection: facingDirection !== 'auto' ? facingDirection : undefined,
+      features: selectedFeatures,
+      landmarks: autoLandmarks?.map(l => `${l.title} (${l.combinedText})`) || [],
+      agentName: chosenAgent?.full_name || 'คุณฉันทากร (เบนซ์)',
+      agentPhone: agentPhone || chosenAgent?.phone || '081-604-0097',
+      agentLine: agentLine || chosenAgent?.line_id || '@chantakorn',
+      agentFacebook: agentFacebook || chosenAgent?.facebook || DEFAULT_OFFICIAL_FACEBOOK,
+    };
+  };
+
+  const handleQuickAiGenerate = async () => {
+    setQuickAiGenerating(true);
+    setAiGenSuccessToast(null);
+    try {
+      const specs = getPropertySpecsForAI();
+      const res = await fetch('/api/ai/generate-property-description', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...specs,
+          tone: 'high_converting',
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || 'ไม่สามารถสร้างคำบรรยายได้');
+      }
+      if (data.description) {
+        setDescription(data.description);
+        setAiGenSuccessToast('✨ AI ร่างคำบรรยายทรัพย์ระดับพรีเมียมเรียบร้อยแล้ว!');
+        setTimeout(() => setAiGenSuccessToast(null), 5000);
+      }
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'เกิดข้อผิดพลาดในการสร้างคำบรรยาย');
+    } finally {
+      setQuickAiGenerating(false);
+    }
+  };
+
   // Google Maps URL & Coordinates Auto-converter State
   const [mapsInput, setMapsInput] = useState('');
   const [mapsParsing, setMapsParsing] = useState(false);
   const [mapsMessage, setMapsMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [showMapPreview, setShowMapPreview] = useState(true);
   const [gpsLoading, setGpsLoading] = useState(false);
+
+  // Smart Auto-Fill from LINE/Facebook/Raw text state
+  const [smartText, setSmartText] = useState('');
+  const [smartMessage, setSmartMessage] = useState<{ type: 'success' | 'info'; text: string } | null>(null);
+  const [showSmartBox, setShowSmartBox] = useState(true);
+
+  // สกัดข้อมูลจากข้อความดิบอัตโนมัติ 1-Click
+  const handleApplySmartText = (customInput?: string) => {
+    const raw = (customInput !== undefined ? customInput : smartText).trim();
+    if (!raw) {
+      setSmartMessage({ type: 'info', text: 'กรุณาวางข้อความจาก LINE หรือโพสต์ Facebook ก่อนกดถอดรหัส' });
+      return;
+    }
+
+    const parsed = parseRawPropertyText(raw);
+    let filledCount = 0;
+
+    if (parsed.title) { setTitle(parsed.title); handleTitleChange(parsed.title); filledCount++; }
+    if (parsed.propertyType) { setPropertyType(parsed.propertyType); filledCount++; }
+    if (parsed.status) { setStatus(parsed.status); filledCount++; }
+    if (parsed.price) { setPrice(String(parsed.price)); filledCount++; }
+    if (parsed.district) {
+      handleDistrictChange(parsed.district);
+      filledCount++;
+      if (parsed.subdistrict) {
+        setSubdistrict(parsed.subdistrict);
+        const coords = getSongkhlaCoordinates(parsed.district, parsed.subdistrict);
+        setLatitude(coords.lat.toFixed(6));
+        setLongitude(coords.lng.toFixed(6));
+      }
+    }
+    if (parsed.bedrooms !== undefined) { setBedrooms(String(parsed.bedrooms)); filledCount++; }
+    if (parsed.bathrooms !== undefined) { setBathrooms(String(parsed.bathrooms)); filledCount++; }
+    if (parsed.parking !== undefined) { setParking(String(parsed.parking)); filledCount++; }
+    if (parsed.landSize !== undefined) { setLandSize(String(parsed.landSize)); filledCount++; }
+    if (parsed.usableArea !== undefined) { setUsableArea(String(parsed.usableArea)); filledCount++; }
+    if (parsed.facingDirection) { setFacingDirection(parsed.facingDirection); filledCount++; }
+    if (parsed.features && parsed.features.length > 0) {
+      setSelectedFeatures(prev => Array.from(new Set([...prev, ...parsed.features!])));
+      filledCount++;
+    }
+
+    // Auto-fill sample photos if no images uploaded yet
+    if (images.length === 0) {
+      if (parsed.propertyType === 'condo') {
+        setImages(SAMPLE_CONDO_PHOTOS);
+        setCoverImage(SAMPLE_CONDO_PHOTOS[0]);
+      } else if (parsed.propertyType === 'land') {
+        setImages(SAMPLE_LAND_PHOTOS);
+        setCoverImage(SAMPLE_LAND_PHOTOS[0]);
+      } else {
+        setImages(SAMPLE_HOUSE_PHOTOS);
+        setCoverImage(SAMPLE_HOUSE_PHOTOS[0]);
+      }
+    }
+
+    // Polished Description Generation
+    const polished = generateProfessionalDescription({
+      title: parsed.title || title,
+      propertyType: parsed.propertyType || propertyType,
+      status: parsed.status || status,
+      price: parsed.price || price,
+      district: parsed.district || district,
+      subdistrict: parsed.subdistrict || subdistrict,
+      bedrooms: parsed.bedrooms !== undefined ? parsed.bedrooms : bedrooms,
+      bathrooms: parsed.bathrooms !== undefined ? parsed.bathrooms : bathrooms,
+      parking: parsed.parking !== undefined ? parsed.parking : parking,
+      landSize: parsed.landSize !== undefined ? parsed.landSize : landSize,
+      usableArea: parsed.usableArea !== undefined ? parsed.usableArea : usableArea,
+      furniture: furniture || 'พร้อมอยู่',
+      facingDirection: parsed.facingDirection || (facingDirection !== 'auto' ? facingDirection : undefined),
+      features: parsed.features && parsed.features.length > 0 ? parsed.features : selectedFeatures,
+      rawNotes: raw
+    });
+    setDescription(polished);
+
+    setSmartMessage({
+      type: 'success',
+      text: `✨ ถอดรหัสสำเร็จ! ระบบสกัดข้อมูลสำคัญ ${filledCount} รายการ และแต่งบทความประกาศพร้อมรูปตัวอย่างให้เรียบร้อยแล้ว`
+    });
+  };
+
+  // สร้างชื่อประกาศอัตโนมัติ 1-Click
+  const handleGenerateSmartTitle = () => {
+    const typeNames: Record<PropertyType, string> = {
+      house: 'บ้านเดี่ยว',
+      condo: 'คอนโด',
+      land: 'ที่ดินเปล่า',
+      commercial: 'อาคารพาณิชย์',
+      investment: 'เพื่อการลงทุน',
+      consignment: 'ขายฝาก-จำนอง'
+    };
+    const action = status === 'rent' ? 'ให้เช่า' : 'ขาย';
+    const typeLabel = typeNames[propertyType] || 'บ้าน';
+    const loc = subdistrict ? `ทำเล ${subdistrict} ${district}` : `ทำเล ${district}`;
+    const spec = Number(bedrooms) > 0 ? `${bedrooms} ห้องนอน` : (Number(landSize) > 0 ? `${landSize} ตร.ว.` : '');
+    const priceText = Number(price) > 0 ? `ราคา ${formatPrice(Number(price), status)}` : '';
+    const generated = `${action}${typeLabel} ${loc} ${spec} ${priceText} จ.สงขลา`.replace(/\s+/g, ' ').trim();
+    setTitle(generated);
+    handleTitleChange(generated);
+  };
+
+  // จัดรูปแบบคำอธิบายมืออาชีพ 1-Click
+  const handleFormatSmartDescription = () => {
+    const formatted = generateProfessionalDescription({
+      title,
+      propertyType,
+      status,
+      price,
+      district,
+      subdistrict,
+      bedrooms,
+      bathrooms,
+      parking,
+      landSize,
+      usableArea,
+      furniture,
+      facingDirection: facingDirection !== 'auto' ? facingDirection : undefined,
+      features: selectedFeatures,
+      rawNotes: description
+    });
+    setDescription(formatted);
+  };
 
   // แปลงพิกัดจากข้อความ/ลิงก์ Google Maps โดยอัตโนมัติ
   const handleConvertMapsInput = async (inputOverride?: string) => {
@@ -402,11 +612,17 @@ function PropertyEditor() {
       setYearBuilt(String(property.year_built ?? '2024'));
       setFurniture(property.furniture || 'พร้อมอยู่บางส่วน');
       setDescription(property.description || '');
+      setInternalNotes(property.internal_notes || '');
       setCoverImage(property.cover_image || property.images[0] || '');
       setImages(property.images || []);
       setVideoUrl(property.video_url || '');
       setSelectedFeatures(property.features || []);
       setFeatured(property.featured || false);
+      if (property.facing_direction) {
+        setFacingDirection(property.facing_direction as FacingDirection);
+      } else {
+        setFacingDirection('auto');
+      }
       setSelectedAgentId(property.agent_id || property.agent?.id || '');
       setAgentPhone(property.agent?.phone || '081-604-0097');
       setAgentLine(property.agent?.line_id || '@chantakorn');
@@ -777,6 +993,8 @@ function PropertyEditor() {
         address: address || `${subdistrict ? `ต.${subdistrict} ` : ''}อ.${district} จ.${province}`,
         latitude: Number(latitude),
         longitude: Number(longitude),
+        facing_direction: (facingDirection === 'auto' ? autoFengShui.direction : facingDirection),
+        feng_shui: autoFengShui,
         bedrooms: Number(bedrooms) || 0,
         bathrooms: Number(bathrooms) || 0,
         parking: Number(parking) || 0,
@@ -790,6 +1008,7 @@ function PropertyEditor() {
         video_url: videoUrl.trim() || undefined,
         featured,
         published,
+        internal_notes: internalNotes.trim() || undefined,
         agent_id: resolvedAgent.id,
         agent: resolvedAgent,
       };
@@ -950,6 +1169,116 @@ function PropertyEditor() {
           </button>
         </div>
       </div>
+
+      {/* Smart Auto-Fill from LINE/Facebook/Raw text */}
+      {!editId && (
+        <div className="bg-white rounded-2xl p-5 border border-gold-300 shadow-sm space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-2.5">
+              <div className="w-8 h-8 rounded-lg bg-gold-100 text-gold-800 flex items-center justify-center font-bold text-sm">
+                ⚡
+              </div>
+              <div>
+                <h3 className="text-sm font-extrabold text-navy-950 flex items-center space-x-1.5">
+                  <span>ตัวช่วยลงทรัพย์ด่วน: สกัดข้อมูลจากข้อความ LINE / Facebook อัตโนมัติ</span>
+                  <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                    แนะนำ
+                  </span>
+                </h3>
+                <p className="text-[11px] text-gray-500">
+                  วางข้อความโพสต์ขายหรือโน้ตย่อ ระบบจะช่วยกรอกราคา, ทำเล, ขนาดที่ดิน, ห้องนอน, ทิศ และแต่งรายละเอียดให้ทันที 1-Click
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setShowSmartBox(!showSmartBox)}
+              className="text-gray-400 hover:text-navy-950 p-1 rounded-lg"
+            >
+              {showSmartBox ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+            </button>
+          </div>
+
+          {showSmartBox && (
+            <div className="space-y-2.5 pt-1">
+              <textarea
+                rows={3}
+                value={smartText}
+                onChange={(e) => setSmartText(e.target.value)}
+                placeholder="วางข้อความที่นี่ เช่น: ขายบ้านเดี่ยว 2 ชั้น ควนลัง หาดใหญ่ 3 ห้องนอน 2 ห้องน้ำ ที่จอดรถ 2 คัน 54 ตรว. 165 ตรม. ราคา 3.89 ล้าน ใกล้สนามบินหาดใหญ่ แอร์ 3 ตัว ทิศใต้..."
+                className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3 text-xs text-navy-950 outline-none focus:bg-white focus:ring-2 focus:ring-gold-500 leading-relaxed font-mono"
+              />
+
+              {smartMessage && (
+                <div className={`p-2.5 rounded-xl text-xs flex items-center space-x-2 ${
+                  smartMessage.type === 'success' 
+                    ? 'bg-emerald-50 text-emerald-800 border border-emerald-200' 
+                    : 'bg-blue-50 text-blue-800 border border-blue-200'
+                }`}>
+                  <Sparkles className="w-4 h-4 flex-shrink-0" />
+                  <span>{smartMessage.text}</span>
+                </div>
+              )}
+
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="flex items-center space-x-2">
+                  <button
+                    type="button"
+                    onClick={() => handleApplySmartText()}
+                    className="px-4 py-2 bg-navy-950 hover:bg-navy-900 text-gold-400 font-bold text-xs rounded-xl shadow-sm flex items-center space-x-1.5 transition-all cursor-pointer"
+                  >
+                    <Wand2 className="w-3.5 h-3.5 text-gold-400" />
+                    <span>🪄 ถอดรหัส & กรอกข้อมูลลงฟอร์มอัตโนมัติ</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      try {
+                        if (navigator.clipboard) {
+                          const clip = await navigator.clipboard.readText();
+                          if (clip) {
+                            setSmartText(clip);
+                            handleApplySmartText(clip);
+                          }
+                        }
+                      } catch {
+                        // clipboard permission denied or not available
+                      }
+                    }}
+                    className="px-3 py-2 bg-gold-500 hover:bg-gold-400 text-navy-950 text-xs font-bold rounded-xl transition-all cursor-pointer flex items-center space-x-1"
+                    title="วางข้อความที่คัดลอกไว้จากคลิปบอร์ดแล้วถอดรหัสทันที"
+                  >
+                    <span>📋 วางจากคลิปบอร์ด & ถอดรหัส</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const sample = 'ขายบ้านเดี่ยว 2 ชั้น ดีไซน์โมเดิร์น ทำเลควนลัง หาดใหญ่ 3 ห้องนอน 2 ห้องน้ำ ที่จอดรถ 2 คัน ที่ดิน 54 ตรว. พื้นที่ใช้สอย 165 ตรม. ราคา 3.89 ล้านบาท ใกล้สนามบินหาดใหญ่ แอร์ 3 ตัว ทิศใต้ พร้อมเฟอร์นิเจอร์บางส่วน';
+                      setSmartText(sample);
+                      handleApplySmartText(sample);
+                    }}
+                    className="px-3 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-semibold rounded-xl transition-all cursor-pointer"
+                  >
+                    ลองใส่ตัวอย่างทดสอบ
+                  </button>
+                </div>
+
+                {smartText && (
+                  <button
+                    type="button"
+                    onClick={() => { setSmartText(''); setSmartMessage(null); }}
+                    className="text-xs text-gray-400 hover:text-red-500 transition-colors"
+                  >
+                    ล้างข้อความ
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* 1-Click Fast Templates (แม่แบบโพสต์ด่วน 1 คลิก ช่วยให้โพสต์งานง่ายกว่าเดิม) */}
       {!editId && (
@@ -1488,6 +1817,118 @@ function PropertyEditor() {
               </div>
             </div>
           )}
+
+          {/* Automated Feng Shui & Auspicious Direction Engine */}
+          <div className="mt-4 p-5 rounded-xl bg-gradient-to-br from-navy-950 via-navy-900 to-navy-950 text-white border border-gold-500/30 shadow-md relative overflow-hidden">
+            {/* Background subtle glow */}
+            <div className="absolute -right-8 -bottom-8 w-40 h-40 bg-gold-500/10 rounded-full blur-2xl pointer-events-none" />
+
+            <div className="relative z-10 space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-white/10">
+                <div className="flex items-center space-x-3">
+                  <div className="w-10 h-10 rounded-xl bg-gold-500/20 border border-gold-400/40 flex items-center justify-center text-gold-400 font-bold text-lg flex-shrink-0">
+                    ☯
+                  </div>
+                  <div>
+                    <div className="flex items-center space-x-2">
+                      <span className="text-[10px] font-bold uppercase tracking-widest text-gold-400 bg-gold-950/80 px-2 py-0.5 rounded-full border border-gold-500/30">
+                        ศาสตร์ฮวงจุ้ย & ทิศทรัพย์มงคล
+                      </span>
+                      <span className="text-[11px] text-emerald-400 font-semibold flex items-center">
+                        <Check className="w-3.5 h-3.5 mr-0.5" />
+                        คำนวณอัตโนมัติ
+                      </span>
+                    </div>
+                    <h4 className="text-base sm:text-lg font-extrabold text-white mt-0.5">
+                      ระบบวิเคราะห์ฮวงจุ้ยประจำทรัพย์ (Feng Shui Engine)
+                    </h4>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={handleAppendFengShuiToDescription}
+                  className="px-3.5 py-2 bg-gold-500 hover:bg-gold-400 text-navy-950 text-xs font-bold rounded-xl shadow-sm flex items-center space-x-1.5 transition-all cursor-pointer self-start sm:self-auto hover:shadow-gold-500/20"
+                >
+                  <Wand2 className="w-3.5 h-3.5" />
+                  <span>แทรกบทวิเคราะห์ฮวงจุ้ยลงในคำอธิบาย 1-Click</span>
+                </button>
+              </div>
+
+              {/* Direction Selector & Live Result */}
+              <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-center">
+                <div className="md:col-span-5 space-y-2">
+                  <label className="block text-xs font-semibold text-gray-300">
+                    กำหนดทิศหน้าทรัพย์ (Facing Direction)
+                  </label>
+                  <select
+                    value={facingDirection}
+                    onChange={(e) => setFacingDirection(e.target.value as FacingDirection | 'auto')}
+                    className="w-full bg-navy-800/90 border border-gold-500/40 rounded-xl p-3 text-xs font-semibold text-gold-300 outline-none focus:ring-2 focus:ring-gold-500"
+                  >
+                    <option value="auto">🌟 คำนวณอัตโนมัติจากพิกัดและทำเล (แนะนำ)</option>
+                    {ALL_FACING_DIRECTIONS.map((dir) => {
+                      const meta = FENG_SHUI_DIRECTIONS[dir];
+                      return (
+                        <option key={dir} value={dir}>
+                          {meta.shortName} — {meta.element} ({meta.degrees}°)
+                        </option>
+                      );
+                    })}
+                  </select>
+                  <p className="text-[11px] text-gray-400">
+                    {facingDirection === 'auto'
+                      ? `ระบบคำนวณทิศที่เหมาะสมที่สุดจากพิกัด: ${autoFengShui.direction} (${autoFengShui.element})`
+                      : `เลือกกำหนดทิศเอง: ${autoFengShui.direction} (${autoFengShui.degrees}°)`}
+                  </p>
+                </div>
+
+                {/* Score & Energy Preview Card */}
+                <div className="md:col-span-7 bg-white/5 border border-white/10 rounded-xl p-3.5 flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <div className="flex items-center space-x-2">
+                      <span className="text-xl sm:text-2xl font-black text-gold-400">
+                        {autoFengShui.direction}
+                      </span>
+                      <span className="text-xs px-2 py-0.5 rounded-md bg-gold-500/20 text-gold-300 font-semibold border border-gold-500/30">
+                        {autoFengShui.element}
+                      </span>
+                    </div>
+                    <p className="text-xs text-emerald-400 font-medium mt-1">
+                      {autoFengShui.grade}
+                    </p>
+                    <p className="text-[11px] text-gray-300 mt-0.5 line-clamp-1">
+                      {autoFengShui.meaning}
+                    </p>
+                  </div>
+
+                  <div className="text-right bg-white/10 px-3.5 py-2 rounded-xl border border-white/10 flex-shrink-0">
+                    <span className="text-[10px] text-gray-400 block uppercase">คะแนนมงคล</span>
+                    <span className="text-2xl font-black text-gold-400">{autoFengShui.score}</span>
+                    <span className="text-xs text-gray-300 font-normal">/100</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Energy Highlights Pills */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-1 text-xs">
+                <div className="bg-navy-800/60 p-2.5 rounded-lg border border-white/5">
+                  <span className="text-gold-400 font-bold block mb-0.5">🍃 พลังงานลม (ชี่ลม)</span>
+                  <span className="text-gray-300 text-[11px] leading-tight block">{autoFengShui.windEnergy}</span>
+                </div>
+                <div className="bg-navy-800/60 p-2.5 rounded-lg border border-white/5">
+                  <span className="text-gold-400 font-bold block mb-0.5">☀️ พลังสุริยัน & หยินหยาง</span>
+                  <span className="text-gray-300 text-[11px] leading-tight block">{autoFengShui.sunEnergy}</span>
+                </div>
+                <div className="bg-navy-800/60 p-2.5 rounded-lg border border-white/5">
+                  <span className="text-gold-400 font-bold block mb-0.5">🎨 สี & เลขมงคล</span>
+                  <span className="text-gray-300 text-[11px] leading-tight block">
+                    สี: {autoFengShui.luckyColors.slice(0, 2).join(', ')} | เลข: {autoFengShui.auspiciousNumbers}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
 
         {/* Section 3: Property Specs & Features */}
@@ -1599,18 +2040,102 @@ function PropertyEditor() {
             </div>
           </div>
 
-          {/* Description */}
-          <div>
-            <label className="block text-xs font-bold text-gray-700 mb-1">
-              คำอธิบายรายละเอียดทรัพย์
-            </label>
+          {/* Description with AI Assistant Toolbar */}
+          <div className="space-y-2 pt-2 border-t border-gray-100">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <label className="block text-xs font-bold text-gray-800">
+                  คำอธิบายรายละเอียดทรัพย์
+                </label>
+                <span className="text-[11px] text-gray-500">
+                  เขียนจุดเด่น ฟังก์ชัน สิ่งอำนวยความสะดวก หรือให้ AI ร่างให้อัตโนมัติจากสเปก
+                </span>
+              </div>
+
+              {/* AI Generator Action Buttons */}
+              <div className="flex items-center space-x-2">
+                <button
+                  type="button"
+                  onClick={handleQuickAiGenerate}
+                  disabled={quickAiGenerating}
+                  className="px-3 py-1.5 bg-gradient-to-r from-gold-400 via-gold-500 to-amber-500 hover:from-gold-300 hover:to-gold-400 text-navy-950 font-black text-xs rounded-xl shadow-xs flex items-center space-x-1.5 transition-all cursor-pointer active:scale-95 disabled:opacity-50"
+                  title="ใช้ AI วิเคราะห์สเปกปัจจุบันและร่างคำบรรยายให้อัตโนมัติทันที"
+                >
+                  {quickAiGenerating ? (
+                    <>
+                      <Loader2 className="w-3.5 h-3.5 animate-spin text-navy-950" />
+                      <span>AI กำลังเขียน...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="w-3.5 h-3.5 text-navy-950 stroke-[2.5]" />
+                      <span>✨ ให้ AI ร่างคำบรรยาย 1-Click</span>
+                    </>
+                  )}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setShowAiDescModal(true)}
+                  className="px-3 py-1.5 bg-navy-950 hover:bg-navy-900 text-gold-400 font-bold text-xs rounded-xl shadow-xs flex items-center space-x-1.5 transition-all cursor-pointer"
+                  title="ปรับแต่งโทนการเขียน (พรีเมียม / ปิดการขาย / โซเชียล / ลงทุน) หรือระบุจุดเน้นเพิ่มเติม"
+                >
+                  <Wand2 className="w-3.5 h-3.5 text-gold-400" />
+                  <span>ปรับแต่งสไตล์ AI</span>
+                </button>
+              </div>
+            </div>
+
+            {aiGenSuccessToast && (
+              <div className="p-2.5 bg-emerald-50 border border-emerald-300 text-emerald-800 text-xs rounded-xl flex items-center justify-between font-semibold animate-fadeIn">
+                <span className="flex items-center space-x-1.5">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                  <span>{aiGenSuccessToast}</span>
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setAiGenSuccessToast(null)}
+                  className="text-emerald-600 hover:text-emerald-900 p-0.5"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            )}
+
+            {/* Voice Dictation Bar for Hands-free Input */}
+            <VoiceDictationBar
+              onAppendText={(spokenText) => {
+                setDescription((prev) => {
+                  if (!prev.trim()) return spokenText;
+                  const endsWithNewline = prev.endsWith('\n');
+                  const sep = endsWithNewline ? '' : ' ';
+                  return prev + sep + spokenText;
+                });
+              }}
+              currentText={description}
+              targetFieldName="คำอธิบายทรัพย์"
+            />
+
             <textarea
-              rows={4}
-              placeholder="จุดเด่นของทรัพย์ เส้นทางการเดินทาง สถานที่สำคัญใกล้เคียง สิ่งอำนวยความสะดวกในโครงการ..."
+              rows={7}
+              placeholder="จุดเด่นของทรัพย์ เส้นทางการเดินทาง สถานที่สำคัญใกล้เคียง สิ่งอำนวยความสะดวกในโครงการ... หรือกดปุ่ม '🎙️ พิมพ์ด้วยเสียง' หรือ '✨ ให้ AI ร่างคำบรรยาย 1-Click' ด้านบน"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3.5 text-xs text-gray-900 focus:bg-white focus:ring-2 focus:ring-gold-500 outline-none leading-relaxed"
+              className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3.5 text-xs text-gray-900 focus:bg-white focus:ring-2 focus:ring-gold-500 outline-none leading-relaxed font-sans"
             />
+
+            <div className="flex items-center justify-between text-[11px] text-gray-500 pt-1">
+              <span>จำนวนตัวอักษร: <strong className="font-mono text-navy-950">{description.length}</strong> ตัวอักษร</span>
+              {description && (
+                <button
+                  type="button"
+                  onClick={() => setDescription('')}
+                  className="text-gray-400 hover:text-red-600 transition-colors"
+                >
+                  ล้างคำอธิบาย
+                </button>
+              )}
+            </div>
           </div>
 
           {/* Features Checkboxes */}
@@ -2273,6 +2798,37 @@ function PropertyEditor() {
           </div>
         </div>
 
+        {/* Section 7: Agent Internal Notes (บันทึกภายในเฉพาะนายหน้า & แอดมิน - ไม่แสดงต่อสาธารณะ) */}
+        <div id="section-7-internal-notes" className="bg-gradient-to-br from-amber-50/90 via-orange-50/40 to-amber-50/90 rounded-2xl p-6 border-2 border-amber-300/80 shadow-xs space-y-4 scroll-mt-28">
+          <div className="border-b border-amber-200 pb-3 flex flex-wrap items-center justify-between gap-2">
+            <h3 className="font-extrabold text-navy-950 text-base flex items-center space-x-2">
+              <ShieldAlert className="w-5 h-5 text-amber-700 flex-shrink-0" />
+              <span>7. บันทึกภายในสำหรับนายหน้า & แอดมิน (Agent Internal Notes - ซ่อนไม่แสดงหน้าบ้าน)</span>
+            </h3>
+            <span className="px-3 py-1 bg-amber-200 text-amber-950 border border-amber-400 rounded-full text-[11px] font-black flex items-center gap-1 shadow-2xs">
+              🔒 ข้อมูลความลับเฉพาะภายใน (Non-Public Agent Notes)
+            </span>
+          </div>
+
+          <p className="text-xs text-amber-900 leading-relaxed font-medium">
+            พื้นที่สำหรับบันทึกข้อมูลส่วนตัวของทรัพย์ เช่น ประวัติการต่อรองราคา, เบอร์ติดต่อเจ้าของบ้านจริง, เงื่อนไขพิเศษของเจ้าของ, ตำหนิภายในทรัพย์ หรือบันทึกนัดหมาย <strong>ข้อมูลนี้จะถูกเก็บเป็นความลับและแสดงให้เห็นเฉพาะนายหน้าและแอดมินในหลังบ้านเท่านั้น</strong>
+          </p>
+
+          <div>
+            <label className="block text-xs font-bold text-navy-950 mb-1.5 flex items-center space-x-1.5">
+              <FileText className="w-4 h-4 text-amber-700" />
+              <span>ข้อความบันทึกภายใน (Agent Internal Notes & Negotiation History)</span>
+            </label>
+            <textarea
+              rows={4}
+              value={internalNotes}
+              onChange={(e) => setInternalNotes(e.target.value)}
+              placeholder="เช่น เจ้าของยอมลดราคาได้สุด 3.5 ล้านบาท, สัญญาแต่งตั้งถึง ธ.ค. 2569, กุญแจบ้านอยู่ที่นายหน้าคุณเบนซ์, สภาพหลังคาต้องซ่อมแซมจุดรั่ว..."
+              className="w-full bg-white border border-amber-300 rounded-xl p-3.5 text-xs text-navy-950 font-medium focus:ring-2 focus:ring-amber-500 focus:border-transparent outline-none transition-all shadow-inner leading-relaxed"
+            />
+          </div>
+        </div>
+
         {/* Sticky Bottom Actions Bar */}
         <div className="sticky bottom-4 z-40 bg-navy-950/95 backdrop-blur-md rounded-2xl p-4 border border-navy-800 shadow-2xl flex items-center justify-between gap-3">
           <Link
@@ -2302,6 +2858,29 @@ function PropertyEditor() {
             </button>
           </div>
         </div>
+
+        {/* AI Smart Description Generator Modal */}
+        {showAiDescModal && (
+          <SmartDescriptionGeneratorModal
+            isOpen={showAiDescModal}
+            onClose={() => setShowAiDescModal(false)}
+            specs={getPropertySpecsForAI()}
+            currentDescription={description}
+            onApplyDescription={(text, mode) => {
+              if (mode === 'append') {
+                setDescription(prev => prev ? `${prev}\n\n${text}` : text);
+              } else {
+                setDescription(text);
+              }
+              setAiGenSuccessToast('✨ ติดตั้งคำบรรยายจาก AI เรียบร้อยแล้ว!');
+              setTimeout(() => setAiGenSuccessToast(null), 5000);
+            }}
+            onApplyTitle={(newTitle) => {
+              setTitle(newTitle);
+              handleTitleChange(newTitle);
+            }}
+          />
+        )}
       </form>
     </div>
   );

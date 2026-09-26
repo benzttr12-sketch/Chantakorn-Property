@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import { submitInquiry } from '@/lib/store/properties-store';
 import { DISTRICTS_LIST } from '@/data/locations';
+import AutoPinLandsMapsValuation from '@/components/landsmaps/AutoPinLandsMapsValuation';
 
 export default function SellPage() {
   const [name, setName] = useState('');

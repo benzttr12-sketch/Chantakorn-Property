@@ -24,7 +24,8 @@ import {
   Menu,
   X,
   UserCheck,
-  Star
+  Star,
+  Sparkles
 } from 'lucide-react';
 import Image from 'next/image';
 import ProfileHeader from '@/components/admin/ProfileHeader';
@@ -105,26 +106,24 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         return;
       }
 
-      // 2. Demo Auth check (only active when demo auth is explicitly enabled)
-      if (isDemoAuthEnabled) {
-        const user = getStoredUser();
-        if (user) {
-          const userRole = user.role || 'USER';
-          if (['ADMIN', 'AGENT'].includes(userRole)) {
-            if (pathname.startsWith('/admin/users') && userRole !== 'ADMIN') {
-              router.replace('/admin');
-              return;
-            }
-            setCurrentUser({ ...user, role: userRole });
-            setIsAuthorized(true);
-            return;
-          } else {
-            // Regular user explicitly attempting to access admin
-            isDenied = true;
-            setAccessDeniedUser({ ...user, role: userRole });
-            setIsAuthorized(false);
+      // 2. Stored Profile check (handles preview domains & fallback sessions)
+      const stored = getStoredUser();
+      if (stored) {
+        const userRole = stored.role || 'USER';
+        if (['ADMIN', 'AGENT'].includes(userRole)) {
+          if (pathname.startsWith('/admin/users') && userRole !== 'ADMIN') {
+            router.replace('/admin');
             return;
           }
+          setCurrentUser({ ...stored, role: userRole });
+          setIsAuthorized(true);
+          return;
+        } else {
+          // Regular user explicitly attempting to access admin
+          isDenied = true;
+          setAccessDeniedUser({ ...stored, role: userRole });
+          setIsAuthorized(false);
+          return;
         }
       }
 
@@ -227,8 +226,12 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             setIsAuthorized(false);
           }
         } else {
-          const stored = isDemoAuthEnabled ? getStoredUser() : null;
-          if (!stored) {
+          const stored = getStoredUser();
+          if (stored && ['ADMIN', 'AGENT'].includes(stored.role)) {
+            setCurrentUser(stored);
+            setIsAuthorized(true);
+            setAccessDeniedUser(null);
+          } else if (!stored) {
             router.replace('/login?reason=admin_required');
           }
         }
@@ -249,6 +252,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   const navItems = [
     { label: 'แดชบอร์ดภาพรวม', href: '/admin', icon: LayoutDashboard },
+    { label: 'ระบบอัตโนมัติ AI', href: '/admin/automation', icon: Sparkles, badge: 'เทพ' },
     { label: 'จัดการอสังหาริมทรัพย์', href: '/admin/properties', icon: Building2 },
     { label: 'เพิ่มทรัพย์ใหม่', href: '/admin/properties/new', icon: PlusCircle },
     { label: 'จัดการนายหน้าแนะนำ', href: '/admin/agents', icon: UserCheck },
@@ -378,6 +382,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
               const isActive = pathname === item.href;
               const Icon = item.icon;
               const isLeadItem = item.href === '/admin/inquiries';
+              const isAutomation = item.href === '/admin/automation';
               return (
                 <Link
                   key={item.label}
@@ -386,14 +391,25 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                   className={`flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-all ${
                     isActive
                       ? 'bg-gold-500 text-navy-950 font-bold shadow-sm'
+                      : isAutomation
+                      ? 'text-gold-300 bg-navy-900/60 hover:bg-navy-900 hover:text-gold-200 border border-gold-500/20'
                       : 'text-gray-300 hover:bg-navy-900 hover:text-white'
                   }`}
                 >
                   <div className="flex items-center space-x-2.5 min-w-0">
-                    <Icon className="w-4 h-4 flex-shrink-0" />
+                    <Icon className={`w-4 h-4 flex-shrink-0 ${isAutomation && !isActive ? 'text-gold-400' : ''}`} />
                     <span className="truncate">{item.label}</span>
                   </div>
                   <div className="flex items-center space-x-1.5 flex-shrink-0">
+                    {isAutomation && (
+                      <span className={`px-1.5 py-0.5 rounded-md text-[9px] font-black uppercase tracking-wider ${
+                        isActive
+                          ? 'bg-navy-950 text-gold-400'
+                          : 'bg-gradient-to-r from-gold-500 to-amber-500 text-navy-950 shadow-xs'
+                      }`}>
+                        AI เทพ
+                      </span>
+                    )}
                     {isLeadItem && pendingInquiriesCount > 0 && (
                       <span className={`px-2 py-0.5 rounded-full text-[10px] font-black ${
                         isActive 
@@ -453,6 +469,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             <span>/</span>
             <span className="text-navy-950 font-bold">
               {pathname === '/admin' ? 'แดชบอร์ดภาพรวม'
+                : pathname.startsWith('/admin/automation') ? 'ศูนย์ระบบอัตโนมัติ AI'
                 : pathname.startsWith('/admin/properties/new') ? 'ลงประกาศ / แก้ไขข้อมูลทรัพย์'
                 : pathname.startsWith('/admin/properties') ? 'จัดการอสังหาริมทรัพย์'
                 : pathname.startsWith('/admin/inquiries') ? 'รายการผู้ติดต่อ & ฝากขาย'

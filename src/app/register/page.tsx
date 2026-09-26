@@ -15,7 +15,7 @@ import {
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase/client';
 import { auth } from '@/lib/firebase/client';
-import { dataBackend, isDemoAuthEnabled } from '@/lib/backend';
+import { dataBackend } from '@/lib/backend';
 import { signInWithGoogle, registerWithEmail } from '@/lib/auth-helpers';
 
 export default function RegisterPage() {
@@ -91,26 +91,6 @@ export default function RegisterPage() {
         return;
       } catch (err: any) {
         setError(err.message || 'เกิดข้อผิดพลาดในการลงทะเบียน');
-        setLoading(false);
-        return;
-      }
-    }
-
-    if (isDemoAuthEnabled) {
-      try {
-        localStorage.setItem('chantakorn_auth_user', JSON.stringify({
-          id: `usr-${Date.now()}`,
-          full_name: fullName,
-          email,
-          phone,
-          role: 'USER',
-        }));
-        setRegistered(true);
-        setLoading(false);
-        setTimeout(() => router.push('/favorites'), 1500);
-        return;
-      } catch {
-        setError('ไม่สามารถลงทะเบียนได้');
         setLoading(false);
         return;
       }

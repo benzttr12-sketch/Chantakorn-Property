@@ -24,6 +24,35 @@ export interface Agent {
   user_id?: string;
 }
 
+export type FacingDirection =
+  | 'ทิศเหนือ'
+  | 'ทิศใต้'
+  | 'ทิศตะวันออก'
+  | 'ทิศตะวันตก'
+  | 'ทิศตะวันออกเฉียงเหนือ'
+  | 'ทิศตะวันออกเฉียงใต้'
+  | 'ทิศตะวันตกเฉียงเหนือ'
+  | 'ทิศตะวันตกเฉียงใต้';
+
+export interface FengShuiAnalysis {
+  direction: string;
+  degrees: number;
+  element: string;
+  elementColor: string;
+  score: number;
+  grade: string;
+  meaning: string;
+  summary: string;
+  highlights: string[];
+  windEnergy: string;
+  sunEnergy: string;
+  suitableFor: string[];
+  luckyColors: string[];
+  auspiciousDecorTips: string[];
+  auspiciousNumbers: string;
+  qiFlow: string;
+}
+
 export interface Property {
   id: string;
   title: string;
@@ -38,6 +67,8 @@ export interface Property {
   address?: string;
   latitude: number;
   longitude: number;
+  facing_direction?: FacingDirection | string;
+  feng_shui?: FengShuiAnalysis;
   bedrooms: number;
   bathrooms: number;
   parking: number;
@@ -52,6 +83,7 @@ export interface Property {
   videos?: string[];
   featured: boolean;
   published: boolean;
+  internal_notes?: string;
   agent_id?: string;
   agent?: Agent;
   created_at: string;
@@ -77,6 +109,7 @@ export interface PropertyCardProps {
   video_url?: string;
   slug: string;
   createdAt?: string;
+  facingDirection?: string;
 }
 
 export interface Inquiry {
@@ -131,4 +164,46 @@ export interface PropertyFilters {
   searchQuery?: string;
   hasVideo?: boolean;
   sortBy?: 'newest' | 'price_asc' | 'price_desc' | 'popular';
+}
+
+export type PropertyHistoryChangeType =
+  | 'price_change'
+  | 'status_change'
+  | 'agent_change'
+  | 'published_change'
+  | 'featured_change'
+  | 'info_update'
+  | 'created'
+  | 'manual_note';
+
+export interface PropertyHistoryLog {
+  id: string;
+  property_id: string;
+  property_title?: string;
+  change_type: PropertyHistoryChangeType;
+  previous_value?: string | number | boolean | null;
+  new_value?: string | number | boolean | null;
+  diff_summary: string;
+  actor_name: string;
+  actor_email?: string;
+  actor_role?: string;
+  timestamp: string;
+  notes?: string;
+}
+
+export type SystemActivityCategory = 'property' | 'inquiry' | 'user_role' | 'system';
+
+export interface SystemActivity {
+  id: string;
+  category: SystemActivityCategory;
+  action: string;
+  title: string;
+  description: string;
+  target_id?: string;
+  target_name?: string;
+  actor_name: string;
+  actor_email?: string;
+  actor_role?: string;
+  metadata?: Record<string, any>;
+  created_at: string;
 }

@@ -20,7 +20,7 @@ import {
   Sparkles
 } from 'lucide-react';
 import { UserProfile } from '@/lib/types';
-import { dataBackend, isDemoAuthEnabled } from '@/lib/backend';
+import { dataBackend } from '@/lib/backend';
 import { 
   fetchUsers,
   updateUserProfile, 
@@ -29,6 +29,7 @@ import {
   deleteUser 
 } from '@/lib/store/properties-store';
 import { updateAgent } from '@/lib/store/agents-store';
+import { logSystemActivity } from '@/lib/store/activity-store';
 import { ExtendedAgent } from '@/data/agents';
 
 export default function AdminUsersPage() {
@@ -83,7 +84,6 @@ export default function AdminUsersPage() {
     try {
       const updated = await updateUserProfile(editingUser.id, {
         full_name: editFullName.trim(),
-        ...(isDemoAuthEnabled ? { email: editEmail.trim() || undefined } : {}),
         phone: editPhone.trim() || undefined,
         line_id: editLineId.trim() || undefined,
         facebook: editFacebook.trim() || undefined,
@@ -124,10 +124,21 @@ export default function AdminUsersPage() {
   const handleRoleChange = async (userId: string, newRole: 'ADMIN' | 'AGENT' | 'USER') => {
     setError('');
     try {
-    const updated = await updateUserRole(userId, newRole);
-    setUsers(updated);
-    const targetUser = updated.find(u => u.id === userId);
-    triggerNotification(`อัปเดตสิทธิ์ของ "${targetUser?.full_name}" เป็น ${newRole === 'ADMIN' ? 'ผู้ดูแลระบบ (Admin)' : newRole === 'AGENT' ? 'นายหน้า (Agent)' : 'ผู้ใช้ทั่วไป (User)'} สำเร็จ`);
+      const updated = await updateUserRole(userId, newRole);
+      setUsers(updated);
+      const targetUser = updated.find(u => u.id === userId);
+      const roleLabel = newRole === 'ADMIN' ? 'ผู้ดูแลระบบ (ADMIN)' : newRole === 'AGENT' ? 'นายหน้า (AGENT)' : 'ผู้ใช้ทั่วไป (USER)';
+      triggerNotification(`อัปเดตสิทธิ์ของ "${targetUser?.full_name}" เป็น ${roleLabel} สำเร็จ`);
+
+      logSystemActivity({
+        category: 'user_role',
+        action: 'user_role_updated',
+        title: 'อัปเดตบทบาท/สิทธิ์สมาชิก',
+        description: `ปรับเปลี่ยนสิทธิ์ใช้งานของ "${targetUser?.full_name || 'สมาชิก'}" เป็น [${roleLabel}]`,
+        target_id: userId,
+        target_name: targetUser?.full_name,
+        actor_name: 'ผู้ดูแลระบบ',
+      }).catch(() => undefined);
     } catch {
       setError('เปลี่ยนสิทธิ์ไม่สำเร็จ กรุณาตรวจสอบสิทธิ์ผู้ดูแลระบบ');
     }
@@ -222,13 +233,13 @@ export default function AdminUsersPage() {
           </p>
         </div>
 
-        {isDemoAuthEnabled && <button
+        <button
           onClick={() => setShowAddModal(true)}
           className="px-5 py-2.5 bg-navy-950 hover:bg-navy-900 text-gold-400 font-bold text-xs rounded-xl shadow-md flex items-center space-x-2 transition-all self-start sm:self-auto"
         >
           <UserPlus className="w-4 h-4 text-gold-400" />
           <span>เพิ่มสมาชิก / แต่งตั้งแอดมิน</span>
-        </button>}
+        </button>
       </div>
 
       {/* Stats Cards */}
@@ -460,13 +471,13 @@ export default function AdminUsersPage() {
                           >
                             <Pencil className="w-4 h-4" />
                           </button>
-                          {isDemoAuthEnabled && <button
+                          <button
                             onClick={() => handleDeleteUser(u.id, u.full_name)}
                             className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
                             title="ลบผู้ใช้นี้"
                           >
                             <Trash2 className="w-4 h-4" />
-                          </button>}
+                          </button>
                         </div>
                       </td>
                     </tr>
@@ -494,7 +505,7 @@ export default function AdminUsersPage() {
       </div>
 
       {/* Add User / Assign Admin Modal */}
-      {isDemoAuthEnabled && showAddModal && (
+      {showAddModal && (
         <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-white rounded-3xl max-w-md w-full p-6 sm:p-8 shadow-2xl border border-surface-border animate-fadeIn relative">
             <div className="border-b border-gray-100 pb-4 mb-5">
@@ -684,13 +695,9 @@ export default function AdminUsersPage() {
                   type="email"
                   value={editEmail}
                   onChange={(e) => setEditEmail(e.target.value)}
-                  disabled={!isDemoAuthEnabled}
                   className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3 text-xs text-gray-900 focus:bg-white focus:ring-2 focus:ring-gold-500 outline-none"
                   placeholder="example@email.com"
                 />
-                {!isDemoAuthEnabled && (
-                  <p className="mt-1 text-[11px] text-gray-500">อีเมลบัญชีต้องแก้ในระบบ Authentication</p>
-                )}
               </div>
 
               {/* Phone */}

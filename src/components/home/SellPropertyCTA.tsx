@@ -21,9 +21,9 @@ export default function SellPropertyCTA() {
           <div className="relative z-10 grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
             {/* Left Content */}
             <div className="lg:col-span-7">
-              <span className="inline-flex items-center space-x-1.5 text-xs font-bold text-gold-400 uppercase tracking-widest bg-navy-800 px-3.5 py-1 rounded-full border border-gold-500/30 mb-4">
-                บริการรับฝากขายอสังหาริมทรัพย์
-              </span>
+              <div className="flex items-center space-x-1.5 text-xs font-bold text-gold-400 uppercase tracking-widest mb-4">
+                <span>บริการรับฝากขายอสังหาริมทรัพย์</span>
+              </div>
               <h2 className="text-3xl sm:text-4xl font-extrabold text-white tracking-tight leading-tight mb-4">
                 มีบ้าน มีที่ดิน อยากขาย? <br />
                 <span className="text-gold-400">ฝากทรัพย์กับเรา</span>

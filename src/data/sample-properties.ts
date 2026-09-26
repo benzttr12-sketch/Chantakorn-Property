@@ -10,6 +10,7 @@ export const SAMPLE_PROPERTIES: Property[] = [
     "video_url": "https://www.youtube.com/watch?v=ScMzIvxBSi4",
     "year_built": 2024,
   "usable_area": 0,
+  "facing_direction": "ทิศใต้",
   "address": "สิงหนคร, สงขลา",
   "description": "อสังหาริมทรัพย์คุณภาพจาก Chantakorn Property",
   "images": [

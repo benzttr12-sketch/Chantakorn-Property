@@ -1,62 +1,50 @@
 import React from 'react';
 import HeroSection from '@/components/home/HeroSection';
-import PropertyCategories from '@/components/home/PropertyCategories';
 import FeaturedProperties from '@/components/home/FeaturedProperties';
-import SmartPropertyMatchmaker from '@/components/home/SmartPropertyMatchmaker';
-import ViewingBookingSection from '@/components/home/ViewingBookingSection';
-import FeaturedAgents from '@/components/home/FeaturedAgents';
-import CustomerReviewsSection from '@/components/home/CustomerReviewsSection';
+import PropertyCategories from '@/components/home/PropertyCategories';
 import WhyChooseUs from '@/components/home/WhyChooseUs';
 import LocationHighlights from '@/components/home/LocationHighlights';
-import MortgageCalculator from '@/components/tools/MortgageCalculator';
+import FeaturedAgents from '@/components/home/FeaturedAgents';
+import CustomerReviewsSection from '@/components/home/CustomerReviewsSection';
+import MarketIntelligenceSection from '@/components/home/MarketIntelligenceSection';
+import ViewingBookingSection from '@/components/home/ViewingBookingSection';
 import SellPropertyCTA from '@/components/home/SellPropertyCTA';
 import ContactCTA from '@/components/home/ContactCTA';
 
 export default function HomePage() {
   return (
-    <div className="flex flex-col min-h-screen">
-      {/* 1 & 2: HERO & FLOATING SEARCH BOX */}
+    <div className="flex flex-col min-h-screen bg-white">
+      {/* 1: LUXURY HERO & SMART FLOATING SEARCH ENGINE */}
       <HeroSection />
 
-      {/* 3: PROPERTY CATEGORIES */}
-      <PropertyCategories />
-
-      {/* 4: FEATURED PROPERTIES */}
+      {/* 2: FEATURED PROPERTIES SHOWCASE (ทรัพย์เด่นคัดสรรระดับพรีเมียม) */}
       <FeaturedProperties />
 
-      {/* 5: FEATURED AGENTS (ระบบนายหน้าแนะนำ & ที่ปรึกษาประจำหาดใหญ่-สงขลา แบบสไลด์กะทัดรัด) */}
-      <FeaturedAgents />
+      {/* 3: PROPERTY CATEGORIES (หมวดหมู่อสังหาริมทรัพย์) */}
+      <PropertyCategories />
 
-      {/* 6: VIEWING APPOINTMENT BOOKING (ระบบจองคิวนัดชมทรัพย์ล่วงหน้า) */}
-      <ViewingBookingSection />
-
-      {/* 7: INTERACTIVE SMART PROPERTY MATCHMAKER (ค้นหาอสังหาฯ ที่ตรงใจใน 3 คลิก) */}
-      <section className="py-16 md:py-20 bg-slate-100/60 border-y border-slate-200">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <SmartPropertyMatchmaker />
-        </div>
-      </section>
-
-      {/* 8: INTERACTIVE MORTGAGE & AFFORDABILITY CALCULATOR */}
-      <section className="py-16 md:py-24 bg-white border-b border-slate-200">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <MortgageCalculator />
-        </div>
-      </section>
-
-      {/* 9: REAL CLIENT TESTIMONIALS & REVIEWS SYSTEM (ระบบรีวิวและความประทับใจจากลูกค้าจริง) */}
-      <CustomerReviewsSection />
-
-      {/* 10: WHY CHOOSE US */}
+      {/* 4: WHY CHOOSE US (มาตรฐานการบริการระดับมืออาชีพ 4 ประการ) */}
       <WhyChooseUs />
 
-      {/* 11: LOCATION HIGHLIGHTS (Hat Yai - Songkhla) */}
+      {/* 5: LOCATION HIGHLIGHTS (ทำเลศักยภาพ หาดใหญ่–สงขลา) */}
       <LocationHighlights />
 
-      {/* 12: SELL PROPERTY CTA */}
+      {/* 6: LIVE MARKET INTELLIGENCE (เจาะลึกทิศทางอสังหาฯ หาดใหญ่ ด้วย Google Search Grounding) */}
+      <MarketIntelligenceSection />
+
+      {/* 7: FEATURED AGENTS (ทีมงานที่ปรึกษาอสังหาริมทรัพย์มืออาชีพ) */}
+      <FeaturedAgents />
+
+      {/* 7: REAL CLIENT TESTIMONIALS (ความประทับใจจากลูกค้าตัวจริง) */}
+      <CustomerReviewsSection />
+
+      {/* 8: PRIVATE VIEWING APPOINTMENT (จองคิวนัดชมทรัพย์ส่วนตัว) */}
+      <ViewingBookingSection />
+
+      {/* 9: SELL PROPERTY CTA (ฝากขายอสังหาฯ รวดเร็ว มั่นใจ) */}
       <SellPropertyCTA />
 
-      {/* 13: CONTACT CTA */}
+      {/* 10: CONTACT CTA (ปรึกษาเราได้ตลอด 24 ชั่วโมง) */}
       <ContactCTA />
     </div>
   );

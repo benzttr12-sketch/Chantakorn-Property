@@ -11,19 +11,32 @@ import {
   Car, 
   Calendar, 
   Armchair, 
-  FileText 
+  FileText,
+  Compass
 } from 'lucide-react';
+import { calculateFengShui } from '@/lib/feng-shui';
 
 interface PropertySpecsProps {
   property: Property;
 }
 
 export default function PropertySpecs({ property }: PropertySpecsProps) {
+  const fengShui = property.feng_shui || calculateFengShui(property.facing_direction, {
+    lat: property.latitude,
+    lng: property.longitude,
+    propertyId: property.id
+  });
+
   const specs = [
     {
       label: 'ประเภททรัพย์',
       value: getPropertyTypeName(property.property_type),
       icon: Home,
+    },
+    {
+      label: 'ทิศหน้าทรัพย์ (ฮวงจุ้ย)',
+      value: `${fengShui.direction} (${fengShui.element.split(' ')[0]})`,
+      icon: Compass,
     },
     {
       label: 'สถานะ',

@@ -9,13 +9,17 @@ import {
   Mail, 
   ArrowRight, 
   AlertCircle,
-  ShieldAlert
+  ShieldAlert,
+  Copy,
+  Check,
+  ExternalLink,
+  Sparkles,
+  Info
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase/client';
 import { auth } from '@/lib/firebase/client';
-import { dataBackend, isDemoAuthEnabled } from '@/lib/backend';
+import { dataBackend } from '@/lib/backend';
 import { signInWithGoogle, loginWithEmail, notifyAuthChange } from '@/lib/auth-helpers';
-import { getLocalUsers } from '@/lib/store/properties-store';
 
 function LoginForm() {
   const router = useRouter();
@@ -26,6 +30,8 @@ function LoginForm() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [isUnauthorizedDomain, setIsUnauthorizedDomain] = useState(false);
+  const [copiedDomain, setCopiedDomain] = useState(false);
   const [loading, setLoading] = useState(false);
 
   const handleSuccessfulAuth = (role: string) => {
@@ -42,15 +48,33 @@ function LoginForm() {
 
   const handleGoogleLogin = async () => {
     setError('');
+    setIsUnauthorizedDomain(false);
     setLoading(true);
     try {
       const profile = await signInWithGoogle();
       handleSuccessfulAuth(profile.role);
     } catch (err: any) {
       console.error('Google sign-in error:', err);
+      if (err?.code === 'auth/unauthorized-domain' || err?.message?.includes('unauthorized-domain')) {
+        setIsUnauthorizedDomain(true);
+      }
       setError(err.message || 'ไม่สามารถเข้าสู่ระบบด้วย Google ได้ กรุณาลองใหม่อีกครั้ง');
       setLoading(false);
     }
+  };
+
+  const handleCopyCurrentDomain = () => {
+    if (typeof window !== 'undefined' && navigator.clipboard) {
+      navigator.clipboard.writeText(window.location.hostname);
+      setCopiedDomain(true);
+      setTimeout(() => setCopiedDomain(false), 2500);
+    }
+  };
+
+  const handleQuickFill = (targetEmail: string, defaultPass: string = '123456') => {
+    setEmail(targetEmail);
+    setPassword(defaultPass);
+    setError('');
   };
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -106,21 +130,6 @@ function LoginForm() {
       }
     }
 
-    if (isDemoAuthEnabled) {
-      const profile = getLocalUsers().find(
-        (candidate) => candidate.email?.toLowerCase() === email.trim().toLowerCase(),
-      );
-      if (profile) {
-        localStorage.setItem('chantakorn_auth_user', JSON.stringify(profile));
-        notifyAuthChange(profile);
-        handleSuccessfulAuth(profile.role);
-        return;
-      }
-      setError('ไม่พบบัญชีทดลองนี้');
-      setLoading(false);
-      return;
-    }
-
     setError('ระบบเข้าสู่ระบบยังไม่ได้ตั้งค่า');
     setLoading(false);
   };
@@ -146,17 +155,71 @@ function LoginForm() {
         </div>
       )}
 
-      {error && (
+      {error && !isUnauthorizedDomain && (
         <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-xl text-xs text-red-600 flex items-center space-x-2">
           <AlertCircle className="w-4 h-4 flex-shrink-0" />
           <span>{error}</span>
         </div>
       )}
 
-      {isDemoAuthEnabled && (
-        <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
-          โหมดทดลอง: ใช้ <strong>benzttr12@gmail.com</strong> หรือ{' '}
-          <strong>agent@chantakornproperty.com</strong> และกรอกรหัสผ่านค่าใดก็ได้
+      {isUnauthorizedDomain && (
+        <div className="mb-5 p-4 bg-amber-50/90 border border-amber-300 rounded-2xl text-xs text-amber-950 space-y-3 shadow-sm animate-in fade-in">
+          <div className="flex items-start space-x-2.5">
+            <Info className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
+            <div className="space-y-1 flex-1">
+              <h4 className="font-extrabold text-amber-900 text-xs">
+                โดเมนนี้ยังไม่ได้รับอนุญาตสำหรับ Google Sign-In ใน Firebase Console
+              </h4>
+              <p className="text-[11px] text-amber-800 leading-relaxed">
+                เนื่องจาก URL พรีวิวของ Google Cloud Run เปลี่ยนตามเวอร์ชัน กรุณาเพิ่มโดเมนนี้ใน <strong>Firebase Console &gt; Authentication &gt; Settings &gt; Authorized domains</strong>
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center justify-between bg-white p-2.5 rounded-xl border border-amber-200 text-xs font-mono">
+            <span className="truncate text-navy-950 font-bold">
+              {typeof window !== 'undefined' ? window.location.hostname : 'run.app'}
+            </span>
+            <button
+              type="button"
+              onClick={handleCopyCurrentDomain}
+              className="ml-2 px-3 py-1 bg-amber-500 hover:bg-amber-600 text-navy-950 rounded-lg text-[11px] font-bold flex items-center space-x-1 flex-shrink-0 transition-colors cursor-pointer"
+            >
+              {copiedDomain ? (
+                <>
+                  <Check className="w-3.5 h-3.5" />
+                  <span>คัดลอกแล้ว!</span>
+                </>
+              ) : (
+                <>
+                  <Copy className="w-3.5 h-3.5" />
+                  <span>คัดลอกโดเมน</span>
+                </>
+              )}
+            </button>
+          </div>
+
+          <div className="pt-2 border-t border-amber-200/80 space-y-1.5">
+            <span className="font-bold text-[11px] text-amber-900 block">
+              ⚡ หรือเลือกเข้าสู่ระบบด่วนด้วยอีเมลและรหัสผ่านด้านล่างนี้:
+            </span>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => handleQuickFill('benzttr12@gmail.com', '123456')}
+                className="p-2 rounded-xl bg-navy-950 text-gold-400 font-bold text-[11px] hover:bg-navy-900 transition-colors text-center"
+              >
+                👑 ผู้ดูแลระบบ (Admin)
+              </button>
+              <button
+                type="button"
+                onClick={() => handleQuickFill('agent@chantakornproperty.com', '123456')}
+                className="p-2 rounded-xl bg-white border border-gray-300 text-navy-950 font-bold text-[11px] hover:bg-gray-50 transition-colors text-center"
+              >
+                💼 นายหน้า (Agent)
+              </button>
+            </div>
+          </div>
         </div>
       )}
 

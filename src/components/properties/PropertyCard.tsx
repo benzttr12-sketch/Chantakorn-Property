@@ -9,6 +9,7 @@ import { PropertyCardProps } from '@/lib/types';
 import { formatPrice, getPropertyStatusBadge, formatThaiNumber, formatPropertyCode } from '@/lib/utils';
 import { getFavoriteIds, toggleFavoriteId } from '@/lib/store/properties-store';
 import { getCompareIds, toggleCompareId } from '@/lib/store/compare-store';
+import { villaModernEstate } from '@/assets/images';
 
 export default function PropertyCard({
   id,
@@ -28,6 +29,7 @@ export default function PropertyCard({
   featured = false,
   video_url,
   slug,
+  facingDirection,
 }: PropertyCardProps) {
   const [isFavorite, setIsFavorite] = useState(false);
   const [isComparing, setIsComparing] = useState(false);
@@ -75,8 +77,8 @@ export default function PropertyCard({
   const displayLocation = location || `${district}, ${province}`;
 
   const displayImage = imageError
-    ? 'https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?auto=format&fit=crop&w=800&q=80'
-    : coverImage || images[0] || 'https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?auto=format&fit=crop&w=800&q=80';
+    ? villaModernEstate
+    : coverImage || images[0] || villaModernEstate;
 
   return (
     <div className="group bg-white rounded-3xl overflow-hidden border border-slate-200/80 hover:border-gold-400/50 shadow-sm hover:shadow-2xl transition-all duration-300 flex flex-col h-full transform hover:-translate-y-1">
@@ -162,10 +164,18 @@ export default function PropertyCard({
       {/* Card Content */}
       <div className="p-5 sm:p-6 flex flex-col flex-grow justify-between bg-white">
         <div>
-          {/* Location */}
-          <div className="flex items-center text-slate-500 text-xs mb-2">
-            <MapPin className="w-3.5 h-3.5 text-gold-600 mr-1 flex-shrink-0" />
-            <span className="truncate font-medium">{displayLocation}</span>
+          {/* Location & Facing Direction */}
+          <div className="flex items-center justify-between text-slate-500 text-xs mb-2">
+            <div className="flex items-center truncate mr-2">
+              <MapPin className="w-3.5 h-3.5 text-gold-600 mr-1 flex-shrink-0" />
+              <span className="truncate font-medium">{displayLocation}</span>
+            </div>
+            {facingDirection && (
+              <span className="text-[10px] font-semibold text-amber-800 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200/80 flex-shrink-0 flex items-center gap-1">
+                <span>☯</span>
+                <span>{facingDirection}</span>
+              </span>
+            )}
           </div>
 
           {/* Title */}

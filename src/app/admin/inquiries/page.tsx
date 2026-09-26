@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
+import Link from 'next/link';
 import { 
   MessageSquare, 
   Phone, 
@@ -16,9 +17,11 @@ import {
   AlertCircle,
   ExternalLink,
   ChevronRight,
-  ShieldCheck
+  ShieldCheck,
+  Sparkles
 } from 'lucide-react';
 import { fetchInquiries, updateInquiryStatus } from '@/lib/store/properties-store';
+import { logSystemActivity } from '@/lib/store/activity-store';
 import { Inquiry } from '@/lib/types';
 import { formatThaiDate, formatPropertyCode } from '@/lib/utils';
 
@@ -69,6 +72,22 @@ function InquiriesContent() {
       const saved = await updateInquiryStatus(id, newStatus);
       if (!saved) throw new Error('ไม่พบรายการผู้ติดต่อนี้');
       setInquiries(current => current.map(inquiry => inquiry.id === id ? saved : inquiry));
+
+      const statusLabels: Record<string, string> = {
+        new: 'ยังไม่ติดต่อ',
+        contacted: 'ติดต่อแล้ว',
+        closed: 'ปิดการขาย/เสร็จสิ้น'
+      };
+
+      logSystemActivity({
+        category: 'inquiry',
+        action: 'inquiry_status_updated',
+        title: 'อัปเดตสถานะผู้ติดต่อ/ฝากขาย',
+        description: `เปลี่ยนสถานะลูกค้า "${saved.name}" เป็น [${statusLabels[newStatus] || newStatus}]`,
+        target_id: saved.id,
+        target_name: saved.name,
+        actor_name: 'ผู้ดูแลระบบ',
+      }).catch(() => undefined);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'บันทึกสถานะไม่สำเร็จ');
     } finally {
@@ -388,6 +407,15 @@ function InquiriesContent() {
                       <span>LINE: {inq.line_id}</span>
                     </a>
                   )}
+
+                  <Link
+                    href={`/admin/automation?tab=leads&inquiryId=${encodeURIComponent(inq.id)}`}
+                    className="w-full py-2 px-3 bg-gradient-to-r from-navy-950 to-blue-900 hover:from-navy-900 hover:to-blue-800 text-gold-300 font-bold text-xs rounded-xl flex items-center justify-center space-x-1.5 shadow-xs transition-all border border-gold-500/20"
+                    title="ให้ AI ค้นหาและจับคู่ทรัพย์ที่ตรงกับความต้องการของลูกค้ารายนี้"
+                  >
+                    <Sparkles className="w-3.5 h-3.5 text-gold-400" />
+                    <span>🎯 จับคู่ทรัพย์ AI</span>
+                  </Link>
                 </div>
 
                 <div className="pt-2">

@@ -10,9 +10,9 @@ export default function ContactCTA() {
       <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-gold-500/10 rounded-full blur-3xl pointer-events-none" />
 
       <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 text-center relative z-10">
-        <span className="text-xs font-bold text-gold-400 uppercase tracking-widest bg-navy-900 border border-gold-500/30 px-3.5 py-1 rounded-full mb-4 inline-block">
-          บริการด้วยใจ ให้คำปรึกษาฟรี
-        </span>
+        <div className="flex items-center justify-center space-x-2 text-xs font-bold text-gold-400 uppercase tracking-widest mb-4">
+          <span>บริการด้วยใจ ให้คำปรึกษาฟรี</span>
+        </div>
 
         <h2 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold text-white tracking-tight mb-4">
           กำลังมองหาอสังหาริมทรัพย์?

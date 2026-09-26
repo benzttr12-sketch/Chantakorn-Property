@@ -22,11 +22,16 @@ import {
   Star,
   Layers,
   MapPin,
-  Check
+  Check,
+  Sparkles,
+  Wand2,
+  FileText,
+  Users
 } from 'lucide-react';
 import { fetchAdminProperties, fetchInquiries, updateInquiryStatus } from '@/lib/store/properties-store';
 import { Property, Inquiry } from '@/lib/types';
 import { formatPrice, propertyHref, formatPropertyCode, getPropertyTypeName, formatThaiDate } from '@/lib/utils';
+import SystemActivityFeed from '@/components/admin/SystemActivityFeed';
 
 export default function AdminDashboardPage() {
   const [properties, setProperties] = useState<Property[]>([]);
@@ -243,6 +248,88 @@ export default function AdminDashboardPage() {
             <div className="min-w-0">
               <div className="text-xs font-bold text-navy-950 group-hover:text-gold-700 truncate">ทรัพย์เด่นหน้าแรก</div>
               <div className="text-[10px] text-gray-500">{featuredListings} รายการแนะนำ</div>
+            </div>
+          </Link>
+        </div>
+      </div>
+
+      {/* AI Automation Super Suite Banner */}
+      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-navy-950 via-slate-900 to-navy-900 text-white p-6 sm:p-7 border border-gold-500/30 shadow-xl space-y-4">
+        <div className="absolute top-0 right-0 -mr-12 -mt-12 w-64 h-64 rounded-full bg-gold-500/10 blur-3xl pointer-events-none" />
+        
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="space-y-1">
+            <div className="inline-flex items-center space-x-1.5 px-3 py-1 rounded-full bg-gold-500/20 border border-gold-500/40 text-gold-300 text-xs font-bold uppercase tracking-wider">
+              <Sparkles className="w-3.5 h-3.5 text-gold-400" />
+              <span>ระบบอัตโนมัติ AI อัจฉริยะ (AI Automation Suite)</span>
+            </div>
+            <h2 className="text-lg sm:text-xl font-extrabold text-white">
+              เพิ่มยอดขายและทุ่นแรงนายหน้า 10 เท่าด้วยระบบอัตโนมัติ
+            </h2>
+            <p className="text-xs text-gray-300 max-w-2xl">
+              สร้างโพสต์การตลาดทุกแพลตฟอร์ม จับคู่ผู้สนใจกับทรัพย์อัตโนมัติ ร่างสัญญาจะซื้อจะขาย และวิเคราะห์ผลตอบแทน Yield ในคลิกเดียว
+            </p>
+          </div>
+
+          <Link
+            href="/admin/automation"
+            className="px-4 py-2.5 bg-gradient-to-r from-gold-500 to-amber-500 hover:from-gold-400 hover:to-amber-400 text-navy-950 font-black text-xs rounded-xl shadow-md flex items-center justify-center space-x-2 transition-all self-start sm:self-auto flex-shrink-0"
+          >
+            <span>เปิดศูนย์ระบบอัตโนมัติ</span>
+            <ArrowUpRight className="w-4 h-4" />
+          </Link>
+        </div>
+
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-2">
+          <Link
+            href="/admin/automation?tab=marketing"
+            className="p-3 rounded-2xl bg-white/5 hover:bg-white/10 border border-white/10 transition-all flex items-center space-x-2.5 group"
+          >
+            <div className="w-8 h-8 rounded-xl bg-gold-500/20 text-gold-400 flex items-center justify-center font-bold flex-shrink-0 group-hover:scale-105 transition-transform">
+              <Wand2 className="w-4 h-4" />
+            </div>
+            <div className="min-w-0">
+              <div className="text-xs font-bold text-white group-hover:text-gold-300 truncate">ผลิตคอนเทนต์ AI</div>
+              <div className="text-[10px] text-gray-400">FB, TikTok, LINE, IG</div>
+            </div>
+          </Link>
+
+          <Link
+            href="/admin/automation?tab=leads"
+            className="p-3 rounded-2xl bg-white/5 hover:bg-white/10 border border-white/10 transition-all flex items-center space-x-2.5 group"
+          >
+            <div className="w-8 h-8 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center font-bold flex-shrink-0 group-hover:scale-105 transition-transform">
+              <Users className="w-4 h-4" />
+            </div>
+            <div className="min-w-0">
+              <div className="text-xs font-bold text-white group-hover:text-emerald-300 truncate">จับคู่ลูกค้าอัจฉริยะ</div>
+              <div className="text-[10px] text-gray-400">Smart Lead Matcher</div>
+            </div>
+          </Link>
+
+          <Link
+            href="/admin/automation?tab=valuation"
+            className="p-3 rounded-2xl bg-white/5 hover:bg-white/10 border border-white/10 transition-all flex items-center space-x-2.5 group"
+          >
+            <div className="w-8 h-8 rounded-xl bg-blue-500/20 text-blue-400 flex items-center justify-center font-bold flex-shrink-0 group-hover:scale-105 transition-transform">
+              <TrendingUp className="w-4 h-4" />
+            </div>
+            <div className="min-w-0">
+              <div className="text-xs font-bold text-white group-hover:text-blue-300 truncate">ประเมินราคา & Yield</div>
+              <div className="text-[10px] text-gray-400">ค่างวดผ่อน & ROI</div>
+            </div>
+          </Link>
+
+          <Link
+            href="/admin/automation?tab=contracts"
+            className="p-3 rounded-2xl bg-white/5 hover:bg-white/10 border border-white/10 transition-all flex items-center space-x-2.5 group"
+          >
+            <div className="w-8 h-8 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center font-bold flex-shrink-0 group-hover:scale-105 transition-transform">
+              <FileText className="w-4 h-4" />
+            </div>
+            <div className="min-w-0">
+              <div className="text-xs font-bold text-white group-hover:text-amber-300 truncate">ร่างสัญญาจะซื้อจะขาย</div>
+              <div className="text-[10px] text-gray-400">พิมพ์สัญญา A4 ใน 1 คลิก</div>
             </div>
           </Link>
         </div>
@@ -566,6 +653,9 @@ export default function AdminDashboardPage() {
           </table>
         </div>
       </div>
+
+      {/* System Activity Feed Timeline */}
+      <SystemActivityFeed />
     </div>
   );
 }

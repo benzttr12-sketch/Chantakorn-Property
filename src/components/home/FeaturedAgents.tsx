@@ -7,9 +7,7 @@ import {
   Phone, 
   MessageSquare, 
   Facebook,
-  ShieldCheck, 
   Star, 
-  Award, 
   MapPin, 
   Calendar,
   ChevronLeft,
@@ -102,39 +100,42 @@ export default function FeaturedAgents({ onSelectAgentForBooking }: FeaturedAgen
   };
 
   return (
-    <section className="py-10 md:py-14 bg-slate-50/70 border-b border-slate-200 overflow-hidden">
+    <section className="py-20 md:py-28 bg-white border-b border-slate-200/80 overflow-hidden">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        {/* Compact Header with Slide Arrows */}
-        <div className="flex flex-col sm:flex-row sm:items-end justify-between mb-6 gap-3">
+        {/* Luxury Section Header with Slide Arrows */}
+        <div className="flex flex-col sm:flex-row sm:items-end justify-between mb-12 gap-6">
           <div>
-            <div className="inline-flex items-center space-x-1.5 px-3 py-0.5 rounded-full bg-gold-50 border border-gold-200 text-gold-800 text-[11px] font-bold mb-1.5">
-              <Users className="w-3 h-3 text-gold-600" />
-              <span>นายหน้าแนะนำประจำพื้นที่หาดใหญ่–สงขลา</span>
+            <div className="flex items-center space-x-2 text-xs font-bold text-gold-700 uppercase tracking-widest mb-3">
+              <Users className="w-3.5 h-3.5 text-gold-600" />
+              <span>DEDICATED LOCAL PROPERTY ADVISORS</span>
             </div>
-            <h2 className="text-xl sm:text-2xl font-black text-navy-950 tracking-tight">
+            <h2 className="text-3xl sm:text-4xl lg:text-5xl font-black text-navy-950 tracking-tight text-balance">
               ทีมงานที่ปรึกษาอสังหาริมทรัพย์มืออาชีพ
             </h2>
+            <p className="text-slate-600 text-sm sm:text-base mt-2.5 max-w-2xl leading-relaxed">
+              พร้อมดูแลและให้คำปรึกษาการซื้อ ขาย เช่า และขายฝากในหาดใหญ่–สงขลา อย่างใกล้ชิดและจริงใจ
+            </p>
           </div>
 
           {/* Slider Controls */}
-          <div className="flex items-center space-x-2 self-end sm:self-auto">
+          <div className="flex items-center space-x-2.5 self-end sm:self-auto">
             <button
               type="button"
               onClick={() => scroll('left')}
               disabled={!canScrollLeft}
-              className="w-8 h-8 rounded-full bg-white border border-slate-200 text-slate-700 hover:bg-slate-100 hover:text-navy-950 flex items-center justify-center transition-colors disabled:opacity-30 disabled:cursor-not-allowed shadow-xs cursor-pointer"
+              className="w-10 h-10 rounded-full bg-white border border-slate-200 text-slate-700 hover:bg-navy-950 hover:text-gold-400 hover:border-navy-950 flex items-center justify-center transition-all disabled:opacity-30 disabled:cursor-not-allowed shadow-xs cursor-pointer"
               aria-label="Previous Agent"
             >
-              <ChevronLeft className="w-4 h-4" />
+              <ChevronLeft className="w-5 h-5" />
             </button>
             <button
               type="button"
               onClick={() => scroll('right')}
               disabled={!canScrollRight}
-              className="w-8 h-8 rounded-full bg-white border border-slate-200 text-slate-700 hover:bg-slate-100 hover:text-navy-950 flex items-center justify-center transition-colors disabled:opacity-30 disabled:cursor-not-allowed shadow-xs cursor-pointer"
+              className="w-10 h-10 rounded-full bg-white border border-slate-200 text-slate-700 hover:bg-navy-950 hover:text-gold-400 hover:border-navy-950 flex items-center justify-center transition-all disabled:opacity-30 disabled:cursor-not-allowed shadow-xs cursor-pointer"
               aria-label="Next Agent"
             >
-              <ChevronRight className="w-4 h-4" />
+              <ChevronRight className="w-5 h-5" />
             </button>
           </div>
         </div>

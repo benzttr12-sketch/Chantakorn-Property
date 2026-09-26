@@ -24,5 +24,15 @@ service cloud.firestore {
     match /agents/{agentId} {
       allow read, write: if true;
     }
+
+    // Property Change History & Audit Logs
+    match /property_history/{logId} {
+      allow read, write: if true;
+    }
+
+    // System Activity Feed
+    match /system_activities/{activityId} {
+      allow read, write: if true;
+    }
   }
 }

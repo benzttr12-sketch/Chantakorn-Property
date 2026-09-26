@@ -129,19 +129,19 @@ export default function ViewingBookingSection({ initialAgent, initialPropertyTit
   };
 
   return (
-    <section id="booking-section" className="py-16 md:py-24 bg-gradient-to-b from-slate-50 via-white to-slate-50 border-b border-slate-200 scroll-mt-20">
+    <section id="booking-section" className="py-20 md:py-28 bg-white border-b border-slate-200/80 scroll-mt-20">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Section Header */}
-        <div className="text-center max-w-3xl mx-auto mb-12">
-          <div className="inline-flex items-center space-x-2 px-3.5 py-1 rounded-full bg-gold-50 border border-gold-200 text-gold-800 text-xs font-bold mb-3">
+        <div className="text-center max-w-3xl mx-auto mb-16">
+          <div className="flex items-center justify-center space-x-2 text-xs font-bold text-gold-700 uppercase tracking-widest mb-3">
             <CalendarCheck className="w-3.5 h-3.5 text-gold-600" />
-            <span>นัดชมสถานที่จริง (VIP Private Property Tour)</span>
+            <span>VIP PRIVATE VIEWING CONCIERGE</span>
           </div>
-          <h2 className="text-3xl sm:text-4xl font-black text-navy-950 tracking-tight">
-            ระบบจองคิวนัดชมทรัพย์ล่วงหน้า
+          <h2 className="text-3xl sm:text-4xl lg:text-5xl font-black text-navy-950 tracking-tight">
+            จองคิวนัดชมอสังหาริมทรัพย์แบบส่วนตัว
           </h2>
-          <p className="text-slate-500 text-sm sm:text-base mt-2">
-            เลือกวันและเวลาที่คุณสะดวก ทีมงาน Chantakorn Property พร้อมพาชมบ้าน ตรวจสอบทำเล และให้ข้อมูลเชิงลึกฟรี ไม่มีค่าใช้จ่าย
+          <p className="text-slate-600 text-sm sm:text-base mt-2.5 max-w-2xl mx-auto leading-relaxed">
+            เลือกวันและเวลาที่คุณสะดวก ทีมงาน Chantakorn Property พร้อมพาชมสถานที่จริง ตรวจสอบทำเล และให้ข้อมูลเชิงลึกฟรี ไม่มีค่าใช้จ่าย
           </p>
         </div>
 

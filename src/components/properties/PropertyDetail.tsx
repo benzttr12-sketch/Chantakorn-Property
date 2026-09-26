@@ -26,6 +26,7 @@ import AgentCard from '@/components/properties/AgentCard';
 import PropertyInquiryForm from '@/components/properties/PropertyInquiryForm';
 import PropertyCard from '@/components/properties/PropertyCard';
 import PropertyMap from '@/components/properties/PropertyMap';
+import PropertyFengShui from '@/components/properties/PropertyFengShui';
 import { fetchPropertyBySlug, fetchProperties } from '@/lib/store/properties-store';
 import { formatPrice, getPropertyStatusBadge, formatThaiNumber, formatPropertyCode, formatLineUrl } from '@/lib/utils';
 
@@ -310,6 +311,9 @@ export default function PropertyDetail({ slug, initialProperty = null }: { slug:
               </div>
             )}
 
+            {/* 6.1 Automated Feng Shui & Auspicious Energy Analysis */}
+            <PropertyFengShui property={property} />
+
             {/* 7. Location & Interactive Map */}
             <div className="bg-white rounded-2xl p-6 border border-surface-border shadow-card">
               <div className="flex items-center justify-between mb-4 pb-2 border-b border-gray-100">
@@ -414,6 +418,7 @@ export default function PropertyDetail({ slug, initialProperty = null }: { slug:
                   video_url={rel.video_url}
                   slug={rel.slug}
                   createdAt={rel.created_at}
+                  facingDirection={rel.facing_direction}
                 />
               ))}
             </div>

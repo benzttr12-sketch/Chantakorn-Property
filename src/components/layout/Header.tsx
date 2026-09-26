@@ -99,11 +99,10 @@ export default function Header() {
     { name: 'หน้าแรก', href: '/' },
     { name: 'ซื้อ', href: '/buy' },
     { name: 'เช่า', href: '/rent' },
-    { name: 'ขาย', href: '/sell' },
+    { name: 'ฝากขาย', href: '/sell' },
     { name: 'บ้าน', href: '/properties?type=house' },
     { name: 'ที่ดิน', href: '/properties?type=land' },
     { name: 'คอนโด', href: '/properties?type=condo' },
-    { name: 'อสังหาริมทรัพย์', href: '/properties' },
     { name: 'บริการ', href: '/services' },
   ];
 
@@ -225,7 +224,16 @@ export default function Header() {
           </nav>
 
           {/* Right Actions (Desktop) */}
-          <div className="hidden lg:flex items-center space-x-3">
+          <div className="hidden lg:flex items-center space-x-2 xl:space-x-3">
+            <button
+              type="button"
+              onClick={() => setLandsMapsModalOpen(true)}
+              className="px-3 py-1.5 text-xs font-bold text-gold-300 bg-navy-900/90 hover:bg-navy-850 rounded-xl border border-gold-400/50 hover:border-gold-300 transition-all shadow-xs flex items-center space-x-1 cursor-pointer"
+              title="ค้นหารูปแปลงที่ดิน กรมที่ดิน (DOL LandsMaps)"
+            >
+              <span>🗺️ แปลงที่ดิน (DOL)</span>
+            </button>
+
             <Link
               href="/favorites"
               className="relative p-2 text-white hover:text-gold-300 hover:bg-navy-900 rounded-xl border border-transparent hover:border-navy-700 transition-all"

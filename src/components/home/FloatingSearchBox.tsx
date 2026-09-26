@@ -2,12 +2,13 @@
 
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Search, Home, Building, MapPin, Coins, ArrowRight, HandCoins } from 'lucide-react';
+import Link from 'next/link';
+import { Search, Home, Building, MapPin, Coins, ArrowRight, Sparkles, Flame, HandCoins } from 'lucide-react';
 import { DISTRICTS_LIST } from '@/data/locations';
 
 export default function FloatingSearchBox() {
   const router = useRouter();
-  const [tab, setTab] = useState<'sale' | 'rent'>('sale');
+  const [tab, setTab] = useState<'sale' | 'rent' | 'consignment'>('sale');
   const [propertyType, setPropertyType] = useState<string>('all');
   const [district, setDistrict] = useState<string>('');
   const [minPrice, setMinPrice] = useState<string>('');
@@ -15,6 +16,11 @@ export default function FloatingSearchBox() {
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
+    if (tab === 'consignment') {
+      router.push('/sell');
+      return;
+    }
+
     const params = new URLSearchParams();
     params.set('status', tab);
     if (propertyType && propertyType !== 'all') {
@@ -34,121 +40,199 @@ export default function FloatingSearchBox() {
   };
 
   return (
-    <div className="w-full max-w-5xl mx-auto bg-white/95 backdrop-blur-2xl rounded-3xl shadow-2xl border border-slate-200/80 p-5 sm:p-7 transition-all">
-      {/* Tabs: ซื้อ / เช่า */}
-      <div className="flex items-center space-x-2 border-b border-slate-100 pb-4 mb-5">
-        <button
-          type="button"
-          onClick={() => setTab('sale')}
-          className={`flex items-center space-x-2 px-6 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all ${
-            tab === 'sale'
-              ? 'bg-navy-950 text-gold-400 shadow-md ring-1 ring-gold-400/40'
-              : 'text-slate-600 hover:text-navy-950 hover:bg-slate-100 bg-slate-50'
-          }`}
-        >
-          <Home className="w-4 h-4" />
-          <span>ซื้ออสังหาริมทรัพย์</span>
-        </button>
+    <div className="w-full max-w-5xl mx-auto bg-white/95 backdrop-blur-2xl rounded-3xl shadow-[0_25px_50px_-12px_rgba(2,8,18,0.25)] border border-slate-200/90 p-5 sm:p-7 transition-all">
+      {/* Tabs: ซื้อ / เช่า / ขายฝาก */}
+      <div className="flex flex-wrap items-center justify-between border-b border-slate-100 pb-4 mb-5 gap-3">
+        <div className="flex items-center space-x-2">
+          <button
+            type="button"
+            onClick={() => setTab('sale')}
+            className={`flex items-center space-x-2 px-5 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer ${
+              tab === 'sale'
+                ? 'bg-navy-950 text-gold-400 shadow-md ring-1 ring-gold-400/40'
+                : 'text-slate-600 hover:text-navy-950 hover:bg-slate-100 bg-slate-50'
+            }`}
+          >
+            <Home className="w-4 h-4" />
+            <span>ซื้ออสังหาริมทรัพย์</span>
+          </button>
 
-        <button
-          type="button"
-          onClick={() => setTab('rent')}
-          className={`flex items-center space-x-2 px-6 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all ${
-            tab === 'rent'
-              ? 'bg-navy-950 text-gold-400 shadow-md ring-1 ring-gold-400/40'
-              : 'text-slate-600 hover:text-navy-950 hover:bg-slate-100 bg-slate-50'
-          }`}
-        >
-          <Building className="w-4 h-4" />
-          <span>เช่าอสังหาริมทรัพย์</span>
-        </button>
+          <button
+            type="button"
+            onClick={() => setTab('rent')}
+            className={`flex items-center space-x-2 px-5 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer ${
+              tab === 'rent'
+                ? 'bg-navy-950 text-gold-400 shadow-md ring-1 ring-gold-400/40'
+                : 'text-slate-600 hover:text-navy-950 hover:bg-slate-100 bg-slate-50'
+            }`}
+          >
+            <Building className="w-4 h-4" />
+            <span>เช่าอสังหาริมทรัพย์</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setTab('consignment')}
+            className={`flex items-center space-x-2 px-5 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer ${
+              tab === 'consignment'
+                ? 'bg-navy-950 text-gold-400 shadow-md ring-1 ring-gold-400/40'
+                : 'text-slate-600 hover:text-navy-950 hover:bg-slate-100 bg-slate-50'
+            }`}
+          >
+            <HandCoins className="w-4 h-4 text-gold-600" />
+            <span>ขายฝาก / จำนองด่วน</span>
+          </button>
+        </div>
+
+        <div className="hidden lg:flex items-center space-x-1.5 text-xs text-slate-500 font-medium">
+          <Sparkles className="w-3.5 h-3.5 text-gold-600" />
+          <span>อัปเดตทรัพย์ใหม่ในหาดใหญ่–สงขลา ทุกสัปดาห์</span>
+        </div>
       </div>
 
       {/* Filter Form */}
-      <form onSubmit={handleSearch} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5 sm:gap-4 items-end">
-        {/* Field 1: ประเภททรัพย์ */}
-        <div>
-          <label className="block text-xs font-bold text-slate-800 mb-1.5 flex items-center">
-            <Home className="w-3.5 h-3.5 mr-1.5 text-gold-600" />
-            ประเภททรัพย์
-          </label>
-          <select
-            value={propertyType}
-            onChange={(e) => setPropertyType(e.target.value)}
-            className="w-full bg-slate-50 hover:bg-white border border-slate-200 rounded-xl py-3 px-3.5 text-xs sm:text-sm text-slate-900 font-medium focus:outline-none focus:ring-2 focus:ring-gold-500 focus:bg-white transition-all cursor-pointer"
+      {tab === 'consignment' ? (
+        <div className="py-2 flex flex-col sm:flex-row items-center justify-between gap-4 bg-gold-50/60 p-5 rounded-2xl border border-gold-200/80">
+          <div className="space-y-1">
+            <h4 className="text-sm font-bold text-navy-950 flex items-center space-x-2">
+              <HandCoins className="w-4 h-4 text-gold-600" />
+              <span>บริการรับขายฝาก & จำนองอสังหาริมทรัพย์ ดอกเบี้ยต่ำ ถูกต้องตามกฎหมาย 100%</span>
+            </h4>
+            <p className="text-xs text-slate-600">
+              อนุมัติไว ได้เงินด่วน ทำสัญญาต่อหน้าเจ้าพนักงาน ณ สำนักงานที่ดิน ปลอดภัยและโปร่งใสทุกขั้นตอน
+            </p>
+          </div>
+          <Link
+            href="/sell"
+            className="px-6 py-3 bg-navy-950 hover:bg-navy-900 text-gold-400 font-bold text-xs rounded-xl shadow-md flex items-center space-x-2 shrink-0 transition-all cursor-pointer"
           >
-            <option value="all">ทุกประเภททรัพย์</option>
-            <option value="house">บ้านเดี่ยว / ทาวน์โฮม</option>
-            <option value="land">ที่ดิน</option>
-            <option value="condo">คอนโดมิเนียม</option>
-            <option value="commercial">อาคารพาณิชย์</option>
-            <option value="investment">อสังหาฯ เพื่อการลงทุน</option>
-            <option value="consignment">ขายฝาก / จำนอง</option>
-          </select>
+            <span>ปรึกษาเรื่องขายฝากทันที</span>
+            <ArrowRight className="w-3.5 h-3.5 text-gold-400" />
+          </Link>
         </div>
+      ) : (
+        <form onSubmit={handleSearch} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5 sm:gap-4 items-end">
+          {/* Field 1: ประเภททรัพย์ */}
+          <div>
+            <label className="block text-xs font-bold text-slate-800 mb-1.5 flex items-center">
+              <Home className="w-3.5 h-3.5 mr-1.5 text-gold-600" />
+              ประเภททรัพย์
+            </label>
+            <select
+              value={propertyType}
+              onChange={(e) => setPropertyType(e.target.value)}
+              className="w-full bg-slate-50 hover:bg-white border border-slate-200 rounded-xl py-3 px-3.5 text-xs sm:text-sm text-slate-900 font-medium focus:outline-none focus:ring-2 focus:ring-gold-500 focus:bg-white transition-all cursor-pointer"
+            >
+              <option value="all">ทุกประเภททรัพย์</option>
+              <option value="house">บ้านเดี่ยว / ทาวน์โฮม / พูลวิลล่า</option>
+              <option value="land">ที่ดินแปลงสวย</option>
+              <option value="condo">คอนโดมิเนียม</option>
+              <option value="commercial">อาคารพาณิชย์ / ตึกแถว</option>
+              <option value="investment">อสังหาฯ เพื่อการลงทุน</option>
+            </select>
+          </div>
 
-        {/* Field 2: ทำเล */}
-        <div>
-          <label className="block text-xs font-bold text-slate-800 mb-1.5 flex items-center">
-            <MapPin className="w-3.5 h-3.5 mr-1.5 text-gold-600" />
-            ทำเล (หาดใหญ่-สงขลา)
-          </label>
-          <select
-            value={district}
-            onChange={(e) => setDistrict(e.target.value)}
-            className="w-full bg-slate-50 hover:bg-white border border-slate-200 rounded-xl py-3 px-3.5 text-xs sm:text-sm text-slate-900 font-medium focus:outline-none focus:ring-2 focus:ring-gold-500 focus:bg-white transition-all cursor-pointer"
-          >
-            <option value="">ทุกทำเลในหาดใหญ่–สงขลา</option>
-            {DISTRICTS_LIST.map((dist) => (
-              <option key={dist} value={dist}>
-                {dist}
-              </option>
-            ))}
-          </select>
-        </div>
+          {/* Field 2: ทำเล */}
+          <div>
+            <label className="block text-xs font-bold text-slate-800 mb-1.5 flex items-center">
+              <MapPin className="w-3.5 h-3.5 mr-1.5 text-gold-600" />
+              ทำเล (หาดใหญ่-สงขลา)
+            </label>
+            <select
+              value={district}
+              onChange={(e) => setDistrict(e.target.value)}
+              className="w-full bg-slate-50 hover:bg-white border border-slate-200 rounded-xl py-3 px-3.5 text-xs sm:text-sm text-slate-900 font-medium focus:outline-none focus:ring-2 focus:ring-gold-500 focus:bg-white transition-all cursor-pointer"
+            >
+              <option value="">ทุกทำเลในหาดใหญ่–สงขลา</option>
+              {DISTRICTS_LIST.map((dist) => (
+                <option key={dist} value={dist}>
+                  {dist}
+                </option>
+              ))}
+            </select>
+          </div>
 
-        {/* Field 3: ช่วงราคา */}
-        <div>
-          <label className="block text-xs font-bold text-slate-800 mb-1.5 flex items-center">
-            <Coins className="w-3.5 h-3.5 mr-1.5 text-gold-600" />
-            งบประมาณ
-          </label>
-          <select
-            value={maxPrice}
-            onChange={(e) => setMaxPrice(e.target.value)}
-            className="w-full bg-slate-50 hover:bg-white border border-slate-200 rounded-xl py-3 px-3.5 text-xs sm:text-sm text-slate-900 font-medium focus:outline-none focus:ring-2 focus:ring-gold-500 focus:bg-white transition-all cursor-pointer"
-          >
-            <option value="">ทุกช่วงราคา</option>
-            {tab === 'sale' ? (
-              <>
-                <option value="2000000">ไม่เกิน 2 ล้านบาท</option>
-                <option value="3500000">ไม่เกิน 3.5 ล้านบาท</option>
-                <option value="5000000">ไม่เกิน 5 ล้านบาท</option>
-                <option value="10000000">ไม่เกิน 10 ล้านบาท</option>
-                <option value="20000000">ไม่เกิน 20 ล้านบาท</option>
-              </>
-            ) : (
-              <>
-                <option value="10000">ไม่เกิน 10,000 บาท/ด.</option>
-                <option value="20000">ไม่เกิน 20,000 บาท/ด.</option>
-                <option value="35000">ไม่เกิน 35,000 บาท/ด.</option>
-                <option value="50000">ไม่เกิน 50,000 บาท/ด.</option>
-              </>
-            )}
-          </select>
-        </div>
+          {/* Field 3: ช่วงราคา */}
+          <div>
+            <label className="block text-xs font-bold text-slate-800 mb-1.5 flex items-center">
+              <Coins className="w-3.5 h-3.5 mr-1.5 text-gold-600" />
+              งบประมาณ
+            </label>
+            <select
+              value={maxPrice}
+              onChange={(e) => setMaxPrice(e.target.value)}
+              className="w-full bg-slate-50 hover:bg-white border border-slate-200 rounded-xl py-3 px-3.5 text-xs sm:text-sm text-slate-900 font-medium focus:outline-none focus:ring-2 focus:ring-gold-500 focus:bg-white transition-all cursor-pointer"
+            >
+              <option value="">ทุกช่วงราคา</option>
+              {tab === 'sale' ? (
+                <>
+                  <option value="2000000">ไม่เกิน 2 ล้านบาท</option>
+                  <option value="3500000">ไม่เกิน 3.5 ล้านบาท</option>
+                  <option value="5000000">ไม่เกิน 5 ล้านบาท</option>
+                  <option value="10000000">ไม่เกิน 10 ล้านบาท</option>
+                  <option value="20000000">ไม่เกิน 20 ล้านบาท</option>
+                </>
+              ) : (
+                <>
+                  <option value="10000">ไม่เกิน 10,000 บาท/ด.</option>
+                  <option value="20000">ไม่เกิน 20,000 บาท/ด.</option>
+                  <option value="35000">ไม่เกิน 35,000 บาท/ด.</option>
+                  <option value="50000">ไม่เกิน 50,000 บาท/ด.</option>
+                </>
+              )}
+            </select>
+          </div>
 
-        {/* Submit Button */}
-        <div>
-          <button
-            type="submit"
-            className="w-full py-3 px-5 bg-gradient-to-r from-gold-400 via-gold-500 to-amber-500 hover:from-gold-300 hover:to-gold-400 text-navy-950 font-black text-xs sm:text-sm rounded-xl shadow-lg hover:shadow-gold-500/25 flex items-center justify-center space-x-2 transition-all transform hover:-translate-y-0.5 active:translate-y-0 cursor-pointer"
-          >
-            <Search className="w-4 h-4 text-navy-950 stroke-[2.5]" />
-            <span>ค้นหาทันที</span>
-          </button>
-        </div>
-      </form>
+          {/* Submit Button */}
+          <div>
+            <button
+              type="submit"
+              className="w-full py-3 px-5 bg-gradient-to-r from-gold-400 via-gold-500 to-amber-500 hover:from-gold-300 hover:to-gold-400 text-navy-950 font-black text-xs sm:text-sm rounded-xl shadow-lg hover:shadow-gold-500/25 flex items-center justify-center space-x-2 transition-all transform hover:-translate-y-0.5 active:translate-y-0 cursor-pointer"
+            >
+              <Search className="w-4 h-4 text-navy-950 stroke-[2.5]" />
+              <span>ค้นหาอสังหาฯ</span>
+            </button>
+          </div>
+        </form>
+      )}
+
+      {/* Quick Search Tag Shortcuts */}
+      <div className="mt-4 pt-3.5 border-t border-slate-100 flex flex-wrap items-center gap-2 text-xs">
+        <span className="text-slate-400 font-semibold flex items-center space-x-1">
+          <Flame className="w-3.5 h-3.5 text-amber-500" />
+          <span>ค้นหายอดนิยม:</span>
+        </span>
+        <Link
+          href="/properties?district=คอหงส์&type=house"
+          className="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-gold-50 hover:text-gold-700 text-slate-700 text-[11px] font-medium transition-colors"
+        >
+          🏡 บ้านเดี่ยวคอหงส์
+        </Link>
+        <Link
+          href="/properties?district=หาดใหญ่&type=condo"
+          className="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-gold-50 hover:text-gold-700 text-slate-700 text-[11px] font-medium transition-colors"
+        >
+          🎓 คอนโดใกล้ ม.อ.
+        </Link>
+        <Link
+          href="/properties?district=หาดใหญ่&type=commercial"
+          className="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-gold-50 hover:text-gold-700 text-slate-700 text-[11px] font-medium transition-colors"
+        >
+          🏢 ตึกแถว 30 เมตร / กิมหยง
+        </Link>
+        <Link
+          href="/properties?type=land"
+          className="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-gold-50 hover:text-gold-700 text-slate-700 text-[11px] font-medium transition-colors"
+        >
+          🏞️ ที่ดินเปล่าแปลงสวย
+        </Link>
+        <Link
+          href="/properties?filter=featured"
+          className="px-2.5 py-1 rounded-lg bg-gold-400/20 text-gold-700 hover:bg-gold-400/30 text-[11px] font-bold transition-colors ml-auto"
+        >
+          ⭐ ทรัพย์ Exclusive ทั้งหมด →
+        </Link>
+      </div>
     </div>
   );
 }

@@ -28,8 +28,11 @@
         "features": { "type": "array", "items": { "type": "string" } },
         "cover_image": { "type": "string" },
         "images": { "type": "array", "items": { "type": "string" } },
+        "facing_direction": { "type": "string" },
+        "feng_shui": { "type": "object" },
         "featured": { "type": "boolean" },
         "published": { "type": "boolean" },
+        "internal_notes": { "type": "string", "description": "Private, non-public agent notes regarding property condition, owner details, or negotiation history" },
         "agent_id": { "type": "string" },
         "created_at": { "type": "string" },
         "updated_at": { "type": "string" }
@@ -96,6 +99,46 @@
         "languages": { "type": "array", "items": { "type": "string" } }
       },
       "required": ["id", "name", "phone"]
+    },
+    "property_history": {
+      "title": "Property History Logs",
+      "description": "Audit trail logging price changes, status updates, agent edits, and listing history",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "property_id": { "type": "string" },
+        "property_title": { "type": "string" },
+        "change_type": { "type": "string" },
+        "previous_value": { "type": "string" },
+        "new_value": { "type": "string" },
+        "diff_summary": { "type": "string" },
+        "actor_name": { "type": "string" },
+        "actor_email": { "type": "string" },
+        "actor_role": { "type": "string" },
+        "timestamp": { "type": "string" },
+        "notes": { "type": "string" }
+      },
+      "required": ["id", "property_id", "change_type", "diff_summary", "timestamp"]
+    },
+    "system_activities": {
+      "title": "System Activity Feed",
+      "description": "Log of critical system events such as property additions, inquiry updates, and user role changes",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "category": { "type": "string", "enum": ["property", "inquiry", "user_role", "system"] },
+        "action": { "type": "string" },
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "target_id": { "type": "string" },
+        "target_name": { "type": "string" },
+        "actor_name": { "type": "string" },
+        "actor_email": { "type": "string" },
+        "actor_role": { "type": "string" },
+        "metadata": { "type": "object" },
+        "created_at": { "type": "string" }
+      },
+      "required": ["id", "category", "action", "title", "description", "created_at"]
     }
   },
   "firestore": {
@@ -114,6 +157,14 @@
     "/agents/{agentId}": {
       "schema": "agents",
       "description": "Collection of featured agents and consultant team members"
+    },
+    "/property_history/{logId}": {
+      "schema": "property_history",
+      "description": "Collection of audit trail events and change history"
+    },
+    "/system_activities/{activityId}": {
+      "schema": "system_activities",
+      "description": "Collection of system activity feed items"
     }
   }
 }

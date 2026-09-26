@@ -1,6 +1,0 @@
-User-Agent: *
-Allow: /
-Disallow: 51895189zaza/admin/
-Disallow: 51895189zaza/api/
-
-Sitemap: http://localhost:3000/sitemap.xml

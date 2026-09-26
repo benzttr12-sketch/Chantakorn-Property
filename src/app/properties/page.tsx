@@ -429,6 +429,7 @@ function PropertiesContent() {
                       video_url={prop.video_url}
                       slug={prop.slug}
                       createdAt={prop.created_at}
+                      facingDirection={prop.facing_direction}
                     />
                   </div>
                 ))}
