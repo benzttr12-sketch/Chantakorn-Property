@@ -12,14 +12,17 @@ import {
   Check
 } from 'lucide-react';
 import { toggleFavoriteId, getFavoriteIds } from '@/lib/store/properties-store';
+import PropertyLineShareButton from '@/components/properties/PropertyLineShareButton';
 
 interface PropertyGalleryProps {
   id: string;
   title: string;
+  price: string;
+  location: string;
   images: string[];
 }
 
-export default function PropertyGallery({ id, title, images }: PropertyGalleryProps) {
+export default function PropertyGallery({ id, title, price, location, images }: PropertyGalleryProps) {
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -83,6 +86,7 @@ export default function PropertyGallery({ id, title, images }: PropertyGalleryPr
           ภาพถ่ายสถานที่จริง ({photoList.length} รูป)
         </span>
         <div className="flex items-center space-x-2">
+          <PropertyLineShareButton title={title} price={price} location={location} />
           <button
             onClick={handleShare}
             className="flex items-center space-x-1.5 px-3 py-1.5 bg-white hover:bg-gray-50 border border-surface-border text-navy-900 text-xs font-semibold rounded-lg shadow-sm transition-all"
