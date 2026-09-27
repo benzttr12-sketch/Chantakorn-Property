@@ -208,6 +208,8 @@ export default function PropertyDetail({ slug, initialProperty = null }: { slug:
             <PropertyGallery
               id={property.id}
               title={property.title}
+              price={formatPrice(property.price, property.status)}
+              location={property.address || `${property.district}, ${property.province}`}
               images={property.images.length ? property.images : [property.cover_image]}
             />
 
