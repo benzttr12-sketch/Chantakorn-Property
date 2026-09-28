@@ -34,22 +34,22 @@ export default function HeroSection() {
             <span className="w-2 h-2 rounded-full bg-gold-400 animate-pulse" />
             <span className="font-bold tracking-widest text-gold-300">CHANTAKORN PROPERTY</span>
             <span className="text-white/40">·</span>
-            <span className="text-slate-200">ศูนย์กลางอสังหาริมทรัพย์ระดับพรีเมียม หาดใหญ่–สงขลา</span>
+            <span className="text-slate-200">นายหน้าอสังหาริมทรัพย์มืออาชีพ หาดใหญ่–สงขลา</span>
           </div>
 
           {/* Main Headline */}
           <h1 className="text-4xl sm:text-5xl lg:text-6xl font-black text-white tracking-tight leading-[1.12] mb-6 text-balance">
-            คัดสรรอสังหาริมทรัพย์ <br className="hidden sm:inline" />
+            ซื้อ ขาย เช่า ฝากขาย <br className="hidden sm:inline" />
             <span className="bg-gradient-to-r from-[#F4E3BA] via-[#D4AF37] to-[#AA771C] bg-clip-text text-transparent">
-              ระดับมาสเตอร์พีซ
+              บ้าน ที่ดิน คอนโด
             </span>
-            <span className="text-white"> ในหาดใหญ่ – สงขลา</span>
+            <span className="text-white"> ในหาดใหญ่–สงขลา</span>
           </h1>
 
           {/* Subheadline */}
           <p className="text-base sm:text-lg text-slate-200 leading-relaxed font-normal mb-8 max-w-2xl">
-            บ้านเดี่ยว พูลวิลล่า คอนโดมิเนียมหรู ที่ดินแปลงสวย และบริการขายฝากดอกเบี้ยเป็นธรรม <br className="hidden sm:inline" />
-            ตรวจสอบความถูกต้องของโฉนดและเอกสารสิทธิ์ 100% พร้อมดูแลประสานสินเชื่อจนถึงวันส่งมอบกรรมสิทธิ์
+            บริการรับฝากขาย ฝากเช่า บ้านเดี่ยว ที่ดินเปล่า คอนโดมิเนียม อาคารพาณิชย์ และขายฝากจำนอง <br className="hidden sm:inline" />
+            ตรวจสอบเอกสารสิทธิ์และโฉนดชัดเจน โปร่งใส พร้อมดูแลยื่นสินเชื่อธนาคารจนถึงวันโอนกรรมสิทธิ์
           </p>
 
           {/* Action CTAs */}
@@ -59,7 +59,7 @@ export default function HeroSection() {
               className="px-8 py-4 bg-gradient-to-r from-gold-400 via-gold-500 to-amber-500 hover:from-gold-300 hover:to-gold-400 text-navy-950 font-black text-sm rounded-xl shadow-xl hover:shadow-gold-500/30 flex items-center space-x-2.5 transition-all transform hover:-translate-y-0.5 active:translate-y-0 group"
             >
               <Search className="w-4 h-4 text-navy-950 stroke-[2.5]" />
-              <span>ชมคอลเลกชันทรัพย์ทั้งหมด</span>
+              <span>ค้นหาบ้านและที่ดินทั้งหมด</span>
               <ChevronRight className="w-4 h-4 text-navy-950 transform group-hover:translate-x-0.5 transition-transform" />
             </Link>
 

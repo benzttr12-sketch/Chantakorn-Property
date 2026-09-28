@@ -44,13 +44,13 @@ export default function WhyChooseUs() {
         <div className="text-center max-w-3xl mx-auto mb-16">
           <div className="flex items-center justify-center space-x-2 text-xs font-bold text-gold-400 uppercase tracking-widest mb-3">
             <Sparkles className="w-3.5 h-3.5 text-gold-400" />
-            <span>UNRIVALED STANDARD OF SERVICE</span>
+            <span>ทำไมต้องเลือก ฉันทากร พร็อพเพอร์ตี้</span>
           </div>
           <h2 className="text-3xl sm:text-4xl lg:text-5xl font-black text-white tracking-tight text-balance">
-            นิยามใหม่แห่งมาตรฐานการบริการอสังหาริมทรัพย์
+            เหตุผลที่ลูกค้าไว้วางใจให้เราดูแลบ้านและที่ดิน
           </h2>
           <p className="text-slate-300 text-sm sm:text-base leading-relaxed mt-3 max-w-2xl mx-auto font-normal">
-            Chantakorn Property ยึดมั่นความซื่อสัตย์ โปร่งใส และผลประโยชน์สูงสุดของลูกค้าเป็นหัวใจสำคัญในทุกการทำธุรกรรม
+            บริการนายหน้าอสังหาริมทรัพย์ด้วยความซื่อสัตย์ โปร่งใส สัญญาชัดเจน และพร้อมอยู่ดูแลเคียงข้างคุณทุกขั้นตอน
           </p>
         </div>
 

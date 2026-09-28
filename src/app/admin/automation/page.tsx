@@ -77,7 +77,7 @@ function AutomationContent() {
   const initialPropId = searchParams.get('propertyId') || '';
   const initialInquiryId = searchParams.get('inquiryId') || '';
 
-  const [activeTab, setActiveTab] = useState<'marketing' | 'best_time' | 'leads' | 'valuation' | 'contracts' | 'scripts'>(
+  const [activeTab, setActiveTab] = useState<'marketing' | 'best_time' | 'leads' | 'valuation' | 'contracts' | 'scripts' | 'media_studio'>(
     (initialTab as any) || 'marketing'
   );
 
@@ -130,6 +130,45 @@ function AutomationContent() {
   const [buyerPhone, setBuyerPhone] = useState('');
   const [depositAmount, setDepositAmount] = useState<number>(50000);
   const [generatedContract, setGeneratedContract] = useState<ContractDraftResult | null>(null);
+
+  // Tab 7: AI Media Studio State (Veo 3.1 Video & Gemini 3.1 Flash Image Preview)
+  const [mediaPrompt, setMediaPrompt] = useState('');
+  const [videoAspectRatio, setVideoAspectRatio] = useState<'16:9' | '9:16'>('16:9');
+  const [stagingStyle, setStagingStyle] = useState('Modern Luxury');
+  const [isMediaLoading, setIsMediaLoading] = useState(false);
+  const [generatedMedia, setGeneratedMedia] = useState<{
+    videoUrl?: string;
+    stagingDescription?: string;
+    modelUsed?: string;
+    aspectRatio?: string;
+    message?: string;
+    imageUrl?: string;
+  } | null>(null);
+
+  const handleGenerateMedia = async (action: 'generate_video' | 'edit_image') => {
+    setIsMediaLoading(true);
+    try {
+      const res = await fetch('/api/ai/property-media-studio', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action,
+          prompt: mediaPrompt || (selectedProperty ? `วอล์กธรูบ้าน ${selectedProperty.title} ในหาดใหญ่` : 'วอล์กธรูบ้านหรูพร้อมสระว่ายน้ำในหาดใหญ่'),
+          imageUrl: selectedProperty?.images?.[0] || '',
+          aspectRatio: videoAspectRatio,
+          editStyle: stagingStyle,
+        }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setGeneratedMedia(data);
+      }
+    } catch (err) {
+      console.error('Media generation error:', err);
+    } finally {
+      setIsMediaLoading(false);
+    }
+  };
 
   // Load Data
   useEffect(() => {
@@ -395,6 +434,18 @@ function AutomationContent() {
         >
           <MessageCircle className="w-4 h-4 text-rose-500" />
           <span>6. สคริปต์ตอบด่วนปิดการขาย</span>
+        </button>
+
+        <button
+          onClick={() => setActiveTab('media_studio')}
+          className={`flex items-center space-x-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap ${
+            activeTab === 'media_studio'
+              ? 'bg-navy-950 text-gold-400 shadow-md scale-102'
+              : 'text-gray-600 hover:bg-gray-100 hover:text-navy-950'
+          }`}
+        >
+          <Video className="w-4 h-4 text-purple-500 animate-pulse" />
+          <span>7. 🎬 AI Media Studio (Veo 3.1 & Staging)</span>
         </button>
       </div>
 
@@ -1349,6 +1400,242 @@ function AutomationContent() {
                 </div>
               </div>
             ))}
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* TAB 7: AI MEDIA STUDIO (VEO 3.1 VIDEO & GEMINI IMAGE STAGING) */}
+      {/* ========================================================================= */}
+      {activeTab === 'media_studio' && (
+        <div className="space-y-6">
+          <div className="bg-gradient-to-r from-purple-900 via-navy-950 to-slate-900 text-white p-6 rounded-3xl border border-purple-800 shadow-xl relative overflow-hidden">
+            <div className="absolute top-0 right-0 w-64 h-64 bg-purple-500/10 rounded-full blur-3xl pointer-events-none" />
+            <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 relative z-10">
+              <div className="space-y-1">
+                <div className="inline-flex items-center space-x-2 px-3 py-0.5 rounded-full bg-purple-500/20 border border-purple-400/40 text-purple-300 text-[10px] font-bold uppercase tracking-wider">
+                  <Sparkles className="w-3 h-3 text-purple-300" />
+                  <span>Veo 3.1 & Gemini 3.1 Flash Media Studio</span>
+                </div>
+                <h2 className="text-xl font-extrabold text-white">
+                  สร้างวิดีโอ walkthrough และตกแต่งภาพ Virtual Staging ด้วย AI
+                </h2>
+                <p className="text-xs text-purple-200/80 max-w-xl">
+                  เนรมิตรูปภาพอสังหาฯ ให้กลายเป็นวิดีโอพรีเซนเทชันระดับพรีเมียมด้วยโมเดล <strong>veo-3.1-fast-generate-preview</strong> หรือใช้ <strong>gemini-3.1-flash-image-preview</strong> ในการจัด Virtual Staging ใน 1 คลิก
+                </p>
+              </div>
+
+              {selectedProperty && (
+                <div className="p-3 bg-white/10 backdrop-blur-md rounded-2xl border border-white/10 text-xs flex items-center space-x-3 shrink-0">
+                  {selectedProperty.images?.[0] && (
+                    <div className="relative w-12 h-12 rounded-xl overflow-hidden shrink-0 border border-gold-400">
+                      <Image
+                        src={selectedProperty.images[0]}
+                        alt={selectedProperty.title}
+                        fill
+                        className="object-cover"
+                        referrerPolicy="no-referrer"
+                      />
+                    </div>
+                  )}
+                  <div>
+                    <span className="text-[10px] text-gold-300 block font-semibold">ทรัพย์ที่เลือก:</span>
+                    <p className="font-bold text-white line-clamp-1 max-w-[180px]">{selectedProperty.title}</p>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+            {/* Control Panel */}
+            <div className="lg:col-span-5 space-y-5 bg-white p-6 rounded-3xl border border-gray-200 shadow-xs">
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-navy-950 flex items-center justify-between">
+                  <span>โจทย์ความต้องการ / พรอมต์คำสั่ง AI:</span>
+                  <span className="text-[10px] text-gray-400 font-normal">ภาษาไทยหรืออังกฤษ</span>
+                </label>
+                <textarea
+                  rows={3}
+                  value={mediaPrompt}
+                  onChange={(e) => setMediaPrompt(e.target.value)}
+                  placeholder={
+                    selectedProperty
+                      ? `วอล์กธรูบ้าน ${selectedProperty.title} บรรยากาศอบอุ่น แสงแดดธรรมชาติตกกระทบผ้าม่านสไตล์ลักชัวรี`
+                      : 'วอล์กธรูบ้านพูลวิลล่าหรูพร้อมสระว่ายน้ำส่วนตัว แสงช่วง Golden hour'
+                  }
+                  className="w-full bg-gray-50 border border-gray-200 rounded-2xl p-3 text-xs text-navy-950 focus:outline-none focus:ring-2 focus:ring-purple-500 font-sans"
+                />
+              </div>
+
+              <div className="space-y-3 pt-2 border-t border-gray-100">
+                <h3 className="text-xs font-bold text-navy-950 flex items-center space-x-1.5">
+                  <Video className="w-4 h-4 text-purple-600" />
+                  <span>1. สร้างวิดีโอด้วย Veo 3.1 Fast (Veo Video Generation)</span>
+                </h3>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setVideoAspectRatio('16:9')}
+                    className={`py-2 px-3 rounded-xl border text-xs font-bold flex items-center justify-center space-x-2 transition-all ${
+                      videoAspectRatio === '16:9'
+                        ? 'bg-purple-950 text-white border-purple-950 shadow-xs'
+                        : 'bg-gray-50 text-gray-700 border-gray-200 hover:bg-gray-100'
+                    }`}
+                  >
+                    <span>16:9 (Landscape)</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setVideoAspectRatio('9:16')}
+                    className={`py-2 px-3 rounded-xl border text-xs font-bold flex items-center justify-center space-x-2 transition-all ${
+                      videoAspectRatio === '9:16'
+                        ? 'bg-purple-950 text-white border-purple-950 shadow-xs'
+                        : 'bg-gray-50 text-gray-700 border-gray-200 hover:bg-gray-100'
+                    }`}
+                  >
+                    <span>9:16 (Portrait Reel)</span>
+                  </button>
+                </div>
+
+                <button
+                  onClick={() => handleGenerateMedia('generate_video')}
+                  disabled={isMediaLoading}
+                  className="w-full py-3 px-4 rounded-2xl bg-gradient-to-r from-purple-700 via-purple-900 to-navy-950 hover:from-purple-800 hover:to-navy-900 text-white font-extrabold text-xs shadow-md hover:shadow-lg transition-all flex items-center justify-center space-x-2 disabled:opacity-50"
+                >
+                  {isMediaLoading ? (
+                    <>
+                      <RefreshCw className="w-4 h-4 animate-spin text-purple-300" />
+                      <span>กำลังประมวลผล Veo 3.1 Video...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Video className="w-4 h-4 text-purple-300" />
+                      <span>🎬 สร้างวิดีโอ Walkthrough ด้วย Veo 3.1</span>
+                    </>
+                  )}
+                </button>
+              </div>
+
+              <div className="space-y-3 pt-4 border-t border-gray-100">
+                <h3 className="text-xs font-bold text-navy-950 flex items-center space-x-1.5">
+                  <Wand2 className="w-4 h-4 text-amber-600" />
+                  <span>2. ตกแต่งรูปภาพ Virtual Staging (Gemini 3.1 Flash)</span>
+                </h3>
+
+                <div>
+                  <label className="text-[11px] font-semibold text-gray-600 block mb-1">เลือกสไตล์การตกแต่ง:</label>
+                  <select
+                    value={stagingStyle}
+                    onChange={(e) => setStagingStyle(e.target.value)}
+                    className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 text-xs font-semibold text-navy-950"
+                  >
+                    <option value="Modern Luxury">Modern Luxury (โมเดิร์นลักชัวรี หรูหรา)</option>
+                    <option value="Minimalist Scandinavian">Minimalist Scandinavian (มินิมอล ไม้อบอุ่น)</option>
+                    <option value="Contemporary Thai-Bali">Contemporary Thai-Bali (คอนเทมโพรารี อบอุ่นผ่อนคลาย)</option>
+                    <option value="Industrial Loft">Industrial Loft (ลอฟท์เท่ ทันสมัย)</option>
+                  </select>
+                </div>
+
+                <button
+                  onClick={() => handleGenerateMedia('edit_image')}
+                  disabled={isMediaLoading}
+                  className="w-full py-3 px-4 rounded-2xl bg-gradient-to-r from-amber-600 via-gold-600 to-navy-950 hover:from-amber-700 hover:to-navy-900 text-white font-extrabold text-xs shadow-md hover:shadow-lg transition-all flex items-center justify-center space-x-2 disabled:opacity-50"
+                >
+                  {isMediaLoading ? (
+                    <>
+                      <RefreshCw className="w-4 h-4 animate-spin text-amber-300" />
+                      <span>กำลังวิเคราะห์การตกแต่ง Staging...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="w-4 h-4 text-amber-300" />
+                      <span>✨ ตกแต่ง Virtual Staging ด้วย Gemini 3.1</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+
+            {/* Display Output Panel */}
+            <div className="lg:col-span-7 bg-white p-6 rounded-3xl border border-gray-200 shadow-xs flex flex-col justify-between space-y-4">
+              <div>
+                <div className="flex items-center justify-between pb-3 border-b border-gray-100">
+                  <div className="flex items-center space-x-2">
+                    <span className="w-2.5 h-2.5 rounded-full bg-purple-500 animate-ping" />
+                    <h3 className="font-extrabold text-navy-950 text-sm">
+                      ผลลัพธ์จาก AI Media Studio
+                    </h3>
+                  </div>
+                  {generatedMedia?.modelUsed && (
+                    <span className="px-2.5 py-0.5 rounded-full bg-purple-50 text-purple-700 text-[10px] font-bold border border-purple-200">
+                      Model: {generatedMedia.modelUsed}
+                    </span>
+                  )}
+                </div>
+
+                {generatedMedia ? (
+                  <div className="mt-4 space-y-4">
+                    {generatedMedia.videoUrl && (
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-bold text-purple-950 flex items-center space-x-1.5">
+                            <Video className="w-3.5 h-3.5 text-purple-600" />
+                            <span>วิดีโอพรีเซนเทชันอัตโนมัติ ({generatedMedia.aspectRatio}):</span>
+                          </span>
+                          <span className="text-[10px] text-gray-500 font-semibold">16:9 / 9:16 Video Stream</span>
+                        </div>
+
+                        <div className={`relative rounded-2xl overflow-hidden bg-black shadow-lg mx-auto ${generatedMedia.aspectRatio === '9:16' ? 'max-w-[280px] aspect-[9/16]' : 'w-full aspect-video'}`}>
+                          <video
+                            src={generatedMedia.videoUrl}
+                            controls
+                            autoPlay
+                            loop
+                            muted
+                            className="w-full h-full object-cover"
+                          />
+                        </div>
+                      </div>
+                    )}
+
+                    {generatedMedia.stagingDescription && (
+                      <div className="space-y-2 pt-3 border-t border-gray-100">
+                        <h4 className="text-xs font-extrabold text-navy-950 flex items-center space-x-1.5">
+                          <Sparkles className="w-3.5 h-3.5 text-gold-600" />
+                          <span>คำแนะนำการจัดวางแผน Virtual Staging:</span>
+                        </h4>
+                        <div className="p-4 bg-purple-50/50 border border-purple-100 rounded-2xl text-xs text-gray-800 leading-relaxed whitespace-pre-wrap font-sans">
+                          {generatedMedia.stagingDescription}
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="p-3 bg-emerald-50 rounded-2xl border border-emerald-200 text-xs text-emerald-800 flex items-center space-x-2">
+                      <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                      <span>{generatedMedia.message || 'ประมวลผลวิดีโอและรูปภาพสำเร็จเรียบร้อยแล้ว'}</span>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="min-h-[320px] flex flex-col items-center justify-center text-center p-8 space-y-3 border-2 border-dashed border-gray-200 rounded-2xl my-4">
+                    <div className="w-14 h-14 rounded-2xl bg-purple-50 flex items-center justify-center text-purple-600">
+                      <Video className="w-7 h-7" />
+                    </div>
+                    <div className="space-y-1">
+                      <h4 className="font-extrabold text-navy-950 text-sm">พร้อมสร้างสรรค์วิดีโอและสเตจจิ้ง</h4>
+                      <p className="text-xs text-gray-500 max-w-sm">
+                        เลือกทรัพย์และกดปุ่มสร้างวิดีโอ Veo 3.1 หรือ Virtual Staging ทางด้านซ้ายเพื่อรับชมผลลัพธ์ได้ทันที
+                      </p>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div className="pt-3 border-t border-gray-100 flex items-center justify-between text-[11px] text-gray-500 font-medium">
+                <span>Chantakorn AI Video Engine v3.1</span>
+                <span>Veo 3.1 Fast & Gemini 3.1 Flash Integrated</span>
+              </div>
+            </div>
           </div>
         </div>
       )}

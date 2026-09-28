@@ -254,7 +254,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const navItems = [
     { label: 'แดชบอร์ดภาพรวม', href: '/admin', icon: LayoutDashboard },
     { label: 'ติดตามเฟสงาน', href: '/admin/work-phases', icon: Layers, badge: 'ใหม่' },
-    { label: 'ระบบอัตโนมัติ AI', href: '/admin/automation', icon: Sparkles, badge: 'เทพ' },
+    { label: 'ระบบอัตโนมัติ AI', href: '/admin/automation', icon: Sparkles, badge: 'AI ช่วยโพสต์' },
     { label: 'จัดการอสังหาริมทรัพย์', href: '/admin/properties', icon: Building2 },
     { label: 'เพิ่มทรัพย์ใหม่', href: '/admin/properties/new', icon: PlusCircle },
     { label: 'จัดการนายหน้าแนะนำ', href: '/admin/agents', icon: UserCheck },

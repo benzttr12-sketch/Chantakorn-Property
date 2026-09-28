@@ -262,13 +262,13 @@ export default function AdminDashboardPage() {
           <div className="space-y-1">
             <div className="inline-flex items-center space-x-1.5 px-3 py-1 rounded-full bg-gold-500/20 border border-gold-500/40 text-gold-300 text-xs font-bold uppercase tracking-wider">
               <Sparkles className="w-3.5 h-3.5 text-gold-400" />
-              <span>ระบบอัตโนมัติ AI อัจฉริยะ (AI Automation Suite)</span>
+              <span>เครื่องมือผู้ช่วย AI และการตลาดอัตโนมัติ</span>
             </div>
             <h2 className="text-lg sm:text-xl font-extrabold text-white">
-              เพิ่มยอดขายและทุ่นแรงนายหน้า 10 เท่าด้วยระบบอัตโนมัติ
+              ระบบช่วยร่างโพสต์โซเชียลมีเดีย และจับคู่ทรัพย์กับลูกค้า
             </h2>
             <p className="text-xs text-gray-300 max-w-2xl">
-              สร้างโพสต์การตลาดทุกแพลตฟอร์ม จับคู่ผู้สนใจกับทรัพย์อัตโนมัติ ร่างสัญญาจะซื้อจะขาย และวิเคราะห์ผลตอบแทน Yield ในคลิกเดียว
+              ช่วยร่างข้อความการตลาดสำหรับ Facebook/TikTok/LINE, ค้นหาจับคู่ผู้สนใจซื้อ และช่วยคำนวณผลตอบแทนการลงทุนอสังหาริมทรัพย์
             </p>
           </div>
 
