@@ -422,7 +422,7 @@ export default function MortgageCalculator({
             {/* CTA action buttons */}
             <div className="pt-2 space-y-2">
               <a
-                href="https://line.me/R/ti/p/@chantakorn"
+                href="https://lin.ee/NMSe28T3"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-gold-500 to-gold-600 hover:from-gold-600 hover:to-gold-700 text-navy-950 font-bold text-xs sm:text-sm flex items-center justify-center space-x-2 shadow-lg hover:scale-[1.02] active:scale-[0.98] transition-all"
@@ -581,7 +581,7 @@ export default function MortgageCalculator({
 
             <div className="pt-2 space-y-2">
               <a
-                href="https://line.me/R/ti/p/@chantakorn"
+                href="https://lin.ee/NMSe28T3"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-gold-500 to-gold-600 hover:from-gold-600 hover:to-gold-700 text-navy-950 font-bold text-xs sm:text-sm flex items-center justify-center space-x-2 shadow-lg transition-all"
@@ -721,12 +721,12 @@ export default function MortgageCalculator({
 
             <div className="pt-2 border-t border-white/10 text-center">
               <a
-                href="https://line.me/R/ti/p/@chantakorn"
+                href="https://lin.ee/NMSe28T3"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-xs text-gold-300 hover:text-gold-200 font-bold inline-flex items-center space-x-1"
               >
-                <span>หรือแอด LINE ส่งรูปโฉนดทันที: @chantakorn</span>
+                <span>หรือแอด LINE ส่งรูปโฉนดทันที: https://lin.ee/NMSe28T3</span>
                 <ArrowRight className="w-3.5 h-3.5" />
               </a>
             </div>

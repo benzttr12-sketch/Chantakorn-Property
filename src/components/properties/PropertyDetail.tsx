@@ -27,11 +27,13 @@ import PropertyInquiryForm from '@/components/properties/PropertyInquiryForm';
 import PropertyCard from '@/components/properties/PropertyCard';
 import PropertyMap from '@/components/properties/PropertyMap';
 import PropertyFengShui from '@/components/properties/PropertyFengShui';
+import SendToLineButton from '@/components/properties/SendToLineButton';
 import { fetchPropertyBySlug, fetchProperties } from '@/lib/store/properties-store';
 import { formatPrice, getPropertyStatusBadge, formatThaiNumber, formatPropertyCode, formatLineUrl } from '@/lib/utils';
 
 import { Property } from '@/lib/types';
 import { calculateNearbyLandmarks } from '@/lib/nearby-landmarks';
+import { getStoredUser } from '@/lib/auth-helpers';
 
 export default function PropertyDetail({ slug, initialProperty = null }: { slug: string; initialProperty?: Property | null }) {
   const [property, setProperty] = useState<Property | null>(initialProperty);
@@ -39,6 +41,11 @@ export default function PropertyDetail({ slug, initialProperty = null }: { slug:
   const [loading, setLoading] = useState(!initialProperty);
   const [error, setError] = useState('');
   const [copiedCode, setCopiedCode] = useState(false);
+  const [userProfile, setUserProfile] = useState<any>(null);
+
+  useEffect(() => {
+    setUserProfile(getStoredUser());
+  }, []);
 
   const handleCopyCode = () => {
     if (!property) return;
@@ -189,17 +196,32 @@ export default function PropertyDetail({ slug, initialProperty = null }: { slug:
               </div>
 
               {/* Price Banner */}
-              <div className="mt-4 p-4 rounded-2xl bg-navy-950 text-white flex flex-wrap items-center justify-between gap-2 shadow-sm border border-navy-800">
+              <div className="mt-4 p-4 sm:p-5 rounded-2xl bg-navy-950 text-white flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-sm border border-navy-800">
                 <div>
                   <span className="text-xs text-gray-400 uppercase tracking-wider block">
                     {property.status === 'rent' ? 'ค่าเช่าต่อเดือน' : 'ราคาเสนอขาย'}
                   </span>
-                  <span className="text-3xl font-extrabold text-gold-400">
+                  <span className="text-2xl sm:text-3xl font-extrabold text-gold-400 font-mono">
                     {formatPrice(property.price, property.status)}
                   </span>
+                  <div className="text-[11px] text-gray-300 mt-0.5">
+                    <span>สถานะ: พร้อมเข้าอยู่ / พร้อมโอนกรรมสิทธิ์</span>
+                  </div>
                 </div>
-                <div className="text-right text-xs text-gray-300">
-                  <span>สถานะ: พร้อมเข้าอยู่ / พร้อมโอนกรรมสิทธิ์</span>
+                <div className="flex items-center gap-2">
+                  <SendToLineButton
+                    property={{
+                      id: property.id,
+                      title: property.title,
+                      price: property.price,
+                      status: property.status,
+                      district: property.district,
+                      province: property.province,
+                      slug: property.slug
+                    }}
+                    variant="banner"
+                    label="ส่งทรัพย์นี้ให้ทีมงานทาง LINE"
+                  />
                 </div>
               </div>
             </div>
@@ -209,6 +231,7 @@ export default function PropertyDetail({ slug, initialProperty = null }: { slug:
               id={property.id}
               title={property.title}
               images={property.images.length ? property.images : [property.cover_image]}
+              videoUrl={property.video_url}
             />
 
             {/* 3. Quick Stats Bar */}
@@ -260,22 +283,53 @@ export default function PropertyDetail({ slug, initialProperty = null }: { slug:
             )}
 
             {/* 4. Description */}
-            <div className="bg-white rounded-2xl p-6 border border-surface-border shadow-card">
-              <h3 className="text-lg font-bold text-navy-950 mb-4 pb-2 border-b border-gray-100">
-                รายละเอียดทรัพย์
-              </h3>
-              <div className="prose prose-sm max-w-none text-gray-700 leading-relaxed space-y-3 whitespace-pre-line">
-                {property.description}
+            <div className="bg-white rounded-2xl p-6 border border-surface-border shadow-card space-y-6">
+              <div>
+                <h3 className="text-lg font-bold text-navy-950 mb-4 pb-2 border-b border-gray-100">
+                  รายละเอียดทรัพย์
+                </h3>
+                <div className="prose prose-sm max-w-none text-gray-700 leading-relaxed space-y-3 whitespace-pre-line">
+                  {property.description}
+                </div>
               </div>
 
               {/* Verified Badge Guarantee */}
-              <div className="mt-6 p-4 rounded-xl bg-emerald-50/70 border border-emerald-200 flex items-center space-x-3">
+              <div className="p-4 rounded-xl bg-emerald-50/70 border border-emerald-200 flex items-center space-x-3">
                 <ShieldCheck className="w-6 h-6 text-emerald-600 flex-shrink-0" />
                 <div className="text-xs text-emerald-900">
                   <strong>การันตีความถูกต้องโดย Chantakorn Property:</strong> ตรวจสอบเอกสารสิทธิ์ โฉนดที่ดิน และความถูกต้องของข้อมูลทรัพย์เรียบร้อยแล้ว ปลอดภาระหนี้ซ้อน
                 </div>
               </div>
             </div>
+
+            {/* Agent Internal Notes (Confidential details visible only to Admins and Agents) */}
+            {userProfile && (userProfile.role === 'ADMIN' || userProfile.role === 'AGENT') && (
+              <div className="bg-gradient-to-br from-amber-50 to-orange-50/40 border-2 border-amber-300 rounded-2xl p-6 shadow-sm space-y-4 animate-in fade-in">
+                <div className="flex items-center justify-between pb-2 border-b border-amber-200">
+                  <h3 className="text-sm font-black text-amber-950 flex items-center gap-2">
+                    <span className="text-base">🔒</span>
+                    <span>บันทึกภายในสำหรับแอดมิน & นายหน้า (Agent Internal Notes)</span>
+                  </h3>
+                  <span className="text-[10px] bg-amber-200 text-amber-900 px-2 py-0.5 rounded-md font-black uppercase tracking-wider">
+                    ความลับเฉพาะเจ้าหน้าที่
+                  </span>
+                </div>
+                
+                <div className="space-y-1">
+                  <p className="text-xs text-amber-900 font-bold">
+                    📝 ประวัติการต่อรองราคา สภาพทรัพย์จริง และรายละเอียดเจ้าของทรัพย์ (ไม่แสดงต่อบุคคลทั่วไป):
+                  </p>
+                  <div className="bg-white rounded-xl p-4 border border-amber-200 text-xs font-semibold text-navy-950 whitespace-pre-line leading-relaxed shadow-inner">
+                    {property.internal_notes ? property.internal_notes : '(ไม่มีข้อมูลบันทึกข้อความภายใน)'}
+                  </div>
+                </div>
+
+                <div className="flex justify-between items-center text-[10px] text-amber-700 font-medium">
+                  <span>ผู้รับผิดชอบทรัพย์: <strong className="text-amber-950 font-bold">{property.agent?.name || 'Chantakorn Admin'}</strong></span>
+                  <span>* ข้อมูลนี้ถูกปิดกั้นความปลอดภัยและแสดงให้เฉพาะพนักงานเห็นเท่านั้น</span>
+                </div>
+              </div>
+            )}
 
             {/* 5. Property Information Specifications */}
             <PropertySpecs property={property} />
@@ -436,15 +490,21 @@ export default function PropertyDetail({ slug, initialProperty = null }: { slug:
           <span>โทรด่วน</span>
         </a>
 
-        <a
-          href={formatLineUrl(property.agent?.line_id)}
-          target="_blank"
-          rel="noreferrer"
-          className="flex-1 py-2.5 bg-[#06C755] text-white rounded-xl text-xs font-bold flex items-center justify-center space-x-1"
-        >
-          <MessageCircle className="w-3.5 h-3.5 fill-current" />
-          <span>แชท LINE</span>
-        </a>
+        <div className="flex-1">
+          <SendToLineButton
+            property={{
+              id: property.id,
+              title: property.title,
+              price: property.price,
+              status: property.status,
+              district: property.district,
+              province: property.province,
+              slug: property.slug
+            }}
+            variant="card"
+            label="ส่งทาง LINE"
+          />
+        </div>
 
         <a
           href="#inquiry"

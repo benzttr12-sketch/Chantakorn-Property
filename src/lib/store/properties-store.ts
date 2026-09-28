@@ -258,6 +258,30 @@ function generateShortPropertyId(): string {
   return `ck-${rand}`;
 }
 
+async function triggerLineNotification(property: Property) {
+  try {
+    const res = await fetch('/api/line/notify', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(property),
+    });
+    const data = await res.json();
+    if (data.success) {
+      logSystemActivity({
+        category: 'system',
+        action: 'system_notification',
+        title: 'แจ้งเตือน LINE OA อัตโนมัติ',
+        description: `ระบบได้ส่งข้อมูลประกาศอสังหาฯ ใหม่ "${property.title}" เข้าไลน์ออฟฟิเชียลแอคเคานต์ https://lin.ee/NMSe28T3 ${data.simulated ? '(โหมดทดสอบจำลอง)' : '(ส่งแจ้งเตือนจริง)'} เรียบร้อยแล้ว`,
+        target_id: property.id,
+        target_name: property.title,
+        actor_name: 'ระบบอัตโนมัติ',
+      }).catch(() => undefined);
+    }
+  } catch (err) {
+    console.warn('Failed to send LINE notification:', err);
+  }
+}
+
 export async function createProperty(property: Omit<Property, 'id' | 'created_at'>): Promise<Property> {
   requireStaffBackend();
   if (dataBackend === 'supabase' && supabase) {
@@ -272,6 +296,7 @@ export async function createProperty(property: Omit<Property, 'id' | 'created_at
       new_value: created.price,
       diff_summary: `สร้างประกาศทรัพย์ใหม่ "${created.title}" ในระบบ`,
     }).catch(() => undefined);
+    triggerLineNotification(created).catch(() => undefined);
     return created;
   }
   const firestore: Firestore | null = db;
@@ -299,6 +324,7 @@ export async function createProperty(property: Omit<Property, 'id' | 'created_at
       target_name: newProperty.title,
       actor_name: 'ผู้ดูแลระบบ',
     }).catch(() => undefined);
+    triggerLineNotification(newProperty).catch(() => undefined);
     return newProperty;
   }
   const properties = getLocalProperties();
@@ -312,6 +338,7 @@ export async function createProperty(property: Omit<Property, 'id' | 'created_at
     new_value: newProperty.price,
     diff_summary: `สร้างประกาศทรัพย์ใหม่ "${newProperty.title}" ในระบบ`,
   }).catch(() => undefined);
+  triggerLineNotification(newProperty).catch(() => undefined);
   return newProperty;
 }
 
@@ -519,28 +546,47 @@ export async function fetchInquiries(): Promise<Inquiry[]> {
 
 export async function updateInquiryStatus(id: string, status: Inquiry['status']): Promise<Inquiry | null> {
   requireStaffBackend();
+  let updatedInquiry: Inquiry | null = null;
   if (dataBackend === 'supabase' && supabase) {
     const { data, error } = await supabase.from('inquiries').update({ status }).eq('id', id).select().maybeSingle();
     if (error) throw error;
-    return data as Inquiry | null;
-  }
-  const firestore: Firestore | null = db;
-  if (dataBackend === 'firebase' && firestore) {
-    try {
-      await setDoc(doc(firestore, 'inquiries', id), { status }, { merge: true });
-      const snap = await getDocs(collection(firestore, 'inquiries'));
-      const found = snap.docs.find(d => d.id === id);
-      return found ? ({ ...found.data(), id: found.id } as Inquiry) : null;
-    } catch (err) {
-      console.error('Firestore updateInquiryStatus error:', err);
+    updatedInquiry = data as Inquiry | null;
+  } else {
+    const firestore: Firestore | null = db;
+    if (dataBackend === 'firebase' && firestore) {
+      try {
+        await setDoc(doc(firestore, 'inquiries', id), { status }, { merge: true });
+        const snap = await getDocs(collection(firestore, 'inquiries'));
+        const found = snap.docs.find(d => d.id === id);
+        updatedInquiry = found ? ({ ...found.data(), id: found.id } as Inquiry) : null;
+      } catch (err) {
+        console.error('Firestore updateInquiryStatus error:', err);
+      }
+    } else {
+      const inquiries = getLocalInquiries();
+      const inquiry = inquiries.find(item => item.id === id);
+      if (inquiry) {
+        const updated = { ...inquiry, status };
+        writeArray(STORAGE_KEY_INQUIRIES, inquiries.map(item => item.id === id ? updated : item));
+        updatedInquiry = updated;
+      }
     }
   }
-  const inquiries = getLocalInquiries();
-  const inquiry = inquiries.find(item => item.id === id);
-  if (!inquiry) return null;
-  const updated = { ...inquiry, status };
-  writeArray(STORAGE_KEY_INQUIRIES, inquiries.map(item => item.id === id ? updated : item));
-  return updated;
+
+  if (updatedInquiry) {
+    const statusLabel = status === 'contacted' ? 'ติดต่อแล้ว' : 'รอดำเนินการ';
+    logSystemActivity({
+      category: 'inquiry',
+      action: 'inquiry_status_updated',
+      title: 'อัปเดตสถานะผู้สนใจ',
+      description: `เปลี่ยนสถานะผู้ติดต่อ คุณ "${updatedInquiry.name}" เป็น "${statusLabel}"`,
+      target_id: updatedInquiry.id,
+      target_name: updatedInquiry.name,
+      actor_name: 'ผู้ดูแลระบบ',
+    }).catch(() => undefined);
+  }
+
+  return updatedInquiry;
 }
 
 export function getLocalUsers(): UserProfile[] {
@@ -643,26 +689,51 @@ export function addLocalUser(user: UserProfile): UserProfile[] {
 export async function updateUserProfile(userId: string, updates: Partial<UserProfile>): Promise<UserProfile[]> {
   requireStaffBackend();
   const { id: ignoredId, ...fields } = updates;
+  let all: UserProfile[] = [];
   if (dataBackend === 'supabase' && supabase) {
     const { data, error } = await supabase.from('profiles').update(fields).eq('id', userId).select('id');
     if (error) throw error;
     if (!data?.length) throw new Error('ไม่สามารถแก้ไขผู้ใช้นี้ได้ กรุณาตรวจสอบสิทธิ์');
-    const all = await fetchUsers();
-    syncAgentsFromUsers(all);
-    return all;
+    all = await fetchUsers();
+  } else {
+    const firestore: Firestore | null = db;
+    if (dataBackend === 'firebase' && firestore) {
+      await setDoc(doc(firestore, 'profiles', userId), fields, { merge: true });
+      all = await fetchUsers();
+    } else {
+      const users = getLocalUsers();
+      const updated = users.map(user => user.id === userId ? { ...user, ...fields } : user);
+      saveLocalUsers(updated);
+      all = updated;
+    }
   }
-  const firestore: Firestore | null = db;
-  if (dataBackend === 'firebase' && firestore) {
-    await setDoc(doc(firestore, 'profiles', userId), fields, { merge: true });
-    const all = await fetchUsers();
-    syncAgentsFromUsers(all);
-    return all;
+
+  // Sync to agents store
+  syncAgentsFromUsers(all);
+
+  // If role is updated, log to system activities
+  if (updates.role) {
+    const targetUser = all.find(u => u.id === userId);
+    if (targetUser) {
+      const roleLabels: Record<string, string> = {
+        'ADMIN': 'ผู้ดูแลระบบ (ADMIN)',
+        'AGENT': 'นายหน้า (AGENT)',
+        'USER': 'ผู้ใช้งานทั่วไป (USER)',
+      };
+      const roleLabel = roleLabels[updates.role] || updates.role;
+      logSystemActivity({
+        category: 'user_role',
+        action: 'user_role_updated',
+        title: 'เปลี่ยนสิทธิ์การเข้าใช้งานระบบ',
+        description: `อัปเดตระดับสิทธิ์ผู้ใช้งาน "${targetUser.full_name}" เป็น "${roleLabel}"`,
+        target_id: userId,
+        target_name: targetUser.full_name,
+        actor_name: 'ผู้ดูแลระบบ',
+      }).catch(() => undefined);
+    }
   }
-  const users = getLocalUsers();
-  const updated = users.map(user => user.id === userId ? { ...user, ...fields } : user);
-  saveLocalUsers(updated);
-  syncAgentsFromUsers(updated);
-  return updated;
+
+  return all;
 }
 
 export async function deleteUser(userId: string): Promise<UserProfile[]> {

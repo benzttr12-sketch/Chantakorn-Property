@@ -1,6 +1,9 @@
 import { type ClassValue, clsx } from "clsx";
 import { twMerge } from "tailwind-merge";
-import { PropertyType, PropertyStatus } from "./types";
+import { PropertyType, PropertyStatus, Property } from "./types";
+import { formatPropertyCode } from "./format-code";
+
+export { formatPropertyCode };
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -263,8 +266,6 @@ export function parseGoogleMapsCoordinates(input: string): ParsedCoordinates | n
   return null;
 }
 
-export { formatPropertyCode } from './format-code';
-
 export function propertyHref(slug: string): string {
   return `/properties/${encodeURIComponent(slug)}`;
 }
@@ -299,11 +300,17 @@ export function formatLineUrl(lineId?: string): string {
   if (/^https?:\/\//i.test(trimmed)) {
     return trimmed;
   }
+  if (
+    trimmed === '@chantakorn' ||
+    trimmed === 'chantakorn' ||
+    trimmed === '@chantakornproperty' ||
+    trimmed === 'LINE Official Account' ||
+    trimmed.toLowerCase() === 'line'
+  ) {
+    return DEFAULT_OFFICIAL_LINE_URL;
+  }
   if (trimmed.startsWith('@')) {
     return `https://line.me/R/ti/p/${encodeURIComponent(trimmed)}`;
-  }
-  if (trimmed === 'LINE Official Account' || trimmed.toLowerCase() === 'line') {
-    return DEFAULT_OFFICIAL_LINE_URL;
   }
   return `https://line.me/ti/p/~${encodeURIComponent(trimmed)}`;
 }
@@ -316,5 +323,91 @@ export function formatFacebookUrl(facebookUrl?: string): string {
   }
   return `https://www.facebook.com/${encodeURIComponent(trimmed.replace(/^@/, ''))}`;
 }
+
+/**
+ * สร้างข้อความสรุปทรัพย์แบบ High-Converting สำหรับคัดลอกส่งต่อลูกค้า หรือโพสต์ใน LINE / Facebook
+ */
+export function formatPropertySnippet(property: Property, options?: { origin?: string }): string {
+  const origin = options?.origin || (typeof window !== 'undefined' ? window.location.origin : 'https://chantakornproperty.com');
+  const propertyUrl = `${origin}${propertyHref(property.slug)}`;
+  const code = formatPropertyCode(property.id);
+  const typeName = getPropertyTypeName(property.property_type);
+  const statusLabel = property.status === 'rent' ? 'ให้เช่า' : 'ขาย';
+  const priceFormatted = formatPrice(property.price, property.status);
+  const priceReadable = property.price > 0 && property.status !== 'rent' ? formatThaiBahtReadable(property.price) : '';
+
+  // Location
+  const locationParts = [
+    property.subdistrict ? `ต.${property.subdistrict}` : '',
+    property.district ? `อ.${property.district}` : '',
+    property.province ? `จ.${property.province}` : ''
+  ].filter(Boolean);
+  const locationStr = locationParts.length > 0 
+    ? locationParts.join(' ') 
+    : [property.district, property.province].filter(Boolean).join(', ') || 'หาดใหญ่ สงขลา';
+
+  // Function & Specs
+  const specs: string[] = [];
+  specs.push(`🏠 ประเภท: ${typeName} (${statusLabel})`);
+
+  const areaParts: string[] = [];
+  if (property.land_size) areaParts.push(`เนื้อที่ ${property.land_size} ตร.ว.`);
+  if (property.usable_area) areaParts.push(`พื้นที่ใช้สอย ${property.usable_area} ตร.ม.`);
+  if (areaParts.length > 0) {
+    specs.push(`📐 ขนาด: ${areaParts.join(' | ')}`);
+  }
+
+  if (property.bedrooms || property.bathrooms || property.parking) {
+    const bedBath: string[] = [];
+    if (property.bedrooms) bedBath.push(`${property.bedrooms} ห้องนอน`);
+    if (property.bathrooms) bedBath.push(`${property.bathrooms} ห้องน้ำ`);
+    if (property.parking) bedBath.push(`${property.parking} ที่จอดรถ`);
+    specs.push(`🛏️ ฟังก์ชัน: ${bedBath.join(' | ')}`);
+  }
+
+  if (property.facing_direction) {
+    specs.push(`🧭 ทิศหน้าทรัพย์: ${property.facing_direction}`);
+  }
+
+  if (property.furniture) {
+    specs.push(`🛋️ เฟอร์นิเจอร์: ${property.furniture}`);
+  }
+
+  // Key Features / Highlights
+  const featuresList = (property.features && property.features.length > 0)
+    ? property.features.slice(0, 4).map(f => `  ✔️ ${f}`).join('\n')
+    : '  ✔️ ทำเลศักยภาพ เดินทางสะดวก เข้าออกได้หลายทาง\n  ✔️ สภาพสวยพร้อมเข้าอยู่ บรรยากาศน่าอยู่อาศัย';
+
+  // Contact details
+  const agentName = property.agent?.name || 'Chantakorn Property';
+  const agentPhone = property.agent?.phone || DEFAULT_OFFICIAL_PHONE;
+  const lineId = property.agent?.line_id || DEFAULT_OFFICIAL_LINE;
+  const lineLink = formatLineUrl(lineId);
+
+  return `🏡 [${statusLabel}] ${property.title}
+🔖 รหัสทรัพย์: ${code}
+💰 ราคา: ${priceFormatted}${priceReadable ? ` (${priceReadable})` : ''}
+📍 พิกัดทำเล: ${locationStr}
+
+📋 รายละเอียดฟังก์ชัน:
+${specs.map(s => `• ${s}`).join('\n')}
+
+🌟 จุดเด่นน่าสนใจ:
+${featuresList}
+
+✨ สิทธิพิเศษ & การดูแล:
+  ✅ ดูแลประสานงานสินเชื่อ ยื่นกู้ฟรีทุกธนาคาร
+  ✅ ให้คำปรึกษาและดูแลนิติกรรมสัญญาจนถึงวันโอนกรรมสิทธิ์
+
+🔗 ดูรูปถ่าย วิดีโอ และรายละเอียดทั้งหมด:
+👉 ${propertyUrl}
+
+━━━━━━━━━━━━━━━━━━━━
+💬 สนใจนัดชมสถานที่จริง / สอบถามเพิ่มเติม:
+📞 โทร: ${agentPhone} (${agentName})
+📱 LINE OA: ${lineId} (คลิกลิงก์: ${lineLink})
+━━━━━━━━━━━━━━━━━━━━`;
+}
+
 
 

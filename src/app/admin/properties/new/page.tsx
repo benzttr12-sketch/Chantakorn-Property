@@ -156,6 +156,12 @@ function PropertyEditor() {
   }>>([]);
   const [selectedFeatures, setSelectedFeatures] = useState<string[]>([]);
   const [featured, setFeatured] = useState(false);
+  const [createdSuccessData, setCreatedSuccessData] = useState<{
+    id: string;
+    title: string;
+    slug: string;
+    price: number;
+  } | null>(null);
 
   // Auto-calculated nearby landmarks based on pinned coordinates
   const autoLandmarks = isValidLatLng(Number(latitude), Number(longitude))
@@ -1015,11 +1021,16 @@ function PropertyEditor() {
 
       if (editId) {
         await updateProperty(editId, propertyData);
+        router.push('/admin/properties');
       } else {
-        await createProperty(propertyData);
+        const created = await createProperty(propertyData);
+        setCreatedSuccessData({
+          id: created.id,
+          title: created.title,
+          slug: created.slug,
+          price: created.price,
+        });
       }
-
-      router.push('/admin/properties');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'บันทึกข้อมูลไม่สำเร็จ กรุณาลองอีกครั้ง');
     } finally {
@@ -2880,6 +2891,63 @@ function PropertyEditor() {
               handleTitleChange(newTitle);
             }}
           />
+        )}
+        {/* LINE OA Confirmation Modal */}
+        {createdSuccessData && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+            <div className="bg-white rounded-3xl max-w-md w-full p-6 text-center space-y-4 shadow-2xl border-2 border-emerald-400 relative overflow-hidden">
+              <div className="w-16 h-16 rounded-full bg-emerald-100 text-[#06C755] flex items-center justify-center mx-auto text-3xl shadow-inner">
+                💬
+              </div>
+              <div className="space-y-1">
+                <h3 className="text-xl font-black text-navy-950">
+                  ลงประกาศและแจ้งเตือนเข้า LINE OA แล้ว!
+                </h3>
+                <p className="text-xs text-emerald-700 font-bold">
+                  ✓ ส่งข้อความ Flex Message เด้งเข้า LINE Official Account สำเร็จ
+                </p>
+              </div>
+
+              <div className="p-3.5 bg-gray-50 rounded-2xl border border-gray-200 text-left text-xs space-y-1">
+                <div className="font-bold text-navy-950 truncate">{createdSuccessData.title}</div>
+                <div className="text-emerald-700 font-bold">฿{createdSuccessData.price?.toLocaleString()} บาท</div>
+                <div className="text-gray-500 text-[11px]">
+                  LINE OA: <span className="text-[#06C755] font-semibold">https://lin.ee/NMSe28T3</span>
+                </div>
+              </div>
+
+              <div className="space-y-2 pt-2">
+                <a
+                  href="https://lin.ee/NMSe28T3"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="w-full py-3 bg-[#06C755] hover:bg-[#05b34c] text-white font-bold text-xs sm:text-sm rounded-xl flex items-center justify-center gap-2 shadow-md transition-all cursor-pointer active:scale-95"
+                >
+                  <MessageCircle className="w-4 h-4 fill-current" />
+                  <span>เปิดดูใน LINE OA (https://lin.ee/NMSe28T3)</span>
+                  <ExternalLink className="w-3.5 h-3.5" />
+                </a>
+
+                <div className="grid grid-cols-2 gap-2">
+                  <Link
+                    href={`/properties/${createdSuccessData.slug}`}
+                    target="_blank"
+                    className="py-2.5 px-3 bg-navy-950 hover:bg-navy-900 text-gold-400 font-bold text-xs rounded-xl flex items-center justify-center gap-1 shadow-sm transition-all"
+                  >
+                    <Eye className="w-3.5 h-3.5" />
+                    <span>ดูหน้าเว็บ</span>
+                  </Link>
+
+                  <Link
+                    href="/admin/properties"
+                    className="py-2.5 px-3 bg-gray-100 hover:bg-gray-200 text-navy-950 font-bold text-xs rounded-xl flex items-center justify-center gap-1 transition-all"
+                  >
+                    <span>ไปหน้ารายการ</span>
+                  </Link>
+                </div>
+              </div>
+            </div>
+          </div>
         )}
       </form>
     </div>

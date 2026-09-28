@@ -139,6 +139,22 @@
         "created_at": { "type": "string" }
       },
       "required": ["id", "category", "action", "title", "description", "created_at"]
+    },
+    "settings": {
+      "title": "System Settings & Integrations",
+      "description": "Integration configurations including LINE Official Account and system notification settings",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "line_channel_access_token": { "type": "string" },
+        "line_notify_token": { "type": "string" },
+        "line_target_user_id": { "type": "string" },
+        "line_oa_url": { "type": "string" },
+        "auto_notify_new_property": { "type": "boolean" },
+        "auto_notify_consignment": { "type": "boolean" },
+        "updated_at": { "type": "string" }
+      },
+      "required": ["id"]
     }
   },
   "firestore": {
@@ -165,6 +181,10 @@
     "/system_activities/{activityId}": {
       "schema": "system_activities",
       "description": "Collection of system activity feed items"
+    },
+    "/settings/{settingId}": {
+      "schema": "settings",
+      "description": "Collection of system configurations and LINE OA settings"
     }
   }
 }

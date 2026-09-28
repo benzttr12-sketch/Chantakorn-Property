@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import { submitInquiry } from '@/lib/store/properties-store';
 import { formatLineUrl, formatFacebookUrl } from '@/lib/utils';
+import SendToLineButton from '@/components/properties/SendToLineButton';
 
 interface AgentCardProps {
   agent?: Agent;
@@ -120,6 +121,23 @@ export default function AgentCard({ agent = DEFAULT_AGENT, property }: AgentCard
               &ldquo;สนใจทรัพย์นี้ ติดต่อเราได้เลย เราช่วยดูแลตั้งแต่การนัดชมทรัพย์ เจรจา ไปจนถึงขั้นตอนการโอนกรรมสิทธิ์&rdquo;
             </p>
           </div>
+        </div>
+
+        {/* Primary LINE OA Inquiry Button */}
+        <div>
+          <SendToLineButton
+            property={{
+              id: property.id,
+              title: property.title,
+              price: property.price,
+              status: property.status,
+              district: property.district,
+              province: property.province,
+              slug: property.slug
+            }}
+            variant="sidebar"
+            label="ส่งทรัพย์นี้ให้ทีมงานทาง LINE OA"
+          />
         </div>
 
         {/* Fast Action Buttons */}

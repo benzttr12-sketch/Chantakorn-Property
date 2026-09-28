@@ -14,6 +14,7 @@ import {
   ShieldCheck,
   ChevronRight,
   Facebook,
+  MessageCircle,
   LogIn,
   LogOut,
   LayoutDashboard,
@@ -144,9 +145,16 @@ export default function Header() {
 
             <span className="text-navy-600">•</span>
 
-            <span className="text-gray-200">
-              LINE: <span className="text-gold-300 font-bold">Official Account</span>
-            </span>
+            <a
+              href="https://lin.ee/NMSe28T3"
+              target="_blank"
+              rel="noreferrer"
+              className="hover:text-gold-300 text-white transition-colors flex items-center group font-medium"
+              title="LINE Official Account: Chantakorn Property (คลิกเพื่อแอดไลน์)"
+            >
+              <MessageCircle className="w-3.5 h-3.5 mr-1.5 text-[#06C755] fill-current group-hover:scale-110 transition-transform" />
+              <span>LINE: <span className="text-gold-300 font-bold">Official Account</span></span>
+            </a>
 
             <span className="text-navy-600">•</span>
 
@@ -225,15 +233,6 @@ export default function Header() {
 
           {/* Right Actions (Desktop) */}
           <div className="hidden lg:flex items-center space-x-2 xl:space-x-3">
-            <button
-              type="button"
-              onClick={() => setLandsMapsModalOpen(true)}
-              className="px-3 py-1.5 text-xs font-bold text-gold-300 bg-navy-900/90 hover:bg-navy-850 rounded-xl border border-gold-400/50 hover:border-gold-300 transition-all shadow-xs flex items-center space-x-1 cursor-pointer"
-              title="ค้นหารูปแปลงที่ดิน กรมที่ดิน (DOL LandsMaps)"
-            >
-              <span>🗺️ แปลงที่ดิน (DOL)</span>
-            </button>
-
             <Link
               href="/favorites"
               className="relative p-2 text-white hover:text-gold-300 hover:bg-navy-900 rounded-xl border border-transparent hover:border-navy-700 transition-all"
@@ -451,8 +450,19 @@ export default function Header() {
               ติดต่อ Chantakorn Property
             </Link>
 
-            <div className="mt-4 pt-4 border-t border-navy-800 text-center text-xs text-gray-200 space-y-1.5">
+            <div className="mt-4 pt-4 border-t border-navy-800 text-center text-xs text-gray-200 space-y-2">
               <div>โทร: <a href="tel:0816040097" className="text-gold-300 font-bold hover:underline">081-604-0097</a></div>
+              <div>
+                <a
+                  href="https://lin.ee/NMSe28T3"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-[#06C755] hover:underline font-bold inline-flex items-center space-x-1"
+                >
+                  <MessageCircle className="w-3.5 h-3.5 fill-current inline mr-1" />
+                  <span>LINE Official: @chantakorn (คลิกเพื่อแอดไลน์)</span>
+                </a>
+              </div>
               <div>
                 <a
                   href="https://www.facebook.com/people/Chantakorn-Property-%E0%B8%99%E0%B8%B2%E0%B8%A2%E0%B8%AB%E0%B8%99%E0%B9%89%E0%B8%B2-%E0%B8%9A%E0%B9%89%E0%B8%B2%E0%B8%99-%E0%B8%97%E0%B8%B5%E0%B9%88%E0%B8%94%E0%B8%B4%E0%B8%99-%E0%B8%84%E0%B8%AD%E0%B8%99%E0%B9%82%E0%B8%94-%E0%B8%AB%E0%B8%B2%E0%B8%94%E0%B9%83%E0%B8%AB%E0%B8%8D%E0%B9%88-%E0%B8%AA%E0%B8%87%E0%B8%82%E0%B8%A5%E0%B8%B2/61593092347613/"

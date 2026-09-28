@@ -213,10 +213,16 @@ export default function Footer() {
                 </a>
               </li>
               <li className="flex items-center space-x-2.5">
-                <MessageCircle className="w-4 h-4 text-[#06C755] flex-shrink-0" />
-                <span className="text-gray-300">
-                  LINE: <strong className="text-white">Official Account</strong>
-                </span>
+                <MessageCircle className="w-4 h-4 text-[#06C755] flex-shrink-0 fill-current" />
+                <a
+                  href="https://lin.ee/NMSe28T3"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="hover:text-gold-400 text-gray-300 text-xs transition-colors"
+                  title="คลิกเพื่อเชื่อมต่อ LINE Official Account"
+                >
+                  LINE: <strong className="text-white hover:underline">Official Account (คลิกเพื่อเชื่อมต่อ)</strong>
+                </a>
               </li>
               <li className="flex items-center space-x-2.5">
                 <Facebook className="w-4 h-4 text-[#1877F2] flex-shrink-0" />

@@ -9,7 +9,9 @@ import {
   ChevronLeft, 
   ChevronRight, 
   X,
-  Check
+  Check,
+  Film,
+  Play
 } from 'lucide-react';
 import { toggleFavoriteId, getFavoriteIds } from '@/lib/store/properties-store';
 
@@ -17,9 +19,10 @@ interface PropertyGalleryProps {
   id: string;
   title: string;
   images: string[];
+  videoUrl?: string;
 }
 
-export default function PropertyGallery({ id, title, images }: PropertyGalleryProps) {
+export default function PropertyGallery({ id, title, images, videoUrl }: PropertyGalleryProps) {
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -103,6 +106,23 @@ export default function PropertyGallery({ id, title, images }: PropertyGalleryPr
             <Heart className={`w-3.5 h-3.5 ${isFavorite ? 'fill-red-500 text-red-500' : ''}`} />
             <span>{isFavorite ? 'บันทึกแล้ว' : 'บันทึก'}</span>
           </button>
+
+          {videoUrl && (
+            <button
+              type="button"
+              onClick={() => {
+                const el = document.getElementById('video-tour-section');
+                if (el) {
+                  el.scrollIntoView({ behavior: 'smooth' });
+                }
+              }}
+              className="flex items-center space-x-1.5 px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white text-xs font-bold rounded-lg shadow-sm transition-all"
+              title="เลื่อนไปดูวิดีโอพาทัวร์สถานที่จริง"
+            >
+              <Film className="w-3.5 h-3.5" />
+              <span>วิดีโอพาทัวร์</span>
+            </button>
+          )}
 
           <button
             onClick={() => setLightboxOpen(true)}

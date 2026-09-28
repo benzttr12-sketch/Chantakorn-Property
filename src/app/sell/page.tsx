@@ -111,6 +111,26 @@ export default function SellPage() {
         },
       });
 
+      // Send alert to LINE Official Account
+      fetch('/api/line/notify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          inquiry_type: 'consignment_sell',
+          name: name.trim(),
+          phone: phone.trim(),
+          line_id: lineId,
+          message: `ฝากขายทรัพย์ประเภท ${propertyType} ใน ${district} จ.${province} ราคาที่ต้องการ ${expectedPrice} บาท\nรายละเอียด: ${description}`,
+          consignment_details: {
+            property_type: propertyType,
+            province,
+            district,
+            subdistrict,
+            expected_price: Number(expectedPrice),
+          }
+        })
+      }).catch(() => undefined);
+
       setSubmitted(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'ส่งข้อมูลไม่สำเร็จ กรุณาลองอีกครั้ง หรือติดต่อโทร 081-604-0097');

@@ -193,7 +193,7 @@ export default function ViewingBookingSection({ initialAgent, initialPropertyTit
               {/* Action Buttons */}
               <div className="flex flex-wrap items-center justify-center gap-3 pt-4">
                 <a
-                  href="https://line.me/R/ti/p/@chantakorn"
+                  href="https://lin.ee/NMSe28T3"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="px-6 py-3.5 bg-[#06C755] hover:bg-[#05b34c] text-white font-bold text-xs sm:text-sm rounded-xl shadow-md flex items-center space-x-2 transition-all"

@@ -304,7 +304,7 @@ export default function MarketIntelligenceSection() {
             </div>
 
             <a
-              href="https://line.me/ti/p/~@chantakorn"
+              href="https://lin.ee/NMSe28T3"
               target="_blank"
               rel="noopener noreferrer"
               className="px-4 py-2 bg-gold-500 hover:bg-gold-400 text-navy-950 font-black text-xs rounded-xl shadow-md transition-all flex items-center space-x-1.5 flex-shrink-0 active:scale-95"

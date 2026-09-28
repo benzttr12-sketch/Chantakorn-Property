@@ -10,6 +10,7 @@ import { formatPrice, getPropertyStatusBadge, formatThaiNumber, formatPropertyCo
 import { getFavoriteIds, toggleFavoriteId } from '@/lib/store/properties-store';
 import { getCompareIds, toggleCompareId } from '@/lib/store/compare-store';
 import { villaModernEstate } from '@/assets/images';
+import SendToLineButton from '@/components/properties/SendToLineButton';
 
 export default function PropertyCard({
   id,
@@ -231,14 +232,28 @@ export default function PropertyCard({
           </div>
 
           {/* Action CTA */}
-          <div className="mt-4 pt-1">
+          <div className="mt-4 pt-1 grid grid-cols-2 gap-2">
             <Link
               href={propertyHref(slug)}
-              className="w-full py-2.5 px-4 bg-slate-50 hover:bg-navy-950 text-navy-950 hover:text-gold-400 rounded-xl text-xs font-bold flex items-center justify-center space-x-1.5 transition-all duration-200 group/btn border border-slate-200/80 hover:border-navy-950"
+              className="py-2.5 px-3 bg-slate-50 hover:bg-navy-950 text-navy-950 hover:text-gold-400 rounded-xl text-xs font-bold flex items-center justify-center space-x-1.5 transition-all duration-200 group/btn border border-slate-200/80 hover:border-navy-950"
             >
               <span>ดูรายละเอียด</span>
               <ArrowRight className="w-3.5 h-3.5 transform group-hover/btn:translate-x-1 transition-transform text-gold-500" />
             </Link>
+
+            <SendToLineButton
+              property={{
+                id,
+                title,
+                price,
+                status,
+                district,
+                province,
+                slug
+              }}
+              variant="card"
+              label="ส่งทาง LINE"
+            />
           </div>
         </div>
       </div>

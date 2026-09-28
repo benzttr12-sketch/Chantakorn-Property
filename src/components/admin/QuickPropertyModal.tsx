@@ -21,7 +21,10 @@ import {
   Eye, 
   CheckCircle2,
   ExternalLink,
-  ChevronRight
+  ChevronRight,
+  Film,
+  Video,
+  Play
 } from 'lucide-react';
 import { Property, PropertyType, PropertyStatus, FacingDirection } from '@/lib/types';
 import { createProperty } from '@/lib/store/properties-store';
@@ -30,6 +33,7 @@ import { DISTRICTS_LIST, getSongkhlaSubdistricts, getSongkhlaCoordinates } from 
 import { calculateFengShui } from '@/lib/feng-shui';
 import { formatPrice, formatThaiBahtReadable, slugify } from '@/lib/utils';
 import { getStoredUser } from '@/lib/auth-helpers';
+import { parseVideoUrl } from '@/lib/image-compressor';
 import SmartDescriptionGeneratorModal, { PropertySpecsForAI } from '@/components/admin/SmartDescriptionGeneratorModal';
 import VoiceDictationBar from '@/components/admin/VoiceDictationBar';
 
@@ -79,6 +83,7 @@ export default function QuickPropertyModal({ isOpen, onClose, onSuccess }: Quick
   const [features, setFeatures] = useState<string[]>(['ติดถนนใหญ่', 'ทำเลชุมชน']);
   const [description, setDescription] = useState('');
   const [internalNotes, setInternalNotes] = useState('');
+  const [videoUrl, setVideoUrl] = useState('');
   const [showAiDescModal, setShowAiDescModal] = useState(false);
   const [quickAiGenerating, setQuickAiGenerating] = useState(false);
   const [publishImmediately, setPublishImmediately] = useState(true);
@@ -273,6 +278,7 @@ export default function QuickPropertyModal({ isOpen, onClose, onSuccess }: Quick
         furniture: 'พร้อมอยู่',
         cover_image: coverImage,
         images: images.length > 0 ? images : [coverImage],
+        video_url: videoUrl.trim() || undefined,
         features: features.length > 0 ? features : ['ทำเลดี เดินทางสะดวก'],
         featured: false,
         published: publishImmediately,
@@ -667,6 +673,74 @@ export default function QuickPropertyModal({ isOpen, onClose, onSuccess }: Quick
                   placeholder="เช่น เบอร์โทรเจ้าของบ้านจริง, สัญญาหมดอายุ ธ.ค. 69, สภาพบ้านต้องซ่อมสี, ราคาสุดท้ายต่อรองไว้..."
                   className="w-full bg-white border border-amber-300 rounded-xl p-2 text-xs font-medium text-navy-950 focus:ring-1 focus:ring-amber-500 outline-none"
                 />
+              </div>
+
+              {/* Video Tour Section (Optional) */}
+              <div className="space-y-2 bg-red-50/60 p-3.5 rounded-2xl border border-red-200">
+                <div className="flex flex-wrap items-center justify-between gap-1">
+                  <label className="text-[11px] font-bold text-navy-950 flex items-center space-x-1.5">
+                    <Video className="w-3.5 h-3.5 text-red-600" />
+                    <span>วิดีโอพาทัวร์อสังหาริมทรัพย์ (Video Tour - ไม่บังคับ/เลือกใส่หรือไม่ใส่ก็ได้)</span>
+                  </label>
+                  <div className="flex items-center space-x-1.5">
+                    <button
+                      type="button"
+                      onClick={() => setVideoUrl('https://www.youtube.com/watch?v=ScMzIvxBSi4')}
+                      className="text-[10px] text-red-700 bg-white hover:bg-red-100 px-2 py-0.5 rounded-md border border-red-200 font-semibold flex items-center space-x-1 transition-colors cursor-pointer"
+                    >
+                      <Play className="w-2.5 h-2.5 fill-red-700" />
+                      <span>+ ลิงก์ตัวอย่าง (YouTube)</span>
+                    </button>
+                    {videoUrl && (
+                      <button
+                        type="button"
+                        onClick={() => setVideoUrl('')}
+                        className="text-[10px] text-gray-500 hover:text-red-600 bg-white px-1.5 py-0.5 rounded border border-gray-200 transition-colors"
+                      >
+                        ลบวิดีโอ
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                <input
+                  type="url"
+                  value={videoUrl}
+                  onChange={(e) => setVideoUrl(e.target.value)}
+                  placeholder="วางลิงก์ YouTube, TikTok, Facebook หรือ MP4 (เว้นว่างไว้ได้หากไม่มี)"
+                  className="w-full bg-white border border-red-300 rounded-xl p-2 text-xs font-medium text-navy-950 focus:ring-1 focus:ring-red-500 outline-none"
+                />
+
+                {videoUrl && (
+                  (() => {
+                    const parsed = parseVideoUrl(videoUrl);
+                    if (!parsed) return null;
+                    return (
+                      <div className="rounded-xl overflow-hidden border border-red-300 bg-black aspect-video max-w-sm mt-1 shadow-xs">
+                        {parsed.type === 'youtube' && parsed.embedUrl && (
+                          <iframe
+                            src={parsed.embedUrl}
+                            title="Video Tour Preview"
+                            className="w-full h-full border-0"
+                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                            allowFullScreen
+                          />
+                        )}
+                        {parsed.type === 'direct' && (
+                          <video controls preload="metadata" className="w-full h-full object-contain">
+                            <source src={parsed.url} />
+                          </video>
+                        )}
+                        {(parsed.type === 'tiktok' || parsed.type === 'facebook' || parsed.type === 'other') && (
+                          <div className="w-full h-full flex flex-col items-center justify-center p-2 text-center text-white bg-slate-900 text-xs">
+                            <Film className="w-6 h-6 text-gold-400 mb-1" />
+                            <p className="font-semibold">{parsed.title || 'วิดีโอจากภายนอก'}</p>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })()
+                )}
               </div>
 
               {/* Photo Preview Strip */}

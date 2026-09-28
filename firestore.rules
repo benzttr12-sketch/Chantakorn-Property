@@ -1,38 +1,99 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+
+    // Helper functions
     function isSignedIn() {
       return request.auth != null;
     }
 
-    // Properties: Allow public read and write (for demo management and app state)
+    function getUserData() {
+      return get(/databases/$(database)/documents/profiles/$(request.auth.uid)).data;
+    }
+
+    function isStaff() {
+      return isSignedIn() && (
+        request.auth.token.email == 'benzttr12@gmail.com' ||
+        request.auth.token.email == 'agent@chantakornproperty.com' ||
+        (exists(/databases/$(database)/documents/profiles/$(request.auth.uid)) && 
+         (getUserData().role == 'ADMIN' || getUserData().role == 'AGENT'))
+      );
+    }
+
+    function isAdmin() {
+      return isSignedIn() && (
+        request.auth.token.email == 'benzttr12@gmail.com' ||
+        (exists(/databases/$(database)/documents/profiles/$(request.auth.uid)) && 
+         getUserData().role == 'ADMIN')
+      );
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    // 1. Global safety net (Default deny catch-all)
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // 2. Properties collection
     match /properties/{propertyId} {
-      allow read, write: if true;
+      allow read: if true;
+      allow create, update, delete: if isStaff();
     }
 
-    // Customer Inquiries & Consignments
+    // 3. Inquiries (Customer contacts/submissions)
     match /inquiries/{inquiryId} {
-      allow read, write: if true;
+      allow create: if true; // anyone can submit an inquiry
+      allow read, update, delete: if isStaff(); // confidential inbox
     }
 
-    // Profiles / User accounts
+    // 4. Profiles (User accounts and roles)
     match /profiles/{userId} {
-      allow read, write: if true;
+      allow read: if isSignedIn() && (
+        request.auth.uid == userId || 
+        isStaff() || 
+        resource.data.role in ['ADMIN', 'AGENT']
+      );
+      
+      // Prevent self-assigned roles during signup (must register as USER, unless they are verified root admin or agent)
+      allow create: if isOwner(userId) && (
+        request.resource.data.role == 'USER' || 
+        (request.resource.data.role == 'ADMIN' && request.auth.token.email == 'benzttr12@gmail.com') ||
+        (request.resource.data.role == 'AGENT' && request.auth.token.email == 'agent@chantakornproperty.com')
+      );
+      
+      // Owners can edit their own profile fields except 'role' (privilege escalation protection)
+      allow update: if (isOwner(userId) && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role'])) || isAdmin();
+      
+      allow delete: if isAdmin();
     }
 
-    // Agents
+    // 5. Featured Agents
     match /agents/{agentId} {
-      allow read, write: if true;
+      allow read: if true; // public team info
+      allow write: if isStaff();
     }
 
-    // Property Change History & Audit Logs
+    // 6. Property history audit logs
     match /property_history/{logId} {
-      allow read, write: if true;
+      allow read, create: if isStaff();
+      allow update: if false;
+      allow delete: if false;
     }
 
-    // System Activity Feed
+    // 7. System activity feed
     match /system_activities/{activityId} {
-      allow read, write: if true;
+      allow read, create: if isStaff();
+      allow update: if false;
+      allow delete: if false;
+    }
+
+    // 8. System Settings & LINE OA Integration
+    match /settings/{settingId} {
+      allow read: if true;
+      allow write: if isStaff();
     }
   }
 }

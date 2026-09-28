@@ -30,12 +30,33 @@ function loadStore({ backend = 'local', supabase = null, firebase = false, fireb
     }).outputText;
     const requireModule = name => {
       if (name === '@/lib/supabase/client') return { supabase, isSupabaseConfigured: Boolean(supabase) };
-      if (name === '@/lib/firebase/client') return { db: firebase ? {} : null, isFirebaseConfigured: firebase };
+      if (name === '@/lib/firebase/client') return { db: firebase ? {} : null, isFirebaseConfigured: firebase, auth: null, googleProvider: {} };
+      if (name === 'firebase/auth') return {
+        signInWithPopup: async () => ({ user: {} }),
+        signOut: async () => {},
+        signInWithEmailAndPassword: async () => ({ user: {} }),
+        createUserWithEmailAndPassword: async () => ({ user: {} }),
+        updateProfile: async () => {},
+        getAuth: () => ({ currentUser: null }),
+        GoogleAuthProvider: class {},
+      };
+      if (name === 'firebase/app') return {
+        initializeApp: () => ({}),
+        getApps: () => [],
+        getApp: () => ({}),
+      };
       if (name === 'firebase/firestore') return {
         collection: () => ({}), query: () => ({}), where: () => ({}), doc: () => ({}),
         getDocs: async () => { if (firebaseError) throw firebaseError; return { docs: [] }; },
+        getDocFromServer: async () => ({ exists: () => false, data: () => ({}) }),
         setDoc: async () => { if (firebaseError) throw firebaseError; },
+        getFirestore: () => ({}),
       };
+      if (!name.startsWith('.') && !name.startsWith('@/')) {
+        try {
+          return require(name);
+        } catch {}
+      }
       const target = name.startsWith('@/') ? path.join(sourceRoot, name.slice(2)) : path.resolve(path.dirname(filename), name);
       return load(`${target}.ts`);
     };

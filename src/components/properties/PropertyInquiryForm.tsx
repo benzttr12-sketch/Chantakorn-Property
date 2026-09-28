@@ -116,7 +116,7 @@ export default function PropertyInquiryForm({ property }: PropertyInquiryFormPro
           </div>
           <div className="pt-2 flex flex-col gap-2">
             <a
-              href="https://line.me/R/ti/p/@chantakorn"
+              href="https://lin.ee/NMSe28T3"
               target="_blank"
               rel="noreferrer"
               className="py-2.5 px-4 bg-[#06C755] text-white text-xs font-bold rounded-xl shadow-sm flex items-center justify-center space-x-1.5"
