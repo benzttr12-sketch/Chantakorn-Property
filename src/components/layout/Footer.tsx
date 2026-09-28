@@ -14,23 +14,10 @@ import {
   ExternalLink
 } from 'lucide-react';
 import { fetchProperties } from '@/lib/store/properties-store';
-import { SAMPLE_PROPERTIES } from '@/data/sample-properties';
-
-// คำนวณทำเลเริ่มต้นจากข้อมูลจริง
-function getInitialDistricts() {
-  const map: Record<string, number> = {};
-  SAMPLE_PROPERTIES.forEach((p) => {
-    if (p.published !== false && p.district?.trim()) {
-      const d = p.district.trim();
-      map[d] = (map[d] || 0) + 1;
-    }
-  });
-  return Object.entries(map).map(([district, count]) => ({ district, count }));
-}
 
 export default function Footer() {
-  const [districts, setDistricts] = useState<{ district: string; count: number }[]>(getInitialDistricts);
-  const [totalProperties, setTotalProperties] = useState<number>(SAMPLE_PROPERTIES.length);
+  const [districts, setDistricts] = useState<{ district: string; count: number }[]>([]);
+  const [totalProperties, setTotalProperties] = useState<number>(0);
 
   useEffect(() => {
     let isMounted = true;

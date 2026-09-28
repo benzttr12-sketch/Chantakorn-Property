@@ -40,16 +40,6 @@ export async function fetchAgents(): Promise<ExtendedAgent[]> {
         }
         return list;
       } else {
-        // Seeding default agents into Cloud Firestore
-        try {
-          const seedPromises = DEFAULT_AGENTS.map(agent => 
-            setDoc(doc(firestore, 'agents', agent.id), JSON.parse(JSON.stringify(agent)))
-          );
-          await Promise.all(seedPromises);
-        } catch (seedErr) {
-          console.warn('Seed agents to Firestore warning:', seedErr);
-        }
-        inMemoryAgents = [...DEFAULT_AGENTS];
         return inMemoryAgents;
       }
     } catch (err) {

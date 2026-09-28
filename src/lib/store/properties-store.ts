@@ -38,15 +38,15 @@ function readArray<T>(key: string, fallback: T[], valid: (item: unknown) => item
       // Disabled storage and malformed old data must not break browsing.
     }
   }
-  return JSON.parse(JSON.stringify(fallback)) as T[];
+  return fallback;
 }
 
 function writeArray<T>(key: string, value: T[]) {
-  if (typeof window === 'undefined') throw new Error('กรุณาเปิดหน้านี้ในเว็บเบราว์เซอร์');
+  if (typeof window === 'undefined') return;
   try {
     window.localStorage.setItem(key, JSON.stringify(value));
   } catch {
-    throw new Error('บันทึกข้อมูลในเบราว์เซอร์ไม่ได้ กรุณาตรวจสอบพื้นที่จัดเก็บและอนุญาตให้เว็บไซต์บันทึกข้อมูล');
+    console.warn('Cannot write to localStorage');
   }
 }
 
@@ -83,7 +83,7 @@ function requireStaffBackend() {
 }
 
 export function getLocalProperties(): Property[] {
-  return readArray(STORAGE_KEY_PROPERTIES, SAMPLE_PROPERTIES, isProperty);
+  return readArray(STORAGE_KEY_PROPERTIES, [], isProperty);
 }
 
 export function saveLocalProperties(properties: Property[]) {
@@ -198,20 +198,6 @@ async function loadProperties(includeUnpublished: boolean): Promise<Property[]> 
       ? query(collection(firestore, 'properties'))
       : query(collection(firestore, 'properties'), where('published', '==', true));
     const snapshot = await getDocs(q);
-    
-    // If Firestore properties collection is empty on first setup, seed SAMPLE_PROPERTIES to Firestore
-    if (snapshot.empty && !includeUnpublished) {
-      try {
-        const seedPromises = SAMPLE_PROPERTIES.map(p => 
-          setDoc(doc(firestore, 'properties', p.id), JSON.parse(JSON.stringify(p)))
-        );
-        await Promise.all(seedPromises);
-        return SAMPLE_PROPERTIES.filter(property => includeUnpublished || property.published);
-      } catch (seedErr) {
-        console.warn('Auto-seed properties to Firestore warning:', seedErr);
-      }
-    }
-
     return snapshot.docs.map(item => rowToProperty({ ...item.data(), id: item.id } as PropertyRow));
   }
   return getLocalProperties().filter(property => includeUnpublished || property.published);
