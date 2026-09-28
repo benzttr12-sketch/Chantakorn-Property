@@ -18,7 +18,8 @@ import {
   ExternalLink,
   ChevronRight,
   ShieldCheck,
-  Sparkles
+  Sparkles,
+  Layers
 } from 'lucide-react';
 import { fetchInquiries, updateInquiryStatus } from '@/lib/store/properties-store';
 import { logSystemActivity } from '@/lib/store/activity-store';
@@ -415,6 +416,15 @@ function InquiriesContent() {
                   >
                     <Sparkles className="w-3.5 h-3.5 text-gold-400" />
                     <span>🎯 จับคู่ทรัพย์ AI</span>
+                  </Link>
+
+                  <Link
+                    href="/admin/work-phases"
+                    className="w-full py-2 px-3 bg-navy-950 hover:bg-navy-900 text-white font-bold text-xs rounded-xl flex items-center justify-center space-x-1.5 shadow-xs transition-all border border-navy-800"
+                    title="ติดตามเฟสงานฝากขายแบบละเอียด 7 เฟส"
+                  >
+                    <Layers className="w-3.5 h-3.5 text-gold-400" />
+                    <span>📋 ติดตามเฟสงาน</span>
                   </Link>
                 </div>
 

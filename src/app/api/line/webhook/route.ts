@@ -153,13 +153,8 @@ async function searchProperties(keyword: string): Promise<Property[]> {
         list.push({ ...item, id: d.id });
       });
     } catch (err) {
-      console.warn('[LINE Webhook] Firestore properties read fallback:', err);
+      console.warn('[LINE Webhook] Firestore properties read warning:', err);
     }
-  }
-
-  // Fallback to sample properties
-  if (list.length === 0) {
-    list = [...SAMPLE_PROPERTIES];
   }
 
   const cleanKey = keyword.toLowerCase().trim();

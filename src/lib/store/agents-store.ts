@@ -14,7 +14,7 @@ import {
 } from 'firebase/firestore';
 
 // In-memory runtime cache for seamless UI rendering
-let inMemoryAgents: ExtendedAgent[] = [...DEFAULT_AGENTS];
+let inMemoryAgents: ExtendedAgent[] = [];
 
 export function getAgents(): ExtendedAgent[] {
   return inMemoryAgents;
@@ -22,7 +22,6 @@ export function getAgents(): ExtendedAgent[] {
 
 /**
  * ดึงข้อมูลนายหน้าทั้งหมดจากคลาวด์ Firebase Firestore โดยตรง
- * ไม่ได้พึ่งพา Local Storage ในเครื่องคอมพิวเตอร์อย่างเดียว
  */
 export async function fetchAgents(): Promise<ExtendedAgent[]> {
   const firestore: Firestore | null = db;
@@ -40,7 +39,8 @@ export async function fetchAgents(): Promise<ExtendedAgent[]> {
         }
         return list;
       } else {
-        return inMemoryAgents;
+        inMemoryAgents = [];
+        return [];
       }
     } catch (err) {
       console.warn('Fetch agents from Firestore warning:', err);

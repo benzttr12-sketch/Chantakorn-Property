@@ -18,6 +18,7 @@ import {
   Sparkles
 } from 'lucide-react';
 import { submitInquiry } from '@/lib/store/properties-store';
+import { compressMultipleImages } from '@/lib/image-compressor';
 import { DISTRICTS_LIST } from '@/data/locations';
 import AutoPinLandsMapsValuation from '@/components/landsmaps/AutoPinLandsMapsValuation';
 
@@ -50,30 +51,8 @@ export default function SellPage() {
     }
     setUploading(true); setError('');
     try {
-      const photos = await Promise.all(files.map(file => new Promise<string>((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onerror = () => reject(new Error('อ่านรูปภาพไม่สำเร็จ กรุณาเลือกไฟล์ใหม่'));
-        reader.onload = () => {
-          const image = new window.Image();
-          image.onerror = () => reject(new Error('ไม่รองรับรูปภาพนี้ กรุณาใช้ไฟล์ JPG, PNG หรือ WebP'));
-          image.onload = () => {
-            const canvas = document.createElement('canvas');
-            const scale = Math.min(1, 1600 / Math.max(image.width, image.height));
-            canvas.width = Math.max(1, Math.round(image.width * scale));
-            canvas.height = Math.max(1, Math.round(image.height * scale));
-            const context = canvas.getContext('2d');
-            if (!context) { reject(new Error('ไม่สามารถเตรียมรูปภาพได้')); return; }
-            context.fillStyle = '#fff'; context.fillRect(0, 0, canvas.width, canvas.height);
-            context.drawImage(image, 0, 0, canvas.width, canvas.height);
-            let quality = 0.85;
-            let photo = canvas.toDataURL('image/jpeg', quality);
-            while (photo.length > 450000 && quality > 0.25) { quality -= 0.1; photo = canvas.toDataURL('image/jpeg', quality); }
-            resolve(photo);
-          };
-          image.src = String(reader.result);
-        };
-        reader.readAsDataURL(file);
-      })));
+      const compressed = await compressMultipleImages(files);
+      const photos = compressed.map(c => c.dataUrl);
       setUploadedPhotos(current => [...current, ...photos]);
     } catch (err) { setError(err instanceof Error ? err.message : 'เตรียมรูปภาพไม่สำเร็จ'); }
     finally { setUploading(false); input.value = ''; }

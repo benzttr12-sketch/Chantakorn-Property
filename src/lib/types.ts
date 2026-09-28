@@ -191,7 +191,7 @@ export interface PropertyHistoryLog {
   notes?: string;
 }
 
-export type SystemActivityCategory = 'property' | 'inquiry' | 'user_role' | 'system';
+export type SystemActivityCategory = 'property' | 'inquiry' | 'user_role' | 'system' | 'work_phase';
 
 export interface SystemActivity {
   id: string;
@@ -206,4 +206,40 @@ export interface SystemActivity {
   actor_role?: string;
   metadata?: Record<string, any>;
   created_at: string;
+}
+
+export type WorkPhaseStatus = 'pending' | 'in_progress' | 'completed' | 'skipped';
+
+export interface WorkPhase {
+  phase_number: number;
+  phase_title: string;
+  description?: string;
+  status: WorkPhaseStatus;
+  started_at?: string;
+  completed_at?: string;
+  completed_by?: string;
+  notes?: string;
+  proof_photos?: string[];
+  target_completion_date?: string;
+  assigned_agent_name?: string;
+}
+
+export type WorkJobStatus = 'active' | 'completed' | 'on_hold';
+
+export interface WorkJob {
+  id: string;
+  job_code: string;
+  title: string;
+  property_id?: string;
+  property_title?: string;
+  inquiry_id?: string;
+  customer_name?: string;
+  customer_phone?: string;
+  assigned_agent?: string;
+  current_phase_number: number;
+  total_phases: number;
+  status: WorkJobStatus;
+  phases: WorkPhase[];
+  created_at: string;
+  updated_at: string;
 }

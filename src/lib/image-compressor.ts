@@ -6,7 +6,14 @@
  * - Handles YouTube, TikTok, Facebook, and direct video URLs
  */
 
-export interface CompressionOptions {
+export interface WatermarkOptions {
+  enableWatermark?: boolean; // default true
+  watermarkText?: string; // default 'CHANTAKORN PROPERTY'
+  phoneText?: string; // default '082-436-4499 | chantakornproperty.com'
+  position?: 'bottom-right' | 'bottom-left' | 'top-right' | 'top-left' | 'center'; // default 'bottom-right'
+}
+
+export interface CompressionOptions extends WatermarkOptions {
   maxDimension?: number; // default 1920 (Full HD)
   initialQuality?: number; // default 0.85
   minQuality?: number; // default 0.45
@@ -39,6 +46,134 @@ export function formatBytes(bytes: number, decimals = 1): string {
 }
 
 /**
+ * Draws an elegant automatic watermark badge at the bottom right corner of a Canvas.
+ */
+export function drawBottomRightWatermark(
+  ctx: CanvasRenderingContext2D,
+  canvasWidth: number,
+  canvasHeight: number,
+  options: WatermarkOptions = {}
+) {
+  const {
+    watermarkText = 'CHANTAKORN PROPERTY',
+    phoneText = '082-436-4499 | chantakornproperty.com',
+    position = 'bottom-right',
+  } = options;
+
+  const baseScale = Math.max(0.45, Math.min(canvasWidth, canvasHeight) / 1000);
+  const mainFontSize = Math.max(12, Math.round(18 * baseScale));
+  const subFontSize = Math.max(9, Math.round(11 * baseScale));
+  const paddingX = Math.round(16 * baseScale);
+  const paddingY = Math.round(10 * baseScale);
+  const margin = Math.round(20 * baseScale);
+
+  ctx.save();
+
+  ctx.font = `800 ${mainFontSize}px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif`;
+  const mainMetrics = ctx.measureText(watermarkText);
+
+  ctx.font = `600 ${subFontSize}px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif`;
+  const subMetrics = ctx.measureText(phoneText);
+
+  const textWidth = Math.max(mainMetrics.width, subMetrics.width);
+  const boxWidth = textWidth + paddingX * 2 + Math.round(20 * baseScale);
+  const boxHeight = mainFontSize + subFontSize + paddingY * 2 + Math.round(6 * baseScale);
+
+  let boxX = canvasWidth - boxWidth - margin;
+  let boxY = canvasHeight - boxHeight - margin;
+
+  if (position === 'bottom-left') {
+    boxX = margin;
+    boxY = canvasHeight - boxHeight - margin;
+  } else if (position === 'top-right') {
+    boxX = canvasWidth - boxWidth - margin;
+    boxY = margin;
+  } else if (position === 'top-left') {
+    boxX = margin;
+    boxY = margin;
+  } else if (position === 'center') {
+    boxX = (canvasWidth - boxWidth) / 2;
+    boxY = (canvasHeight - boxHeight) / 2;
+  }
+
+  // Draw semi-transparent dark navy slate badge
+  const radius = Math.round(10 * baseScale);
+  ctx.fillStyle = 'rgba(15, 23, 42, 0.82)';
+  ctx.shadowColor = 'rgba(0, 0, 0, 0.5)';
+  ctx.shadowBlur = Math.round(12 * baseScale);
+
+  ctx.beginPath();
+  if (typeof (ctx as any).roundRect === 'function') {
+    (ctx as any).roundRect(boxX, boxY, boxWidth, boxHeight, radius);
+  } else {
+    ctx.rect(boxX, boxY, boxWidth, boxHeight);
+  }
+  ctx.fill();
+
+  ctx.shadowColor = 'transparent';
+
+  // Gold accent vertical strip on left edge of badge
+  const barWidth = Math.max(3, Math.round(5 * baseScale));
+  ctx.fillStyle = '#D97706';
+  ctx.beginPath();
+  if (typeof (ctx as any).roundRect === 'function') {
+    (ctx as any).roundRect(boxX + 4, boxY + 6, barWidth, boxHeight - 12, 2);
+  } else {
+    ctx.rect(boxX + 4, boxY + 6, barWidth, boxHeight - 12);
+  }
+  ctx.fill();
+
+  // White Title Text
+  const contentX = boxX + paddingX + Math.round(8 * baseScale);
+  const mainY = boxY + paddingY + mainFontSize * 0.8;
+
+  ctx.fillStyle = '#FFFFFF';
+  ctx.font = `800 ${mainFontSize}px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif`;
+  ctx.fillText(watermarkText, contentX, mainY);
+
+  // Gold Phone & Website Subtext
+  const subY = mainY + subFontSize + Math.round(4 * baseScale);
+  ctx.fillStyle = '#FBBF24';
+  ctx.font = `600 ${subFontSize}px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif`;
+  ctx.fillText(phoneText, contentX, subY);
+
+  ctx.restore();
+}
+
+/**
+ * Utility to add watermark to any base64 image dataUrl
+ */
+export async function addWatermarkToImage(
+  dataUrl: string,
+  options: WatermarkOptions = {}
+): Promise<string> {
+  if (typeof window === 'undefined') return dataUrl;
+  return new Promise((resolve) => {
+    const img = new window.Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => {
+      try {
+        const canvas = document.createElement('canvas');
+        canvas.width = img.width;
+        canvas.height = img.height;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) {
+          resolve(dataUrl);
+          return;
+        }
+        ctx.drawImage(img, 0, 0);
+        drawBottomRightWatermark(ctx, img.width, img.height, options);
+        resolve(canvas.toDataURL('image/jpeg', 0.88));
+      } catch {
+        resolve(dataUrl);
+      }
+    };
+    img.onerror = () => resolve(dataUrl);
+    img.src = dataUrl;
+  });
+}
+
+/**
  * Automatically compresses a single image File in the browser using HTML5 Canvas.
  */
 export async function compressImageFile(
@@ -51,6 +186,10 @@ export async function compressImageFile(
     minQuality = 0.45,
     targetMaxBytes = 450000,
     format = 'image/jpeg',
+    enableWatermark = true,
+    watermarkText = 'CHANTAKORN PROPERTY',
+    phoneText = '082-436-4499 | chantakornproperty.com',
+    position = 'bottom-right',
   } = options;
 
   if (file.size > MAX_UPLOAD_IMAGE_SIZE_BYTES) {
@@ -103,6 +242,15 @@ export async function compressImageFile(
 
           // Draw the resized image
           ctx.drawImage(img, 0, 0, targetWidth, targetHeight);
+
+          // Draw automatic bottom-right watermark
+          if (enableWatermark) {
+            drawBottomRightWatermark(ctx, targetWidth, targetHeight, {
+              watermarkText,
+              phoneText,
+              position,
+            });
+          }
 
           // Check if WebP is supported by this browser
           let chosenFormat = format;

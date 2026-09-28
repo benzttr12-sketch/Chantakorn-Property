@@ -25,7 +25,8 @@ import {
   X,
   UserCheck,
   Star,
-  Sparkles
+  Sparkles,
+  Layers
 } from 'lucide-react';
 import Image from 'next/image';
 import ProfileHeader from '@/components/admin/ProfileHeader';
@@ -252,6 +253,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   const navItems = [
     { label: 'แดชบอร์ดภาพรวม', href: '/admin', icon: LayoutDashboard },
+    { label: 'ติดตามเฟสงาน', href: '/admin/work-phases', icon: Layers, badge: 'ใหม่' },
     { label: 'ระบบอัตโนมัติ AI', href: '/admin/automation', icon: Sparkles, badge: 'เทพ' },
     { label: 'จัดการอสังหาริมทรัพย์', href: '/admin/properties', icon: Building2 },
     { label: 'เพิ่มทรัพย์ใหม่', href: '/admin/properties/new', icon: PlusCircle },

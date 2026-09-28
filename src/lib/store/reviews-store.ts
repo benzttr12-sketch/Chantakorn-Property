@@ -73,7 +73,7 @@ const STORAGE_KEY = 'chantakorn_customer_reviews_v1';
 
 export function getReviews(): Review[] {
   if (typeof window === 'undefined') {
-    return DEFAULT_REVIEWS;
+    return [];
   }
   try {
     const saved = localStorage.getItem(STORAGE_KEY);
@@ -86,7 +86,7 @@ export function getReviews(): Review[] {
   } catch (err) {
     console.error('Failed to parse reviews from storage:', err);
   }
-  return DEFAULT_REVIEWS;
+  return [];
 }
 
 export function saveReviews(reviews: Review[]): void {

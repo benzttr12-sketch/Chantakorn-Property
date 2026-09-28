@@ -92,13 +92,13 @@ export async function fetchSystemActivities(maxCount = 20): Promise<SystemActivi
       if (!snapshot.empty) {
         return snapshot.docs.map(docSnap => docSnap.data() as SystemActivity);
       }
+      return [];
     }
   } catch (err) {
-    console.warn('Failed to fetch system activities from Firestore, using memory store:', err);
+    console.warn('Failed to fetch system activities from Firestore:', err);
   }
 
-  // Fallback / Initial seed
-  return SAMPLE_ACTIVITIES;
+  return [];
 }
 
 export async function logSystemActivity(
