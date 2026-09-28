@@ -59,10 +59,10 @@ export default function FeaturedProperties() {
               <span>HANDPICKED EXCLUSIVE PORTFOLIO</span>
             </div>
             <h2 className="text-3xl sm:text-4xl lg:text-5xl font-black text-navy-950 tracking-tight text-balance">
-              อสังหาริมทรัพย์คัดสรรพิเศษ
+              คอลเลกชันอสังหาริมทรัพย์ระดับพรีเมียม
             </h2>
             <p className="text-slate-600 text-sm sm:text-base mt-2.5 max-w-2xl leading-relaxed">
-              ทรัพย์เด่นทำเลทองในหาดใหญ่และสงขลา คัดกรองและตรวจสอบความถูกต้องของโฉนดแล้ว 100%
+              คัดสรรเฉพาะบ้านเดี่ยว ที่ดิน และคอนโดมิเนียมศักยภาพสูงในทำเลชั้นนำของหาดใหญ่และสงขลา พร้อมเอกสารสิทธิ์ที่ผ่านการตรวจสอบอย่างละเอียดครบถ้วนทุกรายการ
             </p>
           </div>
 
@@ -70,7 +70,7 @@ export default function FeaturedProperties() {
             href="/properties"
             className="inline-flex items-center space-x-2 text-xs sm:text-sm font-bold text-navy-950 hover:text-gold-600 transition-colors group self-start md:self-auto bg-white px-5 py-3 rounded-xl border border-slate-200 shadow-xs hover:border-gold-300"
           >
-            <span>สำรวจอสังหาฯ ทั้งหมด</span>
+            <span>ชมคอลเลกชันทั้งหมด</span>
             <ArrowRight className="w-4 h-4 transform group-hover:translate-x-1 transition-transform text-gold-500" />
           </Link>
         </div>

@@ -6,11 +6,12 @@ import Image from 'next/image';
 import { Home, Trees, Building2, Store, TrendingUp, HandCoins, ArrowRight, Sparkles } from 'lucide-react';
 import { fetchProperties } from '@/lib/store/properties-store';
 import {
-  villaModernEstate,
-  penthouseLivingRoom,
-  hatyaiCitySkyline,
-  coastalSongkhlaVilla,
-  heroLuxuryMansion
+  catHatyaiLuxuryHouse,
+  catHatyaiLuxuryCondo,
+  catSongkhlaPrimeLand,
+  catHatyaiShophouseCommercial,
+  catHatyaiInvestmentApartment,
+  catSongkhlaLandChanote,
 } from '@/assets/images';
 
 export default function PropertyCategories() {
@@ -36,44 +37,50 @@ export default function PropertyCategories() {
     {
       name: 'บ้านเดี่ยว & พูลวิลล่า',
       type: 'house',
+      realLocation: 'สถานที่จริง: โซน ม.อ.–คอหงส์ หาดใหญ่',
       description: 'บ้านเดี่ยว ทาวน์โฮม บ้านแฝด โซน ม.อ. คอหงส์ กาญจนวนิช และสนามบินหาดใหญ่',
       icon: Home,
-      image: villaModernEstate,
+      image: catHatyaiLuxuryHouse,
     },
     {
       name: 'คอนโดมิเนียมหรู',
       type: 'condo',
+      realLocation: 'สถานที่จริง: ย่านเซ็นทรัล–ม.อ. หาดใหญ่',
       description: 'คอนโดพร้อมอยู่ ใกล้ ม.อ. หาดใหญ่ เซ็นทรัล และศูนย์กลางไลฟ์สไตล์การเดินทาง',
       icon: Building2,
-      image: penthouseLivingRoom,
+      image: catHatyaiLuxuryCondo,
     },
     {
       name: 'ที่ดินแปลงสวย',
       type: 'land',
+      realLocation: 'สถานที่จริง: วิวเขาคอหงส์ สงขลา–หาดใหญ่',
       description: 'ที่ดินเปล่าถมแล้ว ติดถนนใหญ่ แปลงสร้างบ้านเดี่ยว หรือจัดสรรเพื่อการลงทุน',
       icon: Trees,
-      image: coastalSongkhlaVilla,
+      image: catSongkhlaPrimeLand,
     },
     {
       name: 'อาคารพาณิชย์ & ตึกแถว',
       type: 'commercial',
+      realLocation: 'สถานที่จริง: ย่านการค้าและถนน 30 เมตร หาดใหญ่',
       description: 'ตึกแถวทำเลทอง ค้าขายได้ทันที โซนตลาดกิมหยง และถนน 30 เมตร',
       icon: Store,
-      image: hatyaiCitySkyline,
+      image: catHatyaiShophouseCommercial,
     },
     {
       name: 'อสังหาฯ เพื่อการลงทุน',
       type: 'investment',
+      realLocation: 'สถานที่จริง: ย่านชุมชน ม.อ. หาดใหญ่',
       description: 'อพาร์ตเมนต์ หอพัก และอาคารพร้อมผู้เช่า กระแสเงินสดมั่นคง Yield สูง',
       icon: TrendingUp,
-      image: heroLuxuryMansion,
+      image: catHatyaiInvestmentApartment,
     },
     {
-      name: 'ขายฝาก & จำนองด่วน',
+      name: 'ขายฝาก & เสริมสภาพคล่อง',
       type: 'consignment',
-      description: 'บริการจัดหาเงินทุนถูกกฎหมาย ดอกเบี้ยต่ำ อนุมัติไว ทำสัญญา ณ กรมที่ดิน',
+      realLocation: 'สถานที่จริง: นิติกรรมสัญญา สนง.ที่ดินสงขลา',
+      description: 'บริการจัดหาเงินทุนถูกกฎหมาย ดอกเบี้ยเป็นธรรม อนุมัติรวดเร็ว ทำนิติกรรมสัญญาถูกต้อง ณ สำนักงานที่ดิน',
       icon: HandCoins,
-      image: villaModernEstate,
+      image: catSongkhlaLandChanote,
     },
   ];
 
@@ -87,10 +94,10 @@ export default function PropertyCategories() {
             <span>DISCOVER BY PROPERTY TYPE</span>
           </div>
           <h2 className="text-3xl sm:text-4xl lg:text-5xl font-black text-navy-950 tracking-tight text-balance">
-            เลือกชมตามประเภทอสังหาริมทรัพย์
+            เลือกสรรตามประเภทอสังหาริมทรัพย์ที่คุณปรารถนา
           </h2>
           <p className="text-slate-600 text-sm sm:text-base mt-2.5 leading-relaxed">
-            ครอบคลุมทุกความต้องการ ทั้งการอยู่อาศัยระดับพรีเมียมและการลงทุนที่สร้างผลตอบแทนสม่ำเสมอ
+            ตอบสนองทุกเป้าหมายชีวิต ทั้งการอยู่อาศัยอันเปี่ยมสุขและการสร้างผลตอบแทนการลงทุนที่เติบโตอย่างยั่งยืน
           </p>
         </div>
 
@@ -119,9 +126,17 @@ export default function PropertyCategories() {
                 {/* Dark Gradient Overlay */}
                 <div className="absolute inset-0 bg-gradient-to-t from-[#020812] via-[#020812]/50 to-transparent group-hover:via-[#020812]/40 transition-colors" />
 
+                {/* Top Left: Real Location Tag */}
+                <div className="absolute top-4 left-4 z-10">
+                  <span className="px-2.5 py-1 bg-black/50 backdrop-blur-md text-gold-200 text-[10.5px] font-semibold rounded-lg border border-gold-400/25 flex items-center gap-1.5 shadow-sm">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 inline-block" />
+                    <span>{cat.realLocation}</span>
+                  </span>
+                </div>
+
                 {/* Live Count Pill (Unboxed text / subtle tag) */}
                 {realCount > 0 && (
-                  <div className="absolute top-5 right-5 z-10">
+                  <div className="absolute top-4 right-4 z-10">
                     <span className="px-3 py-1 bg-white/20 backdrop-blur-md text-white text-xs font-semibold rounded-lg border border-white/20">
                       {realCount} รายการ
                     </span>

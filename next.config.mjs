@@ -12,12 +12,12 @@ const normalizedBasePath = cleanBasePath
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   distDir: staticExport ? '.next-pages' : '.next',
-  experimental: {
-    devtoolSegmentExplorer: false,
-  },
   ...(staticExport ? { output: 'export', trailingSlash: true } : {}),
   ...(normalizedBasePath ? { basePath: normalizedBasePath } : {}),
   poweredByHeader: false,
+  env: {
+    NEXT_PUBLIC_GOOGLE_MAPS_API_KEY: process.env.VITE_GOOGLE_MAPS_API_KEY || process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || 'AIzaSyCcrGFUpzyw7EtVk7uP2C8EYOsY-e8MF34',
+  },
   images: {
     unoptimized: staticExport,
     remotePatterns: [

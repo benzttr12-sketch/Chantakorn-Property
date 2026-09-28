@@ -8,6 +8,7 @@ import FeaturedAgents from '@/components/home/FeaturedAgents';
 import CustomerReviewsSection from '@/components/home/CustomerReviewsSection';
 import MarketIntelligenceSection from '@/components/home/MarketIntelligenceSection';
 import ViewingBookingSection from '@/components/home/ViewingBookingSection';
+import RealEstateFAQ from '@/components/home/RealEstateFAQ';
 import SellPropertyCTA from '@/components/home/SellPropertyCTA';
 import ContactCTA from '@/components/home/ContactCTA';
 
@@ -35,16 +36,19 @@ export default function HomePage() {
       {/* 7: FEATURED AGENTS (ทีมงานที่ปรึกษาอสังหาริมทรัพย์มืออาชีพ) */}
       <FeaturedAgents />
 
-      {/* 7: REAL CLIENT TESTIMONIALS (ความประทับใจจากลูกค้าตัวจริง) */}
+      {/* 8: REAL CLIENT TESTIMONIALS (ความประทับใจจากลูกค้าตัวจริง) */}
       <CustomerReviewsSection />
 
-      {/* 8: PRIVATE VIEWING APPOINTMENT (จองคิวนัดชมทรัพย์ส่วนตัว) */}
+      {/* 9: PRIVATE VIEWING APPOINTMENT (จองคิวนัดชมทรัพย์ส่วนตัว) */}
       <ViewingBookingSection />
 
-      {/* 9: SELL PROPERTY CTA (ฝากขายอสังหาฯ รวดเร็ว มั่นใจ) */}
+      {/* 10: REAL ESTATE FAQ (คำถามที่พบบ่อย ขับเคลื่อนด้วย Gemini AI) */}
+      <RealEstateFAQ />
+
+      {/* 11: SELL PROPERTY CTA (ฝากขายอสังหาฯ รวดเร็ว มั่นใจ) */}
       <SellPropertyCTA />
 
-      {/* 10: CONTACT CTA (ปรึกษาเราได้ตลอด 24 ชั่วโมง) */}
+      {/* 12: CONTACT CTA (ปรึกษาเราได้ตลอด 24 ชั่วโมง) */}
       <ContactCTA />
     </div>
   );

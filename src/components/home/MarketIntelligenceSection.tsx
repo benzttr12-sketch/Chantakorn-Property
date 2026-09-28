@@ -142,10 +142,10 @@ export default function MarketIntelligenceSection() {
             <span>GOOGLE SEARCH GROUNDED INTELLIGENCE</span>
           </div>
           <h2 className="text-2xl sm:text-4xl font-black text-white tracking-tight">
-            เจาะลึกทิศทางตลาดอสังหาฯ หาดใหญ่–สงขลา <span className="text-gold-400 font-serif italic">แบบเรียลไทม์</span>
+            เจาะลึกทัศนียภาพและทิศทางตลาดอสังหาฯ หาดใหญ่–สงขลา <span className="text-gold-400 font-serif italic">แบบเรียลไทม์</span>
           </h2>
           <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
-            ผสานพลัง AI อัจฉริยะร่วมกับข้อมูลสดจาก <strong>Google Search</strong> ดึงสถิติราคาประเมิน โครงสร้างพื้นฐาน และแนวโน้มดอกเบี้ย พร้อมลิงก์ยืนยันแหล่งที่มาที่น่าเชื่อถือ
+            ผสานข้อมูลสืบค้นสดจาก <strong>Google Search</strong> เพื่อรายงานสถิติราคาประเมิน ทิศทางโครงการเมกะโปรเจกต์ และแนวโน้มอัตราดอกเบี้ยอย่างแม่นยำ พร้อมแหล่งอ้างอิงที่เชื่อถือได้
           </p>
         </div>
 

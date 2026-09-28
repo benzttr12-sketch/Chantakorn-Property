@@ -4,10 +4,10 @@ import { PlusCircle, CheckCircle2, ArrowRight } from 'lucide-react';
 
 export default function SellPropertyCTA() {
   const benefits = [
-    'ประเมินราคาตลาดและวางแผนการขายฟรี',
-    'ทำการตลาดครอบคลุม ทั้งออนไลน์ โซเชียล และป้ายประกาศ',
-    'คัดกรองผู้ซื้อที่มีศักยภาพและเครดิตพร้อม',
-    'พาชมทรัพย์ เจรจาต่อรอง และดูแลสัญญาจนถึงวันโอน'
+    'วิเคราะห์มูลค่าตลาดเชิงลึกและวางกลยุทธ์ตั้งราคาอย่างแม่นยำ (ไม่มีค่าใช้จ่าย)',
+    'ทำการตลาดครอบคลุม ทั้งสื่อดิจิทัล โซเชียลมีเดีย และป้ายประกาศทำเลทอง',
+    'คัดกรองกลุ่มผู้ซื้อที่มีศักยภาพ พร้อมตรวจเช็กความพร้อมด้านสินเชื่อ',
+    'บริการนำชมทรัพย์ เจรจาต่อรอง ดูแลสัญญาจนถึงวันส่งมอบกรรมสิทธิ์'
   ];
 
   return (
@@ -22,14 +22,14 @@ export default function SellPropertyCTA() {
             {/* Left Content */}
             <div className="lg:col-span-7">
               <div className="flex items-center space-x-1.5 text-xs font-bold text-gold-400 uppercase tracking-widest mb-4">
-                <span>บริการรับฝากขายอสังหาริมทรัพย์</span>
+                <span>บริการรับฝากขายและบริหารการตลาดอสังหาริมทรัพย์</span>
               </div>
               <h2 className="text-3xl sm:text-4xl font-extrabold text-white tracking-tight leading-tight mb-4">
-                มีบ้าน มีที่ดิน อยากขาย? <br />
-                <span className="text-gold-400">ฝากทรัพย์กับเรา</span>
+                ส่งมอบคุณค่าแห่งอสังหาริมทรัพย์ของคุณ <br />
+                <span className="text-gold-400">สู่มือผู้ซื้อที่คู่ควร</span>
               </h2>
               <p className="text-gray-300 text-sm sm:text-base leading-relaxed mb-6 max-w-xl">
-                ให้ Chantakorn Property ช่วยดูแลทรัพย์ของคุณ ด้วยฐานลูกค้าผู้ซื้อจริงในหาดใหญ่–สงขลา และทีมการตลาดมืออาชีพ ขายได้ไว ในราคาที่เหมาะสม
+                ให้ Chantakorn Property ดูแลอสังหาริมทรัพย์อันทรงคุณค่าของคุณ ด้วยฐานลูกค้าผู้ซื้อจริงในหาดใหญ่–สงขลา และทีมการตลาดมืออาชีพ ขายได้รวดเร็ว ในราคาที่สะท้อนมูลค่าแท้จริง
               </p>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-8">
@@ -55,7 +55,7 @@ export default function SellPropertyCTA() {
             <div className="lg:col-span-5 bg-navy-800/80 border border-gold-500/20 rounded-2xl p-6 sm:p-8 backdrop-blur-md">
               <div className="text-center pb-6 border-b border-navy-700">
                 <span className="text-xs uppercase tracking-wider text-gray-400 font-semibold">
-                  ผลงานการดูแลลูกค้า
+                  ดัชนีความสำเร็จและความพึงพอใจ
                 </span>
                 <div className="text-4xl sm:text-5xl font-extrabold text-gold-400 mt-2">
                   98%
@@ -72,7 +72,7 @@ export default function SellPropertyCTA() {
                 </div>
                 <div>
                   <div className="text-2xl font-bold text-white">100%</div>
-                  <div className="text-xs text-gray-400 mt-0.5">ฟรีค่าการตลาดจนกว่าจะขายได้</div>
+                  <div className="text-xs text-gray-400 mt-0.5">ฟรีค่าการตลาดจนกว่าจะสำเร็จผล</div>
                 </div>
               </div>
             </div>

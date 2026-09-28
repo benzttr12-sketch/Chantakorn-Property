@@ -306,7 +306,7 @@ export const LOCATIONS: LocationItem[] = [
     district: "หาดใหญ่",
     image: "https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?auto=format&fit=crop&w=800&q=80",
     propertyCount: 85,
-    description: "ศูนย์กลางเศรษฐกิจ การค้า และการศึกษา ใกล้ ม.อ. เซ็นทรัลหาดใหญ่ และย่านธุรกิจ"
+    description: "ศูนย์กลางเศรษฐกิจ การค้า และการศึกษา วิวมุมสูงจากเขาคอหงส์ ใกล้ ม.อ. เซ็นทรัลหาดใหญ่ และย่านธุรกิจ"
   },
   {
     id: "mueang-songkhla",
@@ -315,7 +315,7 @@ export const LOCATIONS: LocationItem[] = [
     district: "เมืองสงขลา",
     image: "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=800&q=80",
     propertyCount: 38,
-    description: "เมืองเก่าเสน่ห์ริมทะเล ใกล้หาดชลาทัศน์ แหลมสมิหลา และสถานที่ราชการ"
+    description: "เมืองเก่าเสน่ห์ริมทะเล ชายหาดสมิหลา-นางเงือกทอง เกาะหนูเกาะแมว และศูนย์ราชการริมอ่าวไทย"
   },
   {
     id: "sadao-border",
@@ -324,7 +324,7 @@ export const LOCATIONS: LocationItem[] = [
     district: "สะเดา",
     image: "https://images.unsplash.com/photo-1590283603385-17ffb3a7f29f?auto=format&fit=crop&w=800&q=80",
     propertyCount: 28,
-    description: "เมืองหน้าด่านชายแดนไทย-มาเลเซีย ศูนย์กลางเขตเศรษฐกิจพิเศษและการค้าชายแดน"
+    description: "เมืองหน้าด่านชายแดนไทย-มาเลเซีย ด่านนอก ศูนย์กลางเขตเศรษฐกิจพิเศษและการค้าข้ามพรมแดน"
   },
   {
     id: "khuan-lang",
@@ -333,7 +333,7 @@ export const LOCATIONS: LocationItem[] = [
     district: "หาดใหญ่",
     image: "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=800&q=80",
     propertyCount: 42,
-    description: "โซนขยายตัวยอดนิยม ใกล้สนามบินนานาชาติหาดใหญ่ เดินทางสะดวกรวดเร็ว"
+    description: "ทำเลศักยภาพขยายตัวสูง ประตูสู่ท่าอากาศยานนานาชาติหาดใหญ่ เดินทางสะดวกรวดเร็ว ใกล้ถนนสนามบินพาณิชย์"
   },
   {
     id: "khlong-hae",
@@ -342,7 +342,7 @@ export const LOCATIONS: LocationItem[] = [
     district: "หาดใหญ่",
     image: "https://images.unsplash.com/photo-1580587771525-78b9dba3b914?auto=format&fit=crop&w=800&q=80",
     propertyCount: 29,
-    description: "ทำเลเชื่อมต่อถนนลพบุรีราเมศวร์ ชุมชนน่าอยู่ ใกล้ตลาดน้ำคลองแห"
+    description: "ทำเลเชื่อมต่อถนนลพบุรีราเมศวร์ แหล่งท่องเที่ยวตลาดน้ำคลองแห และวิถีชุมชนริมน้ำที่ร่มรื่น"
   },
   {
     id: "ban-phru",
@@ -351,7 +351,7 @@ export const LOCATIONS: LocationItem[] = [
     district: "หาดใหญ่",
     image: "https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?auto=format&fit=crop&w=800&q=80",
     propertyCount: 24,
-    description: "บรรยากาศร่มรื่น เหมาะแก่การอยู่อาศัยของครอบครัว ใกล้ ม.หาดใหญ่"
+    description: "บรรยากาศร่มรื่น สวนสาธารณะพรุค้างคาว ใกล้ ม.หาดใหญ่ เหมาะแก่การอยู่อาศัยของครอบครัวคุณภาพ"
   },
   {
     id: "singhanakhon",

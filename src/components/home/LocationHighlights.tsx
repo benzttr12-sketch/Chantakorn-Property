@@ -7,22 +7,34 @@ import { MapPin, ArrowRight, Compass } from 'lucide-react';
 import { LOCATIONS } from '@/data/locations';
 import { fetchProperties } from '@/lib/store/properties-store';
 import {
-  hatyaiCitySkyline,
-  coastalSongkhlaVilla,
-  villaModernEstate,
-  penthouseLivingRoom,
-  heroLuxuryMansion
+  hatyaiCityLandmark,
+  songkhlaSamilaMermaid,
+  sadaoBorderTown,
+  khuanlangAirportGateway,
+  khlonghaeFloatingMarket,
+  banphruPruPark,
 } from '@/assets/images';
 
 const LOCATION_IMAGE_MAP: Record<string, StaticImageData> = {
-  'hatyai-central': hatyaiCitySkyline,
-  'mueang-songkhla': coastalSongkhlaVilla,
-  'khuan-lang': villaModernEstate,
-  'khlong-hae': penthouseLivingRoom,
-  'ban-phru': heroLuxuryMansion,
-  'sadao-border': hatyaiCitySkyline,
-  'singhanakhon': coastalSongkhlaVilla,
-  'rattaphum': villaModernEstate,
+  'hatyai-central': hatyaiCityLandmark,
+  'mueang-songkhla': songkhlaSamilaMermaid,
+  'sadao-border': sadaoBorderTown,
+  'khuan-lang': khuanlangAirportGateway,
+  'khlong-hae': khlonghaeFloatingMarket,
+  'ban-phru': banphruPruPark,
+  'singhanakhon': songkhlaSamilaMermaid,
+  'rattaphum': hatyaiCityLandmark,
+};
+
+const LANDMARK_NAME_MAP: Record<string, string> = {
+  'hatyai-central': 'จุดชมวิวเขาคอหงส์ & มโนราห์',
+  'mueang-songkhla': 'หาดสมิหลา & รูปปั้นนางเงือกทอง',
+  'sadao-border': 'ด่านสะเดา & ศูนย์กลางเศรษฐกิจด่านนอก',
+  'khuan-lang': 'ท่าอากาศยานนานาชาติหาดใหญ่',
+  'khlong-hae': 'ตลาดน้ำคลองแห วิถีชีวิตริมน้ำ',
+  'ban-phru': 'สวนสาธารณะพรุค้างคาว & ม.หาดใหญ่',
+  'singhanakhon': 'สะพานติณสูลานนท์ & ทะเลสาบสงขลา',
+  'rattaphum': 'อุทยานเทือกเขาบรรทัด & รัตภูมิ',
 };
 
 export default function LocationHighlights() {
@@ -57,10 +69,10 @@ export default function LocationHighlights() {
               <span>PRIME LOCATIONS IN SONGKHLA</span>
             </div>
             <h2 className="text-3xl sm:text-4xl lg:text-5xl font-black text-navy-950 tracking-tight text-balance">
-              ทำเลศักยภาพที่น่าจับตามอง
+              ทำเลศักยภาพสูงแห่งการอยู่อาศัยและการลงทุน
             </h2>
             <p className="text-slate-600 text-sm sm:text-base mt-2.5 max-w-2xl leading-relaxed">
-              สำรวจอสังหาริมทรัพย์ในทำเลทองของหาดใหญ่–สงขลา ทั้งศูนย์กลางการแพทย์ มหาวิทยาลัย แหล่งช้อปปิ้ง และชายฝั่งทะเล
+              เปิดมุมมองการลงทุนและเลือกสรรที่อยู่อาศัยในย่านพรีเมียมของหาดใหญ่และสงขลา เชื่อมต่อศูนย์กลางการแพทย์ การศึกษาชั้นนำ ย่านการค้า และทิวทัศน์ธรรมชาติอันทรงคุณค่า
             </p>
           </div>
 
@@ -68,7 +80,7 @@ export default function LocationHighlights() {
             href="/properties"
             className="inline-flex items-center space-x-2 text-xs sm:text-sm font-bold text-navy-950 hover:text-gold-600 transition-colors group self-start md:self-auto bg-white px-5 py-3 rounded-xl border border-slate-200 shadow-xs hover:border-gold-300"
           >
-            <span>ดูทุกทำเลในสงขลา</span>
+            <span>สำรวจทุกทำเลศักยภาพ</span>
             <ArrowRight className="w-4 h-4 transform group-hover:translate-x-1 transition-transform text-gold-500" />
           </Link>
         </div>
@@ -78,7 +90,8 @@ export default function LocationHighlights() {
           {LOCATIONS.slice(0, 6).map((loc, idx) => {
             const count = districtCounts[loc.district] || 0;
             const isFeatured = idx === 0 || idx === 1;
-            const localImg = LOCATION_IMAGE_MAP[loc.id] || hatyaiCitySkyline;
+            const localImg = LOCATION_IMAGE_MAP[loc.id] || hatyaiCityLandmark;
+            const landmarkName = LANDMARK_NAME_MAP[loc.id];
 
             return (
               <Link
@@ -91,7 +104,7 @@ export default function LocationHighlights() {
                 {/* Location Image */}
                 <Image
                   src={localImg}
-                  alt={loc.name}
+                  alt={`${loc.name} - ${landmarkName || ''}`}
                   fill
                   placeholder="blur"
                   sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
@@ -103,11 +116,17 @@ export default function LocationHighlights() {
                 <div className="absolute inset-0 bg-gradient-to-t from-[#020812] via-[#020812]/50 to-transparent group-hover:via-[#020812]/40 transition-colors" />
 
                 {/* Top Badge */}
-                <div className="absolute top-5 left-5 z-10">
+                <div className="absolute top-4 left-4 z-10 flex flex-col gap-1.5 items-start">
                   <span className="px-3 py-1 bg-white/15 backdrop-blur-md text-white text-[11px] font-semibold rounded-lg border border-white/20 flex items-center space-x-1">
-                    <MapPin className="w-3 h-3 text-gold-400" />
+                    <MapPin className="w-3 h-3 text-gold-400 shrink-0" />
                     <span>{loc.nameEn}</span>
                   </span>
+                  {landmarkName && (
+                    <span className="px-2.5 py-0.5 bg-black/45 backdrop-blur-md text-gold-200 text-[10px] font-medium rounded-md border border-gold-400/25 flex items-center gap-1.5 shadow-sm">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 inline-block" />
+                      <span>ภาพสถานที่จริง: {landmarkName}</span>
+                    </span>
+                  )}
                 </div>
 
                 {count > 0 && (

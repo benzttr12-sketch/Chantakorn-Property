@@ -141,7 +141,7 @@ export default function ViewingBookingSection({ initialAgent, initialPropertyTit
             จองคิวนัดชมอสังหาริมทรัพย์แบบส่วนตัว
           </h2>
           <p className="text-slate-600 text-sm sm:text-base mt-2.5 max-w-2xl mx-auto leading-relaxed">
-            เลือกวันและเวลาที่คุณสะดวก ทีมงาน Chantakorn Property พร้อมพาชมสถานที่จริง ตรวจสอบทำเล และให้ข้อมูลเชิงลึกฟรี ไม่มีค่าใช้จ่าย
+            เลือกช่วงเวลาที่คุณสะดวก ทีมงานที่ปรึกษา Chantakorn Property ยินดีอำนวยความสะดวกนำชมสถานที่จริง พร้อมวิเคราะห์ศักยภาพทำเลและข้อมูลเชิงลึกอย่างเป็นส่วนตัว โดยไม่มีค่าใช้จ่ายใดๆ ทั้งสิ้น
           </p>
         </div>
 

@@ -221,6 +221,8 @@ export async function fetchProperties(filters?: PropertyFilters): Promise<Proper
   return filterProperties(await loadProperties(false), filters);
 }
 
+export const getProperties = fetchProperties;
+
 export async function fetchAdminProperties(filters?: PropertyFilters): Promise<Property[]> {
   requireStaffBackend();
   return filterProperties(await loadProperties(true), filters);
@@ -259,6 +261,7 @@ function generateShortPropertyId(): string {
 }
 
 async function triggerLineNotification(property: Property) {
+  if (typeof window === 'undefined' || typeof fetch === 'undefined') return;
   try {
     const res = await fetch('/api/line/notify', {
       method: 'POST',

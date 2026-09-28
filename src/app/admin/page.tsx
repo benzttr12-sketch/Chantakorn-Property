@@ -32,6 +32,7 @@ import { fetchAdminProperties, fetchInquiries, updateInquiryStatus } from '@/lib
 import { Property, Inquiry } from '@/lib/types';
 import { formatPrice, propertyHref, formatPropertyCode, getPropertyTypeName, formatThaiDate } from '@/lib/utils';
 import SystemActivityFeed from '@/components/admin/SystemActivityFeed';
+import InvestmentZoneDistributionMap from '@/components/admin/InvestmentZoneDistributionMap';
 
 export default function AdminDashboardPage() {
   const [properties, setProperties] = useState<Property[]>([]);
@@ -461,6 +462,9 @@ export default function AdminDashboardPage() {
           </div>
         )}
       </div>
+
+      {/* D3 Geospatial Property Price Distribution & Investment Zones Map */}
+      <InvestmentZoneDistributionMap properties={properties} />
 
       {/* Analytics Trend Charts */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

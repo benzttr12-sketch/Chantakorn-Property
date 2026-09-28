@@ -85,6 +85,7 @@ import { calculateFengShui, formatFengShuiText, ALL_FACING_DIRECTIONS, FENG_SHUI
 import { parseRawPropertyText, generateProfessionalDescription } from '@/lib/property-text-parser';
 import SmartDescriptionGeneratorModal, { PropertySpecsForAI } from '@/components/admin/SmartDescriptionGeneratorModal';
 import VoiceDictationBar from '@/components/ui/VoiceDictationBar';
+import PropertyFormProgress, { FormValidationItem } from '@/components/admin/PropertyFormProgress';
 
 // ตัวอย่างรูปภาพคุณภาพสูง สำหรับปุ่ม "ใส่รูปภาพตัวอย่างทันที 1 คลิก"
 const SAMPLE_HOUSE_PHOTOS = [
@@ -940,20 +941,41 @@ function PropertyEditor() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (submitting || loading) return;
-    if (!title.trim() || !Number.isFinite(Number(price)) || Number(price) <= 0) { 
-      setError('กรุณาระบุชื่อประกาศและราคาที่ถูกต้องมากกว่า 0'); 
+
+    // Check required validation items
+    if (!title.trim() || title.trim().length < 5) {
+      setError('กรุณาระบุชื่อประกาศอย่างน้อย 5 ตัวอักษร');
+      document.getElementById('section-1-basic')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      return;
+    }
+    if (!Number.isFinite(Number(price)) || Number(price) <= 0) { 
+      setError('กรุณาระบุราคาที่ถูกต้องมากกว่า 0 บาท'); 
+      document.getElementById('section-1-basic')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
       return; 
     }
     if (!slug.trim() || /[/?#\\]/.test(slug)) { 
-      setError('Slug ต้องไม่ว่างและไม่มีอักขระพิเศษ / ? #'); 
+      setError('Slug ต้องไม่ว่างและไม่มีอักขระพิเศษ / ? # \\'); 
+      document.getElementById('section-1-basic')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
       return; 
     }
+    if (!district || !subdistrict) {
+      setError('กรุณาเลือกอำเภอและตำบลในจังหวัดสงขลา');
+      document.getElementById('section-2-location')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      return;
+    }
     if (!images.length || !coverImage) { 
-      setError('กรุณาเพิ่มรูปภาพอย่างน้อย 1 รูป'); 
+      setError('กรุณาเพิ่มรูปภาพอย่างน้อย 1 รูปสำหรับหน้าปก'); 
+      document.getElementById('section-4-images')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
       return; 
+    }
+    if (!selectedAgentId) {
+      setError('กรุณาเลือกนายหน้าผู้ดูแลทรัพย์');
+      document.getElementById('section-6-agent')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      return;
     }
     if (!Number.isFinite(Number(latitude)) || Math.abs(Number(latitude)) > 90 || !Number.isFinite(Number(longitude)) || Math.abs(Number(longitude)) > 180) { 
       setError('พิกัดละติจูดหรือลองจิจูดไม่ถูกต้อง'); 
+      document.getElementById('section-2-location')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
       return; 
     }
 
@@ -1056,16 +1078,163 @@ function PropertyEditor() {
     );
   }
 
-  // Completion calculation for seamless UX
-  const completionItems = [
-    { label: 'ชื่อประกาศ', done: Boolean(title.trim()) },
-    { label: 'ราคา', done: Boolean(price && Number(price) > 0) },
-    { label: 'ทำเลสงขลา', done: Boolean(district && subdistrict) },
-    { label: 'รูปภาพ', done: images.length > 0 },
-    { label: 'นายหน้าผู้ดูแล', done: Boolean(selectedAgentId) },
+  // Comprehensive Real-time Validation Engine & Progress Tracking
+  const validationItems: FormValidationItem[] = [
+    {
+      id: 'val-title',
+      fieldKey: 'title',
+      targetElementId: 'section-1-basic',
+      label: 'หัวข้อประกาศ (Title)',
+      isRequired: true,
+      isValid: title.trim().length >= 10,
+      isWarning: title.trim().length > 0 && title.trim().length < 10,
+      message: !title.trim() 
+        ? 'ยังไม่ได้ระบุชื่อประกาศ' 
+        : title.trim().length < 10 
+        ? `ชื่อประกาศสั้นเกินไป (${title.trim().length}/10 ตัวอักษร)` 
+        : 'ชื่อประกาศสมบูรณ์และชัดเจน',
+      currentValuePreview: title.trim() || undefined,
+    },
+    {
+      id: 'val-slug',
+      fieldKey: 'slug',
+      targetElementId: 'section-1-basic',
+      label: 'ลิงก์ URL (Slug)',
+      isRequired: true,
+      isValid: Boolean(slug.trim() && !/[/?#\\]/.test(slug)),
+      message: !slug.trim() 
+        ? 'ยังไม่ได้ระบุ Slug' 
+        : /[/?#\\]/.test(slug) 
+        ? 'ห้ามมีอักขระพิเศษ / ? # \\' 
+        : 'URL ภาษาอังกฤษถูกต้อง',
+      currentValuePreview: slug.trim() ? `/${slug.trim()}` : undefined,
+    },
+    {
+      id: 'val-price',
+      fieldKey: 'price',
+      targetElementId: 'section-1-basic',
+      label: 'ราคาขาย/เช่า (Price)',
+      isRequired: true,
+      isValid: Boolean(price && Number(price) > 0),
+      message: !price || Number(price) <= 0 
+        ? 'ต้องระบุราคามากกว่า 0 บาท' 
+        : `${formatPrice(Number(price), status)} (${numberToThaiBahtWords(Number(price))})`,
+      currentValuePreview: Number(price) > 0 ? formatThaiBahtReadable(Number(price)) : undefined,
+    },
+    {
+      id: 'val-location',
+      fieldKey: 'district_subdistrict',
+      targetElementId: 'section-2-location',
+      label: 'ทำเลอำเภอ & ตำบล (สงขลา)',
+      isRequired: true,
+      isValid: Boolean(district && subdistrict),
+      message: !district || !subdistrict 
+        ? 'ต้องเลือกอำเภอและตำบล' 
+        : `ต.${subdistrict} อ.${district} จ.สงขลา`,
+      currentValuePreview: `${district} / ${subdistrict}`,
+    },
+    {
+      id: 'val-coordinates',
+      fieldKey: 'coordinates',
+      targetElementId: 'section-2-location',
+      label: 'พิกัดแผนที่ (Latitude & Longitude)',
+      isRequired: false,
+      isValid: isValidLatLng(Number(latitude), Number(longitude)),
+      message: !isValidLatLng(Number(latitude), Number(longitude)) 
+        ? 'พิกัดยังไม่ถูกต้อง' 
+        : `พิกัด ${Number(latitude).toFixed(4)}, ${Number(longitude).toFixed(4)}`,
+      currentValuePreview: `${latitude}, ${longitude}`,
+    },
+    {
+      id: 'val-images',
+      fieldKey: 'images',
+      targetElementId: 'section-4-images',
+      label: 'รูปภาพทรัพย์สิน',
+      isRequired: true,
+      isValid: images.length > 0,
+      isWarning: images.length > 0 && images.length < 3,
+      message: images.length === 0 
+        ? 'ต้องมีรูปภาพอย่างน้อย 1 รูปสำหรับหน้าปก' 
+        : images.length < 3 
+        ? `อัปโหลดแล้ว ${images.length} รูป (แนะนำ 3 รูปขึ้นไป)` 
+        : `มีรูปภาพครบถ้วนสมบูรณ์ (${images.length} รูป)`,
+      currentValuePreview: `${images.length} รูปภาพ`,
+    },
+    {
+      id: 'val-agent',
+      fieldKey: 'agent',
+      targetElementId: 'section-6-agent',
+      label: 'นายหน้าผู้รับผิดชอบทรัพย์',
+      isRequired: true,
+      isValid: Boolean(selectedAgentId),
+      message: !selectedAgentId 
+        ? 'ต้องเลือกนายหน้าผู้ดูแล' 
+        : `นายหน้า: ${eligibleStaff.find(s => s.id === selectedAgentId)?.full_name || 'คุณฉันทากร'}`,
+      currentValuePreview: eligibleStaff.find(s => s.id === selectedAgentId)?.full_name,
+    },
+    {
+      id: 'val-area',
+      fieldKey: 'area',
+      targetElementId: 'section-3-specs',
+      label: 'ขนาดพื้นที่ใช้สอยหรือที่ดิน',
+      isRequired: false,
+      isValid: Boolean(Number(usableArea) > 0 || Number(landSize) > 0),
+      message: (Number(usableArea) <= 0 && Number(landSize) <= 0) 
+        ? 'ยังไม่ได้ระบุขนาดที่ดินหรือพื้นที่ใช้สอย' 
+        : `พท.ใช้สอย ${usableArea || 0} ตร.ม. / ที่ดิน ${landSize || 0} ตร.ว.`,
+      currentValuePreview: `${usableArea ? `${usableArea} ตร.ม.` : ''} ${landSize ? `${landSize} ตร.ว.` : ''}`.trim() || undefined,
+    },
+    {
+      id: 'val-description',
+      fieldKey: 'description',
+      targetElementId: 'section-3-specs',
+      label: 'รายละเอียดทรัพย์เชิงลึก',
+      isRequired: false,
+      isValid: description.trim().length >= 40,
+      isWarning: description.trim().length > 0 && description.trim().length < 40,
+      message: description.trim().length === 0 
+        ? 'ยังไม่มีคำบรรยายทรัพย์ (สามารถใช้ AI ช่วยเขียนได้ทันที)' 
+        : description.trim().length < 40 
+        ? `คำบรรยายสั้นไป (${description.trim().length}/40 ตัวอักษร)` 
+        : `คำบรรยายครบถ้วน (${description.trim().length} ตัวอักษร)`,
+      currentValuePreview: description.trim() ? `${description.trim().slice(0, 35)}...` : undefined,
+    },
+    {
+      id: 'val-features',
+      fieldKey: 'features',
+      targetElementId: 'section-3-specs',
+      label: 'สิ่งอำนวยความสะดวก & จุดเด่น',
+      isRequired: false,
+      isValid: selectedFeatures.length > 0,
+      message: selectedFeatures.length === 0 
+        ? 'ยังไม่ได้เลือกสิ่งอำนวยความสะดวก' 
+        : `เลือกแล้ว ${selectedFeatures.length} รายการ`,
+      currentValuePreview: `${selectedFeatures.length} จุดเด่น`,
+    },
   ];
-  const completedCount = completionItems.filter(i => i.done).length;
-  const completionPercentage = Math.round((completedCount / completionItems.length) * 100);
+
+  const requiredItems = validationItems.filter(i => i.isRequired);
+  const recommendedItems = validationItems.filter(i => !i.isRequired);
+
+  const requiredPassedCount = requiredItems.filter(i => i.isValid).length;
+  const recommendedPassedCount = recommendedItems.filter(i => i.isValid).length;
+
+  // Percentage calculation: required accounts for 75%, recommended accounts for 25%
+  const completionPercentage = Math.round(
+    (requiredPassedCount / requiredItems.length) * 75 +
+    (recommendedPassedCount / recommendedItems.length) * 25
+  );
+
+  const handleScrollToSection = (targetElementId: string) => {
+    const el = document.getElementById(targetElementId);
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      el.classList.add('ring-4', 'ring-gold-400/60', 'transition-all');
+      setTimeout(() => {
+        el.classList.remove('ring-4', 'ring-gold-400/60');
+      }, 2000);
+    }
+  };
 
   return (
     <div className="space-y-6 pb-24">
@@ -1100,42 +1269,47 @@ function PropertyEditor() {
         </div>
       )}
 
-      {/* Sticky Section Jump Navigation Bar */}
-      <div className="sticky top-16 z-20 bg-white/95 backdrop-blur-md p-2 rounded-2xl border border-gray-200 shadow-sm flex items-center justify-between gap-2 overflow-x-auto text-xs">
+      {/* Sticky Section Jump Navigation Bar with Real-time Progress */}
+      <div className="sticky top-16 z-20 bg-white/95 backdrop-blur-md p-2.5 rounded-2xl border border-gray-200 shadow-sm flex items-center justify-between gap-3 overflow-x-auto text-xs">
         <div className="flex items-center space-x-1 sm:space-x-2 flex-shrink-0">
           {[
-            { id: 'section-1-basic', label: '1. ข้อมูล & ราคา' },
-            { id: 'section-2-location', label: '2. ทำเล (สงขลา)' },
-            { id: 'section-3-specs', label: '3. สเปก & จุดเด่น' },
-            { id: 'section-4-images', label: `4. รูปภาพ (${images.length})` },
-            { id: 'section-5-video', label: videoUrl ? '5. วิดีโอพาทัวร์ (มี)' : '5. วิดีโอพาทัวร์' },
-            { id: 'section-6-agent', label: '6. นายหน้าผู้ดูแล' },
+            { id: 'section-1-basic', label: '1. ข้อมูล & ราคา', isValid: title.trim().length >= 10 && Boolean(price && Number(price) > 0) && Boolean(slug.trim()) },
+            { id: 'section-2-location', label: '2. ทำเล (สงขลา)', isValid: Boolean(district && subdistrict) },
+            { id: 'section-3-specs', label: '3. สเปก & จุดเด่น', isValid: Boolean(usableArea || landSize) && description.trim().length >= 30 },
+            { id: 'section-4-images', label: `4. รูปภาพ (${images.length})`, isValid: images.length > 0 },
+            { id: 'section-5-video', label: videoUrl ? '5. วิดีโอพาทัวร์ (มี)' : '5. วิดีโอพาทัวร์', isValid: true },
+            { id: 'section-6-agent', label: '6. นายหน้าผู้ดูแล', isValid: Boolean(selectedAgentId) },
           ].map((sec) => (
             <button
               key={sec.id}
               type="button"
-              onClick={() => {
-                document.getElementById(sec.id)?.scrollIntoView({ behavior: 'smooth' });
-              }}
-              className="px-3 py-1.5 rounded-xl font-semibold text-navy-950 hover:bg-gold-50 hover:text-gold-700 bg-gray-50 border border-gray-200/80 transition-all cursor-pointer whitespace-nowrap"
+              onClick={() => handleScrollToSection(sec.id)}
+              className="px-3 py-1.5 rounded-xl font-semibold text-navy-950 hover:bg-gold-50 hover:text-gold-700 bg-gray-50 border border-gray-200/80 transition-all cursor-pointer whitespace-nowrap flex items-center space-x-1.5"
             >
-              {sec.label}
+              <span className={`w-1.5 h-1.5 rounded-full ${sec.isValid ? 'bg-emerald-500' : 'bg-amber-400'}`} />
+              <span>{sec.label}</span>
             </button>
           ))}
         </div>
 
-        {/* Progress Pill */}
-        <div className="hidden sm:flex items-center space-x-2 pl-3 border-l border-gray-200 flex-shrink-0">
-          <span className="text-[11px] text-gray-500 font-medium">ความสมบูรณ์:</span>
-          <div className="w-20 bg-gray-200 h-2 rounded-full overflow-hidden">
+        {/* Real-time Progress Pill in Sticky Bar (Visible on all viewports) */}
+        <div className="flex items-center space-x-2 pl-3 border-l border-gray-200 flex-shrink-0">
+          <span className="text-[11px] text-gray-500 font-semibold hidden md:inline">ความคืบหน้า:</span>
+          <div className="w-16 sm:w-24 bg-gray-200 h-2.5 rounded-full overflow-hidden">
             <div
-              className={`h-full transition-all duration-300 ${
-                completionPercentage === 100 ? 'bg-emerald-500' : 'bg-gold-500'
+              className={`h-full transition-all duration-500 rounded-full ${
+                completionPercentage === 100 
+                  ? 'bg-emerald-500' 
+                  : completionPercentage >= 75 
+                  ? 'bg-teal-500' 
+                  : completionPercentage >= 50 
+                  ? 'bg-gold-500' 
+                  : 'bg-amber-500'
               }`}
               style={{ width: `${completionPercentage}%` }}
             />
           </div>
-          <span className="text-[11px] font-bold text-navy-950">{completionPercentage}%</span>
+          <span className="text-xs font-black text-navy-950">{completionPercentage}%</span>
         </div>
       </div>
 
@@ -1180,6 +1354,17 @@ function PropertyEditor() {
           </button>
         </div>
       </div>
+
+      {/* REAL-TIME PROGRESS BAR & VALIDATION CHECKLIST COMPONENT */}
+      <PropertyFormProgress
+        items={validationItems}
+        overallPercentage={completionPercentage}
+        requiredPassedCount={requiredPassedCount}
+        totalRequired={requiredItems.length}
+        recommendedPassedCount={recommendedPassedCount}
+        totalRecommended={recommendedItems.length}
+        onScrollToSection={handleScrollToSection}
+      />
 
       {/* Smart Auto-Fill from LINE/Facebook/Raw text */}
       {!editId && (
@@ -1356,23 +1541,64 @@ function PropertyEditor() {
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="sm:col-span-2">
-              <label className="block text-xs font-bold text-gray-700 mb-1">
-                ชื่อหัวข้อประกาศ (Title) *
-              </label>
+              <div className="flex items-center justify-between mb-1">
+                <label className="text-xs font-bold text-gray-700 flex items-center gap-1.5">
+                  <span>ชื่อหัวข้อประกาศ (Title) *</span>
+                  {title.trim().length >= 10 ? (
+                    <span className="text-[10px] bg-emerald-100 text-emerald-800 font-bold px-2 py-0.5 rounded-full flex items-center gap-1 border border-emerald-200">
+                      <Check className="w-3 h-3 text-emerald-600" />
+                      <span>ข้อมูลครบ</span>
+                    </span>
+                  ) : title.trim().length > 0 ? (
+                    <span className="text-[10px] bg-amber-100 text-amber-800 font-bold px-2 py-0.5 rounded-full border border-amber-200">
+                      สั้นเกินไป ({title.trim().length}/10)
+                    </span>
+                  ) : (
+                    <span className="text-[10px] bg-rose-100 text-rose-800 font-bold px-2 py-0.5 rounded-full border border-rose-200">
+                      จำเป็น
+                    </span>
+                  )}
+                </label>
+                <span className={`text-[11px] font-mono ${title.trim().length >= 10 ? 'text-emerald-600 font-bold' : 'text-slate-400'}`}>
+                  {title.trim().length} ตัวอักษร
+                </span>
+              </div>
               <input
                 type="text"
                 required
                 placeholder="เช่น ขายบ้านเดี่ยว 2 ชั้น โครงการหรู ทำเลควนลัง หาดใหญ่ ใกล้สนามบิน"
                 value={title}
                 onChange={(e) => handleTitleChange(e.target.value)}
-                className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3.5 text-xs text-gray-900 focus:bg-white focus:ring-2 focus:ring-gold-500 outline-none font-semibold text-sm"
+                className={`w-full border rounded-xl p-3.5 text-xs text-gray-900 outline-none font-semibold text-sm transition-all ${
+                  title.trim().length >= 10
+                    ? 'bg-emerald-50/20 border-emerald-300 focus:bg-white focus:ring-2 focus:ring-emerald-400'
+                    : title.trim().length > 0
+                    ? 'bg-amber-50/20 border-amber-300 focus:bg-white focus:ring-2 focus:ring-amber-400'
+                    : 'bg-gray-50 border-gray-200 focus:bg-white focus:ring-2 focus:ring-gold-500'
+                }`}
               />
+              <p className="text-[11px] text-gray-500 mt-1 flex items-center justify-between">
+                <span>ระบุประเภททรัพย์ จุดเด่น และทำเลหลัก เช่น &quot;ขายบ้านเดี่ยว 2 ชั้น โซน ม.อ. คอหงส์ หาดใหญ่&quot;</span>
+                {title.trim().length < 10 && (
+                  <span className="text-amber-600 font-medium">แนะนำ 10-80 ตัวอักษรเพื่อ SEO</span>
+                )}
+              </p>
             </div>
 
             <div>
               <div className="flex items-center justify-between mb-1">
-                <label className="text-xs font-bold text-gray-700">
-                  Slug (URL ลิงก์ภาษาอังกฤษ) *
+                <label className="text-xs font-bold text-gray-700 flex items-center gap-1.5">
+                  <span>Slug (URL ลิงก์ภาษาอังกฤษ) *</span>
+                  {slug.trim() && !/[/?#\\]/.test(slug) ? (
+                    <span className="text-[10px] bg-emerald-100 text-emerald-800 font-bold px-2 py-0.5 rounded-full flex items-center gap-1 border border-emerald-200">
+                      <Check className="w-3 h-3 text-emerald-600" />
+                      <span>URL ถูกต้อง</span>
+                    </span>
+                  ) : (
+                    <span className="text-[10px] bg-rose-100 text-rose-800 font-bold px-2 py-0.5 rounded-full border border-rose-200">
+                      จำเป็น
+                    </span>
+                  )}
                 </label>
                 <button
                   type="button"
@@ -1389,14 +1615,35 @@ function PropertyEditor() {
                 placeholder="modern-house-hatyai-01"
                 value={slug}
                 onChange={(e) => { setSlugEdited(true); setSlug(e.target.value); }}
-                className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3 text-xs text-gray-900 focus:bg-white focus:ring-2 focus:ring-gold-500 outline-none font-mono"
+                className={`w-full border rounded-xl p-3 text-xs text-gray-900 outline-none font-mono transition-all ${
+                  slug.trim() && !/[/?#\\]/.test(slug)
+                    ? 'bg-emerald-50/20 border-emerald-300 focus:bg-white focus:ring-2 focus:ring-emerald-400'
+                    : 'bg-gray-50 border-gray-200 focus:bg-white focus:ring-2 focus:ring-gold-500'
+                }`}
               />
+              {/[/?#\\]/.test(slug) && (
+                <p className="text-[11px] text-rose-600 font-semibold mt-1">
+                  ✕ ห้ามมีเครื่องหมาย / ? # หรือ \ ใน URL
+                </p>
+              )}
             </div>
 
             <div>
-              <label className="block text-xs font-bold text-gray-700 mb-1">
-                ราคา (บาท) *
-              </label>
+              <div className="flex items-center justify-between mb-1">
+                <label className="text-xs font-bold text-gray-700 flex items-center gap-1.5">
+                  <span>ราคา (บาท) *</span>
+                  {Number(price) > 0 ? (
+                    <span className="text-[10px] bg-emerald-100 text-emerald-800 font-bold px-2 py-0.5 rounded-full flex items-center gap-1 border border-emerald-200">
+                      <Check className="w-3 h-3 text-emerald-600" />
+                      <span>ระบุแล้ว</span>
+                    </span>
+                  ) : (
+                    <span className="text-[10px] bg-rose-100 text-rose-800 font-bold px-2 py-0.5 rounded-full border border-rose-200">
+                      จำเป็น (&gt; 0)
+                    </span>
+                  )}
+                </label>
+              </div>
               <input
                 type="number" 
                 step="any"
@@ -1404,7 +1651,11 @@ function PropertyEditor() {
                 placeholder="เช่น 3890000 หรือ 12000 (กรณีปล่อยเช่า)"
                 value={price}
                 onChange={(e) => setPrice(e.target.value)}
-                className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3 text-xs text-navy-950 font-bold text-sm focus:bg-white focus:ring-2 focus:ring-gold-500 outline-none"
+                className={`w-full border rounded-xl p-3 text-xs text-navy-950 font-bold text-sm outline-none transition-all ${
+                  Number(price) > 0
+                    ? 'bg-emerald-50/20 border-emerald-300 focus:bg-white focus:ring-2 focus:ring-emerald-400'
+                    : 'bg-gray-50 border-gray-200 focus:bg-white focus:ring-2 focus:ring-gold-500'
+                }`}
               />
 
               {/* Thai Baht Word and Readable Preview */}

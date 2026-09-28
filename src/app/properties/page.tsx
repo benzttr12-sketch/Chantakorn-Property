@@ -14,9 +14,10 @@ import {
 } from 'lucide-react';
 import PropertyCard from '@/components/properties/PropertyCard';
 import PropertyFilterPanel from '@/components/properties/PropertyFilterPanel';
-import PropertyMap from '@/components/properties/PropertyMap';
+import GooglePropertyMap from '@/components/properties/GooglePropertyMap';
 import { Property, PropertyFilters, PropertyType, PropertyStatus } from '@/lib/types';
 import { fetchProperties } from '@/lib/store/properties-store';
+import { LayoutGrid, Columns2, MapPin as MapPinIcon } from 'lucide-react';
 
 function filtersFromQuery(query: string): PropertyFilters {
   const params = new URLSearchParams(query);
@@ -41,6 +42,8 @@ function filtersFromQuery(query: string): PropertyFilters {
   };
 }
 
+export type ViewMode = 'grid' | 'split' | 'map';
+
 function PropertiesContent() {
   const searchParams = useSearchParams();
 
@@ -53,7 +56,8 @@ function PropertiesContent() {
   const [error, setError] = useState('');
   const [selectedProperty, setSelectedProperty] = useState<Property | null>(null);
 
-  // Mobile drawer states
+  // Desktop & Mobile View Modes: 'grid' (listings only), 'split' (list + map), 'map' (full map)
+  const [viewMode, setViewMode] = useState<ViewMode>('split');
   const [mobileFilterOpen, setMobileFilterOpen] = useState(false);
   const [mobileViewMode, setMobileViewMode] = useState<'list' | 'map'>('list');
 
@@ -108,19 +112,26 @@ function PropertiesContent() {
     });
   };
 
+  const handleDistrictSelect = (districtName: string) => {
+    setFilters(prev => ({
+      ...prev,
+      district: prev.district === districtName ? '' : districtName,
+    }));
+  };
+
   return (
     <div className="bg-surface-bg min-h-screen pb-20">
       {/* Top Banner / Search Context */}
-      <div className="bg-navy-950 text-white py-8 border-b border-navy-800">
+      <div className="bg-navy-950 text-white py-7 border-b border-navy-800">
         <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div>
               <div className="text-xs font-semibold text-gold-400 uppercase tracking-wider mb-1 flex items-center">
                 <Building2 className="w-3.5 h-3.5 mr-1" />
-                หาดใหญ่ – สงขลา Real Estate Search
+                หาดใหญ่ – สงขลา Interactive Real Estate
               </div>
               <h1 className="text-2xl sm:text-3xl font-extrabold text-white">
-                ค้นหาอสังหาริมทรัพย์
+                ค้นหาอสังหาริมทรัพย์บนแผนที่จริง
               </h1>
             </div>
 
@@ -225,14 +236,14 @@ function PropertiesContent() {
             <span className="text-navy-700 mx-1 flex-shrink-0">|</span>
 
             {/* Popular districts */}
-            {['หาดใหญ่', 'เมืองสงขลา', 'คลองหอยโข่ง', 'สะเดา'].map(dist => (
+            {['หาดใหญ่', 'ควนลัง', 'คลองแห', 'บ้านพรุ', 'เมืองสงขลา', 'สะเดา', 'สิงหนคร'].map(dist => (
               <button
                 key={dist}
                 type="button"
-                onClick={() => setFilters({ ...filters, district: filters.district === dist ? '' : dist })}
+                onClick={() => handleDistrictSelect(dist)}
                 className={`px-3 py-1.5 rounded-xl font-medium flex-shrink-0 transition-all ${
                   filters.district === dist
-                    ? 'bg-gold-400 text-navy-950 font-bold'
+                    ? 'bg-gold-400 text-navy-950 font-bold shadow-sm'
                     : 'bg-navy-900 text-gray-300 hover:bg-navy-800'
                 }`}
               >
@@ -243,212 +254,336 @@ function PropertiesContent() {
         </div>
       </div>
 
-      {/* Main 3-Pane Container: [ FILTER (280px) | LISTINGS (Flexible) | MAP (380px) ] */}
+      {/* Main Container */}
       <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 pt-6">
         {/* Mobile Control Bar */}
         <div className="lg:hidden flex items-center justify-between bg-white p-3 rounded-2xl border border-surface-border shadow-sm mb-4">
           <button
             onClick={() => setMobileFilterOpen(true)}
-            className="flex items-center space-x-1.5 px-4 py-2 bg-gray-100 hover:bg-gray-200 text-navy-950 text-xs font-semibold rounded-xl"
+            className="flex items-center space-x-1.5 px-3.5 py-2 bg-gray-100 hover:bg-gray-200 text-navy-950 text-xs font-semibold rounded-xl"
           >
             <SlidersHorizontal className="w-4 h-4 text-gold-600" />
             <span>ตัวกรอง ({properties.length})</span>
           </button>
 
-          <div className="flex items-center space-x-2">
+          {/* Mobile View Toggle */}
+          <div className="flex items-center bg-gray-100 p-1 rounded-xl">
             <button
-              onClick={() => setMobileViewMode('list')}
-              className={`p-2 rounded-xl text-xs font-semibold flex items-center space-x-1 ${
+              onClick={() => {
+                setMobileViewMode('list');
+                setViewMode('grid');
+              }}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center space-x-1.5 transition-all ${
                 mobileViewMode === 'list'
-                  ? 'bg-navy-950 text-gold-400'
-                  : 'bg-gray-100 text-gray-700'
+                  ? 'bg-navy-950 text-gold-400 shadow-sm'
+                  : 'text-gray-600 hover:text-navy-950'
               }`}
             >
-              <List className="w-4 h-4" />
+              <List className="w-3.5 h-3.5" />
               <span>รายการ</span>
             </button>
             <button
-              onClick={() => setMobileViewMode('map')}
-              className={`p-2 rounded-xl text-xs font-semibold flex items-center space-x-1 ${
+              onClick={() => {
+                setMobileViewMode('map');
+                setViewMode('map');
+              }}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center space-x-1.5 transition-all ${
                 mobileViewMode === 'map'
-                  ? 'bg-navy-950 text-gold-400'
-                  : 'bg-gray-100 text-gray-700'
+                  ? 'bg-navy-950 text-gold-400 shadow-sm'
+                  : 'text-gray-600 hover:text-navy-950'
               }`}
             >
-              <MapIcon className="w-4 h-4" />
+              <MapIcon className="w-3.5 h-3.5" />
               <span>แผนที่</span>
             </button>
           </div>
         </div>
 
-        {/* Desktop 3-Pane Layout */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-          {/* PANE 1: LEFT FILTER PANEL (3 Cols) */}
-          <aside className="hidden lg:block lg:col-span-3">
-            <div className="sticky top-20">
-              <PropertyFilterPanel
-                filters={filters}
-                onChange={setFilters}
-                onReset={handleResetFilters}
-                resultCount={sortedProperties.length}
-              />
+        {/* Desktop View Header / Toggle Controls */}
+        <div className="hidden lg:flex items-center justify-between bg-white p-3.5 rounded-2xl border border-surface-border shadow-sm mb-6">
+          <div className="flex items-center space-x-3">
+            <span className="text-sm font-bold text-navy-950">
+              พบ <span className="text-gold-600 font-extrabold text-base">{sortedProperties.length}</span> รายการ
+            </span>
+            {filters.district && (
+              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full bg-gold-50 text-gold-800 text-xs font-bold border border-gold-200">
+                📍 {filters.district}
+              </span>
+            )}
+          </div>
+
+          <div className="flex items-center space-x-4">
+            {/* Sort Selector */}
+            <div className="flex items-center space-x-2">
+              <ArrowUpDown className="w-3.5 h-3.5 text-gray-500" />
+              <span className="text-xs text-gray-500">เรียงตาม:</span>
+              <select
+                value={filters.sortBy || 'newest'}
+                onChange={(e) => setFilters({ ...filters, sortBy: e.target.value as PropertyFilters['sortBy'] })}
+                className="text-xs font-semibold text-navy-950 bg-gray-50 border border-gray-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-gold-500 cursor-pointer"
+              >
+                <option value="newest">ล่าสุด</option>
+                <option value="price_asc">ราคาต่ำ → สูง</option>
+                <option value="price_desc">ราคาสูง → ต่ำ</option>
+                <option value="popular">ยอดนิยม</option>
+              </select>
             </div>
-          </aside>
 
-          {/* PANE 2: CENTER PROPERTY LISTINGS (5 or 6 Cols) */}
-          <section className={`lg:col-span-5 xl:col-span-5 ${mobileViewMode === 'map' ? 'hidden lg:block' : 'block'}`}>
-            {/* Sorting & Results Header */}
-            <div className="bg-white rounded-2xl p-4 border border-surface-border shadow-sm mb-4 flex items-center justify-between">
-              <div className="text-xs sm:text-sm font-semibold text-navy-950">
-                พบ <span className="text-gold-600 font-bold text-base">{sortedProperties.length}</span> รายการ
-              </div>
+            <div className="h-5 w-px bg-gray-200" />
 
-              {/* Sort Selector */}
+            {/* Interactive View Mode Segmented Switcher */}
+            <div className="flex items-center bg-gray-100 p-1 rounded-xl border border-gray-200/80">
+              <button
+                type="button"
+                onClick={() => setViewMode('grid')}
+                className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                  viewMode === 'grid'
+                    ? 'bg-navy-950 text-gold-400 shadow-sm'
+                    : 'text-gray-600 hover:text-navy-950'
+                }`}
+                title="แสดงเฉพาะรายการแบบเต็มจอ"
+              >
+                <LayoutGrid className="w-3.5 h-3.5" />
+                <span>รายการ</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setViewMode('split')}
+                className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                  viewMode === 'split'
+                    ? 'bg-navy-950 text-gold-400 shadow-sm'
+                    : 'text-gray-600 hover:text-navy-950'
+                }`}
+                title="แสดงรายการพร้อมแผนที่แบ่งครึ่งจอ"
+              >
+                <Columns2 className="w-3.5 h-3.5" />
+                <span>แบ่งหน้าจอ</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setViewMode('map')}
+                className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                  viewMode === 'map'
+                    ? 'bg-navy-950 text-gold-400 shadow-sm'
+                    : 'text-gray-600 hover:text-navy-950'
+                }`}
+                title="แสดงแผนที่แบบเต็มจอ"
+              >
+                <MapPinIcon className="w-3.5 h-3.5" />
+                <span>แผนที่เต็มจอ</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* FULL MAP VIEW MODE (Desktop & Mobile) */}
+        {viewMode === 'map' || mobileViewMode === 'map' ? (
+          <div className="space-y-4">
+            {/* Quick Top Bar for Full Map Mode */}
+            <div className="flex items-center justify-between bg-white p-3 rounded-2xl border border-surface-border shadow-sm">
               <div className="flex items-center space-x-2">
-                <ArrowUpDown className="w-3.5 h-3.5 text-gray-500" />
-                <span className="text-xs text-gray-500 hidden sm:inline">เรียงตาม:</span>
-                <select
-                  value={filters.sortBy || 'newest'}
-                  onChange={(e) => setFilters({ ...filters, sortBy: e.target.value as PropertyFilters['sortBy'] })}
-                  className="text-xs font-semibold text-navy-950 bg-gray-50 border border-gray-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-gold-500 cursor-pointer"
-                >
-                  <option value="newest">ล่าสุด</option>
-                  <option value="price_asc">ราคาต่ำ → สูง</option>
-                  <option value="price_desc">ราคาสูง → ต่ำ</option>
-                  <option value="popular">ยอดนิยม</option>
-                </select>
+                <span className="text-xs font-bold text-navy-950">
+                  กำลังแสดงผลบน Google Map ({sortedProperties.length} รายการ)
+                </span>
               </div>
-            </div>
-
-            {/* Active Filters Bar */}
-            {(filters.type !== 'all' || filters.status !== 'all' || filters.district || filters.minPrice || filters.maxPrice || filters.bedrooms !== 'any' || filters.searchQuery) && (
-              <div className="bg-white/80 backdrop-blur rounded-2xl p-3 border border-gray-200 mb-4 flex flex-wrap items-center gap-1.5 text-xs animate-in fade-in">
-                <span className="text-[11px] text-gray-500 font-semibold mr-1">กำลังกรอง:</span>
-                
-                {filters.status !== 'all' && (
-                  <span className="inline-flex items-center space-x-1 px-2.5 py-1 rounded-full bg-gold-100 text-gold-900 font-medium text-[11px]">
-                    <span>{filters.status === 'rent' ? 'สำหรับเช่า' : 'สำหรับขาย'}</span>
-                    <button type="button" onClick={() => setFilters({ ...filters, status: 'all' })} className="hover:text-red-600">
-                      <X className="w-3 h-3" />
-                    </button>
-                  </span>
-                )}
-
-                {filters.type !== 'all' && (
-                  <span className="inline-flex items-center space-x-1 px-2.5 py-1 rounded-full bg-blue-50 text-blue-800 font-medium text-[11px]">
-                    <span>{filters.type}</span>
-                    <button type="button" onClick={() => setFilters({ ...filters, type: 'all' })} className="hover:text-red-600">
-                      <X className="w-3 h-3" />
-                    </button>
-                  </span>
-                )}
-
-                {filters.district && (
-                  <span className="inline-flex items-center space-x-1 px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-800 font-medium text-[11px]">
-                    <span>📍 {filters.district}</span>
-                    <button type="button" onClick={() => setFilters({ ...filters, district: '' })} className="hover:text-red-600">
-                      <X className="w-3 h-3" />
-                    </button>
-                  </span>
-                )}
-
-                {filters.searchQuery && (
-                  <span className="inline-flex items-center space-x-1 px-2.5 py-1 rounded-full bg-gray-100 text-gray-800 font-medium text-[11px]">
-                    <span>ค้นหา: &quot;{filters.searchQuery}&quot;</span>
-                    <button type="button" onClick={() => setFilters({ ...filters, searchQuery: '' })} className="hover:text-red-600">
-                      <X className="w-3 h-3" />
-                    </button>
-                  </span>
-                )}
-
-                {(filters.minPrice || filters.maxPrice) && (
-                  <span className="inline-flex items-center space-x-1 px-2.5 py-1 rounded-full bg-purple-50 text-purple-800 font-medium text-[11px]">
-                    <span>
-                      ราคา: {filters.minPrice ? `${(filters.minPrice / 1000000).toFixed(1)}ลบ.` : '0'} - {filters.maxPrice ? `${(filters.maxPrice / 1000000).toFixed(1)}ลบ.` : 'ไม่จำกัด'}
-                    </span>
-                    <button type="button" onClick={() => setFilters({ ...filters, minPrice: undefined, maxPrice: undefined })} className="hover:text-red-600">
-                      <X className="w-3 h-3" />
-                    </button>
-                  </span>
-                )}
-
+              <div className="flex items-center space-x-2">
                 <button
                   type="button"
-                  onClick={handleResetFilters}
-                  className="text-[11px] text-red-600 hover:underline font-bold ml-auto px-2 py-0.5"
+                  onClick={() => setMobileFilterOpen(true)}
+                  className="lg:hidden px-3 py-1.5 bg-gray-100 text-navy-950 text-xs font-semibold rounded-lg"
                 >
-                  ล้างทั้งหมด
+                  ตัวกรอง
                 </button>
-              </div>
-            )}
-
-            {error && <p role="alert" className="mb-4 rounded-xl bg-red-50 p-4 text-sm text-red-700">{error}</p>}
-            {/* Listings Grid */}
-            {loading ? (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {[...Array(6)].map((_, i) => (
-                  <div key={i} className="bg-white rounded-2xl h-80 animate-pulse" />
-                ))}
-              </div>
-            ) : sortedProperties.length === 0 ? (
-              <div className="bg-white rounded-2xl p-12 text-center border border-surface-border">
-                <Building2 className="w-12 h-12 text-gray-300 mx-auto mb-3" />
-                <h3 className="font-bold text-navy-950 text-lg mb-1">ไม่พบอสังหาริมทรัพย์ที่ตรงกับเงื่อนไข</h3>
-                <p className="text-xs text-gray-500 mb-5">ลองปรับตัวกรอง หรือค้นหาทำเลอื่นในหาดใหญ่-สงขลา</p>
                 <button
-                  onClick={handleResetFilters}
-                  className="px-4 py-2 bg-navy-950 text-gold-400 text-xs font-semibold rounded-lg hover:bg-navy-900"
+                  type="button"
+                  onClick={() => {
+                    setViewMode('split');
+                    setMobileViewMode('list');
+                  }}
+                  className="px-3 py-1.5 bg-navy-950 text-gold-400 text-xs font-bold rounded-lg hover:bg-navy-900 transition-colors"
                 >
-                  ล้างตัวกรองทั้งหมด
+                  กลับสู่มุมมองรายการ
                 </button>
               </div>
-            ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-                {sortedProperties.map((prop) => (
-                  <div
-                    key={prop.id}
-                    onMouseEnter={() => setSelectedProperty(prop)}
-                    className="transition-all"
-                  >
-                    <PropertyCard
-                      id={prop.id}
-                      title={prop.title}
-                      type={prop.property_type}
-                      status={prop.status}
-                      price={prop.price}
-                      location={prop.address || `${prop.district}, ${prop.province}`}
-                      district={prop.district}
-                      province={prop.province}
-                      coverImage={prop.cover_image}
-                      images={prop.images}
-                      bedrooms={prop.bedrooms}
-                      bathrooms={prop.bathrooms}
-                      landSize={prop.land_size}
-                      usableArea={prop.usable_area}
-                      featured={prop.featured}
-                      video_url={prop.video_url}
-                      slug={prop.slug}
-                      createdAt={prop.created_at}
-                      facingDirection={prop.facing_direction}
-                    />
-                  </div>
-                ))}
-              </div>
-            )}
-          </section>
+            </div>
 
-          {/* PANE 3: RIGHT INTERACTIVE MAP (4 Cols) */}
-          <aside className={`lg:col-span-4 xl:col-span-4 ${mobileViewMode === 'list' ? 'hidden lg:block' : 'block'}`}>
-            <div className="sticky top-20 h-[580px] lg:h-[calc(100vh-100px)]">
-              <PropertyMap
+            {/* Google Map Full View */}
+            <div className="h-[75vh] min-h-[550px] w-full rounded-2xl overflow-hidden shadow-lg border border-surface-border">
+              <GooglePropertyMap
                 properties={sortedProperties}
                 selectedProperty={selectedProperty}
                 onSelectProperty={(prop) => setSelectedProperty(prop)}
+                onDistrictSelect={handleDistrictSelect}
+                isFullScreen={true}
                 height="100%"
               />
             </div>
-          </aside>
-        </div>
+          </div>
+        ) : (
+          /* GRID OR SPLIT VIEW MODE */
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+            {/* PANE 1: LEFT FILTER PANEL (3 Cols) */}
+            <aside className="hidden lg:block lg:col-span-3">
+              <div className="sticky top-20">
+                <PropertyFilterPanel
+                  filters={filters}
+                  onChange={setFilters}
+                  onReset={handleResetFilters}
+                  resultCount={sortedProperties.length}
+                />
+              </div>
+            </aside>
+
+            {/* PANE 2: PROPERTY LISTINGS (9 Cols in Grid mode, 5 Cols in Split mode) */}
+            <section
+              className={`transition-all duration-300 ${
+                viewMode === 'grid'
+                  ? 'lg:col-span-9'
+                  : 'lg:col-span-5 xl:col-span-5'
+              }`}
+            >
+              {/* Active Filters Bar */}
+              {(filters.type !== 'all' || filters.status !== 'all' || filters.district || filters.minPrice || filters.maxPrice || filters.bedrooms !== 'any' || filters.searchQuery) && (
+                <div className="bg-white/80 backdrop-blur rounded-2xl p-3 border border-gray-200 mb-4 flex flex-wrap items-center gap-1.5 text-xs animate-in fade-in">
+                  <span className="text-[11px] text-gray-500 font-semibold mr-1">กำลังกรอง:</span>
+                  
+                  {filters.status !== 'all' && (
+                    <span className="inline-flex items-center space-x-1 px-2.5 py-1 rounded-full bg-gold-100 text-gold-900 font-medium text-[11px]">
+                      <span>{filters.status === 'rent' ? 'สำหรับเช่า' : 'สำหรับขาย'}</span>
+                      <button type="button" onClick={() => setFilters({ ...filters, status: 'all' })} className="hover:text-red-600">
+                        <X className="w-3 h-3" />
+                      </button>
+                    </span>
+                  )}
+
+                  {filters.type !== 'all' && (
+                    <span className="inline-flex items-center space-x-1 px-2.5 py-1 rounded-full bg-blue-50 text-blue-800 font-medium text-[11px]">
+                      <span>{filters.type}</span>
+                      <button type="button" onClick={() => setFilters({ ...filters, type: 'all' })} className="hover:text-red-600">
+                        <X className="w-3 h-3" />
+                      </button>
+                    </span>
+                  )}
+
+                  {filters.district && (
+                    <span className="inline-flex items-center space-x-1 px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-800 font-medium text-[11px]">
+                      <span>📍 {filters.district}</span>
+                      <button type="button" onClick={() => setFilters({ ...filters, district: '' })} className="hover:text-red-600">
+                        <X className="w-3 h-3" />
+                      </button>
+                    </span>
+                  )}
+
+                  {filters.searchQuery && (
+                    <span className="inline-flex items-center space-x-1 px-2.5 py-1 rounded-full bg-gray-100 text-gray-800 font-medium text-[11px]">
+                      <span>ค้นหา: &quot;{filters.searchQuery}&quot;</span>
+                      <button type="button" onClick={() => setFilters({ ...filters, searchQuery: '' })} className="hover:text-red-600">
+                        <X className="w-3 h-3" />
+                      </button>
+                    </span>
+                  )}
+
+                  {(filters.minPrice || filters.maxPrice) && (
+                    <span className="inline-flex items-center space-x-1 px-2.5 py-1 rounded-full bg-purple-50 text-purple-800 font-medium text-[11px]">
+                      <span>
+                        ราคา: {filters.minPrice ? `${(filters.minPrice / 1000000).toFixed(1)}ลบ.` : '0'} - {filters.maxPrice ? `${(filters.maxPrice / 1000000).toFixed(1)}ลบ.` : 'ไม่จำกัด'}
+                      </span>
+                      <button type="button" onClick={() => setFilters({ ...filters, minPrice: undefined, maxPrice: undefined })} className="hover:text-red-600">
+                        <X className="w-3 h-3" />
+                      </button>
+                    </span>
+                  )}
+
+                  <button
+                    type="button"
+                    onClick={handleResetFilters}
+                    className="text-[11px] text-red-600 hover:underline font-bold ml-auto px-2 py-0.5"
+                  >
+                    ล้างทั้งหมด
+                  </button>
+                </div>
+              )}
+
+              {error && <p role="alert" className="mb-4 rounded-xl bg-red-50 p-4 text-sm text-red-700">{error}</p>}
+
+              {/* Listings Grid */}
+              {loading ? (
+                <div className={`grid gap-4 ${viewMode === 'grid' ? 'grid-cols-1 sm:grid-cols-2 xl:grid-cols-3' : 'grid-cols-1 sm:grid-cols-2'}`}>
+                  {[...Array(6)].map((_, i) => (
+                    <div key={i} className="bg-white rounded-2xl h-80 animate-pulse" />
+                  ))}
+                </div>
+              ) : sortedProperties.length === 0 ? (
+                <div className="bg-white rounded-2xl p-12 text-center border border-surface-border">
+                  <Building2 className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+                  <h3 className="font-bold text-navy-950 text-lg mb-1">ไม่พบอสังหาริมทรัพย์ที่ตรงกับเงื่อนไข</h3>
+                  <p className="text-xs text-gray-500 mb-5">ลองปรับตัวกรอง หรือค้นหาทำเลอื่นในหาดใหญ่-สงขลา</p>
+                  <button
+                    onClick={handleResetFilters}
+                    className="px-4 py-2 bg-navy-950 text-gold-400 text-xs font-semibold rounded-lg hover:bg-navy-900"
+                  >
+                    ล้างตัวกรองทั้งหมด
+                  </button>
+                </div>
+              ) : (
+                <div className={`grid gap-5 ${viewMode === 'grid' ? 'grid-cols-1 sm:grid-cols-2 xl:grid-cols-3' : 'grid-cols-1 sm:grid-cols-2'}`}>
+                  {sortedProperties.map((prop) => {
+                    const isSelected = selectedProperty?.id === prop.id;
+                    return (
+                      <div
+                        key={prop.id}
+                        onMouseEnter={() => setSelectedProperty(prop)}
+                        className={`transition-all duration-200 rounded-2xl ${
+                          isSelected ? 'ring-2 ring-gold-500 shadow-md' : ''
+                        }`}
+                      >
+                        <PropertyCard
+                          id={prop.id}
+                          title={prop.title}
+                          type={prop.property_type}
+                          status={prop.status}
+                          price={prop.price}
+                          location={prop.address || `${prop.district}, ${prop.province}`}
+                          district={prop.district}
+                          province={prop.province}
+                          coverImage={prop.cover_image}
+                          images={prop.images}
+                          bedrooms={prop.bedrooms}
+                          bathrooms={prop.bathrooms}
+                          landSize={prop.land_size}
+                          usableArea={prop.usable_area}
+                          featured={prop.featured}
+                          video_url={prop.video_url}
+                          slug={prop.slug}
+                          createdAt={prop.created_at}
+                          facingDirection={prop.facing_direction}
+                        />
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </section>
+
+            {/* PANE 3: RIGHT INTERACTIVE GOOGLE MAP (Visible in Split Mode) */}
+            {viewMode === 'split' && (
+              <aside className="hidden lg:block lg:col-span-4 xl:col-span-4">
+                <div className="sticky top-20 h-[calc(100vh-120px)] min-h-[580px]">
+                  <GooglePropertyMap
+                    properties={sortedProperties}
+                    selectedProperty={selectedProperty}
+                    onSelectProperty={(prop) => setSelectedProperty(prop)}
+                    onDistrictSelect={handleDistrictSelect}
+                    onToggleFullScreen={() => setViewMode('map')}
+                    height="100%"
+                  />
+                </div>
+              </aside>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Mobile Slide-Out Filter Drawer Modal */}
@@ -499,3 +634,4 @@ export default function PropertiesPage() {
     </Suspense>
   );
 }
+

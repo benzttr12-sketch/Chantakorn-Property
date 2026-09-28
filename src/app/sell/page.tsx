@@ -83,6 +83,18 @@ export default function SellPage() {
     setUploadedPhotos((prev) => prev.filter((_, i) => i !== index));
   };
 
+  // Real-time validation & progress calculation for Sell form
+  const sellValidationItems = [
+    { label: 'ชื่อผู้ติดต่อ', done: Boolean(name.trim().length >= 2) },
+    { label: 'เบอร์โทรศัพท์', done: Boolean(phone.trim().length >= 9) },
+    { label: 'ราคาที่ต้องการ', done: Boolean(expectedPrice && Number(expectedPrice) > 0) },
+    { label: 'ทำเลอำเภอ', done: Boolean(district) },
+    { label: 'รูปภาพทรัพย์', done: uploadedPhotos.length > 0 },
+    { label: 'รายละเอียด', done: description.trim().length >= 10 },
+  ];
+  const sellPassedCount = sellValidationItems.filter(i => i.done).length;
+  const sellPercentage = Math.round((sellPassedCount / sellValidationItems.length) * 100);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (submitting || uploading) return;
@@ -151,12 +163,12 @@ export default function SellPage() {
           </div>
 
           <h1 className="text-3xl sm:text-5xl font-extrabold text-white tracking-tight mb-4">
-            ต้องการขายบ้านหรือที่ดิน?
+            ส่งมอบคุณค่าแห่งอสังหาริมทรัพย์ของคุณ <br className="hidden sm:inline" />
+            <span className="text-gold-400">สู่มือผู้ซื้อที่มีศักยภาพสูงสุด</span>
           </h1>
 
-          <p className="text-base sm:text-xl text-gray-300 max-w-2xl mx-auto leading-relaxed">
-            ฝากทรัพย์กับ <strong className="text-gold-400 font-semibold">Chantakorn Property</strong> <br />
-            ให้เราช่วยหาผู้ซื้อที่เหมาะสม วางแผนการตลาด และดูแลความเรียบร้อยจนจบขั้นตอน
+          <p className="text-base sm:text-lg text-gray-300 max-w-2xl mx-auto leading-relaxed">
+            ไว้วางใจให้ <strong className="text-gold-400 font-semibold">Chantakorn Property</strong> ดูแลอสังหาริมทรัพย์อันทรงคุณค่าของคุณ พร้อมกลยุทธ์การตลาดเจาะกลุ่มผู้ซื้อตัวจริง การวิเคราะห์ราคาตลาด และการดูแลเอกสารสิทธิ์จนถึงวันส่งมอบกรรมสิทธิ์
           </p>
 
           <div className="mt-8 flex justify-center">
@@ -164,7 +176,7 @@ export default function SellPage() {
               href="#consignment-form"
               className="px-8 py-3.5 bg-gradient-to-r from-gold-400 to-gold-500 hover:from-gold-300 hover:to-gold-400 text-navy-950 font-bold text-sm sm:text-base rounded-xl shadow-lg transition-all"
             >
-              ฝากขายกับเรา
+              เริ่มต้นฝากทรัพย์กับเรา
             </a>
           </div>
         </div>
@@ -198,7 +210,50 @@ export default function SellPage() {
             </div>
           ) : (
             <form onSubmit={handleSubmit} className="space-y-8">
-          {error && <p role="alert" className="rounded-xl bg-red-50 p-3 text-sm text-red-700">{error}</p>}
+              {error && <p role="alert" className="rounded-xl bg-red-50 p-3 text-sm text-red-700">{error}</p>}
+
+              {/* Real-time Progress Bar Banner */}
+              <div className="p-4 sm:p-5 bg-gradient-to-r from-navy-950 via-navy-900 to-navy-950 rounded-2xl text-white space-y-3 shadow-md border border-navy-800">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-2">
+                    <Sparkles className="w-4 h-4 text-gold-400" />
+                    <span className="text-xs font-bold text-slate-200">ความคืบหน้าการกรอกข้อมูลทรัพย์</span>
+                  </div>
+                  <span className="text-xs font-black px-2.5 py-0.5 rounded-full bg-white/15 text-gold-300 font-mono">
+                    {sellPercentage}%
+                  </span>
+                </div>
+
+                <div className="w-full bg-navy-800 h-2.5 rounded-full overflow-hidden p-0.5 border border-white/10">
+                  <div
+                    className={`h-full rounded-full transition-all duration-500 ${
+                      sellPercentage === 100
+                        ? 'bg-gradient-to-r from-emerald-500 to-teal-400'
+                        : sellPercentage >= 60
+                        ? 'bg-gradient-to-r from-gold-500 to-emerald-400'
+                        : 'bg-gradient-to-r from-amber-500 to-gold-400'
+                    }`}
+                    style={{ width: `${sellPercentage}%` }}
+                  />
+                </div>
+
+                <div className="flex flex-wrap items-center gap-1.5 pt-1">
+                  {sellValidationItems.map((item, idx) => (
+                    <span
+                      key={idx}
+                      className={`text-[10px] px-2 py-0.5 rounded-md flex items-center gap-1 font-medium transition-colors ${
+                        item.done
+                          ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                          : 'bg-white/5 text-slate-400 border border-white/10'
+                      }`}
+                    >
+                      <span className={`w-1.5 h-1.5 rounded-full ${item.done ? 'bg-emerald-400' : 'bg-slate-500'}`} />
+                      <span>{item.label}</span>
+                    </span>
+                  ))}
+                </div>
+              </div>
+
               {/* Section 1: ข้อมูลผู้ติดต่อ */}
               <div>
                 <div className="flex items-center space-x-2 text-navy-950 font-bold text-base pb-3 border-b border-gray-100 mb-4">
@@ -208,30 +263,48 @@ export default function SellPage() {
 
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                   <div>
-                    <label className="block text-xs font-semibold text-gray-700 mb-1">
-                      ชื่อ-นามสกุล ผู้ติดต่อ *
-                    </label>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="text-xs font-semibold text-gray-700">
+                        ชื่อ-นามสกุล ผู้ติดต่อ *
+                      </label>
+                      {name.trim().length >= 2 && (
+                        <span className="text-[10px] text-emerald-600 font-bold">✓ ถูกต้อง</span>
+                      )}
+                    </div>
                     <input
                       type="text"
                       required
                       placeholder="เช่น คุณสมชาย นวลศรี"
                       value={name}
                       onChange={(e) => setName(e.target.value)}
-                      className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3 text-xs text-gray-900 focus:bg-white focus:ring-2 focus:ring-gold-500 outline-none"
+                      className={`w-full border rounded-xl p-3 text-xs text-gray-900 outline-none transition-all ${
+                        name.trim().length >= 2
+                          ? 'bg-emerald-50/20 border-emerald-300 focus:bg-white focus:ring-2 focus:ring-emerald-400'
+                          : 'bg-gray-50 border-gray-200 focus:bg-white focus:ring-2 focus:ring-gold-500'
+                      }`}
                     />
                   </div>
 
                   <div>
-                    <label className="block text-xs font-semibold text-gray-700 mb-1">
-                      เบอร์โทรศัพท์ติดต่อ *
-                    </label>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="text-xs font-semibold text-gray-700">
+                        เบอร์โทรศัพท์ติดต่อ *
+                      </label>
+                      {phone.trim().length >= 9 && (
+                        <span className="text-[10px] text-emerald-600 font-bold">✓ ถูกต้อง</span>
+                      )}
+                    </div>
                     <input
                       type="tel"
                       required
                       placeholder="081-xxx-xxxx"
                       value={phone}
                       onChange={(e) => setPhone(e.target.value)}
-                      className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3 text-xs text-gray-900 focus:bg-white focus:ring-2 focus:ring-gold-500 outline-none"
+                      className={`w-full border rounded-xl p-3 text-xs text-gray-900 outline-none transition-all ${
+                        phone.trim().length >= 9
+                          ? 'bg-emerald-50/20 border-emerald-300 focus:bg-white focus:ring-2 focus:ring-emerald-400'
+                          : 'bg-gray-50 border-gray-200 focus:bg-white focus:ring-2 focus:ring-gold-500'
+                      }`}
                     />
                   </div>
 

@@ -11,16 +11,16 @@ export default function ContactCTA() {
 
       <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 text-center relative z-10">
         <div className="flex items-center justify-center space-x-2 text-xs font-bold text-gold-400 uppercase tracking-widest mb-4">
-          <span>บริการด้วยใจ ให้คำปรึกษาฟรี</span>
+          <span>บริการด้วยความจริงใจ ให้คำปรึกษาฟรี</span>
         </div>
 
         <h2 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold text-white tracking-tight mb-4">
-          กำลังมองหาอสังหาริมทรัพย์?
+          กำลังมองหาอสังหาริมทรัพย์ที่ตอบโจทย์ชีวิต?
         </h2>
 
         <p className="text-lg sm:text-xl text-gray-300 max-w-2xl mx-auto mb-10 leading-relaxed font-light">
-          ให้เราช่วยคุณค้นหาทรัพย์ที่เหมาะกับคุณ <br className="hidden sm:inline" />
-          ทีมงานพร้อมตอบคำถาม แนะนำทำเล และพาชมสถานที่จริงทุกวัน
+          ให้เราช่วยดูแลและร่วมค้นหาทรัพย์ที่ใช่สำหรับคุณ <br className="hidden sm:inline" />
+          ทีมงานพร้อมตอบทุกข้อสงสัย แนะนำทำเลศักยภาพ และอำนวยความสะดวกพาชมสถานที่จริงทุกวัน
         </p>
 
         <div className="flex flex-wrap items-center justify-center gap-4">
@@ -29,7 +29,7 @@ export default function ContactCTA() {
             className="px-8 py-3.5 bg-gradient-to-r from-gold-400 to-gold-500 hover:from-gold-300 hover:to-gold-400 text-navy-950 font-bold text-sm sm:text-base rounded-xl shadow-lg hover:shadow-gold-500/25 transition-all transform hover:-translate-y-0.5 flex items-center space-x-2"
           >
             <Search className="w-4 h-4" />
-            <span>ค้นหาทรัพย์</span>
+            <span>ค้นหาทรัพย์ที่สนใจ</span>
           </Link>
 
           <Link
@@ -47,7 +47,7 @@ export default function ContactCTA() {
             className="px-6 py-3.5 bg-[#06C755] hover:bg-[#05b34c] text-white font-semibold text-sm sm:text-base rounded-xl transition-all transform hover:-translate-y-0.5 flex items-center space-x-2 shadow-md"
           >
             <MessageCircle className="w-5 h-5 fill-current" />
-            <span>คุยไลน์กับเรา</span>
+            <span>ปรึกษาทีมงานทาง LINE</span>
           </a>
         </div>
 

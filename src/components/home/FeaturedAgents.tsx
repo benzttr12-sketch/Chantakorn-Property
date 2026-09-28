@@ -110,10 +110,10 @@ export default function FeaturedAgents({ onSelectAgentForBooking }: FeaturedAgen
               <span>DEDICATED LOCAL PROPERTY ADVISORS</span>
             </div>
             <h2 className="text-3xl sm:text-4xl lg:text-5xl font-black text-navy-950 tracking-tight text-balance">
-              ทีมงานที่ปรึกษาอสังหาริมทรัพย์มืออาชีพ
+              ทีมที่ปรึกษาผู้ทรงคุณวุฒิด้านอสังหาริมทรัพย์
             </h2>
             <p className="text-slate-600 text-sm sm:text-base mt-2.5 max-w-2xl leading-relaxed">
-              พร้อมดูแลและให้คำปรึกษาการซื้อ ขาย เช่า และขายฝากในหาดใหญ่–สงขลา อย่างใกล้ชิดและจริงใจ
+              พร้อมมอบบริการที่เปี่ยมด้วยความใส่ใจ ความซื่อสัตย์ และความเชี่ยวชาญเฉพาะด้าน เพื่อความสำเร็จสูงสุดในทุกธุรกรรมอสังหาริมทรัพย์ของคุณในหาดใหญ่และสงขลา
             </p>
           </div>
 

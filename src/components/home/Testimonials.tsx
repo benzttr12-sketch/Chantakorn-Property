@@ -35,14 +35,14 @@ export default function Testimonials() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Header */}
         <div className="text-center max-w-2xl mx-auto mb-14">
-          <div className="inline-flex items-center space-x-1.5 px-3 py-1 rounded-full bg-gold-50 border border-gold-200 text-xs font-bold text-gold-700 uppercase tracking-wider mb-2">
-            <span>เสียงตอบรับจากลูกค้าจริง</span>
+          <div className="flex items-center justify-center space-x-2 text-xs font-bold text-gold-700 uppercase tracking-widest mb-3">
+            <span>CLIENT TESTIMONIALS & TRUST</span>
           </div>
           <h2 className="text-3xl sm:text-4xl font-extrabold text-navy-950">
-            ความไว้วางใจจากลูกค้าของเรา
+            เสียงสะท้อนแห่งความประทับใจและความไว้วางใจ
           </h2>
-          <p className="text-brand-muted text-sm sm:text-base mt-2">
-            เรามุ่งมั่นให้บริการด้วยความจริงใจ และสร้างผลลัพธ์ที่ดีที่สุดให้กับทุกท่าน
+          <p className="text-brand-muted text-sm sm:text-base mt-2.5 leading-relaxed">
+            เรื่องราวความสำเร็จจากผู้ครอบครองกรรมสิทธิ์และเจ้าของทรัพย์ที่ไว้วางใจให้ Chantakorn Property ดูแล
           </p>
         </div>
 

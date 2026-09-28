@@ -1142,6 +1142,7 @@ export default function AdminPropertiesPage() {
         isOpen={isLandsMapsModalOpen}
         onClose={() => setIsLandsMapsModalOpen(false)}
         property={landsMapsModalProperty}
+        allProperties={properties}
         onPropertyUpdated={loadData}
       />
 

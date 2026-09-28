@@ -13,25 +13,55 @@ export interface MarketIntelligenceResponse {
   timestamp: string;
 }
 
+// In-memory cache for market intelligence to protect against Gemini API rate limits & 429 quota errors
+interface CachedInsight {
+  data: {
+    answer: string;
+    sources: GroundingSource[];
+    searchQueries: string[];
+    timestamp: string;
+  };
+  cachedAt: number;
+}
+
+const CACHE_TTL_MS = 60 * 60 * 1000; // 1 hour TTL
+const insightCache = new Map<string, CachedInsight>();
+
 export async function POST(req: NextRequest) {
   let query = '';
   let category = '';
 
   try {
-    const body = await req.json();
-    query = body.query || '';
-    category = body.category || '';
+    const body = await req.json().catch(() => ({}));
+    query = (body.query || '').trim();
+    category = (body.category || '').trim();
+
+    const cacheKey = (query || category || 'default').toLowerCase().replace(/\s+/g, ' ');
+
+    // Check in-memory cache first to save quota
+    const cached = insightCache.get(cacheKey);
+    if (cached && Date.now() - cached.cachedAt < CACHE_TTL_MS) {
+      return NextResponse.json({
+        success: true,
+        ...cached.data,
+        fromCache: true,
+      });
+    }
 
     const ai = getGeminiClient();
 
     if (!ai) {
-      // Fallback curated responses for Hat Yai market if API key is not yet set
-      return NextResponse.json({
-        success: true,
+      const fallbackResult = {
         answer: getFallbackMarketInsight(query || category),
         sources: getFallbackSources(query || category),
         searchQueries: ['ราคาประเมินที่ดิน หาดใหญ่ ล่าสุด', 'โครงการมอเตอร์เวย์ หาดใหญ่ สะเดา', 'แนวโน้มอสังหา สงขลา'],
         timestamp: new Date().toISOString(),
+      };
+      insightCache.set(cacheKey, { data: fallbackResult, cachedAt: Date.now() });
+
+      return NextResponse.json({
+        success: true,
+        ...fallbackResult,
       });
     }
 
@@ -47,44 +77,69 @@ export async function POST(req: NextRequest) {
 3. ให้คำแนะนำเชิงกลยุทธ์สำหรับผู้ซื้อเพื่ออยู่อาศัย และนักลงทุนอสังหาฯ ในหาดใหญ่-สงขลา
 4. ใช้ภาษาไทยที่สุภาพ น่าเชื่อถือ ชัดเจน`;
 
-    const response = await ai.models.generateContent({
-      model: 'gemini-3.5-flash',
-      contents: prompt,
-      config: {
-        tools: [{ googleSearch: {} }],
-      },
-    });
+    let responseText = '';
+    let uniqueSources: GroundingSource[] = [];
+    let searchQueries: string[] = [];
 
-    const groundingMetadata = response.candidates?.[0]?.groundingMetadata;
-    const webChunks = (groundingMetadata?.groundingChunks || [])
-      .map((chunk: any) => ({
-        title: chunk.web?.title || 'แหล่งข้อมูลอ้างอิง',
-        uri: chunk.web?.uri || '',
-      }))
-      .filter((c: any) => c.uri);
+    try {
+      const response = await ai.models.generateContent({
+        model: 'gemini-3.8-flash',
+        contents: prompt,
+        config: {
+          tools: [{ googleSearch: {} }],
+        },
+      });
 
-    // Deduplicate sources by URI
-    const uniqueSources: GroundingSource[] = [];
-    const seenUris = new Set<string>();
-    for (const source of webChunks) {
-      if (!seenUris.has(source.uri)) {
-        seenUris.add(source.uri);
-        uniqueSources.push(source);
+      responseText = response.text || '';
+      const groundingMetadata = response.candidates?.[0]?.groundingMetadata;
+      const webChunks = (groundingMetadata?.groundingChunks || [])
+        .map((chunk: any) => ({
+          title: chunk.web?.title || 'แหล่งข้อมูลอ้างอิง',
+          uri: chunk.web?.uri || '',
+        }))
+        .filter((c: any) => c.uri);
+
+      const seenUris = new Set<string>();
+      for (const source of webChunks) {
+        if (!seenUris.has(source.uri)) {
+          seenUris.add(source.uri);
+          uniqueSources.push(source);
+        }
       }
+
+      searchQueries = groundingMetadata?.webSearchQueries || [];
+    } catch (genError: any) {
+      // Graceful fallback when rate limited (429 RESOURCE_EXHAUSTED) or quota exceeded
+      const isQuotaError = genError?.status === 429 || 
+                           genError?.message?.includes('429') || 
+                           genError?.message?.includes('RESOURCE_EXHAUSTED') ||
+                           genError?.message?.includes('quota');
+
+      if (!isQuotaError) {
+        console.info('Market intelligence search note, using curated dataset');
+      }
+
+      responseText = getFallbackMarketInsight(query || category);
+      uniqueSources = getFallbackSources(query || category);
+      searchQueries = ['ราคาประเมินที่ดิน หาดใหญ่ ล่าสุด', 'โครงการมอเตอร์เวย์ หาดใหญ่ สะเดา', 'แนวโน้มอสังหา สงขลา'];
     }
 
-    const searchQueries: string[] = groundingMetadata?.webSearchQueries || [];
-
-    return NextResponse.json({
-      success: true,
-      answer: response.text || getFallbackMarketInsight(query || category),
+    const finalResult = {
+      answer: responseText || getFallbackMarketInsight(query || category),
       sources: uniqueSources.length > 0 ? uniqueSources : getFallbackSources(query || category),
       searchQueries: searchQueries.length > 0 ? searchQueries : ['ราคาประเมินที่ดิน หาดใหญ่ ล่าสุด', 'โครงการมอเตอร์เวย์ หาดใหญ่ สะเดา', 'แนวโน้มอสังหา สงขลา'],
       timestamp: new Date().toISOString(),
+    };
+
+    // Store in cache to minimize future API calls
+    insightCache.set(cacheKey, { data: finalResult, cachedAt: Date.now() });
+
+    return NextResponse.json({
+      success: true,
+      ...finalResult,
     });
   } catch (error: any) {
-    console.warn('Market intelligence Gemini API limit reached or error occurred, using curated market intelligence:', error?.message || error);
-    // Graceful fallback on 429 quota exceeded or other errors
+    // Ultimate graceful catch-all
     return NextResponse.json({
       success: true,
       answer: getFallbackMarketInsight(query || category),

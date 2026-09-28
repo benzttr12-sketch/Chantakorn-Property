@@ -63,6 +63,7 @@ import {
   QuickClosingScript
 } from '@/lib/automation-engine';
 import SocialBestTimeD3Chart from '@/components/admin/SocialBestTimeD3Chart';
+import InvestmentZoneDistributionMap from '@/components/admin/InvestmentZoneDistributionMap';
 import { 
   calculateBestTimeSlot, 
   getCurrentPostingHealth, 
@@ -1145,6 +1146,11 @@ function AutomationContent() {
             <pre className="bg-slate-950 p-4 rounded-2xl text-xs font-mono text-gray-200 overflow-x-auto whitespace-pre-wrap leading-relaxed border border-slate-800">
               {valuationData.investorPitchCard}
             </pre>
+          </div>
+
+          {/* D3 Geospatial Investment Zone Price Distribution Map */}
+          <div className="pt-4">
+            <InvestmentZoneDistributionMap properties={properties} />
           </div>
         </div>
       )}

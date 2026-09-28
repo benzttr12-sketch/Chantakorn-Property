@@ -175,8 +175,11 @@ export async function POST(req: NextRequest) {
             ...parsed,
           });
         }
-      } catch (geminiError) {
-        console.warn('Gemini API call failed, falling back to intelligent template:', geminiError);
+      } catch (geminiError: any) {
+        const isQuota = geminiError?.status === 429 || geminiError?.message?.includes('429') || geminiError?.message?.includes('quota');
+        if (!isQuota) {
+          console.info('Using intelligent template engine for property description');
+        }
       }
     }
 

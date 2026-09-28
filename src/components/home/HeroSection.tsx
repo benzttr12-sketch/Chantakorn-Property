@@ -48,8 +48,8 @@ export default function HeroSection() {
 
           {/* Subheadline */}
           <p className="text-base sm:text-lg text-slate-200 leading-relaxed font-normal mb-8 max-w-2xl">
-            บ้านเดี่ยว พูลวิลล่า คอนโดมิเนียมหรู ที่ดินแปลงสวย และบริการขายฝากดอกเบี้ยต่ำ <br className="hidden sm:inline" />
-            ตรวจสอบความถูกต้องของโฉนด 100% พร้อมดูแลประสานสินเชื่อธนาคารจนถึงวันโอนกรรมสิทธิ์
+            บ้านเดี่ยว พูลวิลล่า คอนโดมิเนียมหรู ที่ดินแปลงสวย และบริการขายฝากดอกเบี้ยเป็นธรรม <br className="hidden sm:inline" />
+            ตรวจสอบความถูกต้องของโฉนดและเอกสารสิทธิ์ 100% พร้อมดูแลประสานสินเชื่อจนถึงวันส่งมอบกรรมสิทธิ์
           </p>
 
           {/* Action CTAs */}
@@ -59,7 +59,7 @@ export default function HeroSection() {
               className="px-8 py-4 bg-gradient-to-r from-gold-400 via-gold-500 to-amber-500 hover:from-gold-300 hover:to-gold-400 text-navy-950 font-black text-sm rounded-xl shadow-xl hover:shadow-gold-500/30 flex items-center space-x-2.5 transition-all transform hover:-translate-y-0.5 active:translate-y-0 group"
             >
               <Search className="w-4 h-4 text-navy-950 stroke-[2.5]" />
-              <span>สำรวจอสังหาฯ ทั้งหมด</span>
+              <span>ชมคอลเลกชันทรัพย์ทั้งหมด</span>
               <ChevronRight className="w-4 h-4 text-navy-950 transform group-hover:translate-x-0.5 transition-transform" />
             </Link>
 
@@ -68,7 +68,7 @@ export default function HeroSection() {
               className="px-8 py-4 bg-white/10 hover:bg-white/20 text-white hover:text-gold-300 border border-white/25 hover:border-gold-400/60 font-bold text-sm rounded-xl backdrop-blur-md flex items-center space-x-2.5 transition-all transform hover:-translate-y-0.5 active:translate-y-0 shadow-lg"
             >
               <PlusCircle className="w-4 h-4 text-gold-400" />
-              <span>ฝากขาย / ขายฝากกับเรา</span>
+              <span>ฝากขาย & บริการขายฝาก</span>
             </Link>
           </div>
 
@@ -76,19 +76,19 @@ export default function HeroSection() {
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-xs text-slate-200 pt-6 border-t border-white/15">
             <div className="space-y-0.5">
               <div className="text-2xl sm:text-3xl font-black text-gold-300 tabular-nums">500+</div>
-              <span className="text-[11px] text-slate-300 font-medium">ทรัพย์คุณภาพในพอร์ต</span>
+              <span className="text-[11px] text-slate-300 font-medium">ทรัพย์คุณภาพคัดสรร</span>
             </div>
             <div className="space-y-0.5">
               <div className="text-2xl sm:text-3xl font-black text-gold-300 tabular-nums">99%</div>
-              <span className="text-[11px] text-slate-300 font-medium">ยื่นกู้ผ่านฉลุย</span>
+              <span className="text-[11px] text-slate-300 font-medium">อัตราอนุมัติสินเชื่อ</span>
             </div>
             <div className="space-y-0.5">
               <div className="text-2xl sm:text-3xl font-black text-gold-300 tabular-nums">100%</div>
-              <span className="text-[11px] text-slate-300 font-medium">โฉนดตรวจสอบแล้ว</span>
+              <span className="text-[11px] text-slate-300 font-medium">ตรวจสอบเอกสารสิทธิ์</span>
             </div>
             <div className="space-y-0.5">
-              <div className="text-2xl sm:text-3xl font-black text-gold-300 tabular-nums">6 ธนาคาร</div>
-              <span className="text-[11px] text-slate-300 font-medium">ดอกเบี้ยพิเศษพันธมิตร</span>
+              <div className="text-2xl sm:text-3xl font-black text-gold-300 tabular-nums">สถาบันการเงิน</div>
+              <span className="text-[11px] text-slate-300 font-medium">พันธมิตรชั้นนำดอกเบี้ยพิเศษ</span>
             </div>
           </div>
         </div>
