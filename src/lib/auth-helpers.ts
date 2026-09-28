@@ -45,10 +45,17 @@ export async function syncFirebaseUserProfile(
   const email = user.email || '';
   const isDefaultAdmin = email.toLowerCase() === 'benzttr12@gmail.com';
   const userDocRef = doc(db, 'profiles', user.uid);
-  const snap = await getDocFromServer(userDocRef);
+  let snap;
+  try {
+    snap = await getDocFromServer(userDocRef);
+  } catch {
+    const { getDoc } = await import('firebase/firestore');
+    snap = await getDoc(userDocRef);
+  }
+
   let data: Partial<UserProfile> = {};
 
-  if (snap.exists()) {
+  if (snap && snap.exists()) {
     data = snap.data() as Partial<UserProfile>;
     if (isDefaultAdmin && data.role !== 'ADMIN') {
       data.role = 'ADMIN';
@@ -66,7 +73,7 @@ export async function syncFirebaseUserProfile(
       facebook: isDefaultAdmin ? 'https://www.facebook.com/chantakornproperty' : '',
       created_at: new Date().toISOString(),
     };
-    await setDoc(userDocRef, data);
+    await setDoc(userDocRef, data, { merge: true });
   }
 
   const profile: UserProfile = {
@@ -95,10 +102,39 @@ export async function updateCurrentUserProfile(updates: ProfileUpdates): Promise
     if (!auth?.currentUser || !db) throw new Error('กรุณาเข้าสู่ระบบอีกครั้ง');
 
     const current = await syncFirebaseUserProfile(auth.currentUser);
-    await updateProfile(auth.currentUser, {
-      displayName: updates.full_name ?? auth.currentUser.displayName,
-      photoURL: updates.avatar_url ?? auth.currentUser.photoURL,
-    });
+
+    // Safely update Firebase Auth displayName & photoURL
+    // Note: Firebase Auth enforces a max 2,048 character limit and valid URL scheme on photoURL.
+    // Base64 data URIs (data:image/...) or long URLs must NOT be sent to Auth photoURL,
+    // but are fully supported in Firestore profiles/{uid} document!
+    try {
+      const authUpdates: { displayName?: string; photoURL?: string | null } = {};
+      if (updates.full_name !== undefined && updates.full_name.trim()) {
+        authUpdates.displayName = updates.full_name.trim().slice(0, 100);
+      }
+      if (updates.avatar_url !== undefined) {
+        const rawAvatar = updates.avatar_url?.trim() || '';
+        if (
+          rawAvatar &&
+          !rawAvatar.startsWith('data:') &&
+          rawAvatar.length <= 1500 &&
+          (rawAvatar.startsWith('http://') || rawAvatar.startsWith('https://'))
+        ) {
+          authUpdates.photoURL = rawAvatar;
+        } else if (rawAvatar === '') {
+          authUpdates.photoURL = null;
+        }
+        // If it's a data URL or > 1500 chars, do NOT update auth.currentUser.photoURL; it will be saved in Firestore!
+      }
+
+      if (Object.keys(authUpdates).length > 0) {
+        await updateProfile(auth.currentUser, authUpdates).catch((err) => {
+          console.warn('Firebase Auth updateProfile non-critical warning:', err);
+        });
+      }
+    } catch (authError) {
+      console.warn('Firebase Auth updateProfile caught:', authError);
+    }
 
     const safeUpdates = Object.fromEntries(
       PROFILE_FIELDS
@@ -112,6 +148,8 @@ export async function updateCurrentUserProfile(updates: ProfileUpdates): Promise
       { merge: true },
     );
     updatedProfile = { ...current, ...safeUpdates, updated_at: updatedAt };
+    demoCacheProfile(updatedProfile);
+    notifyAuthChange(updatedProfile);
   } else if (dataBackend === 'supabase' && supabase) {
     const { data: authData, error: authError } = await supabase.auth.getUser();
     if (authError || !authData.user) throw authError || new Error('กรุณาเข้าสู่ระบบอีกครั้ง');
