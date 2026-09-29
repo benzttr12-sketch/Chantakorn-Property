@@ -1,5 +1,5 @@
 import { jsonResponse } from '@/lib/api-response';
-import { getGeminiClient } from '@/lib/gemini';
+import { GEMINI_PRIMARY_MODEL, generateGeminiContent, getGeminiClient } from '@/lib/gemini';
 import { requireStaff } from '@/lib/server-auth';
 
 export async function POST(req: Request) {
@@ -44,8 +44,8 @@ export async function POST(req: Request) {
 - ถ้าเป็น chinese: เขียนภาษาจีน สำหรับนักลงทุนชาวจีน/มาเลเซียที่มองหาอสังหาฯ ในหาดใหญ่-สงขลา
 - ถ้าเป็น facebook: เขียน Headline หยุดสายตา, Storytelling เล่าอารมณ์ความคุ้มค่า, bullet points ฟังก์ชัน, และ Call to action ชัดเจน`;
 
-      const response = await ai.models.generateContent({
-        model: 'gemini-3.8-flash',
+      const { response } = await generateGeminiContent(ai, {
+        model: GEMINI_PRIMARY_MODEL,
         contents: prompt,
       });
 
@@ -75,8 +75,8 @@ export async function POST(req: Request) {
 1. เหตุผลที่ทรัพย์นี้ตอบโจทย์ลูกค้าท่านนี้ (3 ข้อสั้นๆ)
 2. ข้อความสั้นๆ สุภาพ น่าเชื่อถือ สำหรับนายหน้าใช้ส่งทักทายลูกค้าทาง LINE พร้อมแนบข้อเสนอ`;
 
-      const response = await ai.models.generateContent({
-        model: 'gemini-3.8-flash',
+      const { response } = await generateGeminiContent(ai, {
+        model: GEMINI_PRIMARY_MODEL,
         contents: prompt,
       });
 

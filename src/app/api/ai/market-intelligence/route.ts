@@ -1,5 +1,5 @@
 import { jsonResponse } from '@/lib/api-response';
-import { getGeminiClient } from '@/lib/gemini';
+import { GEMINI_PRIMARY_MODEL, generateGeminiContent, getGeminiClient } from '@/lib/gemini';
 
 export interface GroundingSource {
   title: string;
@@ -82,8 +82,8 @@ export async function POST(req: Request) {
     let searchQueries: string[] = [];
 
     try {
-      const response = await ai.models.generateContent({
-        model: 'gemini-3.8-flash',
+      const { response } = await generateGeminiContent(ai, {
+        model: GEMINI_PRIMARY_MODEL,
         contents: prompt,
         config: {
           tools: [{ googleSearch: {} }],

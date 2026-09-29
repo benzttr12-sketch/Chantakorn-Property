@@ -1,6 +1,7 @@
 import { jsonResponse } from '@/lib/api-response';
 import { GoogleGenAI, Type } from '@google/genai';
 import type { FAQCategoryData, FAQItem } from '@/lib/faq-types';
+import { GEMINI_PRIMARY_MODEL, generateGeminiContent } from '@/lib/gemini';
 
 // Curated Fallback Database for Hat Yai - Songkhla Real Estate
 const CURATED_FAQS: Record<string, FAQItem[]> = {
@@ -190,8 +191,8 @@ export async function POST(req: Request) {
   "tip": "คำแนะนำพิเศษที่เป็นประโยชน์ 1 ประโยค"
 }`;
 
-          const response = await ai.models.generateContent({
-            model: 'gemini-3.8-flash',
+          const { response, model } = await generateGeminiContent(ai, {
+            model: GEMINI_PRIMARY_MODEL,
             contents: prompt,
             config: {
               systemInstruction: 'คุณคือที่ปรึกษาอสังหาริมทรัพย์ผู้เชี่ยวชาญในหาดใหญ่และสงขลา ตอบเป็น JSON เท่านั้น',
@@ -215,7 +216,7 @@ export async function POST(req: Request) {
             const parsed = JSON.parse(text);
             return jsonResponse({
               success: true,
-              source: 'gemini-3.8-flash',
+              source: model,
               faq: {
                 id: `faq-custom-${Date.now()}`,
                 ...parsed,
@@ -266,8 +267,8 @@ export async function POST(req: Request) {
 2. คำตอบกระชับ ตรงประเด็น ชัดเจน
 3. มีคำแนะนำพิเศษ (tip) 1 ประโยคในแต่ละข้อ`;
 
-        const response = await ai.models.generateContent({
-          model: 'gemini-3.8-flash',
+        const { response, model } = await generateGeminiContent(ai, {
+          model: GEMINI_PRIMARY_MODEL,
           contents: prompt,
           config: {
             systemInstruction: 'คุณคือที่ปรึกษาอสังหาริมทรัพย์ผู้เชี่ยวชาญ ตอบกลับด้วยโครงสร้าง JSON เท่านั้น',
@@ -302,7 +303,7 @@ export async function POST(req: Request) {
           const parsed = JSON.parse(text);
           return jsonResponse({
             success: true,
-            source: 'gemini-3.8-flash',
+            source: model,
             category,
             categoryTitle: parsed.categoryTitle || CATEGORY_NAMES[category] || 'คำถามที่พบบ่อย',
             faqs: parsed.faqs || [],
