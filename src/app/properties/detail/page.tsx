@@ -2,7 +2,12 @@
 
 import { Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
-import PropertyDetail from '@/components/properties/PropertyDetail';
+import dynamic from 'next/dynamic';
+
+const PropertyDetail = dynamic(() => import('@/components/properties/PropertyDetail'), {
+  ssr: false,
+  loading: () => <div className="p-16 text-center text-sm font-bold text-navy-950">กำลังโหลดรายละเอียดทรัพย์...</div>,
+});
 
 function PropertyDetailContent() {
   const params = useSearchParams();

@@ -95,5 +95,10 @@ service cloud.firestore {
       allow read: if true;
       allow write: if isStaff();
     }
+
+    // 9. Work Jobs (7-Phase Workflow & Operations)
+    match /work_jobs/{jobId} {
+      allow read, write: if isStaff();
+    }
   }
 }

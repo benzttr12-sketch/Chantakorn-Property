@@ -83,7 +83,7 @@ function requireStaffBackend() {
 }
 
 export function getLocalProperties(): Property[] {
-  return readArray(STORAGE_KEY_PROPERTIES, [], isProperty);
+  return readArray(STORAGE_KEY_PROPERTIES, SAMPLE_PROPERTIES, isProperty);
 }
 
 export function saveLocalProperties(properties: Property[]) {
@@ -185,20 +185,26 @@ function filterProperties(properties: Property[], filters?: PropertyFilters): Pr
 
 async function loadProperties(includeUnpublished: boolean): Promise<Property[]> {
   requireConnection();
-  if (dataBackend === 'supabase' && supabase) {
-    let request = supabase.from('properties').select(PROPERTY_SELECT);
-    if (!includeUnpublished) request = request.eq('published', true);
-    const { data, error } = await request;
-    if (error) throw error;
-    return (data || []).map(row => rowToProperty(row as PropertyRow));
+  if (dataBackend === 'supabase') {
+    if (supabase) {
+      let request = supabase.from('properties').select(PROPERTY_SELECT);
+      if (!includeUnpublished) request = request.eq('published', true);
+      const { data, error } = await request;
+      if (error) throw error;
+      return (data || []).map(row => rowToProperty(row as PropertyRow));
+    }
+    return [];
   }
   const firestore: Firestore | null = db;
-  if (dataBackend === 'firebase' && firestore) {
-    const q = includeUnpublished
-      ? query(collection(firestore, 'properties'))
-      : query(collection(firestore, 'properties'), where('published', '==', true));
-    const snapshot = await getDocs(q);
-    return snapshot.docs.map(item => rowToProperty({ ...item.data(), id: item.id } as PropertyRow));
+  if (dataBackend === 'firebase') {
+    if (firestore) {
+      const q = includeUnpublished
+        ? query(collection(firestore, 'properties'))
+        : query(collection(firestore, 'properties'), where('published', '==', true));
+      const snapshot = await getDocs(q);
+      return snapshot.docs.map(item => rowToProperty({ ...item.data(), id: item.id } as PropertyRow));
+    }
+    return [];
   }
   return getLocalProperties().filter(property => includeUnpublished || property.published);
 }
@@ -216,24 +222,23 @@ export async function fetchAdminProperties(filters?: PropertyFilters): Promise<P
 
 export async function fetchPropertyBySlug(slug: string): Promise<Property | null> {
   requireConnection();
-  if (dataBackend === 'supabase' && supabase) {
-    try {
+  if (dataBackend === 'supabase') {
+    if (supabase) {
       const { data, error } = await supabase.from('properties').select(PROPERTY_SELECT)
         .eq('slug', slug).eq('published', true).maybeSingle();
       if (error) throw error;
       return data ? rowToProperty(data as PropertyRow) : null;
-    } catch (err) {
-      console.warn('Supabase fetchPropertyBySlug error, falling back:', err);
+    }
+    return null;
+  }
+  const firestore: Firestore | null = db;
+  if (dataBackend === 'firebase') {
+    if (firestore) {
       const all = await loadProperties(false);
       return all.find(property => property.slug === slug) || null;
     }
+    return null;
   }
-  const firestore: Firestore | null = db;
-  if (dataBackend === 'firebase' && firestore) {
-    const all = await loadProperties(false);
-    return all.find(property => property.slug === slug) || null;
-  }
-  // A single published query avoids requiring an additional Firestore composite index.
   return (await loadProperties(false)).find(property => property.slug === slug) || null;
 }
 

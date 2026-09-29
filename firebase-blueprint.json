@@ -155,6 +155,29 @@
         "updated_at": { "type": "string" }
       },
       "required": ["id"]
+    },
+    "work_jobs": {
+      "title": "7-Phase Real Estate Work Jobs",
+      "description": "Internal operational workflow jobs tracking 7 phases of property closing and marketing",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "job_code": { "type": "string" },
+        "title": { "type": "string" },
+        "property_id": { "type": "string" },
+        "property_title": { "type": "string" },
+        "inquiry_id": { "type": "string" },
+        "customer_name": { "type": "string" },
+        "customer_phone": { "type": "string" },
+        "assigned_agent": { "type": "string" },
+        "current_phase_number": { "type": "number" },
+        "total_phases": { "type": "number" },
+        "status": { "type": "string", "enum": ["active", "completed", "on_hold"] },
+        "phases": { "type": "array" },
+        "created_at": { "type": "string" },
+        "updated_at": { "type": "string" }
+      },
+      "required": ["id", "job_code", "title", "current_phase_number", "total_phases", "status", "created_at"]
     }
   },
   "firestore": {
@@ -185,6 +208,10 @@
     "/settings/{settingId}": {
       "schema": "settings",
       "description": "Collection of system configurations and LINE OA settings"
+    },
+    "/work_jobs/{jobId}": {
+      "schema": "work_jobs",
+      "description": "Collection of 7-phase operational work jobs"
     }
   }
 }
