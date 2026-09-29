@@ -2,6 +2,7 @@ import { jsonResponse } from '@/lib/api-response';
 import { GoogleGenAI, Type } from '@google/genai';
 import { PropertyType, PropertyStatus } from '@/lib/types';
 import { requireStaff } from '@/lib/server-auth';
+import { GEMINI_PRIMARY_MODEL, generateGeminiContent } from '@/lib/gemini';
 
 interface GenerateDescriptionRequest {
   title?: string;
@@ -132,8 +133,8 @@ export async function POST(req: Request) {
 3. แยกหมวดหมู่ให้อ่านง่าย เช่น 📍 ทำเลและจุดเด่น, 📐 ฟังก์ชันตัวทรัพย์, 🌟 สิ่งอำนวยความสะดวก, 🛡️ มาตรฐานความปลอดภัย (ตรวจสอบโฉนด 100% ดูแลสินเชื่อธนาคารฟรี 100%), 📞 ช่องทางติดต่อ
 4. สื่อถึงความจริงใจและผลประโยชน์ของผู้ซื้อเป็นสำคัญ`;
 
-        const response = await ai.models.generateContent({
-          model: 'gemini-3.8-flash',
+        const { response, model } = await generateGeminiContent(ai, {
+          model: GEMINI_PRIMARY_MODEL,
           contents: prompt,
           config: {
             systemInstruction:
@@ -175,7 +176,7 @@ export async function POST(req: Request) {
           const parsed = JSON.parse(text);
           return jsonResponse({
             success: true,
-            source: 'gemini-3.8-flash',
+            source: model,
             ...parsed,
           });
         }
