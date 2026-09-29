@@ -1,5 +1,7 @@
 'use client';
 
+import { fetchStaffApi } from '@/lib/staff-api';
+
 import React, { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
@@ -243,7 +245,7 @@ function PropertyEditor() {
     setAiGenSuccessToast(null);
     try {
       const specs = getPropertySpecsForAI();
-      const res = await fetch('/api/ai/generate-property-description', {
+      const res = await fetchStaffApi('/api/ai/generate-property-description', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -428,7 +430,7 @@ function PropertyEditor() {
 
       // 2. ถ้าเป็นลิงก์ย่อ เช่น maps.app.goo.gl หรือลิงก์เว็บ ส่งให้เซิร์ฟเวอร์ resolve
       if (/https?:\/\//i.test(rawVal) || /goo\.gl|google\.com/i.test(rawVal)) {
-        const res = await fetch('/api/resolve-maps', {
+        const res = await fetchStaffApi('/api/resolve-maps', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ url: rawVal }),

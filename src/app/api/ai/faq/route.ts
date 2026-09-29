@@ -1,21 +1,6 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { jsonResponse } from '@/lib/api-response';
 import { GoogleGenAI, Type } from '@google/genai';
-
-export interface FAQItem {
-  id: string;
-  question: string;
-  answer: string;
-  category: string;
-  tag: string;
-  tip?: string;
-}
-
-export interface FAQCategoryData {
-  category: string;
-  categoryTitle: string;
-  faqs: FAQItem[];
-  source: 'gemini-3.8-flash' | 'curated-expert-database';
-}
+import type { FAQCategoryData, FAQItem } from '@/lib/faq-types';
 
 // Curated Fallback Database for Hat Yai - Songkhla Real Estate
 const CURATED_FAQS: Record<string, FAQItem[]> = {
@@ -170,7 +155,7 @@ const CATEGORY_NAMES: Record<string, string> = {
   legal: 'โฉนดที่ดิน & ข้อกฎหมาย',
 };
 
-export async function POST(req: NextRequest) {
+export async function POST(req: Request) {
   try {
     const body = await req.json().catch(() => ({}));
     const category = typeof body.category === 'string' && body.category in CURATED_FAQS ? body.category : 'all';
@@ -228,7 +213,7 @@ export async function POST(req: NextRequest) {
           const text = response.text?.trim();
           if (text) {
             const parsed = JSON.parse(text);
-            return NextResponse.json({
+            return jsonResponse({
               success: true,
               source: 'gemini-3.8-flash',
               faq: {
@@ -246,7 +231,7 @@ export async function POST(req: NextRequest) {
       }
 
       // Fallback for custom question if Gemini is unavailable
-      return NextResponse.json({
+      return jsonResponse({
         success: true,
         source: 'curated-expert-database',
         faq: {
@@ -315,7 +300,7 @@ export async function POST(req: NextRequest) {
         const text = response.text?.trim();
         if (text) {
           const parsed = JSON.parse(text);
-          return NextResponse.json({
+          return jsonResponse({
             success: true,
             source: 'gemini-3.8-flash',
             category,
@@ -334,7 +319,7 @@ export async function POST(req: NextRequest) {
     // Default: Fast, ultra-reliable Curated Database
     const items = CURATED_FAQS[category] || CURATED_FAQS.all;
 
-    return NextResponse.json({
+    return jsonResponse({
       success: true,
       source: 'curated-expert-database',
       category,
@@ -343,7 +328,7 @@ export async function POST(req: NextRequest) {
     });
   } catch (error) {
     console.error('Error handling FAQ route:', error);
-    return NextResponse.json(
+    return jsonResponse(
       {
         success: false,
         error: error instanceof Error ? error.message : 'เกิดข้อผิดพลาดในการโหลดคำถาม-คำตอบ',
@@ -353,12 +338,12 @@ export async function POST(req: NextRequest) {
   }
 }
 
-export async function GET(req: NextRequest) {
+export async function GET(req: Request) {
   const url = new URL(req.url);
   const category = url.searchParams.get('category') || 'all';
   const items = CURATED_FAQS[category] || CURATED_FAQS.all;
 
-  return NextResponse.json({
+  return jsonResponse({
     success: true,
     source: 'curated-expert-database',
     category,

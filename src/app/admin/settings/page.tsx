@@ -1,12 +1,14 @@
 'use client';
 
+import { fetchStaffApi } from '@/lib/staff-api';
+import { apiUrl } from '@/lib/api-url';
+
 import React, { useState, useEffect } from 'react';
 import { Database, ShieldCheck, Loader2, Check, ExternalLink, Send, MessageCircle, Info, Copy, Globe, RefreshCw, Sparkles, Terminal } from 'lucide-react';
 import { dataBackend } from '@/lib/backend';
 
 export default function AdminSettingsPage() {
   const [lineToken, setLineToken] = useState('');
-  const [lineSecret, setLineSecret] = useState('');
   const [lineNotifyToken, setLineNotifyToken] = useState('');
   const [targetUserId, setTargetUserId] = useState('');
   const [autoNotify, setAutoNotify] = useState(true);
@@ -35,7 +37,7 @@ export default function AdminSettingsPage() {
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      setWebhookUrl(`${window.location.origin}/api/line/webhook`);
+      setWebhookUrl(apiUrl('/api/line/webhook'));
     }
   }, []);
 
@@ -44,7 +46,7 @@ export default function AdminSettingsPage() {
     let isMounted = true;
     async function loadConfig() {
       try {
-        const res = await fetch('/api/line/notify');
+        const res = await fetchStaffApi('/api/line/notify');
         if (res.ok) {
           const data = await res.json();
           if (isMounted) {
@@ -56,17 +58,6 @@ export default function AdminSettingsPage() {
         console.warn('Could not fetch LINE settings from server:', err);
       } finally {
         if (isMounted) {
-          // Check local storage fallback
-          if (typeof window !== 'undefined') {
-            const localToken = localStorage.getItem('line_channel_access_token');
-            const localSecret = localStorage.getItem('line_channel_secret');
-            const localNotify = localStorage.getItem('line_notify_token');
-            const localTarget = localStorage.getItem('line_target_user_id');
-            if (localToken) setLineToken(localToken);
-            if (localSecret) setLineSecret(localSecret);
-            if (localNotify) setLineNotifyToken(localNotify);
-            if (localTarget) setTargetUserId(localTarget);
-          }
           setLoadingConfig(false);
         }
       }
@@ -88,24 +79,11 @@ export default function AdminSettingsPage() {
     setSaveSuccess(false);
 
     try {
-      if (typeof window !== 'undefined') {
-        localStorage.setItem('line_channel_access_token', lineToken.trim());
-        localStorage.setItem('line_channel_secret', lineSecret.trim());
-        localStorage.setItem('line_notify_token', lineNotifyToken.trim());
-        localStorage.setItem('line_target_user_id', targetUserId.trim());
-        localStorage.setItem('line_auto_notify', String(autoNotify));
-        localStorage.setItem('line_auto_notify_consignment', String(autoNotifyConsignment));
-      }
-
-      const res = await fetch('/api/line/notify', {
+      const res = await fetchStaffApi('/api/line/notify', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           action: 'save_settings',
-          channelAccessToken: lineToken.trim(),
-          channelSecret: lineSecret.trim(),
-          lineNotifyToken: lineNotifyToken.trim(),
-          targetUserId: targetUserId.trim(),
           autoNotifyNewProperty: autoNotify,
           autoNotifyConsignment: autoNotifyConsignment,
         })
@@ -127,7 +105,7 @@ export default function AdminSettingsPage() {
     setTestResult(null);
 
     try {
-      const res = await fetch('/api/line/notify', {
+      const res = await fetchStaffApi('/api/line/notify', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -205,11 +183,11 @@ export default function AdminSettingsPage() {
         ]
       };
 
-      const res = await fetch('/api/line/webhook', {
+      const res = await fetchStaffApi('/api/line/webhook', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'x-line-signature': 'simulated_test_signature'
+          'x-line-simulation': 'true'
         },
         body: JSON.stringify(mockEvent)
       });
@@ -401,6 +379,9 @@ export default function AdminSettingsPage() {
         {/* LINE Notification Settings Form */}
         <form onSubmit={handleSaveLineSettings} className="space-y-4 pt-1">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="md:col-span-2 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs leading-relaxed text-amber-900">
+              เก็บ LINE credentials ใน Cloudflare Workers → Settings → Variables and Secrets เท่านั้น ระบบจะไม่บันทึก secrets ลง Firestore หรือ localStorage ชื่อที่ต้องตั้งคือ LINE_CHANNEL_ACCESS_TOKEN, LINE_CHANNEL_SECRET, LINE_TARGET_USER_ID และ LINE_NOTIFY_TOKEN
+            </div>
             <div className="space-y-1">
               <label className="block text-xs font-bold text-gray-700">
                 LINE Channel Access Token (Long-lived)
@@ -417,21 +398,6 @@ export default function AdminSettingsPage() {
               </p>
             </div>
 
-            <div className="space-y-1">
-              <label className="block text-xs font-bold text-gray-700">
-                LINE Channel Secret (Webhook Signature)
-              </label>
-              <input
-                type="password"
-                value={lineSecret}
-                onChange={(e) => setLineSecret(e.target.value)}
-                placeholder="วาง Channel Secret จากแท็บ Basic settings"
-                className="w-full bg-gray-50 border border-gray-200 rounded-xl p-2.5 text-xs text-navy-950 focus:bg-white focus:ring-2 focus:ring-[#06C755] outline-none font-mono"
-              />
-              <p className="text-[10px] text-gray-500 leading-relaxed">
-                * ใช้สำหรับตรวจสอบความถูกต้องปลอดภัยของลายเซ็น x-line-signature
-              </p>
-            </div>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -512,7 +478,7 @@ export default function AdminSettingsPage() {
 
             {saveSuccess && (
               <span className="text-xs text-emerald-600 font-bold bg-emerald-50 border border-emerald-200 px-3 py-1.5 rounded-lg animate-in fade-in">
-                ✓ บันทึกการตั้งค่าลงระบบเรียบร้อยแล้ว!
+                ✓ บันทึกสถานะการแจ้งเตือนแล้ว; LINE credentials ต้องตั้งใน Cloudflare Workers
               </span>
             )}
           </div>

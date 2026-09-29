@@ -1,5 +1,7 @@
 'use client';
 
+import { fetchStaffApi } from '@/lib/staff-api';
+
 import React, { useState } from 'react';
 import Image from 'next/image';
 import { 
@@ -94,7 +96,7 @@ export default function QuickPropertyModal({ isOpen, onClose, onSuccess }: Quick
     setQuickAiGenerating(true);
     try {
       const currentUser = getStoredUser();
-      const res = await fetch('/api/ai/generate-property-description', {
+      const res = await fetchStaffApi('/api/ai/generate-property-description', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

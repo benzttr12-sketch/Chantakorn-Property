@@ -92,8 +92,8 @@ service cloud.firestore {
 
     // 8. System Settings & LINE OA Integration
     match /settings/{settingId} {
-      allow read: if true;
-      allow write: if isStaff();
+      // Integration settings may contain operational data; only staff can access them.
+      allow read, write: if isStaff();
     }
 
     // 9. Work Jobs (7-Phase Workflow & Operations)

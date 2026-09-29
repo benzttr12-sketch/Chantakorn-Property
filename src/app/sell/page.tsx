@@ -1,5 +1,7 @@
 'use client';
 
+import { apiUrl } from '@/lib/api-url';
+
 import React, { useState } from 'react';
 import { 
   Building2, 
@@ -103,7 +105,7 @@ export default function SellPage() {
       });
 
       // Send alert to LINE Official Account
-      fetch('/api/line/notify', {
+      fetch(apiUrl('/api/line/notify'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

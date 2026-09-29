@@ -1,5 +1,7 @@
 'use client';
 
+import { fetchStaffApi } from '@/lib/staff-api';
+
 import React, { useState, useEffect, useMemo, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
@@ -148,7 +150,7 @@ function AutomationContent() {
   const handleGenerateMedia = async (action: 'generate_video' | 'edit_image') => {
     setIsMediaLoading(true);
     try {
-      const res = await fetch('/api/ai/property-media-studio', {
+      const res = await fetchStaffApi('/api/ai/property-media-studio', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -235,7 +237,7 @@ function AutomationContent() {
     if (!selectedProperty) return;
     setIsAiGenerating(true);
     try {
-      const res = await fetch('/api/ai/automate', {
+      const res = await fetchStaffApi('/api/ai/automate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

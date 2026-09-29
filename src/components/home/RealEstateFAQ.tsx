@@ -1,5 +1,7 @@
 'use client';
 
+import { apiUrl } from '@/lib/api-url';
+
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { 
   HelpCircle, 
@@ -17,7 +19,7 @@ import {
   FileCheck,
   Scale
 } from 'lucide-react';
-import { FAQItem } from '@/app/api/ai/faq/route';
+import type { FAQItem } from '@/lib/faq-types';
 
 const CATEGORIES = [
   { id: 'all', label: 'ทั้งหมด', icon: HelpCircle },
@@ -52,7 +54,7 @@ export default function RealEstateFAQ() {
     }
 
     try {
-      const res = await fetch('/api/ai/faq', {
+      const res = await fetch(apiUrl('/api/ai/faq'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ category: cat, refreshWithGemini }),
@@ -92,7 +94,7 @@ export default function RealEstateFAQ() {
     setCustomAnswer(null);
 
     try {
-      const res = await fetch('/api/ai/faq', {
+      const res = await fetch(apiUrl('/api/ai/faq'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ customQuestion: customQuestion.trim() }),

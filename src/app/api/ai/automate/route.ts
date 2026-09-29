@@ -1,7 +1,11 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { jsonResponse } from '@/lib/api-response';
 import { getGeminiClient } from '@/lib/gemini';
+import { requireStaff } from '@/lib/server-auth';
 
-export async function POST(req: NextRequest) {
+export async function POST(req: Request) {
+  const denied = await requireStaff(req);
+  if (denied) return denied;
+
   try {
     const body = await req.json();
     const { action, payload } = body;
@@ -10,7 +14,7 @@ export async function POST(req: NextRequest) {
 
     // If Gemini client or API key is not present, return null text so client can use offline smart engine
     if (!ai) {
-      return NextResponse.json({
+      return jsonResponse({
         success: false,
         error: 'No GEMINI_API_KEY configured',
         fallback: true,
@@ -45,7 +49,7 @@ export async function POST(req: NextRequest) {
         contents: prompt,
       });
 
-      return NextResponse.json({
+      return jsonResponse({
         success: true,
         text: response.text,
       });
@@ -76,19 +80,19 @@ export async function POST(req: NextRequest) {
         contents: prompt,
       });
 
-      return NextResponse.json({
+      return jsonResponse({
         success: true,
         text: response.text,
       });
     }
 
-    return NextResponse.json({
+    return jsonResponse({
       success: false,
       error: 'Unknown action',
     });
   } catch (error: any) {
     console.warn('AI Automate Route warning/error, falling back to client templates:', error?.message || error);
-    return NextResponse.json(
+    return jsonResponse(
       {
         success: false,
         error: error instanceof Error ? error.message : 'Internal Server Error',

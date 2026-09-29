@@ -6,9 +6,6 @@ export type BackendType = 'local' | 'supabase' | 'firebase';
 const configuredBackend = (process.env.NEXT_PUBLIC_DATA_BACKEND || '').trim().toLowerCase();
 
 export const dataBackend: BackendType = (() => {
-  if (configuredBackend === 'supabase' && !isSupabaseConfigured && isFirebaseConfigured) {
-    return 'firebase';
-  }
   if (configuredBackend === 'local' || configuredBackend === 'supabase' || configuredBackend === 'firebase') {
     return configuredBackend as BackendType;
   }
