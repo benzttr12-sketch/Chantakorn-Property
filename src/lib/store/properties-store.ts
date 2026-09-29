@@ -1,5 +1,7 @@
 'use client';
 
+import { fetchStaffApi } from '@/lib/staff-api';
+
 import { Property, PropertyFilters, Inquiry, UserProfile, Agent, AgentRank } from '@/lib/types';
 import { SAMPLE_PROPERTIES } from '@/data/sample-properties';
 import { formatPropertyCode } from '@/lib/format-code';
@@ -254,7 +256,7 @@ function generateShortPropertyId(): string {
 async function triggerLineNotification(property: Property) {
   if (typeof window === 'undefined' || typeof fetch === 'undefined') return;
   try {
-    const res = await fetch('/api/line/notify', {
+    const res = await fetchStaffApi('/api/line/notify', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(property),

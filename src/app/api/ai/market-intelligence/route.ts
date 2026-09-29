@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { jsonResponse } from '@/lib/api-response';
 import { getGeminiClient } from '@/lib/gemini';
 
 export interface GroundingSource {
@@ -27,7 +27,7 @@ interface CachedInsight {
 const CACHE_TTL_MS = 60 * 60 * 1000; // 1 hour TTL
 const insightCache = new Map<string, CachedInsight>();
 
-export async function POST(req: NextRequest) {
+export async function POST(req: Request) {
   let query = '';
   let category = '';
 
@@ -41,7 +41,7 @@ export async function POST(req: NextRequest) {
     // Check in-memory cache first to save quota
     const cached = insightCache.get(cacheKey);
     if (cached && Date.now() - cached.cachedAt < CACHE_TTL_MS) {
-      return NextResponse.json({
+      return jsonResponse({
         success: true,
         ...cached.data,
         fromCache: true,
@@ -59,7 +59,7 @@ export async function POST(req: NextRequest) {
       };
       insightCache.set(cacheKey, { data: fallbackResult, cachedAt: Date.now() });
 
-      return NextResponse.json({
+      return jsonResponse({
         success: true,
         ...fallbackResult,
       });
@@ -134,13 +134,13 @@ export async function POST(req: NextRequest) {
     // Store in cache to minimize future API calls
     insightCache.set(cacheKey, { data: finalResult, cachedAt: Date.now() });
 
-    return NextResponse.json({
+    return jsonResponse({
       success: true,
       ...finalResult,
     });
   } catch (error: any) {
     // Ultimate graceful catch-all
-    return NextResponse.json({
+    return jsonResponse({
       success: true,
       answer: getFallbackMarketInsight(query || category),
       sources: getFallbackSources(query || category),

@@ -157,6 +157,9 @@ test('an explicit backend selection wins over automatic configuration detection'
   const supabase = { from: () => queryResult({ data: [], error: null }) };
   const explicitSupabase = loadStore({ backend: 'supabase', supabase, firebase: true });
   assert.equal(explicitSupabase.flags.dataBackend, 'supabase');
+
+  const explicitUnavailableSupabase = loadStore({ backend: 'supabase', firebase: true });
+  assert.equal(explicitUnavailableSupabase.flags.dataBackend, 'supabase');
 });
 
 test('security-sensitive Firebase paths have regression guards', () => {

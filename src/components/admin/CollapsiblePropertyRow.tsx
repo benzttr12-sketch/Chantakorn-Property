@@ -1,5 +1,7 @@
 'use client';
 
+import { fetchStaffApi } from '@/lib/staff-api';
+
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
@@ -149,7 +151,7 @@ export default function CollapsiblePropertyRow({
   const handleSendToLine = async () => {
     setSendingLine(true);
     try {
-      const res = await fetch('/api/line/notify', {
+      const res = await fetchStaffApi('/api/line/notify', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(property),

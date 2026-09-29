@@ -1,3 +1,5 @@
+'use client';
+
 // src/lib/firebase/client.ts
 // Firebase configuration for Chantakorn Property
 import { initializeApp, getApps, getApp, FirebaseApp } from 'firebase/app';

@@ -1,6 +1,7 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { jsonResponse } from '@/lib/api-response';
 import { GoogleGenAI, Type } from '@google/genai';
 import { PropertyType, PropertyStatus } from '@/lib/types';
+import { requireStaff } from '@/lib/server-auth';
 
 interface GenerateDescriptionRequest {
   title?: string;
@@ -27,7 +28,10 @@ interface GenerateDescriptionRequest {
   customHighlights?: string;
 }
 
-export async function POST(req: NextRequest) {
+export async function POST(req: Request) {
+  const denied = await requireStaff(req);
+  if (denied) return denied;
+
   try {
     const body: GenerateDescriptionRequest = await req.json();
 
@@ -169,7 +173,7 @@ export async function POST(req: NextRequest) {
         const text = response.text?.trim() || '';
         if (text) {
           const parsed = JSON.parse(text);
-          return NextResponse.json({
+          return jsonResponse({
             success: true,
             source: 'gemini-3.8-flash',
             ...parsed,
@@ -217,7 +221,7 @@ export async function POST(req: NextRequest) {
       `• Facebook: ${agentFacebook}`,
     ].filter(Boolean).join('\n').trim();
 
-    return NextResponse.json({
+    return jsonResponse({
       success: true,
       source: 'smart-template-engine',
       headline: fallbackHeadline,
@@ -232,7 +236,7 @@ export async function POST(req: NextRequest) {
     });
   } catch (error) {
     console.error('Error generating property description:', error);
-    return NextResponse.json(
+    return jsonResponse(
       {
         success: false,
         error: error instanceof Error ? error.message : 'เกิดข้อผิดพลาดในการสร้างคำบรรยาย',

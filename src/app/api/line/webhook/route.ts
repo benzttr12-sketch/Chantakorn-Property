@@ -1,9 +1,7 @@
-import { NextRequest, NextResponse } from 'next/server';
-import crypto from 'crypto';
-import { db } from '@/lib/firebase/client';
-import { doc, getDoc, collection, addDoc, getDocs, query, limit } from 'firebase/firestore';
-import { SAMPLE_PROPERTIES } from '@/data/sample-properties';
+import { jsonResponse } from '@/lib/api-response';
 import { Property } from '@/lib/types';
+import { requireStaff } from '@/lib/server-auth';
+import { createFirestoreDocument, listFirestoreDocuments } from '@/lib/firestore-rest';
 
 const OFFICIAL_LINE_OA_URL = 'https://lin.ee/NMSe28T3';
 const DEFAULT_PHONE = '081-604-0097';
@@ -15,58 +13,39 @@ interface LineOaConfig {
   targetUserId: string;
 }
 
-// In-memory cache for configuration
-let cachedConfig: LineOaConfig | null = null;
-let lastConfigCacheTime = 0;
-
 async function getLineConfig(): Promise<LineOaConfig> {
-  const now = Date.now();
-  if (cachedConfig && now - lastConfigCacheTime < 30000) {
-    return cachedConfig;
-  }
-
-  const config: LineOaConfig = {
+  return {
     channelAccessToken: process.env.LINE_CHANNEL_ACCESS_TOKEN || '',
     channelSecret: process.env.LINE_CHANNEL_SECRET || '',
     targetUserId: process.env.LINE_TARGET_USER_ID || '',
   };
-
-  if (db) {
-    try {
-      const docRef = doc(db, 'settings', 'line_oa');
-      const snap = await getDoc(docRef);
-      if (snap.exists()) {
-        const data = snap.data();
-        if (data.channel_access_token) config.channelAccessToken = data.channel_access_token;
-        if (data.channel_secret) config.channelSecret = data.channel_secret;
-        if (data.target_user_id) config.targetUserId = data.target_user_id;
-      }
-    } catch (err) {
-      console.warn('Could not read LINE OA settings from Firestore in Webhook:', err);
-    }
-  }
-
-  cachedConfig = config;
-  lastConfigCacheTime = now;
-  return config;
 }
 
 // Verify LINE Signature using HMAC-SHA256
-function verifyLineSignature(bodyText: string, signature: string | null, channelSecret: string): boolean {
+async function verifyLineSignature(bodyText: string, signature: string | null, channelSecret: string): Promise<boolean> {
   if (!channelSecret || !channelSecret.trim()) {
-    // If channel secret is not configured yet, bypass to allow testing/connectivity
-    return true;
+    return false;
   }
   if (!signature) {
     return false;
   }
 
   try {
-    const hash = crypto
-      .createHmac('SHA256', channelSecret.trim())
-      .update(bodyText)
-      .digest('base64');
-    return hash === signature;
+    const key = await crypto.subtle.importKey(
+      'raw',
+      new TextEncoder().encode(channelSecret.trim()),
+      { name: 'HMAC', hash: 'SHA-256' },
+      false,
+      ['sign']
+    );
+    const digest = new Uint8Array(await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(bodyText)));
+    const expected = btoa(String.fromCharCode(...digest));
+    if (expected.length !== signature.length) return false;
+    let difference = 0;
+    for (let index = 0; index < expected.length; index += 1) {
+      difference |= expected.charCodeAt(index) ^ signature.charCodeAt(index);
+    }
+    return difference === 0;
   } catch (err) {
     console.error('Error verifying LINE signature:', err);
     return false;
@@ -119,10 +98,8 @@ async function saveInquiry(inquiryData: {
   inquiry_type?: string;
   property_title?: string;
 }) {
-  if (!db) return;
   try {
-    const inquiriesRef = collection(db, 'inquiries');
-    await addDoc(inquiriesRef, {
+    const response = await createFirestoreDocument('inquiries', {
       name: inquiryData.name || `ลูกค้า LINE OA (${inquiryData.userId ? inquiryData.userId.slice(0, 8) : 'ผู้ใช้'})`,
       phone: '-',
       line_id: inquiryData.userId || '@chantakorn',
@@ -133,6 +110,7 @@ async function saveInquiry(inquiryData: {
       created_at: new Date().toISOString(),
       source: 'line_messaging_api_webhook',
     });
+    if (!response.ok) throw new Error(`Firestore write failed with status ${response.status}`);
   } catch (err) {
     console.warn('[LINE Webhook] Could not save inquiry to Firestore:', err);
   }
@@ -143,18 +121,10 @@ async function searchProperties(keyword: string): Promise<Property[]> {
   let list: Property[] = [];
 
   // Try reading from Firestore first
-  if (db) {
-    try {
-      const propRef = collection(db, 'properties');
-      const q = query(propRef, limit(20));
-      const snap = await getDocs(q);
-      snap.forEach((d) => {
-        const item = d.data() as Property;
-        list.push({ ...item, id: d.id });
-      });
-    } catch (err) {
-      console.warn('[LINE Webhook] Firestore properties read warning:', err);
-    }
+  try {
+    list = (await listFirestoreDocuments('properties', 20)) as Property[];
+  } catch (err) {
+    console.warn('[LINE Webhook] Firestore properties read warning:', err);
   }
 
   const cleanKey = keyword.toLowerCase().trim();
@@ -609,11 +579,11 @@ function buildContactFlex(hostOrigin: string): any {
 }
 
 // GET: Health Check & Webhook Diagnostic Endpoint
-export async function GET(req: NextRequest) {
+export async function GET(req: Request) {
   const config = await getLineConfig();
-  const hostOrigin = req.nextUrl.origin || 'https://ais-dev-4fthqw6uuad4ntgghqrlse-213200673887.asia-east1.run.app';
+  const hostOrigin = new URL(req.url).origin;
 
-  return NextResponse.json({
+  return jsonResponse({
     status: 'online',
     service: 'LINE Messaging API Webhook for Chantakorn Property',
     webhookEndpoint: `${hostOrigin}/api/line/webhook`,
@@ -633,17 +603,20 @@ export async function GET(req: NextRequest) {
 }
 
 // POST: Handles incoming LINE Messaging API Webhook events
-export async function POST(req: NextRequest) {
+export async function POST(req: Request) {
   try {
     const rawBody = await req.text();
     const signature = req.headers.get('x-line-signature');
     const config = await getLineConfig();
 
-    // 1. Verify Signature
-    const isValidSignature = verifyLineSignature(rawBody, signature, config.channelSecret);
-    if (!isValidSignature) {
+    // Admin-only test requests can simulate LINE events without weakening real webhook verification.
+    const isSimulation = req.headers.get('x-line-simulation') === 'true';
+    if (isSimulation) {
+      const denied = await requireStaff(req);
+      if (denied) return denied;
+    } else if (!(await verifyLineSignature(rawBody, signature, config.channelSecret))) {
       console.warn('[LINE Webhook] Invalid x-line-signature header received.');
-      return NextResponse.json(
+      return jsonResponse(
         { success: false, error: 'Invalid signature verification' },
         { status: 401 }
       );
@@ -653,11 +626,11 @@ export async function POST(req: NextRequest) {
     try {
       body = JSON.parse(rawBody);
     } catch {
-      return NextResponse.json({ success: false, error: 'Invalid JSON payload' }, { status: 400 });
+      return jsonResponse({ success: false, error: 'Invalid JSON payload' }, { status: 400 });
     }
 
     const events: any[] = body.events || [];
-    const hostOrigin = req.nextUrl.origin || 'https://ais-dev-4fthqw6uuad4ntgghqrlse-213200673887.asia-east1.run.app';
+    const hostOrigin = process.env.NEXT_PUBLIC_SITE_URL || new URL(req.url).origin;
 
     // Handle each event in batch
     for (const event of events) {
@@ -776,7 +749,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Always respond 200 OK to LINE Webhook requests
-    return NextResponse.json({
+    return jsonResponse({
       success: true,
       processedEvents: events.length,
       timestamp: new Date().toISOString(),
@@ -784,7 +757,7 @@ export async function POST(req: NextRequest) {
   } catch (error: any) {
     console.error('[LINE Webhook] Unexpected error handling webhook request:', error);
     // Even on error, LINE expects 200 OK so it doesn't repeatedly retry
-    return NextResponse.json(
+    return jsonResponse(
       { success: false, error: error.message || 'Internal Server Error' },
       { status: 200 }
     );

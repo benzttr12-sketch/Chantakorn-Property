@@ -37,9 +37,39 @@ npm run build:pages
 npm run preview:pages
 ```
 
-เปิด http://localhost:4173 ไฟล์สำหรับเผยแพร่อยู่ใน `out/` ไม่ต้อง commit โฟลเดอร์นี้
+เปิด http://localhost:4173 ไฟล์สำหรับเผยแพร่อยู่ใน `.next-pages/` ไม่ต้อง commit โฟลเดอร์นี้
 
-`build:pages` เลือกข้อมูลตัวอย่างและปิดล็อกอินทดลองโดยค่าเริ่มต้น แม้ในเครื่องมี `.env.local` สำหรับฐานข้อมูลจริง เพื่อให้ผลการ build สำหรับสาธารณะคาดเดาได้
+`build:pages` เลือกข้อมูลตัวอย่างและปิดล็อกอินทดลองโดยค่าเริ่มต้น แม้ในเครื่องมี `.env.local` สำหรับฐานข้อมูลจริง เพื่อให้ผลการ build สำหรับสาธารณะคาดเดาได้; workflow เผยแพร่ตั้ง backend เป็น Firebase โดยค่าเริ่มต้น
+GitHub Pages รองรับเฉพาะไฟล์ static; API ทำงานแยกบน Cloudflare Worker ฟรี แล้วหน้าเว็บเรียกผ่าน `NEXT_PUBLIC_API_BASE_URL`
+
+## ใช้งาน API บน Cloudflare Workers
+
+API ใช้ Cloudflare Worker แยกจากหน้าเว็บ static บน GitHub Pages เพื่อให้ Worker อยู่ภายในขนาด script ฟรีและใช้ Firestore REST แทน Firebase Node SDK ทดสอบในเครื่องได้ด้วย:
+
+```sh
+npm run preview:worker
+```
+
+การเผยแพร่จากเครื่องที่ล็อกอิน Cloudflare แล้ว:
+
+```sh
+npx wrangler login
+npm run deploy:worker
+```
+
+ตั้ง Secrets ใน Cloudflare Dashboard → Workers & Pages → `chantakorn-property-api` → Settings → Variables and Secrets:
+
+- `GEMINI_API_KEY`
+- `LINE_CHANNEL_ACCESS_TOKEN`
+- `LINE_CHANNEL_SECRET`
+- `LINE_TARGET_USER_ID` (ถ้าใช้ Push แทน Broadcast)
+- `LINE_NOTIFY_TOKEN` (ไม่บังคับ)
+
+หลัง deploy ให้ตั้ง GitHub repository variable `NEXT_PUBLIC_API_BASE_URL` เป็น Worker URL เช่น `https://chantakorn-property-api.<account>.workers.dev` แล้วรัน GitHub Pages workflow ใหม่ ตั้ง `ALLOWED_ORIGINS` ใน Worker ให้ตรงกับ origin ของเว็บไซต์ (ค่าเริ่มต้นคือ `https://benzttr12-sketch.github.io`) และตั้ง `NEXT_PUBLIC_SITE_URL` ให้เป็น URL หน้าเว็บจริง
+
+API สำหรับงานพนักงานตรวจ Firebase ID token และ role `ADMIN`/`AGENT` จาก Firestore ทุกครั้ง ส่วน LINE webhook ต้องส่ง `x-line-signature` ที่ตรวจด้วย channel secret ได้ ฟอร์มลูกค้าสาธารณะส่งคำถามและฝากขายได้โดยไม่มี token ต้อง deploy `firestore.rules` ที่แก้ให้ settings อ่าน/เขียนได้เฉพาะพนักงานก่อนใช้งาน secrets จริง
+
+เอกสารตั้งค่าที่เกี่ยวข้อง: [Cloudflare Workers](https://developers.cloudflare.com/workers/), [ตัวแปรและ secrets](https://developers.cloudflare.com/workers/configuration/secrets/), [Workers pricing และข้อจำกัด](https://developers.cloudflare.com/workers/platform/pricing/)
 
 ## เผยแพร่บน GitHub Pages
 
@@ -48,7 +78,7 @@ npm run preview:pages
 3. ไปที่ **Actions → Build and deploy website → Run workflow** หรือ push commit ใหม่
 4. รอ job `build` และ `deploy` สำเร็จ แล้วเปิด URL ที่แสดงใน environment `github-pages`
 
-Workflow `.github/workflows/pages.yml` จะติดตั้งด้วย `npm ci`, ตรวจ lint/types, สร้าง static export และเผยแพร่เว็บ เส้นทาง CSS/JavaScript และลิงก์รองรับชื่อ repository ใน URL แล้ว
+Workflow `.github/workflows/pages.yml` จะติดตั้ง dependencies จาก `bun.lock`, ตรวจ lint/types, สร้าง static export และเผยแพร่เว็บ เส้นทาง CSS/JavaScript และลิงก์รองรับชื่อ repository ใน URL แล้ว
 
 URL ตามชื่อ repository ปัจจุบันคือ `https://benzttr12-sketch.github.io/Chantakorn-Property/` โดยจะใช้ได้หลัง deploy สำเร็จและเปิด Pages แล้วเท่านั้น
 

@@ -1,5 +1,7 @@
 'use client';
 
+import { apiUrl } from '@/lib/api-url';
+
 import React, { useState } from 'react';
 import { 
   Globe, 
@@ -97,7 +99,7 @@ export default function MarketIntelligenceSection() {
     setIsLoading(true);
 
     try {
-      const res = await fetch('/api/ai/market-intelligence', {
+      const res = await fetch(apiUrl('/api/ai/market-intelligence'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ query: queryText }),

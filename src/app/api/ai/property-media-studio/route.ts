@@ -1,7 +1,11 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { jsonResponse } from '@/lib/api-response';
 import { getGeminiClient } from '@/lib/gemini';
+import { requireStaff } from '@/lib/server-auth';
 
-export async function POST(req: NextRequest) {
+export async function POST(req: Request) {
+  const denied = await requireStaff(req);
+  if (denied) return denied;
+
   try {
     const body = await req.json().catch(() => ({}));
     const { action, prompt, imageUrl, aspectRatio = '16:9', editStyle } = body;
@@ -26,7 +30,7 @@ export async function POST(req: NextRequest) {
           }).catch(() => null);
 
           if (response?.generatedVideos?.[0]?.videoUri) {
-            return NextResponse.json({
+            return jsonResponse({
               success: true,
               videoUrl: response.generatedVideos[0].videoUri,
               modelUsed: 'veo-3.1-fast-generate-preview',
@@ -45,7 +49,7 @@ export async function POST(req: NextRequest) {
         ? 'https://assets.mixkit.co/videos/preview/mixkit-modern-apartment-interior-tour-41440-large.mp4'
         : 'https://assets.mixkit.co/videos/preview/mixkit-luxury-house-exterior-and-swimming-pool-41438-large.mp4';
 
-      return NextResponse.json({
+      return jsonResponse({
         success: true,
         videoUrl: fallbackVideoUrl,
         modelUsed: 'veo-3.1-fast-generate-preview',
@@ -75,7 +79,7 @@ export async function POST(req: NextRequest) {
           }).catch(() => null);
 
           if (response?.text) {
-            return NextResponse.json({
+            return jsonResponse({
               success: true,
               stagingDescription: response.text,
               modelUsed: 'gemini-3.1-flash-image-preview',
@@ -88,7 +92,7 @@ export async function POST(req: NextRequest) {
         }
       }
 
-      return NextResponse.json({
+      return jsonResponse({
         success: true,
         stagingDescription: `### ✨ คำแนะนำการจัด Virtual Staging สไตล์ ${editStyle || 'Modern Luxury'}\n- **แนวคิดการออกแบบ:** เน้นโทนสีอบอุ่น (Warm Earth Tone) รวมกับเฟอร์นิเจอร์บุผ้าเกรดพรีเมียม\n- **การจัดการแสง:** ใช้แสงธรรมชาติช่วงเช้าส่องผ่านผ้าม่านโปร่งเพื่อเพิ่มความรู้สึกโปร่งสบายและกว้างขวาง\n- **จุดดึงดูดสายตา:** วางชุดโคมไฟเพดานทรงดีไซเนอร์และภาพงานศิลปะคอนเทมโพรารีบนผนังฝั่งรับแขก`,
         modelUsed: 'gemini-3.1-flash-image-preview',
@@ -98,8 +102,8 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    return NextResponse.json({ error: 'Invalid action provided' }, { status: 400 });
+    return jsonResponse({ error: 'Invalid action provided' }, { status: 400 });
   } catch (err: any) {
-    return NextResponse.json({ error: err.message || 'Server error' }, { status: 500 });
+    return jsonResponse({ error: err.message || 'Server error' }, { status: 500 });
   }
 }
