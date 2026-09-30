@@ -62,7 +62,7 @@ npm run deploy:worker
 - `GEMINI_API_KEY`
 - `LINE_CHANNEL_ACCESS_TOKEN`
 - `LINE_CHANNEL_SECRET`
-- `LINE_TARGET_USER_ID` (ถ้าใช้ Push แทน Broadcast)
+- `LINE_TARGET_USER_ID` (จำเป็น: LINE user ID ของเจ้าของบัญชี)
 
 Gemini ใช้ `gemini-3.5-flash-lite` โดยตรง หากเรียก AI ไม่สำเร็จจะแสดงข้อผิดพลาด ไม่สลับโมเดลหรือแสดงผลจำลองแทน ส่วนคำถามที่พบบ่อยแบบคัดสรรยังเปิดอ่านได้ตามปกติ
 
