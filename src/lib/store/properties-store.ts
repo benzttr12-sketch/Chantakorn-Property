@@ -1,5 +1,8 @@
 'use client';
 
+import { buildLinePropertyPayload } from '@/lib/line-property-payload';
+
+
 import { fetchStaffApi } from '@/lib/staff-api';
 
 import { Property, PropertyFilters, Inquiry, UserProfile, Agent, AgentRank } from '@/lib/types';
@@ -259,15 +262,15 @@ async function triggerLineNotification(property: Property) {
     const res = await fetchStaffApi('/api/line/notify', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(property),
+      body: JSON.stringify(buildLinePropertyPayload(property)),
     });
     const data = await res.json();
-    if (data.success) {
+    if (res.ok && data.isRealSent) {
       logSystemActivity({
         category: 'system',
         action: 'system_notification',
         title: 'แจ้งเตือน LINE OA อัตโนมัติ',
-        description: `ระบบได้ส่งข้อมูลประกาศอสังหาฯ ใหม่ "${property.title}" เข้าไลน์ออฟฟิเชียลแอคเคานต์ https://lin.ee/NMSe28T3 ${data.simulated ? '(โหมดทดสอบจำลอง)' : '(ส่งแจ้งเตือนจริง)'} เรียบร้อยแล้ว`,
+        description: `ระบบได้ส่งข้อมูลประกาศอสังหาฯ ใหม่ "${property.title}" เข้าไลน์ออฟฟิเชียลแอคเคานต์ https://lin.ee/NMSe28T3 (LINE รับคำขอแล้ว) เรียบร้อยแล้ว`,
         target_id: property.id,
         target_name: property.title,
         actor_name: 'ระบบอัตโนมัติ',

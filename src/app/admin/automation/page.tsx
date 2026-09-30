@@ -250,6 +250,7 @@ function AutomationContent() {
         }),
       });
       const data = await res.json();
+      if (!res.ok || !data.success || !data.text) throw new Error(data.error || 'Gemini ไม่ส่งคำตอบกลับมา');
       if (data.success && data.text) {
         setGeneratedPost(prev => ({
           headline: prev?.headline || 'AI Generated Post',
@@ -259,8 +260,8 @@ function AutomationContent() {
           fullPost: data.text,
         }));
       }
-    } catch {
-      // Fallback already active
+    } catch (error) {
+      window.alert(error instanceof Error ? error.message : 'เรียก Gemini ไม่สำเร็จ');
     } finally {
       setIsAiGenerating(false);
     }

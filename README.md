@@ -62,8 +62,11 @@ npm run deploy:worker
 - `GEMINI_API_KEY`
 - `LINE_CHANNEL_ACCESS_TOKEN`
 - `LINE_CHANNEL_SECRET`
-- `LINE_TARGET_USER_ID` (ถ้าใช้ Push แทน Broadcast)
-- `LINE_NOTIFY_TOKEN` (ไม่บังคับ)
+- `LINE_TARGET_USER_ID` (จำเป็น: LINE user ID ของเจ้าของบัญชี)
+
+Gemini ใช้ `gemini-3.5-flash-lite` โดยตรง หากเรียก AI ไม่สำเร็จจะแสดงข้อผิดพลาด ไม่สลับโมเดลหรือแสดงผลจำลองแทน ส่วนคำถามที่พบบ่อยแบบคัดสรรยังเปิดอ่านได้ตามปกติ
+
+LINE ส่งข้อความส่วนตัวถึง `LINE_TARGET_USER_ID` ของเจ้าของบัญชีเท่านั้น ต้องเพิ่มเพื่อน LINE OA และไม่บล็อกบัญชี ระบบไม่ broadcast และไม่ใช้ LINE Notify เมื่อ API ปฏิเสธข้อความจะรายงานข้อผิดพลาด ส่วนฟอร์มฝากขายที่บันทึกแล้วจะแสดงสถานะการแจ้งเตือนแยกกัน
 
 หลัง deploy ให้ตั้ง GitHub repository variable `NEXT_PUBLIC_API_BASE_URL` เป็น Worker URL เช่น `https://chantakorn-property-api.<account>.workers.dev` แล้วรัน GitHub Pages workflow ใหม่ ตั้ง `ALLOWED_ORIGINS` ใน Worker ให้ตรงกับ origin ของเว็บไซต์ (ค่าเริ่มต้นคือ `https://benzttr12-sketch.github.io`) และตั้ง `NEXT_PUBLIC_SITE_URL` ให้เป็น URL หน้าเว็บจริง
 

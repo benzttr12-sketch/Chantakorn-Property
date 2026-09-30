@@ -40,24 +40,11 @@ export async function POST(req: Request) {
             });
           }
         } catch (veoErr) {
-          console.info('Veo video generation note, fallback preview utilized:', veoErr);
+          console.info('Veo generation failed');
         }
       }
 
-      // High-fidelity fallback / simulated video preview asset with real estate walkthrough footage
-      const fallbackVideoUrl = selectedAspect === '9:16'
-        ? 'https://assets.mixkit.co/videos/preview/mixkit-modern-apartment-interior-tour-41440-large.mp4'
-        : 'https://assets.mixkit.co/videos/preview/mixkit-luxury-house-exterior-and-swimming-pool-41438-large.mp4';
-
-      return jsonResponse({
-        success: true,
-        videoUrl: fallbackVideoUrl,
-        modelUsed: 'veo-3.1-fast-generate-preview',
-        aspectRatio: selectedAspect,
-        prompt: finalPrompt,
-        message: 'วิดีโอตัวอย่าง Veo 3.1 พร้อมใช้งานเรียบร้อยแล้ว',
-        isSimulation: true,
-      });
+      return jsonResponse({ success: false, error: 'บริการสร้างวิดีโอไม่ส่งผลลัพธ์กลับมา กรุณาตรวจสิทธิ์และโควตาโมเดล' }, { status: 503 });
     }
 
     if (action === 'edit_image') {
@@ -78,28 +65,16 @@ export async function POST(req: Request) {
             ],
           }).catch(() => null);
 
-          if (response?.text) {
-            return jsonResponse({
-              success: true,
-              stagingDescription: response.text,
-              modelUsed: 'gemini-3.1-flash-image-preview',
-              imageUrl: imageUrl || 'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=1200&q=80',
-              message: 'สร้าง/ตกแต่งภาพ Virtual Staging สำเร็จแล้ว',
-            });
+          const generatedImage = response?.candidates?.[0]?.content?.parts?.find(part => part.inlineData?.mimeType?.startsWith('image/'))?.inlineData;
+          if (generatedImage?.data) {
+            return jsonResponse({ success: true, imageUrl: `data:${generatedImage.mimeType};base64,${generatedImage.data}`, modelUsed: 'gemini-3.1-flash-image-preview', message: 'สร้างภาพสำเร็จแล้ว' });
           }
         } catch (imgErr) {
-          console.info('Gemini image preview note, fallback preview utilized:', imgErr);
+          console.info('Gemini image generation failed');
         }
       }
 
-      return jsonResponse({
-        success: true,
-        stagingDescription: `### ✨ คำแนะนำการจัด Virtual Staging สไตล์ ${editStyle || 'Modern Luxury'}\n- **แนวคิดการออกแบบ:** เน้นโทนสีอบอุ่น (Warm Earth Tone) รวมกับเฟอร์นิเจอร์บุผ้าเกรดพรีเมียม\n- **การจัดการแสง:** ใช้แสงธรรมชาติช่วงเช้าส่องผ่านผ้าม่านโปร่งเพื่อเพิ่มความรู้สึกโปร่งสบายและกว้างขวาง\n- **จุดดึงดูดสายตา:** วางชุดโคมไฟเพดานทรงดีไซเนอร์และภาพงานศิลปะคอนเทมโพรารีบนผนังฝั่งรับแขก`,
-        modelUsed: 'gemini-3.1-flash-image-preview',
-        imageUrl: imageUrl || 'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=1200&q=80',
-        message: 'วิเคราะห์การตกแต่ง Virtual Staging สำเร็จแล้ว',
-        isSimulation: true,
-      });
+      return jsonResponse({ success: false, error: 'บริการสร้างภาพไม่ส่งผลลัพธ์กลับมา กรุณาตรวจสิทธิ์และโควตาโมเดล' }, { status: 503 });
     }
 
     return jsonResponse({ error: 'Invalid action provided' }, { status: 400 });

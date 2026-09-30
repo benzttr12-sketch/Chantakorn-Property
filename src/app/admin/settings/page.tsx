@@ -8,9 +8,6 @@ import { Database, ShieldCheck, Loader2, Check, ExternalLink, Send, MessageCircl
 import { dataBackend } from '@/lib/backend';
 
 export default function AdminSettingsPage() {
-  const [lineToken, setLineToken] = useState('');
-  const [lineNotifyToken, setLineNotifyToken] = useState('');
-  const [targetUserId, setTargetUserId] = useState('');
   const [autoNotify, setAutoNotify] = useState(true);
   const [autoNotifyConsignment, setAutoNotifyConsignment] = useState(true);
 
@@ -118,9 +115,6 @@ export default function AdminSettingsPage() {
           district: 'หาดใหญ่',
           subdistrict: 'คอหงส์',
           cover_image: 'https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?auto=format&fit=crop&w=1200&q=80',
-          overrideToken: lineToken.trim() || undefined,
-          overrideNotifyToken: lineNotifyToken.trim() || undefined,
-          overrideTargetId: targetUserId.trim() || undefined,
           agent: {
             name: 'คุณเบนซ์ (แอดมิน Chantakorn)',
             phone: '081-604-0097',
@@ -130,15 +124,11 @@ export default function AdminSettingsPage() {
       });
 
       const data = await res.json();
-      if (data.success) {
+      if (res.ok && data.isRealSent) {
         setTestResult({
           success: true,
           isRealSent: data.isRealSent,
-          message: data.isRealSent 
-            ? '🚀 ส่งแจ้งเตือน Flex Message ไปยัง LINE OA จริงสำเร็จเรียบร้อย!' 
-            : '✨ ระบบได้ประมวลผลข้อความและสร้างลิงก์แจ้งเตือนด่วนเข้า LINE OA เรียบร้อยแล้ว (สามารถคลิกปุ่มแชร์เข้า LINE ได้ทันที)',
-          shareUrl: data.shareUrl,
-          lineOaUrl: data.lineOaUrl || 'https://lin.ee/NMSe28T3',
+          message: data.message || 'LINE รับคำขอส่งข้อความถึงเจ้าของบัญชีแล้ว',
           error: data.error
         });
       } else {
@@ -171,7 +161,7 @@ export default function AdminSettingsPage() {
             replyToken: 'test_simulated_token_123',
             source: {
               type: 'user',
-              userId: targetUserId.trim() || 'U_test_admin_user'
+              userId: 'U_test_admin_user'
             },
             timestamp: Date.now(),
             message: {
@@ -378,55 +368,9 @@ export default function AdminSettingsPage() {
 
         {/* LINE Notification Settings Form */}
         <form onSubmit={handleSaveLineSettings} className="space-y-4 pt-1">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="md:col-span-2 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs leading-relaxed text-amber-900">
-              เก็บ LINE credentials ใน Cloudflare Workers → Settings → Variables and Secrets เท่านั้น ระบบจะไม่บันทึก secrets ลง Firestore หรือ localStorage ชื่อที่ต้องตั้งคือ LINE_CHANNEL_ACCESS_TOKEN, LINE_CHANNEL_SECRET, LINE_TARGET_USER_ID และ LINE_NOTIFY_TOKEN
-            </div>
-            <div className="space-y-1">
-              <label className="block text-xs font-bold text-gray-700">
-                LINE Channel Access Token (Long-lived)
-              </label>
-              <input
-                type="password"
-                value={lineToken}
-                onChange={(e) => setLineToken(e.target.value)}
-                placeholder="วาง Channel Access Token จากแท็บ Messaging API"
-                className="w-full bg-gray-50 border border-gray-200 rounded-xl p-2.5 text-xs text-navy-950 focus:bg-white focus:ring-2 focus:ring-[#06C755] outline-none font-mono"
-              />
-              <p className="text-[10px] text-gray-500 leading-relaxed">
-                * ใช้สำหรับการส่งข้อความ Flex Reply และ Push Notification เข้า LINE
-              </p>
-            </div>
-
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-1">
-              <label className="block text-xs font-bold text-gray-700">
-                Target User ID / Group ID (Messaging API Push Target)
-              </label>
-              <input
-                type="text"
-                value={targetUserId}
-                onChange={(e) => setTargetUserId(e.target.value)}
-                placeholder="ระบุ User ID เช่น U123... หรือ Group ID"
-                className="w-full bg-gray-50 border border-gray-200 rounded-xl p-2.5 text-xs text-navy-950 focus:bg-white focus:ring-2 focus:ring-[#06C755] outline-none font-mono"
-              />
-            </div>
-
-            <div className="space-y-1">
-              <label className="block text-xs font-bold text-gray-700">
-                LINE Notify Token (ทางเลือกสำหรับกลุ่มทีมงาน)
-              </label>
-              <input
-                type="password"
-                value={lineNotifyToken}
-                onChange={(e) => setLineNotifyToken(e.target.value)}
-                placeholder="วาง Token ของ LINE Notify (ถ้ามี)"
-                className="w-full bg-gray-50 border border-gray-200 rounded-xl p-2.5 text-xs text-navy-950 focus:bg-white focus:ring-2 focus:ring-[#06C755] outline-none font-mono"
-              />
-            </div>
-          </div>
+          <p className="rounded-xl bg-emerald-50 p-3 text-sm text-emerald-900">
+            แจ้งเตือนถึง LINE ส่วนตัวของเจ้าของบัญชีที่ตั้งค่าไว้ กดทดสอบเพื่อส่งข้อความจริง หากต้องเปลี่ยนบัญชีหรือผู้รับ ให้ผู้ดูแลปรับค่าใน Cloudflare
+          </p>
 
           {/* Autonotify toggles */}
           <div className="space-y-2 pt-2 border-t border-gray-100">
@@ -497,7 +441,7 @@ export default function AdminSettingsPage() {
               </span>
               {testResult.isRealSent && (
                 <span className="px-2 py-0.5 bg-emerald-200 text-emerald-900 text-[10px] rounded-full font-bold">
-                  Real API Push / Broadcast
+                  ส่งถึงเจ้าของบัญชี
                 </span>
               )}
             </div>

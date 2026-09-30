@@ -41,6 +41,7 @@ export default function SellPage() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [submitted, setSubmitted] = useState(false);
+  const [lineError, setLineError] = useState('');
 
   const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const input = e.currentTarget;
@@ -105,26 +106,31 @@ export default function SellPage() {
       });
 
       // Send alert to LINE Official Account
-      fetch(apiUrl('/api/line/notify'), {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          inquiry_type: 'consignment_sell',
-          name: name.trim(),
-          phone: phone.trim(),
-          line_id: lineId,
-          message: `ฝากขายทรัพย์ประเภท ${propertyType} ใน ${district} จ.${province} ราคาที่ต้องการ ${expectedPrice} บาท\nรายละเอียด: ${description}`,
-          consignment_details: {
-            property_type: propertyType,
-            province,
-            district,
-            subdistrict,
-            expected_price: Number(expectedPrice),
-          }
-        })
-      }).catch(() => undefined);
-
       setSubmitted(true);
+      try {
+        const lineResponse = await fetch(apiUrl('/api/line/notify'), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            inquiry_type: 'consignment_sell',
+            name: name.trim(),
+            phone: phone.trim(),
+            line_id: lineId,
+            message: `ฝากขายทรัพย์ประเภท ${propertyType} ใน ${district} จ.${province} ราคาที่ต้องการ ${expectedPrice} บาท\nรายละเอียด: ${description}`,
+            consignment_details: {
+              property_type: propertyType,
+              province,
+              district,
+              subdistrict,
+              expected_price: Number(expectedPrice),
+            }
+          })
+        });
+        const lineResult = await lineResponse.json();
+        if (!lineResponse.ok || !lineResult.isRealSent) throw new Error(lineResult.error || 'ส่งแจ้งเตือน LINE ไม่สำเร็จ');
+      } catch (notificationError) {
+        setLineError(notificationError instanceof Error ? notificationError.message : 'ส่งแจ้งเตือน LINE ไม่สำเร็จ');
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'ส่งข้อมูลไม่สำเร็จ กรุณาลองอีกครั้ง หรือติดต่อโทร 081-604-0097');
     } finally {
@@ -177,6 +183,7 @@ export default function SellPage() {
               <p className="text-base text-gray-600 max-w-lg mx-auto leading-relaxed">
                 ทีมงาน <strong className="text-navy-950">Chantakorn Property</strong> จะติดต่อกลับโดยเร็วที่สุดเพื่อยืนยันข้อมูล นัดหมายลงพื้นที่ถ่ายภาพ และเริ่มแผนการตลาดครับ
               </p>
+              {lineError && <p role="alert" className="rounded-xl bg-amber-50 p-3 text-sm text-amber-800">บันทึกข้อมูลแล้ว แต่ยังแจ้งทีมงานผ่าน LINE ไม่สำเร็จ: {lineError} กรุณาติดต่อผ่านปุ่มด้านล่าง</p>}
               <div className="pt-6">
                 <a
                   href="https://lin.ee/NMSe28T3"
