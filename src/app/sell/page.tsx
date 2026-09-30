@@ -1,7 +1,5 @@
 'use client';
 
-import { apiUrl } from '@/lib/api-url';
-
 import React, { useState } from 'react';
 import { 
   Building2, 
@@ -25,6 +23,7 @@ import { DISTRICTS_LIST } from '@/data/locations';
 import AutoPinLandsMapsValuation from '@/components/landsmaps/AutoPinLandsMapsValuation';
 
 export default function SellPage() {
+  const lineOaMessageUrl = 'https://line.me/R/oaMessage/%40930xzcyi/';
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
   const [lineId, setLineId] = useState('');
@@ -41,7 +40,9 @@ export default function SellPage() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [submitted, setSubmitted] = useState(false);
-  const [lineError, setLineError] = useState('');
+  const [lineMessage, setLineMessage] = useState('');
+  const [lineCopied, setLineCopied] = useState(false);
+  const [lineCopyError, setLineCopyError] = useState('');
 
   const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const input = e.currentTarget;
@@ -85,7 +86,7 @@ export default function SellPage() {
     setError('');
     setSubmitting(true);
     try {
-      await submitInquiry({
+      const savedInquiry = await submitInquiry({
         name: name.trim(),
         phone: phone.trim(),
         line_id: lineId,
@@ -105,36 +106,42 @@ export default function SellPage() {
         },
       });
 
-      // Send alert to LINE Official Account
+      const lineSummary = [
+        'ฝากขายอสังหาริมทรัพย์ผ่านเว็บไซต์ Chantakorn Property',
+        `รหัสอ้างอิง: [CP-WEB-FORM:${savedInquiry.id}]`,
+        `ชื่อผู้ติดต่อ: ${name.trim()}`,
+        `โทรศัพท์: ${phone.trim()}`,
+        `LINE ID: ${lineId.trim() || '-'}`,
+        `ประเภททรัพย์: ${propertyType}`,
+        `ทำเล: ${subdistrict.trim() ? `ต.${subdistrict.trim()} ` : ''}อ.${district} จ.${province}`,
+        `ราคาที่ต้องการ: ${new Intl.NumberFormat('th-TH').format(Number(expectedPrice))} บาท`,
+        `ขนาดที่ดิน: ${landSize.trim() || '-'}`,
+        `พื้นที่ใช้สอย: ${usableArea.trim() || '-'}`,
+        `รายละเอียด: ${description.trim().slice(0, 800) || '-'}`,
+        uploadedPhotos.length ? `แนบรูปในแบบฟอร์มแล้ว ${uploadedPhotos.length} รูป` : '',
+      ].filter(Boolean).join('\n');
+      setLineMessage(lineSummary);
       setSubmitted(true);
-      try {
-        const lineResponse = await fetch(apiUrl('/api/line/notify'), {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            inquiry_type: 'consignment_sell',
-            name: name.trim(),
-            phone: phone.trim(),
-            line_id: lineId,
-            message: `ฝากขายทรัพย์ประเภท ${propertyType} ใน ${district} จ.${province} ราคาที่ต้องการ ${expectedPrice} บาท\nรายละเอียด: ${description}`,
-            consignment_details: {
-              property_type: propertyType,
-              province,
-              district,
-              subdistrict,
-              expected_price: Number(expectedPrice),
-            }
-          })
-        });
-        const lineResult = await lineResponse.json();
-        if (!lineResponse.ok || !lineResult.isRealSent) throw new Error(lineResult.error || 'ส่งแจ้งเตือน LINE ไม่สำเร็จ');
-      } catch (notificationError) {
-        setLineError(notificationError instanceof Error ? notificationError.message : 'ส่งแจ้งเตือน LINE ไม่สำเร็จ');
-      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'ส่งข้อมูลไม่สำเร็จ กรุณาลองอีกครั้ง หรือติดต่อโทร 081-604-0097');
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const openLineWithSubmission = () => {
+    const url = `${lineOaMessageUrl}?${encodeURIComponent(lineMessage)}`;
+    window.open(url, '_blank', 'noopener,noreferrer');
+  };
+
+  const copyLineMessage = async () => {
+    try {
+      await navigator.clipboard.writeText(lineMessage);
+      setLineCopied(true);
+      setLineCopyError('');
+      window.setTimeout(() => setLineCopied(false), 2500);
+    } catch {
+      setLineCopyError('คัดลอกอัตโนมัติไม่สำเร็จ กรุณาคัดลอกข้อความจากช่องด้านล่างแล้ววางในแชต LINE OA');
     }
   };
 
@@ -183,18 +190,38 @@ export default function SellPage() {
               <p className="text-base text-gray-600 max-w-lg mx-auto leading-relaxed">
                 ทีมงาน <strong className="text-navy-950">Chantakorn Property</strong> จะติดต่อกลับโดยเร็วที่สุดเพื่อยืนยันข้อมูล นัดหมายลงพื้นที่ถ่ายภาพ และเริ่มแผนการตลาดครับ
               </p>
-              {lineError && <p role="alert" className="rounded-xl bg-amber-50 p-3 text-sm text-amber-800">บันทึกข้อมูลแล้ว แต่ยังแจ้งทีมงานผ่าน LINE ไม่สำเร็จ: {lineError} กรุณาติดต่อผ่านปุ่มด้านล่าง</p>}
-              <div className="pt-6">
-                <a
-                  href="https://lin.ee/NMSe28T3"
-                  target="_blank"
-                  rel="noreferrer"
-                  className="inline-flex items-center space-x-2 px-6 py-3 bg-[#06C755] hover:bg-[#05b34c] text-white font-bold text-sm rounded-xl shadow-md transition-all"
+              <p className="text-sm text-gray-600 max-w-lg mx-auto">
+                หากต้องการให้รายละเอียดนี้เข้ามาในแชต LINE OA ให้เปิดข้อความที่เตรียมไว้แล้วกดส่งใน LINE ข้อมูลของคุณบันทึกบนเว็บไซต์เรียบร้อยแล้ว
+              </p>
+              <div className="pt-2 flex flex-col sm:flex-row justify-center gap-3">
+                <button
+                  type="button"
+                  onClick={openLineWithSubmission}
+                  className="inline-flex items-center justify-center space-x-2 px-6 py-3 bg-[#06C755] hover:bg-[#05b34c] text-white font-bold text-sm rounded-xl shadow-md transition-all"
                 >
                   <MessageCircle className="w-4 h-4 fill-current" />
-                  <span>แจ้งข้อมูลด่วนทาง LINE Official Account</span>
-                </a>
+                  <span>เปิดแชต LINE OA พร้อมข้อความ</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={copyLineMessage}
+                  className="inline-flex items-center justify-center space-x-2 px-6 py-3 border border-gray-300 hover:bg-gray-50 text-gray-700 font-bold text-sm rounded-xl transition-all"
+                >
+                  <span>{lineCopied ? 'คัดลอกแล้ว' : 'คัดลอกข้อความ LINE'}</span>
+                </button>
               </div>
+              {lineCopied && <p role="status" className="text-sm text-emerald-700">คัดลอกข้อความแล้ว นำไปวางในแชต LINE OA ได้เลย</p>}
+              {lineCopyError && <p role="alert" className="text-sm text-amber-700">{lineCopyError}</p>}
+              {lineCopyError && (
+                <textarea
+                  readOnly
+                  value={lineMessage}
+                  onFocus={(event) => event.currentTarget.select()}
+                  rows={5}
+                  aria-label="ข้อความสรุปสำหรับส่งเข้า LINE OA"
+                  className="w-full max-w-2xl mx-auto rounded-xl border border-gray-300 bg-gray-50 p-3 text-left text-xs text-gray-700"
+                />
+              )}
             </div>
           ) : (
             <form onSubmit={handleSubmit} className="space-y-8">

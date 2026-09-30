@@ -654,12 +654,16 @@ export async function POST(req: Request) {
         const userText = (event.message.text || '').trim();
         const lowerText = userText.toLowerCase();
 
-        // Save incoming inquiry to Firestore
-        await saveInquiry({
-          userId,
-          message: userText,
-          inquiry_type: 'inquiry',
-        });
+        // Website form submissions are already stored before the customer opens LINE.
+        // Keep the LINE chat message, but avoid creating a duplicate inbox record.
+        const isWebsiteFormSubmission = /\[CP-WEB-FORM:[0-9a-f-]{36}\]/i.test(userText);
+        if (!isWebsiteFormSubmission) {
+          await saveInquiry({
+            userId,
+            message: userText,
+            inquiry_type: 'inquiry',
+          });
+        }
 
         // Intent 1: Greetings, Help, Main Menu
         if (
