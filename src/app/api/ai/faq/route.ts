@@ -223,30 +223,16 @@ export async function POST(req: Request) {
               },
             });
           }
-        } catch (geminiError: any) {
-          const isQuota = geminiError?.status === 429 || geminiError?.message?.includes('429') || geminiError?.message?.includes('quota');
-          if (!isQuota) {
-            console.info('Custom Q&A using curated fallback response');
-          }
+        } catch (geminiError) {
+          throw geminiError;
         }
       }
 
-      // Fallback for custom question if Gemini is unavailable
-      return jsonResponse({
-        success: true,
-        source: 'curated-expert-database',
-        faq: {
-          id: `faq-custom-${Date.now()}`,
-          question: customQuestion,
-          answer: `ขอบคุณสำหรับคำถามครับ สำหรับกรณี "${customQuestion}" ในพื้นที่หาดใหญ่–สงขลา แนะนำให้ตรวจสอบรายละเอียดเอกสารสิทธิ์โฉนดที่ดิน ผังเมือง และเงื่อนไขสัญญาอย่างรอบคอบ หรือสามารถติดต่อทีมงานที่ปรึกษา Chantakorn Property ได้โดยตรงทางโทรศัพท์ 081-604-0097 หรือ LINE Official Account เพื่อรับคำปรึกษาเชิงลึกที่สอดคล้องกับกรณีของคุณโดยไม่มีค่าใช้จ่ายครับ`,
-          category: 'buying',
-          tag: 'คำถามพิเศษ',
-          tip: 'สามารถปรึกษาทีมงานผ่าน LINE OA https://lin.ee/NMSe28T3 ได้ตลอด 24 ชม.',
-        },
-      });
+      return jsonResponse({ success: false, error: 'Gemini ไม่พร้อมให้บริการ กรุณาลองอีกครั้ง' }, { status: 503 });
     }
 
     // Mode 2: Fetch Category FAQ List (Dynamically generated with Gemini or refreshed)
+    if (body.refreshWithGemini === true && !apiKey) return jsonResponse({ success: false, error: 'ยังไม่ได้ตั้งค่า Gemini' }, { status: 503 });
     if (apiKey && body.refreshWithGemini === true) {
       try {
         const ai = new GoogleGenAI({
@@ -309,12 +295,10 @@ export async function POST(req: Request) {
             faqs: parsed.faqs || [],
           });
         }
-      } catch (geminiError: any) {
-        const isQuota = geminiError?.status === 429 || geminiError?.message?.includes('429') || geminiError?.message?.includes('quota');
-        if (!isQuota) {
-          console.info('Using curated real estate FAQ database');
-        }
+      } catch (geminiError) {
+        throw geminiError;
       }
+      return jsonResponse({ success: false, error: 'Gemini ไม่ส่งคำตอบกลับมา' }, { status: 502 });
     }
 
     // Default: Fast, ultra-reliable Curated Database

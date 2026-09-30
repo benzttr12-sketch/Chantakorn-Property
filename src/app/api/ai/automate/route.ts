@@ -16,9 +16,8 @@ export async function POST(req: Request) {
     if (!ai) {
       return jsonResponse({
         success: false,
-        error: 'No GEMINI_API_KEY configured',
-        fallback: true,
-      });
+        error: 'ยังไม่ได้ตั้งค่า Gemini',
+      }, { status: 503 });
     }
 
     if (action === 'generate-social-post') {
@@ -91,14 +90,14 @@ export async function POST(req: Request) {
       error: 'Unknown action',
     });
   } catch (error: any) {
-    console.warn('AI Automate Route warning/error, falling back to client templates:', error?.message || error);
+    console.warn('AI generation failed');
     return jsonResponse(
       {
         success: false,
         error: error instanceof Error ? error.message : 'Internal Server Error',
         fallback: true,
       },
-      { status: 200 }
+      { status: 503 }
     );
   }
 }

@@ -1,5 +1,8 @@
 'use client';
 
+import { buildLinePropertyPayload } from '@/lib/line-property-payload';
+
+
 import { fetchStaffApi } from '@/lib/staff-api';
 
 import React, { useState, useEffect } from 'react';
@@ -154,16 +157,14 @@ export default function CollapsiblePropertyRow({
       const res = await fetchStaffApi('/api/line/notify', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(property),
+        body: JSON.stringify(buildLinePropertyPayload(property)),
       });
       const data = await res.json();
+      if (!res.ok || !data.isRealSent) throw new Error(data.error || 'ส่งข้อความเข้า LINE ไม่สำเร็จ');
       setLineSent(true);
       setTimeout(() => setLineSent(false), 3000);
-      if (data.shareUrl && typeof window !== 'undefined') {
-        window.open(data.shareUrl, '_blank');
-      }
     } catch (err) {
-      console.warn('Failed to send LINE notification:', err);
+      window.alert(err instanceof Error ? err.message : 'ส่งข้อความเข้า LINE ไม่สำเร็จ');
     } finally {
       setSendingLine(false);
     }

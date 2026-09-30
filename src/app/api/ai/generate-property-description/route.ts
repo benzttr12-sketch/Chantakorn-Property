@@ -180,61 +180,12 @@ export async function POST(req: Request) {
             ...parsed,
           });
         }
-      } catch (geminiError: any) {
-        const isQuota = geminiError?.status === 429 || geminiError?.message?.includes('429') || geminiError?.message?.includes('quota');
-        if (!isQuota) {
-          console.info('Using intelligent template engine for property description');
-        }
+      } catch (geminiError) {
+        throw geminiError;
       }
     }
 
-    // Intelligent Fallback Generator (Ensures 100% reliability even if offline or key not yet configured)
-    const fallbackHeadline = `✨ ${actionText}${typeNames[propertyType] || 'บ้าน'} ${subdistrict ? `ทำเล ${subdistrict}` : `ทำเล ${district}`} ${formattedPrice !== 'ราคาพิเศษ (ติดต่อสอบถาม)' ? `เพียง ${formattedPrice}` : ''} จ.สงขลา`.trim();
-
-    const specBullets: string[] = [];
-    if (Number(bedrooms) > 0) specBullets.push(`• ${bedrooms} ห้องนอน`);
-    if (Number(bathrooms) > 0) specBullets.push(`• ${bathrooms} ห้องน้ำ`);
-    if (Number(parking) > 0) specBullets.push(`• ที่จอดรถ ${parking} คัน`);
-    if (Number(landSize) > 0) specBullets.push(`• ขนาดที่ดิน ${landSize} ตารางวา`);
-    if (Number(usableArea) > 0) specBullets.push(`• พื้นที่ใช้สอย ${usableArea} ตารางเมตร`);
-    if (furniture) specBullets.push(`• เฟอร์นิเจอร์: ${furniture}`);
-    if (facingDirection) specBullets.push(`• ทิศหน้าทรัพย์: ${facingDirection}`);
-
-    const fallbackDescription = [
-      `🌟 ${fallbackHeadline}`,
-      ``,
-      `📍 ทำเลที่ตั้ง: ${subdistrict ? `ต.${subdistrict} ` : ''}อ.${district} จ.สงขลา ${address ? `(${address})` : ''}`,
-      `💰 ราคา${actionText}: ${formattedPrice}`,
-      ``,
-      `📐 ฟังก์ชันและรายละเอียดตัวทรัพย์:`,
-      specBullets.length > 0 ? specBullets.join('\n') : `• ทรัพย์คุณภาพ สภาพดี พร้อมส่งมอบกรรมสิทธิ์`,
-      ``,
-      features.length > 0 ? `✨ จุดเด่นและสิ่งอำนวยความสะดวก:\n${features.map(f => `• ${f}`).join('\n')}\n` : '',
-      customHighlights ? `📝 ข้อมูลเพิ่มเติม:\n${customHighlights}\n` : '',
-      `🛡️ มาตรฐานการบริการโดย Chantakorn Property:`,
-      `• ตรวจสอบความถูกต้องของเอกสารสิทธิ์และโฉนดที่ดิน 100% ไร้ข้อพิพาท ไร้หนี้ซ้อน`,
-      `• ดันเคสสินเชื่อธนาคารเต็มวงเงิน พร้อมดูแลจนถึงวันโอนกรรมสิทธิ์ ณ กรมที่ดิน`,
-      `• บริการนัดพาชมสถานที่จริงฟรี ไม่มีค่าใช้จ่ายล่วงหน้า`,
-      ``,
-      `📞 ติดต่อสอบถามและนัดชมทรัพย์ได้ทุกวัน:`,
-      `• โทร: ${agentPhone} (${agentName})`,
-      `• LINE: ${agentLine}`,
-      `• Facebook: ${agentFacebook}`,
-    ].filter(Boolean).join('\n').trim();
-
-    return jsonResponse({
-      success: true,
-      source: 'smart-template-engine',
-      headline: fallbackHeadline,
-      description: fallbackDescription,
-      keyPoints: [
-        `ทำเลคุณภาพ ${subdistrict ? `ต.${subdistrict} ` : ''}อ.${district} เดินทางสะดวก`,
-        `ราคา${actionText} ${formattedPrice}`,
-        `โฉนดตรวจสอบแล้ว 100% พร้อมบริการยื่นกู้ธนาคารฟรี`,
-      ],
-      socialCaption: `${fallbackHeadline}\n\nราคา ${formattedPrice} สนใจนัดชมติดต่อ ${agentPhone} (${agentName}) หรือ LINE: ${agentLine}`,
-      hashtags: ['#อสังหาหาดใหญ่', '#บ้านหาดใหญ่', '#ChantakornProperty', '#ที่ดินสงขลา'],
-    });
+    return jsonResponse({ success: false, error: 'Gemini ไม่พร้อมให้บริการ กรุณาลองอีกครั้ง' }, { status: 503 });
   } catch (error) {
     console.error('Error generating property description:', error);
     return jsonResponse(

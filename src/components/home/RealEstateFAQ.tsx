@@ -37,6 +37,7 @@ export default function RealEstateFAQ() {
   const [loading, setLoading] = useState<boolean>(true);
   const [refreshingAi, setRefreshingAi] = useState<boolean>(false);
   const [searchQuery, setSearchQuery] = useState<string>('');
+  const [faqError, setFaqError] = useState('');
   const [source, setSource] = useState<string>('curated-expert-database');
 
   // Custom AI Question State
@@ -60,16 +61,18 @@ export default function RealEstateFAQ() {
         body: JSON.stringify({ category: cat, refreshWithGemini }),
       });
       const data = await res.json();
+      if (!res.ok || !data.success) throw new Error(data.error || 'โหลดคำถามไม่สำเร็จ');
+      setFaqError('');
       if (data.success && Array.isArray(data.faqs)) {
         setFaqs(data.faqs);
-        setSource(data.source || 'gemini-3.8-flash');
+        setSource(data.source || '');
         // Auto-expand first item
         if (data.faqs.length > 0) {
           setExpandedId(prev => prev || data.faqs[0].id);
         }
       }
     } catch (err) {
-      console.warn('Failed to fetch FAQs:', err);
+      setFaqError(err instanceof Error ? err.message : 'เชื่อมต่อ Gemini ไม่สำเร็จ');
     } finally {
       setLoading(false);
       setRefreshingAi(false);
@@ -223,6 +226,7 @@ export default function RealEstateFAQ() {
 
         {/* FAQ Accordion List */}
         <div className="max-w-3xl mx-auto space-y-3.5">
+          {faqError && <p role="alert" className="text-red-600 p-3">{faqError}</p>}
           {loading && !refreshingAi ? (
             <div className="space-y-3 py-6">
               {[1, 2, 3, 4].map(idx => (

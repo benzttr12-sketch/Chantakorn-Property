@@ -9,7 +9,6 @@ interface LineSettings {
   channelAccessToken?: string;
   channelSecret?: string;
   targetUserId?: string;
-  lineNotifyToken?: string;
   autoNotifyNewProperty?: boolean;
   autoNotifyConsignment?: boolean;
 }
@@ -28,7 +27,6 @@ async function getLineSettings(token?: string): Promise<LineSettings> {
     channelAccessToken: process.env.LINE_CHANNEL_ACCESS_TOKEN || '',
     channelSecret: process.env.LINE_CHANNEL_SECRET || '',
     targetUserId: process.env.LINE_TARGET_USER_ID || '',
-    lineNotifyToken: process.env.LINE_NOTIFY_TOKEN || '',
     autoNotifyNewProperty: true,
     autoNotifyConsignment: true,
   };
@@ -65,11 +63,10 @@ export async function GET(req: Request) {
   const hostOrigin = new URL(req.url).origin || 'https://ais-dev-4fthqw6uuad4ntgghqrlse-213200673887.asia-east1.run.app';
   return jsonResponse({
     officialLineUrl: OFFICIAL_LINE_OA_URL,
-    lineId: '@chantakorn',
+    lineId: '@930xzcyi',
     webhookUrl: `${hostOrigin}/api/line/webhook`,
     isChannelTokenConfigured: Boolean(settings.channelAccessToken?.trim()),
     isChannelSecretConfigured: Boolean(settings.channelSecret?.trim()),
-    isLineNotifyConfigured: Boolean(settings.lineNotifyToken?.trim()),
     targetUserId: settings.targetUserId ? `${settings.targetUserId.slice(0, 4)}***` : null,
     autoNotifyNewProperty: settings.autoNotifyNewProperty,
     autoNotifyConsignment: settings.autoNotifyConsignment,
@@ -122,11 +119,10 @@ export async function POST(req: Request) {
 
     const token = req.headers.get('authorization')?.match(/^Bearer\s+(.+)$/i)?.[1];
     const storedSettings = await getLineSettings(token);
-    const lineAccessToken = body.overrideToken || storedSettings.channelAccessToken || '';
-    const lineNotifyToken = body.overrideNotifyToken || storedSettings.lineNotifyToken || '';
-    const lineTargetUserId = body.overrideTargetId || storedSettings.targetUserId || '';
+    const lineAccessToken = storedSettings.channelAccessToken || '';
+    const lineTargetUserId = storedSettings.targetUserId || '';
 
-    const hostOrigin = process.env.NEXT_PUBLIC_SITE_URL || new URL(req.url).origin;
+    const hostOrigin = (process.env.NEXT_PUBLIC_SITE_URL || new URL(req.url).origin).replace(/\/+$/, '');
 
     // 1. Check if payload is a Consignment / Customer Inquiry
     const isConsignment = body.inquiry_type === 'consignment_sell' || body.inquiry_type === 'consignment';
@@ -248,7 +244,7 @@ LINE Official Account: ${OFFICIAL_LINE_OA_URL}`;
       // 2. Standard Property Listing Notification
       const { title, price, status, district, subdistrict, slug, cover_image, agent } = body;
       
-      propertyUrl = slug ? `${hostOrigin}/properties/${slug}` : `${hostOrigin}/properties`;
+      propertyUrl = slug ? `${hostOrigin}/properties/detail/?slug=${encodeURIComponent(slug)}` : `${hostOrigin}/properties/`;
       const priceFormatted = price 
         ? new Intl.NumberFormat('th-TH', { style: 'currency', currency: 'THB', maximumFractionDigits: 0 }).format(price)
         : 'ราคาพิเศษ';
@@ -267,7 +263,7 @@ LINE Official Account: ${OFFICIAL_LINE_OA_URL}`;
 
 LINE Official Account: ${OFFICIAL_LINE_OA_URL}`;
 
-      const heroImg = cover_image || "https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?auto=format&fit=crop&w=1200&q=80";
+      const heroImg = typeof cover_image === 'string' && /^https:\/\//i.test(cover_image) ? cover_image : '';
 
       flexMessagePayload = {
         type: "flex",
@@ -413,112 +409,35 @@ LINE Official Account: ${OFFICIAL_LINE_OA_URL}`;
           }
         }
       };
+      if (!heroImg) delete flexMessagePayload.contents.hero;
     }
 
-    // Direct 1-Click LINE Share Link (Always available & works immediately on desktop and mobile)
-    const directLineShareUrl = `https://line.me/R/msg/text/?${encodeURIComponent(messageText)}`;
-
-    // Prepare LINE Messaging API payload
-    let isRealSent = false;
-    let errors: string[] = [];
-
-    // Mode A: LINE Messaging API
-    if (lineAccessToken.trim()) {
-      let lineApiUrl = "https://api.line.me/v2/bot/message/broadcast";
-      let payload: any = {
-        messages: [
-          {
-            type: "text",
-            text: messageText
-          },
-          flexMessagePayload
-        ]
-      };
-
-      if (lineTargetUserId.trim()) {
-        lineApiUrl = "https://api.line.me/v2/bot/message/push";
-        payload = {
-          to: lineTargetUserId.trim(),
-          messages: [
-            {
-              type: "text",
-              text: messageText
-            },
-            flexMessagePayload
-          ]
-        };
-      }
-
-      try {
-        const response = await fetch(lineApiUrl, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${lineAccessToken.trim()}`
-          },
-          body: JSON.stringify(payload)
-        });
-
-        if (response.ok) {
-          isRealSent = true;
-        } else {
-          const errText = await response.text();
-          errors.push(`Messaging API status ${response.status}: ${errText}`);
-        }
-      } catch (err: any) {
-        errors.push(`Messaging API error: ${err.message || String(err)}`);
-      }
+    if (!lineAccessToken.trim() || !/^U[0-9a-f]{32}$/i.test(lineTargetUserId.trim())) {
+      return jsonResponse({ success: false, isRealSent: false, error: 'ยังไม่ได้ตั้งค่าโทเค็นและผู้รับ LINE ส่วนตัวให้ครบถ้วน' }, { status: 503 });
     }
 
-    // Mode B: LINE Notify API (If token present)
-    if (lineNotifyToken.trim()) {
-      try {
-        const formData = new URLSearchParams();
-        formData.append('message', `\n${messageText}`);
-        if (body.cover_image && /^https?:\/\//i.test(body.cover_image)) {
-          formData.append('imageThumbnail', body.cover_image);
-          formData.append('imageFullsize', body.cover_image);
-        }
-
-        const notifyRes = await fetch('https://notify-api.line.me/api/notify', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/x-www-form-urlencoded',
-            'Authorization': `Bearer ${lineNotifyToken.trim()}`
-          },
-          body: formData.toString()
-        });
-
-        if (notifyRes.ok) {
-          isRealSent = true;
-        } else {
-          const notifyErr = await notifyRes.text();
-          errors.push(`LINE Notify status ${notifyRes.status}: ${notifyErr}`);
-        }
-      } catch (notifyErr: any) {
-        errors.push(`LINE Notify error: ${notifyErr.message || String(notifyErr)}`);
-      }
+    // Fail closed: customer details are sent only to the configured owner.
+    const response = await fetch('https://api.line.me/v2/bot/message/push', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${lineAccessToken.trim()}` },
+      body: JSON.stringify({
+        to: lineTargetUserId.trim(),
+        messages: [{ type: 'text', text: messageText.slice(0, 5000) }, { ...flexMessagePayload, altText: flexMessagePayload.altText.slice(0, 400) }],
+      }),
+    });
+    const requestId = response.headers.get('x-line-request-id');
+    if (!response.ok) {
+      const detail = await response.json().catch(() => ({})) as { message?: string };
+      console.error('LINE push rejected', { status: response.status, requestId, message: detail.message });
+      const error = response.status === 401 ? 'โทเค็น LINE ไม่ถูกต้องหรือหมดอายุ'
+        : response.status === 429 ? 'LINE จำกัดการส่งข้อความหรือโควตาประจำเดือนเต็ม'
+        : 'LINE ไม่รับข้อความ กรุณาตรวจผู้รับและรูปแบบข้อมูล';
+      return jsonResponse({ success: false, isRealSent: false, error, requestId }, { status: 502 });
     }
-
-    if (!lineAccessToken.trim() && !lineNotifyToken.trim()) {
-      errors.push('ยังไม่ได้ระบุ Channel Access Token หรือ LINE Notify Token (ระบบจัดเตรียมลิงก์ส่งด่วน 1-Click Share สู่ LINE OA ให้ทันที)');
-    }
-
     return jsonResponse({
-      success: true,
-      simulated: !isRealSent,
-      isRealSent,
-      lineOaUrl: OFFICIAL_LINE_OA_URL,
-      shareUrl: directLineShareUrl,
-      message: isRealSent 
-        ? '🚀 ส่งข้อความแจ้งเตือนเด้งเข้า LINE Official Account สำเร็จ!' 
-        : 'จำลองการส่งแจ้งเตือนสำเร็จ (คลิกเพื่อเด้งแชร์เข้า LINE ได้ทันที)',
-      payload: {
-        text: messageText,
-        flex: flexMessagePayload,
-        propertyUrl
-      },
-      error: errors.length > 0 ? errors.join('; ') : null
+      success: true, isRealSent: true, simulated: false, requestId,
+      deliveryStatus: 'accepted',
+      message: 'LINE รับคำขอส่งข้อความถึงเจ้าของบัญชีแล้ว',
     });
 
   } catch (error: any) {
