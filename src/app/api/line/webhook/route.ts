@@ -55,8 +55,8 @@ async function verifyLineSignature(bodyText: string, signature: string | null, c
 // Send reply message using LINE Messaging API
 async function replyLineMessage(replyToken: string, channelAccessToken: string, messages: any[]): Promise<boolean> {
   if (!channelAccessToken || !channelAccessToken.trim()) {
-    console.log('[LINE Webhook] Channel Access Token not set. Simulated reply payload:', JSON.stringify(messages));
-    return true;
+    console.error('[LINE Webhook] Channel Access Token not configured; reply not sent.');
+    return false;
   }
 
   if (!replyToken || replyToken === '00000000000000000000000000000000' || replyToken.startsWith('test_')) {
@@ -122,7 +122,8 @@ async function searchProperties(keyword: string): Promise<Property[]> {
 
   // Try reading from Firestore first
   try {
-    list = (await listFirestoreDocuments('properties', 20)) as Property[];
+    list = ((await listFirestoreDocuments('properties', 20, { publishedOnly: true })) as Property[])
+      .filter((property) => property.published === true);
   } catch (err) {
     console.warn('[LINE Webhook] Firestore properties read warning:', err);
   }
@@ -155,8 +156,8 @@ function buildPropertyCarouselFlex(properties: Property[], hostOrigin: string, q
       ? new Intl.NumberFormat('th-TH', { style: 'currency', currency: 'THB', maximumFractionDigits: 0 }).format(p.price)
       : 'ราคาพิเศษ';
     const actionText = p.status === 'rent' ? 'ปล่อยเช่า' : 'เสนอขาย';
-    const detailUrl = p.slug ? `${hostOrigin}/properties/${p.slug}` : `${hostOrigin}/properties`;
-    const coverImg = p.cover_image && /^https?:\/\//i.test(p.cover_image)
+    const detailUrl = p.slug ? `${hostOrigin}/properties/detail/?slug=${encodeURIComponent(p.slug)}` : `${hostOrigin}/properties/`;
+    const coverImg = p.cover_image && /^https:\/\//i.test(p.cover_image)
       ? p.cover_image
       : 'https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?auto=format&fit=crop&w=1200&q=80';
 
@@ -582,15 +583,17 @@ function buildContactFlex(hostOrigin: string): any {
 export async function GET(req: Request) {
   const config = await getLineConfig();
   const hostOrigin = new URL(req.url).origin;
+  const isChannelAccessTokenConfigured = Boolean(config.channelAccessToken?.trim());
+  const isChannelSecretConfigured = Boolean(config.channelSecret?.trim());
 
   return jsonResponse({
-    status: 'online',
+    status: isChannelAccessTokenConfigured && isChannelSecretConfigured ? 'configured' : 'configuration_required',
     service: 'LINE Messaging API Webhook for Chantakorn Property',
     webhookEndpoint: `${hostOrigin}/api/line/webhook`,
     officialLineOaUrl: OFFICIAL_LINE_OA_URL,
     lineId: DEFAULT_LINE_ID,
-    isChannelAccessTokenConfigured: Boolean(config.channelAccessToken?.trim()),
-    isChannelSecretConfigured: Boolean(config.channelSecret?.trim()),
+    isChannelAccessTokenConfigured,
+    isChannelSecretConfigured,
     signatureVerificationSupported: true,
     supportedEvents: ['message (text/location)', 'follow', 'unfollow', 'postback'],
     instructions: {
@@ -630,7 +633,11 @@ export async function POST(req: Request) {
     }
 
     const events: any[] = body.events || [];
-    const hostOrigin = process.env.NEXT_PUBLIC_SITE_URL || new URL(req.url).origin;
+    const hostOrigin = (process.env.NEXT_PUBLIC_SITE_URL || new URL(req.url).origin).replace(/\/+$/, '');
+    let failedReplies = 0;
+    const reply = async (replyToken: string, messages: any[]) => {
+      if (!(await replyLineMessage(replyToken, config.channelAccessToken, messages))) failedReplies += 1;
+    };
 
     // Handle each event in batch
     for (const event of events) {
@@ -646,7 +653,7 @@ export async function POST(req: Request) {
         });
 
         const welcomeFlex = buildWelcomeFlex(hostOrigin);
-        await replyLineMessage(replyToken, config.channelAccessToken, [welcomeFlex]);
+        await reply(replyToken, [welcomeFlex]);
       }
 
       // Event B: User sends a text message
@@ -654,12 +661,16 @@ export async function POST(req: Request) {
         const userText = (event.message.text || '').trim();
         const lowerText = userText.toLowerCase();
 
-        // Save incoming inquiry to Firestore
-        await saveInquiry({
-          userId,
-          message: userText,
-          inquiry_type: 'inquiry',
-        });
+        // Website form submissions are already stored before the customer opens LINE.
+        // Keep the LINE chat message, but avoid creating a duplicate inbox record.
+        const isWebsiteFormSubmission = /\[CP-WEB-FORM:[0-9a-f-]{36}\]/i.test(userText);
+        if (!isWebsiteFormSubmission) {
+          await saveInquiry({
+            userId,
+            message: userText,
+            inquiry_type: 'inquiry',
+          });
+        }
 
         // Intent 1: Greetings, Help, Main Menu
         if (
@@ -675,7 +686,7 @@ export async function POST(req: Request) {
           lowerText === 'เริ่มต้น'
         ) {
           const welcomeMsg = buildWelcomeFlex(hostOrigin);
-          await replyLineMessage(replyToken, config.channelAccessToken, [welcomeMsg]);
+          await reply(replyToken, [welcomeMsg]);
         }
 
         // Intent 2: Consignment / Selling / Valuation
@@ -688,7 +699,7 @@ export async function POST(req: Request) {
           lowerText.includes('จำนอง')
         ) {
           const consignmentMsg = buildConsignmentFlex(hostOrigin);
-          await replyLineMessage(replyToken, config.channelAccessToken, [consignmentMsg]);
+          await reply(replyToken, [consignmentMsg]);
         }
 
         // Intent 3: Contact / Agent / Phone / Office
@@ -703,7 +714,7 @@ export async function POST(req: Request) {
           lowerText.includes('contact')
         ) {
           const contactMsg = buildContactFlex(hostOrigin);
-          await replyLineMessage(replyToken, config.channelAccessToken, [contactMsg]);
+          await reply(replyToken, [contactMsg]);
         }
 
         // Intent 4: Search Properties (Houses, Land, Condo, Location, Price, Status)
@@ -711,7 +722,7 @@ export async function POST(req: Request) {
           const matchedProperties = await searchProperties(userText);
           if (matchedProperties.length > 0) {
             const carouselMsg = buildPropertyCarouselFlex(matchedProperties, hostOrigin, userText);
-            await replyLineMessage(replyToken, config.channelAccessToken, [carouselMsg]);
+            await reply(replyToken, [carouselMsg]);
           } else {
             // Friendly Fallback
             const fallbackWelcome = buildWelcomeFlex(hostOrigin);
@@ -719,7 +730,7 @@ export async function POST(req: Request) {
               type: 'text',
               text: `ขอบพระคุณที่ติดต่อ Chantakorn Property ครับ/ค่ะ 🏡\n\nทีมงานได้รับข้อความ "${userText}" ของท่านเรียบร้อยแล้ว แอดมินจะรีบติดต่อกลับโดยเร็วที่สุด หรือสามารถเลือกดูรายการทรัพย์และบริการยอดนิยมด้านล่างได้ทันทีครับ`,
             };
-            await replyLineMessage(replyToken, config.channelAccessToken, [textResponse, fallbackWelcome]);
+            await reply(replyToken, [textResponse, fallbackWelcome]);
           }
         }
       }
@@ -733,25 +744,30 @@ export async function POST(req: Request) {
         if (action === 'search_all' || action === 'search') {
           const keyword = params.get('keyword') || 'all';
           const properties = await searchProperties(keyword);
-          const carousel = buildPropertyCarouselFlex(properties, hostOrigin, keyword);
-          await replyLineMessage(replyToken, config.channelAccessToken, [carousel]);
+          if (properties.length > 0) {
+            const carousel = buildPropertyCarouselFlex(properties, hostOrigin, keyword);
+            await reply(replyToken, [carousel]);
+          } else {
+            await reply(replyToken, [buildWelcomeFlex(hostOrigin)]);
+          }
         } else if (action === 'consignment') {
           const consignmentMsg = buildConsignmentFlex(hostOrigin);
-          await replyLineMessage(replyToken, config.channelAccessToken, [consignmentMsg]);
+          await reply(replyToken, [consignmentMsg]);
         } else if (action === 'contact') {
           const contactMsg = buildContactFlex(hostOrigin);
-          await replyLineMessage(replyToken, config.channelAccessToken, [contactMsg]);
+          await reply(replyToken, [contactMsg]);
         } else {
           const welcomeMsg = buildWelcomeFlex(hostOrigin);
-          await replyLineMessage(replyToken, config.channelAccessToken, [welcomeMsg]);
+          await reply(replyToken, [welcomeMsg]);
         }
       }
     }
 
     // Always respond 200 OK to LINE Webhook requests
     return jsonResponse({
-      success: true,
+      success: failedReplies === 0,
       processedEvents: events.length,
+      failedReplies,
       timestamp: new Date().toISOString(),
     });
   } catch (error: any) {

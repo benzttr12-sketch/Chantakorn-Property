@@ -91,12 +91,25 @@ export async function createFirestoreDocument(collection: string, fields: Record
   });
 }
 
-export async function listFirestoreDocuments(collection: string, limit: number) {
+export async function listFirestoreDocuments(collection: string, limit: number, options: { publishedOnly?: boolean } = {}) {
   const url = withApiKey(`${documentsUrl}:runQuery`);
+  const structuredQuery = {
+    from: [{ collectionId: collection }],
+    limit,
+    ...(options.publishedOnly ? {
+      where: {
+        fieldFilter: {
+          field: { fieldPath: 'published' },
+          op: 'EQUAL',
+          value: { booleanValue: true },
+        },
+      },
+    } : {}),
+  };
   const response = await fetch(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ structuredQuery: { from: [{ collectionId: collection }], limit } }),
+    body: JSON.stringify({ structuredQuery }),
     signal: AbortSignal.timeout(10000),
   });
   if (!response.ok) throw new Error(`Firestore query failed with status ${response.status}`);
