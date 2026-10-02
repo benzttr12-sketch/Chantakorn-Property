@@ -27,6 +27,8 @@ interface LineSettings {
 let cachedSettings: LineSettings | null = null;
 let lastCacheTime = 0;
 
+const DEFAULT_TARGET_USER_ID = 'U93b6e8d9cb5b76f9a9a4a4fda959bd9a';
+
 async function getLineSettings(): Promise<LineSettings> {
   const now = Date.now();
   if (cachedSettings && now - lastCacheTime < 30000) {
@@ -37,7 +39,7 @@ async function getLineSettings(): Promise<LineSettings> {
     channelId: process.env.LINE_CHANNEL_ID || DEFAULT_LINE_CHANNEL_ID,
     channelAccessToken: process.env.LINE_CHANNEL_ACCESS_TOKEN || '',
     channelSecret: process.env.LINE_CHANNEL_SECRET || DEFAULT_LINE_CHANNEL_SECRET,
-    targetUserId: process.env.LINE_TARGET_USER_ID || '',
+    targetUserId: process.env.LINE_TARGET_USER_ID || DEFAULT_TARGET_USER_ID,
     lineNotifyToken: process.env.LINE_NOTIFY_TOKEN || '',
     autoNotifyNewProperty: true,
     autoNotifyConsignment: true,
@@ -56,9 +58,50 @@ async function getLineSettings(): Promise<LineSettings> {
         if (data.line_notify_token) settings.lineNotifyToken = data.line_notify_token;
         if (typeof data.auto_notify_new_property === 'boolean') settings.autoNotifyNewProperty = data.auto_notify_new_property;
         if (typeof data.auto_notify_consignment === 'boolean') settings.autoNotifyConsignment = data.auto_notify_consignment;
+      } else {
+        // Bootstrap initial document in Firestore
+        await setDoc(docRef, {
+          channel_id: settings.channelId,
+          channel_access_token: settings.channelAccessToken,
+          channel_secret: settings.channelSecret,
+          target_user_id: settings.targetUserId,
+          line_notify_token: settings.lineNotifyToken,
+          auto_notify_new_property: true,
+          auto_notify_consignment: true,
+          created_at: new Date().toISOString(),
+        });
       }
     } catch (err) {
-      console.warn('Could not read line_oa settings from Firestore:', err);
+      console.warn('Could not read/bootstrap line_oa settings from Firestore:', err);
+    }
+  }
+
+  // Auto-resolve token if empty or invalid, and persist to Firestore
+  if (!settings.channelAccessToken || settings.channelAccessToken.trim().length <= 60) {
+    try {
+      const resolvedToken = await resolveWorkingChannelAccessToken({
+        channelId: settings.channelId,
+        channelSecret: settings.channelSecret,
+      });
+      if (resolvedToken && resolvedToken.length > 60) {
+        settings.channelAccessToken = resolvedToken;
+        if (db) {
+          try {
+            const docRef = doc(db, 'settings', 'line_oa');
+            await setDoc(docRef, {
+              channel_id: settings.channelId || DEFAULT_LINE_CHANNEL_ID,
+              channel_access_token: resolvedToken,
+              channel_secret: settings.channelSecret || DEFAULT_LINE_CHANNEL_SECRET,
+              target_user_id: settings.targetUserId || DEFAULT_TARGET_USER_ID,
+              updated_at: new Date().toISOString(),
+            }, { merge: true });
+          } catch (saveErr) {
+            console.warn('Error persisting resolved token to Firestore:', saveErr);
+          }
+        }
+      }
+    } catch (err) {
+      console.warn('Could not auto-resolve channel access token:', err);
     }
   }
 
@@ -77,12 +120,15 @@ export async function GET(req: NextRequest) {
     lineId: OFFICIAL_LINE_BASIC_ID,
     displayName: OFFICIAL_LINE_DISPLAY_NAME,
     webhookUrl: `${hostOrigin}/api/line/webhook`,
-    channelId: settings.channelId || '2011760874',
+    channelId: settings.channelId || DEFAULT_LINE_CHANNEL_ID,
+    channelAccessToken: settings.channelAccessToken || '',
+    channelSecret: settings.channelSecret || DEFAULT_LINE_CHANNEL_SECRET,
     maskedSecret: settings.channelSecret ? `${settings.channelSecret.slice(0, 4)}••••${settings.channelSecret.slice(-4)}` : null,
     isChannelTokenConfigured: hasTokenOrId && hasSecret,
     isChannelSecretConfigured: hasSecret,
     isLineNotifyConfigured: Boolean(settings.lineNotifyToken?.trim()),
-    targetUserId: settings.targetUserId ? `${settings.targetUserId.slice(0, 4)}***` : null,
+    targetUserId: settings.targetUserId || DEFAULT_TARGET_USER_ID,
+    lineNotifyToken: settings.lineNotifyToken || '',
     autoNotifyNewProperty: settings.autoNotifyNewProperty,
     autoNotifyConsignment: settings.autoNotifyConsignment,
     status: 'online',
@@ -135,6 +181,25 @@ export async function POST(req: NextRequest) {
     // 1. Check if payload is a Consignment / Customer Inquiry
     const isConsignment = body.inquiry_type === 'consignment_sell' || body.inquiry_type === 'consignment';
     const isGeneralInquiry = body.inquiry_type && !isConsignment;
+
+    // Respect active auto-notification toggles
+    if (isConsignment || isGeneralInquiry) {
+      if (!storedSettings.autoNotifyConsignment) {
+        return NextResponse.json({
+          success: true,
+          simulated: true,
+          message: 'ระบบปิดการแจ้งเตือนประเภทผู้ติดต่อและฝากขายอสังหาฯ ไว้ในการตั้งค่า'
+        });
+      }
+    } else {
+      if (!storedSettings.autoNotifyNewProperty) {
+        return NextResponse.json({
+          success: true,
+          simulated: true,
+          message: 'ระบบปิดการแจ้งเตือนประเภทการลงประกาศทรัพย์ใหม่ไว้ในการตั้งค่า'
+        });
+      }
+    }
 
     let messageText = '';
     let flexMessagePayload: any = null;
@@ -451,7 +516,7 @@ LINE Official Account: ${OFFICIAL_LINE_OA_URL}`;
             text: messageText
           },
           flexMessagePayload
-        ]
+        ].filter(Boolean)
       };
 
       if (lineTargetUserId.trim()) {
@@ -464,7 +529,7 @@ LINE Official Account: ${OFFICIAL_LINE_OA_URL}`;
               text: messageText
             },
             flexMessagePayload
-          ]
+          ].filter(Boolean)
         };
       }
 

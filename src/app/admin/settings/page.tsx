@@ -52,6 +52,10 @@ export default function AdminSettingsPage() {
           if (isMounted) {
             setSystemConfig(data);
             if (data.channelId) setChannelId(data.channelId);
+            if (data.channelAccessToken) setLineToken(data.channelAccessToken);
+            if (data.channelSecret) setLineSecret(data.channelSecret);
+            if (data.targetUserId) setTargetUserId(data.targetUserId);
+            if (data.lineNotifyToken) setLineNotifyToken(data.lineNotifyToken);
             if (data.autoNotifyNewProperty !== undefined) setAutoNotify(data.autoNotifyNewProperty);
             if (data.autoNotifyConsignment !== undefined) setAutoNotifyConsignment(data.autoNotifyConsignment);
           }
@@ -80,6 +84,13 @@ export default function AdminSettingsPage() {
     loadConfig();
     return () => { isMounted = false; };
   }, []);
+
+  const handleFillDefaultCredentials = () => {
+    setChannelId('2011760874');
+    setLineSecret('f0bf93dfa53dfdb33c7a81b0b2a80a44');
+    setTargetUserId('U93b6e8d9cb5b76f9a9a4a4fda959bd9a');
+    setSaveSuccess(false);
+  };
 
   const handleCopyWebhookUrl = () => {
     if (!webhookUrl) return;
@@ -458,17 +469,51 @@ export default function AdminSettingsPage() {
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={handleFillDefaultCredentials}
+              className="px-3.5 py-2 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 font-bold text-xs rounded-xl flex items-center justify-center gap-1.5 shadow-xs transition-all cursor-pointer"
+              title="เติมค่า Channel ID, Channel Secret และ Target User ID เริ่มต้นสำเร็จ"
+            >
+              <Sparkles className="w-3.5 h-3.5 text-amber-600" />
+              <span>⚡ ใช้ค่าพารามิเตอร์ระบบมาตรฐาน (1-Click Presets)</span>
+            </button>
             <a 
               href="https://lin.ee/NMSe28T3" 
               target="_blank" 
               rel="noreferrer"
-              className="px-4 py-2.5 bg-[#06C755] hover:bg-[#05b34c] text-white font-bold text-xs rounded-xl flex items-center justify-center gap-1.5 shadow-sm transition-all cursor-pointer active:scale-95"
+              className="px-4 py-2 bg-[#06C755] hover:bg-[#05b34c] text-white font-bold text-xs rounded-xl flex items-center justify-center gap-1.5 shadow-sm transition-all cursor-pointer active:scale-95"
             >
               <MessageCircle className="w-4 h-4 fill-current" />
               <span>เปิดดู LINE OA (NMSe28T3)</span>
               <ExternalLink className="w-3 h-3 ml-0.5" />
             </a>
+          </div>
+        </div>
+
+        {/* User ID Auto-Registration Instructions */}
+        <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-4 text-xs space-y-2 text-emerald-950">
+          <div className="flex items-center gap-2 font-bold text-sm text-[#059669]">
+            <Sparkles className="w-4 h-4" />
+            <span>วิธีผูกและลงทะเบียนผู้รับการแจ้งเตือนส่วนตัว (Admin LINE User ID Auto-Detection):</span>
+          </div>
+          <p className="leading-relaxed text-gray-700">
+            ระบบสามารถตรวจจับและลงทะเบียนผู้รับแจ้งเตือนส่วนตัวให้อัตโนมัติ โดยที่ไม่ต้องพิมพ์คีย์ User ID เอง:
+          </p>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-1 font-semibold">
+            <div className="bg-white p-3 rounded-xl border border-emerald-200 text-center space-y-1">
+              <span className="block font-bold text-emerald-700 text-xs">ขั้นตอนที่ 1</span>
+              <span className="text-[11px] text-gray-700 block">เปิดแชทกับ LINE OA <a href="https://lin.ee/NMSe28T3" target="_blank" rel="noreferrer" className="text-[#06C755] underline font-bold">@930xzcyi</a></span>
+            </div>
+            <div className="bg-white p-3 rounded-xl border border-emerald-200 text-center space-y-1">
+              <span className="block font-bold text-emerald-700 text-xs">ขั้นตอนที่ 2</span>
+              <span className="text-[11px] text-gray-700 block">พิมพ์คำว่า <code className="bg-emerald-100 text-emerald-900 px-1.5 py-0.5 rounded font-bold">#admin</code> หรือ <code className="bg-emerald-100 text-emerald-900 px-1.5 py-0.5 rounded font-bold">รับแจ้งเตือน</code></span>
+            </div>
+            <div className="bg-white p-3 rounded-xl border border-emerald-200 text-center space-y-1">
+              <span className="block font-bold text-emerald-700 text-xs">ขั้นตอนที่ 3</span>
+              <span className="text-[11px] text-gray-700 block">ระบบบันทึก User ID เป็นผู้รับการแจ้งเตือนเด้งส่วนตัวทันที!</span>
+            </div>
           </div>
         </div>
 

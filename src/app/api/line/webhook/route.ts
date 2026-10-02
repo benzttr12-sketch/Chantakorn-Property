@@ -1,10 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import crypto from 'crypto';
 import { db } from '@/lib/firebase/client';
-import { doc, getDoc, collection, addDoc, getDocs, query, limit } from 'firebase/firestore';
+import { doc, getDoc, setDoc, collection, addDoc, getDocs, query, limit } from 'firebase/firestore';
 import { SAMPLE_PROPERTIES } from '@/data/sample-properties';
 import { Property } from '@/lib/types';
-import { resolveWorkingChannelAccessToken, invalidateChannelAccessToken } from '@/lib/line-auth';
+import { 
+  resolveWorkingChannelAccessToken, 
+  invalidateChannelAccessToken,
+  DEFAULT_LINE_CHANNEL_ID,
+  DEFAULT_LINE_CHANNEL_SECRET
+} from '@/lib/line-auth';
 
 const OFFICIAL_LINE_OA_URL = 'https://lin.ee/NMSe28T3';
 const DEFAULT_PHONE = '081-604-0097';
@@ -28,8 +33,8 @@ async function getLineConfig(): Promise<LineOaConfig> {
 
   const config: LineOaConfig = {
     channelAccessToken: process.env.LINE_CHANNEL_ACCESS_TOKEN || '',
-    channelSecret: process.env.LINE_CHANNEL_SECRET || '',
-    targetUserId: process.env.LINE_TARGET_USER_ID || '',
+    channelSecret: process.env.LINE_CHANNEL_SECRET || DEFAULT_LINE_CHANNEL_SECRET,
+    targetUserId: process.env.LINE_TARGET_USER_ID || 'U93b6e8d9cb5b76f9a9a4a4fda959bd9a',
   };
 
   if (db) {
@@ -44,6 +49,35 @@ async function getLineConfig(): Promise<LineOaConfig> {
       }
     } catch (err) {
       console.warn('Could not read LINE OA settings from Firestore in Webhook:', err);
+    }
+  }
+
+  // Auto-resolve token if empty or invalid
+  if (!config.channelAccessToken || config.channelAccessToken.trim().length <= 60) {
+    try {
+      const resolvedToken = await resolveWorkingChannelAccessToken({
+        channelId: DEFAULT_LINE_CHANNEL_ID,
+        channelSecret: config.channelSecret,
+      });
+      if (resolvedToken && resolvedToken.length > 60) {
+        config.channelAccessToken = resolvedToken;
+        if (db) {
+          try {
+            const docRef = doc(db, 'settings', 'line_oa');
+            await setDoc(docRef, {
+              channel_id: DEFAULT_LINE_CHANNEL_ID,
+              channel_access_token: resolvedToken,
+              channel_secret: config.channelSecret,
+              target_user_id: config.targetUserId,
+              updated_at: new Date().toISOString(),
+            }, { merge: true });
+          } catch (saveErr) {
+            console.warn('Error persisting resolved token to Firestore in Webhook:', saveErr);
+          }
+        }
+      }
+    } catch (err) {
+      console.warn('Could not auto-resolve channel access token in Webhook:', err);
     }
   }
 
@@ -715,8 +749,34 @@ export async function POST(req: NextRequest) {
           inquiry_type: 'inquiry',
         });
 
-        // Intent 1: Greetings, Help, Main Menu
+        // Intent 0: Admin LINE User ID Auto-Registration
         if (
+          lowerText.includes('#admin') ||
+          lowerText === 'admin' ||
+          lowerText.includes('สมัครแอดมิน') ||
+          lowerText.includes('รับแจ้งเตือน') ||
+          lowerText.includes('userid')
+        ) {
+          if (db && userId) {
+            try {
+              const docRef = doc(db, 'settings', 'line_oa');
+              await setDoc(docRef, {
+                target_user_id: userId,
+                updated_at: new Date().toISOString(),
+              }, { merge: true });
+            } catch (err) {
+              console.warn('Could not auto-save target_user_id to Firestore:', err);
+            }
+          }
+          const adminReply = {
+            type: 'text',
+            text: `🟢 [Chantakorn Property System]\nบันทึก LINE User ID ของคุณเรียบร้อยแล้ว!\n\n👤 Target User ID: ${userId}\n\n🏠 เมื่อมีการลงประกาศทรัพย์ใหม่ หรือลูกค้าส่งข้อมูลฝากขาย/สอบถามเข้ามา ระบบจะส่งข้อความแจ้งเตือน Flex Message เด้งเข้า LINE ส่วนตัวของคุณโดยอัตโนมัติครับ`
+          };
+          await replyLineMessage(replyToken, config.channelAccessToken, [adminReply]);
+        }
+
+        // Intent 1: Greetings, Help, Main Menu
+        else if (
           lowerText === 'สวัสดี' ||
           lowerText === 'ดีครับ' ||
           lowerText === 'ดีค่ะ' ||
