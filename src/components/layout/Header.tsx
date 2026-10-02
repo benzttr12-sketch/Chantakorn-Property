@@ -102,7 +102,6 @@ export default function Header() {
     { name: 'ซื้อ', href: '/buy' },
     { name: 'เช่า', href: '/rent' },
     { name: 'ฝากขาย', href: '/sell' },
-    { name: 'ประเมินราคา & LandsMaps', href: '/valuation' },
     { name: 'บ้าน', href: '/properties?type=house' },
     { name: 'ที่ดิน', href: '/properties?type=land' },
     { name: 'คอนโด', href: '/properties?type=condo' },

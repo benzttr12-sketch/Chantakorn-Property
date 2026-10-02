@@ -26,7 +26,8 @@ import {
   UserCheck,
   Star,
   Sparkles,
-  Layers
+  Layers,
+  MapPin
 } from 'lucide-react';
 import Image from 'next/image';
 import ProfileHeader from '@/components/admin/ProfileHeader';
@@ -254,6 +255,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   const navItems = [
     { label: 'แดชบอร์ดภาพรวม', href: '/admin', icon: LayoutDashboard },
+    { label: 'ประเมินราคาที่ดิน & LandsMaps', href: '/admin/valuation', icon: MapPin },
     { label: 'ติดตามเฟสงาน', href: '/admin/work-phases', icon: Layers, badge: 'ใหม่' },
     { label: 'ระบบอัตโนมัติ AI', href: '/admin/automation', icon: Sparkles, badge: 'AI ช่วยโพสต์' },
     { label: 'จัดการอสังหาริมทรัพย์', href: '/admin/properties', icon: Building2 },

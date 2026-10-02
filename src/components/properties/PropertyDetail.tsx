@@ -363,12 +363,13 @@ export default function PropertyDetail({ slug, initialProperty = null }: { slug:
               </div>
 
               {/* Map View */}
-              <div className="h-72 w-full rounded-xl overflow-hidden mb-6 border border-gray-200">
+              <div className="h-80 sm:h-96 w-full rounded-2xl overflow-hidden mb-6 border border-gray-200 shadow-sm relative">
                 <PropertyMap
                   properties={[property]}
                   selectedProperty={property}
-                  zoom={14}
+                  zoom={15}
                   height="100%"
+                  showDistrictPills={false}
                 />
               </div>
 

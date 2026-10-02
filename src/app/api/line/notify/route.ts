@@ -18,6 +18,7 @@ interface LineSettings {
   channelAccessToken?: string;
   channelSecret?: string;
   targetUserId?: string;
+  registeredAdminIds?: string[];
   lineNotifyToken?: string;
   autoNotifyNewProperty?: boolean;
   autoNotifyConsignment?: boolean;
@@ -27,7 +28,7 @@ interface LineSettings {
 let cachedSettings: LineSettings | null = null;
 let lastCacheTime = 0;
 
-const DEFAULT_TARGET_USER_ID = 'U93b6e8d9cb5b76f9a9a4a4fda959bd9a';
+const DEFAULT_FALLBACK_USER_ID = 'U93b6e8d9cb5b76f9a9a4a4fda959bd9a';
 
 async function getLineSettings(): Promise<LineSettings> {
   const now = Date.now();
@@ -39,7 +40,8 @@ async function getLineSettings(): Promise<LineSettings> {
     channelId: process.env.LINE_CHANNEL_ID || DEFAULT_LINE_CHANNEL_ID,
     channelAccessToken: process.env.LINE_CHANNEL_ACCESS_TOKEN || '',
     channelSecret: process.env.LINE_CHANNEL_SECRET || DEFAULT_LINE_CHANNEL_SECRET,
-    targetUserId: process.env.LINE_TARGET_USER_ID || DEFAULT_TARGET_USER_ID,
+    targetUserId: process.env.LINE_TARGET_USER_ID || '',
+    registeredAdminIds: [],
     lineNotifyToken: process.env.LINE_NOTIFY_TOKEN || '',
     autoNotifyNewProperty: true,
     autoNotifyConsignment: true,
@@ -55,6 +57,10 @@ async function getLineSettings(): Promise<LineSettings> {
         if (data.channel_access_token) settings.channelAccessToken = data.channel_access_token;
         if (data.channel_secret) settings.channelSecret = data.channel_secret;
         if (data.target_user_id) settings.targetUserId = data.target_user_id;
+        if (Array.isArray(data.admin_user_ids)) settings.registeredAdminIds = data.admin_user_ids;
+        if (Array.isArray(data.registered_admin_ids)) {
+          settings.registeredAdminIds = Array.from(new Set([...(settings.registeredAdminIds || []), ...data.registered_admin_ids]));
+        }
         if (data.line_notify_token) settings.lineNotifyToken = data.line_notify_token;
         if (typeof data.auto_notify_new_property === 'boolean') settings.autoNotifyNewProperty = data.auto_notify_new_property;
         if (typeof data.auto_notify_consignment === 'boolean') settings.autoNotifyConsignment = data.auto_notify_consignment;
@@ -65,6 +71,7 @@ async function getLineSettings(): Promise<LineSettings> {
           channel_access_token: settings.channelAccessToken,
           channel_secret: settings.channelSecret,
           target_user_id: settings.targetUserId,
+          admin_user_ids: [],
           line_notify_token: settings.lineNotifyToken,
           auto_notify_new_property: true,
           auto_notify_consignment: true,
@@ -76,14 +83,14 @@ async function getLineSettings(): Promise<LineSettings> {
     }
   }
 
-  // Auto-resolve token if empty or invalid, and persist to Firestore
-  if (!settings.channelAccessToken || settings.channelAccessToken.trim().length <= 60) {
+  // Auto-resolve token if empty or numeric, and persist to Firestore
+  if (!settings.channelAccessToken || settings.channelAccessToken.trim().length <= 50) {
     try {
       const resolvedToken = await resolveWorkingChannelAccessToken({
         channelId: settings.channelId,
         channelSecret: settings.channelSecret,
       });
-      if (resolvedToken && resolvedToken.length > 60) {
+      if (resolvedToken && resolvedToken.length > 50) {
         settings.channelAccessToken = resolvedToken;
         if (db) {
           try {
@@ -92,7 +99,7 @@ async function getLineSettings(): Promise<LineSettings> {
               channel_id: settings.channelId || DEFAULT_LINE_CHANNEL_ID,
               channel_access_token: resolvedToken,
               channel_secret: settings.channelSecret || DEFAULT_LINE_CHANNEL_SECRET,
-              target_user_id: settings.targetUserId || DEFAULT_TARGET_USER_ID,
+              target_user_id: settings.targetUserId || '',
               updated_at: new Date().toISOString(),
             }, { merge: true });
           } catch (saveErr) {
@@ -114,7 +121,9 @@ export async function GET(req: NextRequest) {
   const settings = await getLineSettings();
   const hostOrigin = req.nextUrl.origin || 'https://ais-dev-4fthqw6uuad4ntgghqrlse-213200673887.asia-east1.run.app';
   const hasSecret = Boolean(settings.channelSecret?.trim());
-  const hasTokenOrId = Boolean(settings.channelAccessToken?.trim() || settings.channelId?.trim());
+  const hasToken = Boolean(settings.channelAccessToken && settings.channelAccessToken.trim().length > 50);
+  const targetId = settings.targetUserId || (settings.registeredAdminIds?.[0] || '');
+
   return NextResponse.json({
     officialLineUrl: OFFICIAL_LINE_OA_URL,
     lineId: OFFICIAL_LINE_BASIC_ID,
@@ -124,13 +133,14 @@ export async function GET(req: NextRequest) {
     channelAccessToken: settings.channelAccessToken || '',
     channelSecret: settings.channelSecret || DEFAULT_LINE_CHANNEL_SECRET,
     maskedSecret: settings.channelSecret ? `${settings.channelSecret.slice(0, 4)}••••${settings.channelSecret.slice(-4)}` : null,
-    isChannelTokenConfigured: hasTokenOrId && hasSecret,
+    isChannelTokenConfigured: hasToken || (Boolean(settings.channelId?.trim()) && hasSecret),
     isChannelSecretConfigured: hasSecret,
     isLineNotifyConfigured: Boolean(settings.lineNotifyToken?.trim()),
-    targetUserId: settings.targetUserId || DEFAULT_TARGET_USER_ID,
+    targetUserId: targetId,
+    registeredAdminIds: settings.registeredAdminIds || [],
     lineNotifyToken: settings.lineNotifyToken || '',
-    autoNotifyNewProperty: settings.autoNotifyNewProperty,
-    autoNotifyConsignment: settings.autoNotifyConsignment,
+    autoNotifyNewProperty: settings.autoNotifyNewProperty ?? true,
+    autoNotifyConsignment: settings.autoNotifyConsignment ?? true,
     status: 'online',
     timestamp: new Date().toISOString(),
   });
@@ -142,14 +152,23 @@ export async function POST(req: NextRequest) {
 
     // Special Action: Save Settings
     if (body.action === 'save_settings') {
-      const { channelId, channelAccessToken, channelSecret, targetUserId, lineNotifyToken, autoNotifyNewProperty, autoNotifyConsignment } = body;
+      const { 
+        channelId, 
+        channelAccessToken, 
+        channelSecret, 
+        targetUserId, 
+        lineNotifyToken, 
+        autoNotifyNewProperty, 
+        autoNotifyConsignment 
+      } = body;
+
       if (db) {
         try {
           const docRef = doc(db, 'settings', 'line_oa');
           await setDoc(docRef, {
-            channel_id: channelId?.trim() || '',
+            channel_id: channelId?.trim() || DEFAULT_LINE_CHANNEL_ID,
             channel_access_token: channelAccessToken?.trim() || '',
-            channel_secret: channelSecret?.trim() || '',
+            channel_secret: channelSecret?.trim() || DEFAULT_LINE_CHANNEL_SECRET,
             target_user_id: targetUserId?.trim() || '',
             line_notify_token: lineNotifyToken?.trim() || '',
             auto_notify_new_property: Boolean(autoNotifyNewProperty),
@@ -162,6 +181,7 @@ export async function POST(req: NextRequest) {
       }
       // invalidate cache
       cachedSettings = null;
+      invalidateChannelAccessToken();
       return NextResponse.json({
         success: true,
         message: 'บันทึกการตั้งค่า LINE Official Account เรียบร้อยแล้ว'
@@ -169,9 +189,9 @@ export async function POST(req: NextRequest) {
     }
 
     const storedSettings = await getLineSettings();
-    const lineAccessToken = body.overrideToken || storedSettings.channelAccessToken || '';
-    const lineNotifyToken = body.overrideNotifyToken || storedSettings.lineNotifyToken || '';
-    const lineTargetUserId = body.overrideTargetId || storedSettings.targetUserId || '';
+    const lineAccessToken = (body.overrideToken || storedSettings.channelAccessToken || '').trim();
+    const lineNotifyToken = (body.overrideNotifyToken || storedSettings.lineNotifyToken || '').trim();
+    const lineTargetUserId = (body.overrideTargetId || storedSettings.targetUserId || '').trim();
 
     const rawOrigin = req.nextUrl.origin || '';
     const hostOrigin = (rawOrigin.startsWith('https://') 
@@ -180,11 +200,11 @@ export async function POST(req: NextRequest) {
 
     // 1. Check if payload is a Consignment / Customer Inquiry
     const isConsignment = body.inquiry_type === 'consignment_sell' || body.inquiry_type === 'consignment';
-    const isGeneralInquiry = body.inquiry_type && !isConsignment;
+    const isGeneralInquiry = Boolean(body.inquiry_type && !isConsignment);
 
     // Respect active auto-notification toggles
     if (isConsignment || isGeneralInquiry) {
-      if (!storedSettings.autoNotifyConsignment) {
+      if (storedSettings.autoNotifyConsignment === false && !body.isTest) {
         return NextResponse.json({
           success: true,
           simulated: true,
@@ -192,7 +212,7 @@ export async function POST(req: NextRequest) {
         });
       }
     } else {
-      if (!storedSettings.autoNotifyNewProperty) {
+      if (storedSettings.autoNotifyNewProperty === false && !body.isTest) {
         return NextResponse.json({
           success: true,
           simulated: true,
@@ -212,12 +232,12 @@ export async function POST(req: NextRequest) {
         ? new Intl.NumberFormat('th-TH', { style: 'currency', currency: 'THB', maximumFractionDigits: 0 }).format(consignment_details.expected_price)
         : 'ตามตกลง';
 
-      shareTitle = isConsignment ? `ฝากขายทรัพย์ใหม่: ${name}` : `ข้อความสอบถามใหม่จากคุณ: ${name}`;
+      shareTitle = isConsignment ? `ฝากขายทรัพย์ใหม่: ${name || 'ลูกค้า'}` : `ข้อความสอบถามใหม่จาก: ${name || 'ลูกค้า'}`;
 
       messageText = `🔔 มีข้อมูล${isConsignment ? 'ฝากขายอสังหาริมทรัพย์' : 'ติดต่อสอบถาม'}ใหม่เข้ามา!
 ----------------------------------
 👤 ผู้ติดต่อ: ${name || 'ไม่ระบุชื่อ'}
-📞 โทร: ${phone || '-'}
+📞 เบอร์โทร: ${phone || '-'}
 💬 LINE ID: ${line_id || '-'}
 🏠 ประเภท: ${consignment_details?.property_type || 'อสังหาริมทรัพย์'}
 📍 ทำเล: ${consignment_details?.district || 'หาดใหญ่-สงขลา'} ${consignment_details?.province || 'จ.สงขลา'}
@@ -231,7 +251,7 @@ LINE Official Account: ${OFFICIAL_LINE_OA_URL}`;
 
       flexMessagePayload = {
         type: "flex",
-        altText: `🔔 ${shareTitle}`,
+        altText: `🔔 ${shareTitle}`.slice(0, 400),
         contents: {
           type: "bubble",
           body: {
@@ -275,7 +295,7 @@ LINE Official Account: ${OFFICIAL_LINE_OA_URL}`;
                   },
                   {
                     type: "text",
-                    text: `📍 พื้นที่: ${consignment_details?.district || 'หาดใหญ่'} จ.สงขลา`,
+                    text: `📍 พื้นที่: ${consignment_details?.district || 'หาดใหญ่'} จ.${consignment_details?.province || 'สงขลา'}`,
                     size: "xs",
                     color: "#666666"
                   }
@@ -337,19 +357,17 @@ LINE Official Account: ${OFFICIAL_LINE_OA_URL}`;
 
 LINE Official Account: ${OFFICIAL_LINE_OA_URL}`;
 
-      // LINE Flex image MUST be a valid HTTPS URL (no 302 redirects, direct image or proxy)
+      // LINE Flex image MUST be a direct HTTPS URL
       let heroImg = "https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?auto=format&fit=crop&w=1200&q=80";
-      if (typeof cover_image === 'string' && /^https:\/\//i.test(cover_image)) {
+      if (typeof cover_image === 'string' && /^https:\/\//i.test(cover_image) && !cover_image.includes('/api/properties/')) {
         heroImg = cover_image;
-      } else if (Array.isArray(body.images) && body.images[0] && /^https:\/\//i.test(body.images[0])) {
+      } else if (Array.isArray(body.images) && body.images[0] && /^https:\/\//i.test(body.images[0]) && !body.images[0].includes('/api/properties/')) {
         heroImg = body.images[0];
-      } else if (body.id) {
-        heroImg = `${hostOrigin}/api/properties/${body.id}/image`;
       }
 
       flexMessagePayload = {
         type: "flex",
-        altText: `📢 ลงทรัพย์ใหม่: ${title || 'อสังหาฯ หาดใหญ่'}`,
+        altText: `📢 ลงทรัพย์ใหม่: ${title || 'อสังหาฯ หาดใหญ่'}`.slice(0, 400),
         contents: {
           type: "bubble",
           hero: {
@@ -493,11 +511,12 @@ LINE Official Account: ${OFFICIAL_LINE_OA_URL}`;
       };
     }
 
-    // Direct 1-Click LINE Share Link (Always available & works immediately on desktop and mobile)
+    // Direct 1-Click LINE Share Link (Always available & works instantly on desktop & mobile)
     const directLineShareUrl = `https://line.me/R/msg/text/?${encodeURIComponent(messageText)}`;
 
-    // Prepare LINE Messaging API payload
+    // Prepare LINE Messaging API delivery
     let isRealSent = false;
+    let deliveryMethod = 'none';
     let errors: string[] = [];
 
     // Mode A: LINE Messaging API
@@ -508,70 +527,113 @@ LINE Official Account: ${OFFICIAL_LINE_OA_URL}`;
     });
 
     if (activeAccessToken.trim()) {
-      let lineApiUrl = "https://api.line.me/v2/bot/message/broadcast";
-      let payload: any = {
-        messages: [
-          {
-            type: "text",
-            text: messageText
-          },
-          flexMessagePayload
-        ].filter(Boolean)
-      };
-
-      if (lineTargetUserId.trim()) {
-        lineApiUrl = "https://api.line.me/v2/bot/message/push";
-        payload = {
-          to: lineTargetUserId.trim(),
-          messages: [
-            {
-              type: "text",
-              text: messageText
-            },
-            flexMessagePayload
-          ].filter(Boolean)
-        };
+      // Build candidate target user IDs list
+      const candidateTargetIds: string[] = [];
+      if (lineTargetUserId && lineTargetUserId !== DEFAULT_FALLBACK_USER_ID) {
+        lineTargetUserId.split(/[\s,]+/).forEach((id: string) => {
+          const clean = id.trim();
+          if (clean && clean.length > 5) candidateTargetIds.push(clean);
+        });
+      }
+      if (Array.isArray(storedSettings.registeredAdminIds)) {
+        storedSettings.registeredAdminIds.forEach((id: string) => {
+          if (id && !candidateTargetIds.includes(id)) candidateTargetIds.push(id);
+        });
       }
 
-      try {
-        let response = await fetch(lineApiUrl, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${activeAccessToken.trim()}`
-          },
-          body: JSON.stringify(payload)
-        });
-
-        // If token was invalid or expired, retry once with fresh OAuth token
-        if (response.status === 401) {
-          invalidateChannelAccessToken();
-          const refreshedToken = await resolveWorkingChannelAccessToken({
-            channelId: storedSettings.channelId,
-            channelSecret: storedSettings.channelSecret,
+      // Helper function to send messages to a specific URL with token refresh and plain-text fallback
+      const sendLineRequest = async (url: string, payloadObj: any): Promise<boolean> => {
+        try {
+          let response = await fetch(url, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${activeAccessToken.trim()}`
+            },
+            body: JSON.stringify(payloadObj)
           });
 
-          if (refreshedToken && refreshedToken !== activeAccessToken) {
-            activeAccessToken = refreshedToken;
-            response = await fetch(lineApiUrl, {
+          // If token expired, refresh and retry once
+          if (response.status === 401) {
+            invalidateChannelAccessToken();
+            const refreshedToken = await resolveWorkingChannelAccessToken({
+              channelId: storedSettings.channelId,
+              channelSecret: storedSettings.channelSecret,
+            });
+
+            if (refreshedToken && refreshedToken !== activeAccessToken) {
+              activeAccessToken = refreshedToken;
+              response = await fetch(url, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Authorization': `Bearer ${activeAccessToken.trim()}`
+                },
+                body: JSON.stringify(payloadObj)
+              });
+            }
+          }
+
+          // If Flex message was rejected (400 Bad Request), fallback to guaranteed plain text message
+          if (response.status === 400 && payloadObj.messages?.some((m: any) => m.type === 'flex')) {
+            const plainTextPayload = {
+              ...payloadObj,
+              messages: [{ type: "text", text: messageText }]
+            };
+            const fallbackRes = await fetch(url, {
               method: 'POST',
               headers: {
                 'Content-Type': 'application/json',
                 'Authorization': `Bearer ${activeAccessToken.trim()}`
               },
-              body: JSON.stringify(payload)
+              body: JSON.stringify(plainTextPayload)
             });
+            if (fallbackRes.ok) return true;
+          }
+
+          if (response.ok) {
+            return true;
+          } else {
+            const errText = await response.text();
+            errors.push(`Messaging API (${url}) HTTP ${response.status}: ${errText}`);
+            return false;
+          }
+        } catch (err: any) {
+          errors.push(`Messaging API call error: ${err.message || String(err)}`);
+          return false;
+        }
+      };
+
+      const baseMessages = [
+        { type: "text", text: messageText },
+        flexMessagePayload
+      ].filter(Boolean);
+
+      // 1. Try Push to Candidate Target Users/Admins if available
+      let pushDelivered = false;
+      if (candidateTargetIds.length > 0) {
+        for (const targetId of candidateTargetIds) {
+          const pushOk = await sendLineRequest("https://api.line.me/v2/bot/message/push", {
+            to: targetId,
+            messages: baseMessages
+          });
+          if (pushOk) {
+            pushDelivered = true;
+            isRealSent = true;
+            deliveryMethod = 'push';
           }
         }
+      }
 
-        if (response.ok) {
+      // 2. If Push was not possible or did not deliver, fallback to LINE Broadcast to all followers!
+      if (!pushDelivered) {
+        const broadcastOk = await sendLineRequest("https://api.line.me/v2/bot/message/broadcast", {
+          messages: baseMessages
+        });
+        if (broadcastOk) {
           isRealSent = true;
-        } else {
-          const errText = await response.text();
-          errors.push(`Messaging API status ${response.status}: ${errText}`);
+          deliveryMethod = 'broadcast';
         }
-      } catch (err: any) {
-        errors.push(`Messaging API error: ${err.message || String(err)}`);
       }
     }
 
@@ -596,6 +658,7 @@ LINE Official Account: ${OFFICIAL_LINE_OA_URL}`;
 
         if (notifyRes.ok) {
           isRealSent = true;
+          deliveryMethod = deliveryMethod !== 'none' ? `${deliveryMethod}+notify` : 'notify';
         } else {
           const notifyErr = await notifyRes.text();
           errors.push(`LINE Notify status ${notifyRes.status}: ${notifyErr}`);
@@ -605,19 +668,20 @@ LINE Official Account: ${OFFICIAL_LINE_OA_URL}`;
       }
     }
 
-    if (!lineAccessToken.trim() && !lineNotifyToken.trim()) {
-      errors.push('ยังไม่ได้ระบุ Channel Access Token หรือ LINE Notify Token (ระบบจัดเตรียมลิงก์ส่งด่วน 1-Click Share สู่ LINE OA ให้ทันที)');
+    if (!activeAccessToken.trim() && !lineNotifyToken.trim()) {
+      errors.push('ยังไม่ได้ระบุ Channel Access Token หรือ Channel Secret (ระบบเตรียม 1-Click Direct LINE Link สำหรับแชร์เข้าห้องแชท LINE OA ได้ทันที)');
     }
 
     return NextResponse.json({
       success: true,
       simulated: !isRealSent,
       isRealSent,
+      deliveryMethod,
       lineOaUrl: OFFICIAL_LINE_OA_URL,
       shareUrl: directLineShareUrl,
       message: isRealSent 
-        ? '🚀 ส่งข้อความแจ้งเตือนเด้งเข้า LINE Official Account สำเร็จ!' 
-        : 'จำลองการส่งแจ้งเตือนสำเร็จ (คลิกเพื่อเด้งแชร์เข้า LINE ได้ทันที)',
+        ? `🚀 ส่งข้อความแจ้งเตือนเข้า LINE Official Account สำเร็จ (${deliveryMethod.toUpperCase()})` 
+        : '✨ จัดเตรียมข้อความแจ้งเตือนสำเร็จ (คลิกเพื่อแชร์เข้า LINE ได้ทันที)',
       payload: {
         text: messageText,
         flex: flexMessagePayload,

@@ -749,30 +749,22 @@ export async function POST(req: NextRequest) {
           inquiry_type: 'inquiry',
         });
 
-        // Intent 0: Admin LINE User ID Auto-Registration
-        if (
-          lowerText.includes('#admin') ||
-          lowerText === 'admin' ||
-          lowerText.includes('สมัครแอดมิน') ||
-          lowerText.includes('รับแจ้งเตือน') ||
-          lowerText.includes('userid')
-        ) {
-          if (db && userId) {
-            try {
-              const docRef = doc(db, 'settings', 'line_oa');
+        // Auto-register user ID into admin list
+        if (db && userId) {
+          try {
+            const docRef = doc(db, 'settings', 'line_oa');
+            const snap = await getDoc(docRef);
+            const currentAdmins: string[] = snap.exists() ? (snap.data().registered_admin_ids || []) : [];
+            if (!currentAdmins.includes(userId)) {
               await setDoc(docRef, {
-                target_user_id: userId,
+                registered_admin_ids: [...currentAdmins, userId],
+                target_user_id: snap.exists() && snap.data().target_user_id ? snap.data().target_user_id : userId,
                 updated_at: new Date().toISOString(),
               }, { merge: true });
-            } catch (err) {
-              console.warn('Could not auto-save target_user_id to Firestore:', err);
             }
+          } catch (err) {
+            console.warn('[LINE Webhook] Error updating registered_admin_ids:', err);
           }
-          const adminReply = {
-            type: 'text',
-            text: `🟢 [Chantakorn Property System]\nบันทึก LINE User ID ของคุณเรียบร้อยแล้ว!\n\n👤 Target User ID: ${userId}\n\n🏠 เมื่อมีการลงประกาศทรัพย์ใหม่ หรือลูกค้าส่งข้อมูลฝากขาย/สอบถามเข้ามา ระบบจะส่งข้อความแจ้งเตือน Flex Message เด้งเข้า LINE ส่วนตัวของคุณโดยอัตโนมัติครับ`
-          };
-          await replyLineMessage(replyToken, config.channelAccessToken, [adminReply]);
         }
 
         // Intent 1: Greetings, Help, Main Menu

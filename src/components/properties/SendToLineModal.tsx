@@ -84,9 +84,13 @@ export default function SendToLineModal({ isOpen, onClose, property, autoSend = 
           price: property.price,
           status: property.status || 'sale',
           district: property.district || 'หาดใหญ่',
+          subdistrict: property.subdistrict || 'ควนลัง',
           province: property.province || 'สงขลา',
           slug: property.slug,
           id: property.id,
+          cover_image: property.cover_image || (property.images && property.images[0]) || undefined,
+          images: property.images || undefined,
+          agent: property.agent || undefined,
         })
       });
 

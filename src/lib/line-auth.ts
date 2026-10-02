@@ -26,7 +26,7 @@ export async function resolveWorkingChannelAccessToken(options?: {
   const tokenCandidate = (options?.explicitToken || process.env.LINE_CHANNEL_ACCESS_TOKEN || '').trim();
 
   // If token is a valid long-lived bearer token (not numeric Channel ID)
-  if (tokenCandidate.length > 60 && !/^\d+$/.test(tokenCandidate)) {
+  if (tokenCandidate.length > 50 && !/^\d+$/.test(tokenCandidate)) {
     return tokenCandidate;
   }
 
@@ -90,3 +90,4 @@ export async function resolveWorkingChannelAccessToken(options?: {
 export function invalidateChannelAccessToken(): void {
   cachedOAuthToken = null;
 }
+

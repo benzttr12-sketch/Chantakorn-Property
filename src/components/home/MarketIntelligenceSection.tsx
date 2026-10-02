@@ -142,7 +142,7 @@ export default function MarketIntelligenceSection() {
             <span>GOOGLE SEARCH GROUNDED INTELLIGENCE</span>
           </div>
           <h2 className="text-2xl sm:text-4xl font-black text-white tracking-tight">
-            เจาะลึกทัศนียภาพและทิศทางตลาดอสังหาฯ หาดใหญ่–สงขลา <span className="bg-gradient-to-r from-gold-300 via-amber-200 to-amber-400 bg-clip-text text-transparent font-serif italic drop-shadow-[0_2px_10px_rgba(234,179,8,0.35)] border-b-2 border-gold-400/40 pb-0.5 inline-block ml-1">แบบเรียลไทม์</span>
+            เจาะลึกทัศนียภาพและทิศทางตลาดอสังหาฯ หาดใหญ่–สงขลา <span className="bg-gradient-to-r from-gold-300 via-amber-200 to-amber-400 bg-clip-text text-transparent font-sans not-italic drop-shadow-[0_2px_10px_rgba(234,179,8,0.35)] border-b-2 border-gold-400/40 pb-0.5 inline-block ml-1">แบบเรียลไทม์</span>
           </h2>
           <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
             ผสานข้อมูลสืบค้นสดจาก <strong>Google Search</strong> เพื่อรายงานสถิติราคาประเมิน ทิศทางโครงการเมกะโปรเจกต์ และแนวโน้มอัตราดอกเบี้ยอย่างแม่นยำ พร้อมแหล่งอ้างอิงที่เชื่อถือได้
@@ -243,7 +243,7 @@ export default function MarketIntelligenceSection() {
             {insightData.answer.split('\n\n').map((paragraph, idx) => {
               if (paragraph.startsWith('###')) {
                 return (
-                  <h4 key={idx} className="text-sm sm:text-base font-black text-gold-300 mt-2 flex items-center gap-2">
+                  <h4 key={idx} className="text-sm sm:text-base font-normal text-gold-300 mt-2 flex items-center gap-2">
                     {paragraph.replace('###', '').trim()}
                   </h4>
                 );

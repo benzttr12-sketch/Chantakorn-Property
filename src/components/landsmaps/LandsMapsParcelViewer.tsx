@@ -59,8 +59,9 @@ export default function LandsMapsParcelViewer({ property }: LandsMapsParcelViewe
         zoomControl: true,
       });
 
-      L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
-        attribution: 'Tiles &copy; Esri World Imagery'
+      L.tileLayer('https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}', {
+        maxZoom: 20,
+        attribution: '&copy; Google Satellite &copy; กรมที่ดิน DOL LandsMaps'
       }).addTo(map);
 
       // Render polygon boundary for land parcel

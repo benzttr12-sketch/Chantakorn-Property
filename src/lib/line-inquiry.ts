@@ -7,8 +7,12 @@ export interface PropertyLineData {
   price: number;
   status?: string;
   district?: string;
+  subdistrict?: string;
   province?: string;
   slug: string;
+  cover_image?: string;
+  images?: string[];
+  agent?: any;
 }
 
 /**
