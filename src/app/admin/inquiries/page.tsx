@@ -28,7 +28,7 @@ import { formatThaiDate, formatPropertyCode } from '@/lib/utils';
 
 function InquiriesContent() {
   const searchParams = useSearchParams();
-  const initialFilter = searchParams.get('filter') || 'all';
+  const initialFilter = searchParams?.get('filter') || 'all';
 
   const [inquiries, setInquiries] = useState<Inquiry[]>([]);
   const [loading, setLoading] = useState(true);
@@ -59,7 +59,7 @@ function InquiriesContent() {
 
   // Sync with searchParams if filter changes in URL
   useEffect(() => {
-    const urlFilter = searchParams.get('filter');
+    const urlFilter = searchParams?.get('filter');
     if (urlFilter && ['all', 'new', 'contacted', 'closed'].includes(urlFilter)) {
       setStatusFilter(urlFilter as any);
     }

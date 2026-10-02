@@ -483,12 +483,9 @@ export default function AdminLandsMapsOverlayModal({
     if (!activeProperty) return;
     setSaving(true);
     try {
-      const updatedDescription = activeProperty.description.includes('📌 ข้อมูลรูปแปลงโฉนดที่ดิน (DOL LandsMaps):')
-        ? activeProperty.description.replace(
-            /📌 ข้อมูลรูปแปลงโฉนดที่ดิน \(DOL LandsMaps\):[\s\S]*/,
-            `📌 ข้อมูลรูปแปลงโฉนดที่ดิน (DOL LandsMaps):\n• เลขที่โฉนด: ${chanoteNo}\n• ระวาง: ${mapSheet}\n• เลขที่ดิน: ${landNo} | หน้าสำรวจ: ${surveyPage}\n• ราคาประเมินกรมธนารักษ์: ฿${appraisalRate.toLocaleString()} / ตร.ว. (รวม ฿${totalAppraisalVal.toLocaleString()})`
-          )
-        : `${activeProperty.description}\n\n📌 ข้อมูลรูปแปลงโฉนดที่ดิน (DOL LandsMaps):\n• เลขที่โฉนด: ${chanoteNo}\n• ระวาง: ${mapSheet}\n• เลขที่ดิน: ${landNo} | หน้าสำรวจ: ${surveyPage}\n• ราคาประเมินกรมธนารักษ์: ฿${appraisalRate.toLocaleString()} / ตร.ว. (รวม ฿${totalAppraisalVal.toLocaleString()})`;
+      const updatedDescription = (activeProperty.description || '')
+        .replace(/📌 ข้อมูลรูปแปลงโฉนดที่ดิน \(DOL LandsMaps\):[\s\S]*/gi, '')
+        .trim();
 
       await updateProperty(activeProperty.id, {
         description: updatedDescription,

@@ -24,8 +24,8 @@ import { signInWithGoogle, loginWithEmail, notifyAuthChange } from '@/lib/auth-h
 function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const redirectTarget = searchParams.get('redirect');
-  const reason = searchParams.get('reason');
+  const redirectTarget = searchParams?.get('redirect');
+  const reason = searchParams?.get('reason');
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');

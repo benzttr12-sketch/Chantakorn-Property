@@ -1,7 +1,5 @@
 'use client';
 
-import { apiUrl } from '@/lib/api-url';
-
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { 
   HelpCircle, 
@@ -19,7 +17,7 @@ import {
   FileCheck,
   Scale
 } from 'lucide-react';
-import type { FAQItem } from '@/lib/faq-types';
+import { FAQItem } from '@/app/api/ai/faq/route';
 
 const CATEGORIES = [
   { id: 'all', label: 'ทั้งหมด', icon: HelpCircle },
@@ -37,7 +35,6 @@ export default function RealEstateFAQ() {
   const [loading, setLoading] = useState<boolean>(true);
   const [refreshingAi, setRefreshingAi] = useState<boolean>(false);
   const [searchQuery, setSearchQuery] = useState<string>('');
-  const [faqError, setFaqError] = useState('');
   const [source, setSource] = useState<string>('curated-expert-database');
 
   // Custom AI Question State
@@ -55,24 +52,22 @@ export default function RealEstateFAQ() {
     }
 
     try {
-      const res = await fetch(apiUrl('/api/ai/faq'), {
+      const res = await fetch('/api/ai/faq', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ category: cat, refreshWithGemini }),
       });
       const data = await res.json();
-      if (!res.ok || !data.success) throw new Error(data.error || 'โหลดคำถามไม่สำเร็จ');
-      setFaqError('');
       if (data.success && Array.isArray(data.faqs)) {
         setFaqs(data.faqs);
-        setSource(data.source || '');
+        setSource(data.source || 'gemini-3.8-flash');
         // Auto-expand first item
         if (data.faqs.length > 0) {
           setExpandedId(prev => prev || data.faqs[0].id);
         }
       }
     } catch (err) {
-      setFaqError(err instanceof Error ? err.message : 'เชื่อมต่อ Gemini ไม่สำเร็จ');
+      console.warn('Failed to fetch FAQs:', err);
     } finally {
       setLoading(false);
       setRefreshingAi(false);
@@ -97,7 +92,7 @@ export default function RealEstateFAQ() {
     setCustomAnswer(null);
 
     try {
-      const res = await fetch(apiUrl('/api/ai/faq'), {
+      const res = await fetch('/api/ai/faq', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ customQuestion: customQuestion.trim() }),
@@ -226,7 +221,6 @@ export default function RealEstateFAQ() {
 
         {/* FAQ Accordion List */}
         <div className="max-w-3xl mx-auto space-y-3.5">
-          {faqError && <p role="alert" className="text-red-600 p-3">{faqError}</p>}
           {loading && !refreshingAi ? (
             <div className="space-y-3 py-6">
               {[1, 2, 3, 4].map(idx => (

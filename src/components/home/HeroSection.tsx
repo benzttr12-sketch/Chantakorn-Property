@@ -73,7 +73,7 @@ export default function HeroSection() {
           </div>
 
           {/* Stat Counter Strip */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-xs text-slate-200 pt-6 border-t border-white/15">
+          <div className="grid grid-cols-3 gap-4 sm:gap-6 text-xs text-slate-200 pt-6 border-t border-white/15">
             <div className="space-y-0.5">
               <div className="text-2xl sm:text-3xl font-black text-gold-300 tabular-nums">500+</div>
               <span className="text-[11px] text-slate-300 font-medium">ทรัพย์คุณภาพคัดสรร</span>
@@ -85,10 +85,6 @@ export default function HeroSection() {
             <div className="space-y-0.5">
               <div className="text-2xl sm:text-3xl font-black text-gold-300 tabular-nums">100%</div>
               <span className="text-[11px] text-slate-300 font-medium">ตรวจสอบเอกสารสิทธิ์</span>
-            </div>
-            <div className="space-y-0.5">
-              <div className="text-2xl sm:text-3xl font-black text-gold-300 tabular-nums">สถาบันการเงิน</div>
-              <span className="text-[11px] text-slate-300 font-medium">พันธมิตรชั้นนำดอกเบี้ยพิเศษ</span>
             </div>
           </div>
         </div>

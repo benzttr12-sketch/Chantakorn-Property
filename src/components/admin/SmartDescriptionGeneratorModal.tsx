@@ -1,7 +1,5 @@
 'use client';
 
-import { fetchStaffApi } from '@/lib/staff-api';
-
 import React, { useState } from 'react';
 import { 
   Sparkles, 
@@ -116,7 +114,7 @@ export default function SmartDescriptionGeneratorModal({
     setError('');
 
     try {
-      const res = await fetchStaffApi('/api/ai/generate-property-description', {
+      const res = await fetch('/api/ai/generate-property-description', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

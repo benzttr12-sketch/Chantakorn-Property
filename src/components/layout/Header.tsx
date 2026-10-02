@@ -32,7 +32,8 @@ export default function Header() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [favCount, setFavCount] = useState(0);
   const [currentUser, setCurrentUser] = useState<UserProfile | null>(null);
-  const pathname = usePathname();
+  const rawPathname = usePathname();
+  const pathname = rawPathname || '';
 
   useEffect(() => {
     const handleScroll = () => {
@@ -101,6 +102,7 @@ export default function Header() {
     { name: 'ซื้อ', href: '/buy' },
     { name: 'เช่า', href: '/rent' },
     { name: 'ฝากขาย', href: '/sell' },
+    { name: 'ประเมินราคา & LandsMaps', href: '/valuation' },
     { name: 'บ้าน', href: '/properties?type=house' },
     { name: 'ที่ดิน', href: '/properties?type=land' },
     { name: 'คอนโด', href: '/properties?type=condo' },

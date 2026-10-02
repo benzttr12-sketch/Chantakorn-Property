@@ -85,14 +85,19 @@ export default function PropertyCard({
     <div className="group bg-white rounded-3xl overflow-hidden border border-slate-200/80 hover:border-gold-400/50 shadow-sm hover:shadow-2xl transition-all duration-300 flex flex-col h-full transform hover:-translate-y-1">
       {/* 4:3 Image Container with Overlays */}
       <div className="relative aspect-[4/3] w-full overflow-hidden bg-slate-100">
-        <Link href={propertyHref(slug)} className="block w-full h-full">
+        <Link href={propertyHref(slug)} className="relative block w-full h-full">
           <Image
             src={displayImage}
             alt={title}
             fill
+            unoptimized={typeof displayImage === 'string' && displayImage.startsWith('data:')}
             sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
             className="object-cover group-hover:scale-105 transition-transform duration-700 ease-out"
-            onError={() => setImageError(true)}
+            onError={() => {
+              if (typeof displayImage === 'string' && !displayImage.startsWith('data:')) {
+                setImageError(true);
+              }
+            }}
             priority={featured}
           />
         </Link>

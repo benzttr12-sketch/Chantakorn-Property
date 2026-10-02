@@ -1,7 +1,5 @@
 import { spawnSync } from 'node:child_process';
-import { existsSync, renameSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { join, resolve } from 'node:path';
+import { writeFileSync } from 'node:fs';
 
 // The explicit backend keeps a local .env.local out of the public demo build.
 const env = {
@@ -20,33 +18,9 @@ if (env.NEXT_PUBLIC_DATA_BACKEND === 'local') {
     'NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID', 'NEXT_PUBLIC_FIREBASE_APP_ID',
   ]) env[key] = '';
 }
-const apiRoutes = resolve('src/app/api');
-const apiRoutesBackup = join(tmpdir(), `chantakorn-api-routes-${process.pid}`);
-const workerApiEntry = resolve('src/worker-api.ts');
-const workerApiBackup = join(tmpdir(), `chantakorn-worker-api-${process.pid}.ts`);
-let apiRoutesMoved = false;
-let workerApiMoved = false;
-
-try {
-  // GitHub Pages only serves static files; keep server-only route handlers out of this export.
-  if (existsSync(apiRoutes)) {
-    if (existsSync(apiRoutesBackup)) throw new Error(`Temporary API route backup already exists: ${apiRoutesBackup}`);
-    renameSync(apiRoutes, apiRoutesBackup);
-    apiRoutesMoved = true;
-  }
-  if (existsSync(workerApiEntry)) {
-    if (existsSync(workerApiBackup)) throw new Error(`Temporary Worker entry backup already exists: ${workerApiBackup}`);
-    renameSync(workerApiEntry, workerApiBackup);
-    workerApiMoved = true;
-  }
-
-  const result = spawnSync(process.execPath, ['node_modules/next/dist/bin/next', 'build'], {
-    env, stdio: 'inherit',
-  });
-  if (result.error) throw result.error;
-  if (result.status !== 0) throw new Error(`Static export failed with exit code ${result.status || 1}`);
-  writeFileSync(resolve('.next-pages/.nojekyll'), '');
-} finally {
-  if (workerApiMoved) renameSync(workerApiBackup, workerApiEntry);
-  if (apiRoutesMoved) renameSync(apiRoutesBackup, apiRoutes);
-}
+const result = spawnSync(process.execPath, ['node_modules/next/dist/bin/next', 'build'], {
+  env, stdio: 'inherit',
+});
+if (result.error) throw result.error;
+if (result.status !== 0) process.exit(result.status || 1);
+writeFileSync('out/.nojekyll', '');

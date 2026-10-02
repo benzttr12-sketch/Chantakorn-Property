@@ -11,7 +11,7 @@ const PropertyDetail = dynamic(() => import('@/components/properties/PropertyDet
 
 function PropertyDetailContent() {
   const params = useSearchParams();
-  return <PropertyDetail key={params.get('slug') || ''} slug={params.get('slug') || ''} />;
+  return <PropertyDetail key={params?.get('slug') || ''} slug={params?.get('slug') || ''} />;
 }
 
 export default function PropertyDetailPage() {

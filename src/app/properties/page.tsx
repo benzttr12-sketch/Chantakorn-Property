@@ -47,7 +47,7 @@ export type ViewMode = 'grid' | 'split' | 'map';
 function PropertiesContent() {
   const searchParams = useSearchParams();
 
-  const queryString = searchParams.toString();
+  const queryString = searchParams?.toString() || '';
   const [filters, setFilters] = useState<PropertyFilters>(() => filtersFromQuery(queryString));
   useEffect(() => { setFilters(filtersFromQuery(queryString)); }, [queryString]);
 

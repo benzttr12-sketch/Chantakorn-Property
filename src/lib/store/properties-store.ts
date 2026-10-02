@@ -1,10 +1,5 @@
 'use client';
 
-import { buildLinePropertyPayload } from '@/lib/line-property-payload';
-
-
-import { fetchStaffApi } from '@/lib/staff-api';
-
 import { Property, PropertyFilters, Inquiry, UserProfile, Agent, AgentRank } from '@/lib/types';
 import { SAMPLE_PROPERTIES } from '@/data/sample-properties';
 import { formatPropertyCode } from '@/lib/format-code';
@@ -259,18 +254,18 @@ function generateShortPropertyId(): string {
 async function triggerLineNotification(property: Property) {
   if (typeof window === 'undefined' || typeof fetch === 'undefined') return;
   try {
-    const res = await fetchStaffApi('/api/line/notify', {
+    const res = await fetch('/api/line/notify', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(buildLinePropertyPayload(property)),
+      body: JSON.stringify(property),
     });
     const data = await res.json();
-    if (res.ok && data.isRealSent) {
+    if (data.success) {
       logSystemActivity({
         category: 'system',
         action: 'system_notification',
         title: 'แจ้งเตือน LINE OA อัตโนมัติ',
-        description: `ระบบได้ส่งข้อมูลประกาศอสังหาฯ ใหม่ "${property.title}" เข้าไลน์ออฟฟิเชียลแอคเคานต์ https://lin.ee/NMSe28T3 (LINE รับคำขอแล้ว) เรียบร้อยแล้ว`,
+        description: `ระบบได้ส่งข้อมูลประกาศอสังหาฯ ใหม่ "${property.title}" เข้าไลน์ออฟฟิเชียลแอคเคานต์ https://lin.ee/NMSe28T3 ${data.simulated ? '(โหมดทดสอบจำลอง)' : '(ส่งแจ้งเตือนจริง)'} เรียบร้อยแล้ว`,
         target_id: property.id,
         target_name: property.title,
         actor_name: 'ระบบอัตโนมัติ',
@@ -508,16 +503,30 @@ export async function submitInquiry(inquiry: Omit<Inquiry, 'id' | 'created_at'>)
     throw new Error('กรุณากรอกชื่อ เบอร์โทรศัพท์ และข้อความให้ครบถ้วน');
   }
   const result: Inquiry = { ...inquiry, id: crypto.randomUUID(), status: 'new', created_at: new Date().toISOString() };
-  if (dataBackend === 'supabase' && supabase) {
-    // Anonymous visitors may insert inquiries but may never read the private inbox.
-    const { error } = await supabase.from('inquiries').insert(result);
-    if (error) throw error;
-    return result;
-  }
   const firestore: Firestore | null = db;
   if (dataBackend === 'firebase' && firestore) {
     // Firestore rejects undefined optional fields. JSON also strips them recursively.
     await setDoc(doc(firestore, 'inquiries', result.id), JSON.parse(JSON.stringify(result)));
+    if (typeof window !== 'undefined' && typeof fetch !== 'undefined') {
+      fetch('/api/line/notify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(result),
+      }).catch(() => undefined);
+    }
+    return result;
+  }
+  if (dataBackend === 'supabase' && supabase) {
+    // Anonymous visitors may insert inquiries but may never read the private inbox.
+    const { error } = await supabase.from('inquiries').insert(result);
+    if (error) throw error;
+    if (typeof window !== 'undefined' && typeof fetch !== 'undefined') {
+      fetch('/api/line/notify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(result),
+      }).catch(() => undefined);
+    }
     return result;
   }
   throw new Error('ไม่สามารถเชื่อมต่อระบบรับข้อความ กรุณาติดต่อทางโทรศัพท์หรือ LINE');

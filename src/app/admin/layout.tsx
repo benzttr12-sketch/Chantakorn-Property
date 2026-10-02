@@ -33,7 +33,8 @@ import ProfileHeader from '@/components/admin/ProfileHeader';
 import { fetchInquiries } from '@/lib/store/properties-store';
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
-  const pathname = usePathname();
+  const rawPathname = usePathname();
+  const pathname = rawPathname || '';
   const router = useRouter();
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [isAuthorized, setIsAuthorized] = useState(false);

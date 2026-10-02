@@ -138,6 +138,11 @@ export default function Footer() {
                 </Link>
               </li>
               <li>
+                <Link href="/valuation" className="text-gold-300 font-semibold hover:text-gold-400 transition-colors flex items-center gap-1">
+                  <span>🗺️ ประเมินราคา & DOL LandsMaps</span>
+                </Link>
+              </li>
+              <li>
                 <Link href="/sell" className="text-gold-400 font-medium hover:underline flex items-center">
                   ฝากขายทรัพย์กับเรา
                   <ExternalLink className="w-3 h-3 ml-1" />
