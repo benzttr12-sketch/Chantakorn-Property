@@ -14,12 +14,12 @@ function load(file, { env = {}, fetch = async () => { throw Error('Unexpected re
   const context = vm.createContext({
     module, exports: module.exports, Request, Response, URL, URLSearchParams, Headers, AbortSignal,
     TextEncoder, crypto: webcrypto, btoa: text => Buffer.from(text, 'binary').toString('base64'),
-    fetch, process: { env }, console: { log() {}, warn() {}, error() {} },
+    fetch, process: { env }, console: { log() {}, info() {}, warn() {}, error() {} },
     require(name) {
       if (name === '@/lib/api-response') return { jsonResponse: (body, init) => Response.json(body, init) };
       if (name === '@/lib/server-auth') return { requireStaff: async () => null };
       if (name === '@/lib/firestore-rest') return {
-        createFirestoreDocument: async () => ({ ok: true }),
+        createFirestoreDocument: firestore.createFirestoreDocument || (async () => ({ ok: true })),
         listFirestoreDocuments: firestore.listFirestoreDocuments || (async () => []),
       };
       if (name === '../../firebase-applet-config.json') return { default: { projectId: 'test-project', firestoreDatabaseId: '(default)', apiKey: 'test-key' } };
@@ -43,6 +43,74 @@ test('webhook reports missing LINE credentials instead of readiness', async () =
   assert.equal(result.status, 'configuration_required');
   assert.equal(result.isChannelAccessTokenConfigured, false);
   assert.equal(result.isChannelSecretConfigured, false);
+});
+
+test('diagnostics expose source revision and presence checks without revealing credentials', async () => {
+  const api = load('app/api/line/webhook/route.ts', {
+    env: { LINE_CHANNEL_ACCESS_TOKEN: 'private-token', LINE_CHANNEL_SECRET: 'private-secret', APP_BUILD_SHA: 'abc123' },
+  });
+  const response = await api.GET(new Request('https://api.example.com/api/line/webhook'));
+  const result = await response.json();
+  assert.equal(result.status, 'configured');
+  assert.equal(result.buildRevision, 'abc123');
+  assert.equal(result.credentialValidation, 'presence_only');
+  assert.equal(result.webhookEndpoint, 'https://api.example.com/api/line/webhook');
+  assert.equal(JSON.stringify(result).includes('private-token'), false);
+  assert.equal(JSON.stringify(result).includes('private-secret'), false);
+});
+
+test('LINE verification accepts signed empty events without calling LINE or writing inquiries', async () => {
+  const api = load('app/api/line/webhook/route.ts', {
+    env: { LINE_CHANNEL_SECRET: 'test-secret' },
+    firestore: { createFirestoreDocument: async () => { throw Error('Unexpected write'); } },
+  });
+  const body = JSON.stringify({ destination: 'Ubot', events: [] });
+  const signature = createHmac('sha256', 'test-secret').update(body).digest('base64');
+  const response = await api.POST(new Request('https://example.com/api/line/webhook', {
+    method: 'POST', headers: { 'x-line-signature': signature }, body,
+  }));
+  const result = await response.json();
+  assert.equal(response.status, 200);
+  assert.equal(result.success, true);
+  assert.equal(result.processedEvents, 0);
+  assert.equal(result.successfulReplies, 0);
+});
+
+test('invalid webhook signatures are rejected before writing customer data', async () => {
+  let writes = 0;
+  const api = load('app/api/line/webhook/route.ts', {
+    env: { LINE_CHANNEL_SECRET: 'actual-secret' },
+    firestore: { createFirestoreDocument: async () => { writes += 1; return { ok: true }; } },
+  });
+  const response = await api.POST(signedRequest('ดูทรัพย์', 'wrong-secret'));
+  assert.equal(response.status, 401);
+  assert.equal(writes, 0);
+});
+
+test('staff simulation neither writes customer records nor sends real replies', async () => {
+  let writes = 0;
+  let sends = 0;
+  const api = load('app/api/line/webhook/route.ts', {
+    env: { LINE_CHANNEL_ACCESS_TOKEN: 'test-token' },
+    fetch: async () => { sends += 1; return Response.json({}); },
+    firestore: {
+      createFirestoreDocument: async () => { writes += 1; return { ok: true }; },
+      listFirestoreDocuments: async () => [{ published: true, title: 'Public home', slug: 'home' }],
+    },
+  });
+  const response = await api.POST(new Request('https://example.com/api/line/webhook', {
+    method: 'POST', headers: { 'x-line-simulation': 'true' },
+    body: JSON.stringify({ events: [
+      { type: 'follow', replyToken: 'test_follow', source: { userId: 'Utest' } },
+      { type: 'message', replyToken: 'test_message', source: { userId: 'Utest' }, message: { type: 'text', text: 'ดูทรัพย์' } },
+    ] }),
+  }));
+  const result = await response.json();
+  assert.equal(result.simulation, true);
+  assert.equal(result.simulatedReplies, 2);
+  assert.equal(result.successfulReplies, 0);
+  assert.equal(writes, 0);
+  assert.equal(sends, 0);
 });
 
 test('webhook does not claim to have replied when the LINE token is missing', async () => {

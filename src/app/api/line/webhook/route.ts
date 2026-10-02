@@ -5,7 +5,7 @@ import { createFirestoreDocument, listFirestoreDocuments } from '@/lib/firestore
 
 const OFFICIAL_LINE_OA_URL = 'https://lin.ee/NMSe28T3';
 const DEFAULT_PHONE = '081-604-0097';
-const DEFAULT_LINE_ID = '@chantakorn';
+const DEFAULT_LINE_ID = '@930xzcyi';
 
 interface LineOaConfig {
   channelAccessToken: string;
@@ -60,8 +60,8 @@ async function replyLineMessage(replyToken: string, channelAccessToken: string, 
   }
 
   if (!replyToken || replyToken === '00000000000000000000000000000000' || replyToken.startsWith('test_')) {
-    // LINE Developers Webhook Verification ping token
-    return true;
+    // Verification has no events; simulated events are handled separately.
+    return false;
   }
 
   try {
@@ -588,6 +588,8 @@ export async function GET(req: Request) {
 
   return jsonResponse({
     status: isChannelAccessTokenConfigured && isChannelSecretConfigured ? 'configured' : 'configuration_required',
+    buildRevision: process.env.APP_BUILD_SHA || 'unknown',
+    credentialValidation: 'presence_only',
     service: 'LINE Messaging API Webhook for Chantakorn Property',
     webhookEndpoint: `${hostOrigin}/api/line/webhook`,
     officialLineOaUrl: OFFICIAL_LINE_OA_URL,
@@ -595,7 +597,7 @@ export async function GET(req: Request) {
     isChannelAccessTokenConfigured,
     isChannelSecretConfigured,
     signatureVerificationSupported: true,
-    supportedEvents: ['message (text/location)', 'follow', 'unfollow', 'postback'],
+    supportedEvents: ['message (text)', 'follow', 'postback'],
     instructions: {
       step1: 'คัดลอก Webhook URL ไปวางใน LINE Developers Console > Messaging API > Webhook settings',
       step2: 'เปิดใช้งานสวิตช์ "Use webhook" เป็น Enabled',
@@ -635,8 +637,16 @@ export async function POST(req: Request) {
     const events: any[] = body.events || [];
     const hostOrigin = (process.env.NEXT_PUBLIC_SITE_URL || new URL(req.url).origin).replace(/\/+$/, '');
     let failedReplies = 0;
+    let successfulReplies = 0;
+    let simulatedReplies = 0;
     const reply = async (replyToken: string, messages: any[]) => {
-      if (!(await replyLineMessage(replyToken, config.channelAccessToken, messages))) failedReplies += 1;
+      if (isSimulation) {
+        simulatedReplies += 1;
+      } else if (await replyLineMessage(replyToken, config.channelAccessToken, messages)) {
+        successfulReplies += 1;
+      } else {
+        failedReplies += 1;
+      }
     };
 
     // Handle each event in batch
@@ -646,7 +656,7 @@ export async function POST(req: Request) {
 
       // Event A: User adds LINE OA as friend (Follow)
       if (type === 'follow') {
-        await saveInquiry({
+        if (!isSimulation) await saveInquiry({
           userId,
           message: 'ผู้ใช้เพิ่มเพื่อนใหม่ (Followed LINE Official Account)',
           inquiry_type: 'inquiry',
@@ -664,7 +674,7 @@ export async function POST(req: Request) {
         // Website form submissions are already stored before the customer opens LINE.
         // Keep the LINE chat message, but avoid creating a duplicate inbox record.
         const isWebsiteFormSubmission = /\[CP-WEB-FORM:[0-9a-f-]{36}\]/i.test(userText);
-        if (!isWebsiteFormSubmission) {
+        if (!isSimulation && !isWebsiteFormSubmission) {
           await saveInquiry({
             userId,
             message: userText,
@@ -764,10 +774,16 @@ export async function POST(req: Request) {
     }
 
     // Always respond 200 OK to LINE Webhook requests
+    console.info('[LINE Webhook] Processing result', {
+      processedEvents: events.length, successfulReplies, failedReplies, simulatedReplies, simulation: isSimulation,
+    });
     return jsonResponse({
       success: failedReplies === 0,
       processedEvents: events.length,
+      successfulReplies,
       failedReplies,
+      simulatedReplies,
+      simulation: isSimulation,
       timestamp: new Date().toISOString(),
     });
   } catch (error: any) {

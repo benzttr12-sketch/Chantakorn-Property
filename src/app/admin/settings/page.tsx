@@ -34,7 +34,7 @@ export default function AdminSettingsPage() {
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      setWebhookUrl(apiUrl('/api/line/webhook'));
+      setWebhookUrl(new URL(apiUrl('/api/line/webhook'), window.location.origin).toString());
     }
   }, []);
 
@@ -184,6 +184,7 @@ export default function AdminSettingsPage() {
 
       const data = await res.json();
       setWebhookTestResult({
+        success: res.ok && data.success === true,
         status: res.status,
         data,
         simulatedKeyword: webhookSimKeyword,
@@ -191,6 +192,7 @@ export default function AdminSettingsPage() {
       });
     } catch (err: any) {
       setWebhookTestResult({
+        success: false,
         status: 'error',
         error: err.message || String(err),
         timestamp: new Date().toLocaleTimeString('th-TH')
@@ -221,7 +223,7 @@ export default function AdminSettingsPage() {
               <div className="flex items-center gap-2">
                 <h2 className="text-base font-extrabold text-navy-950">LINE Messaging API Webhook URL</h2>
                 <span className="px-2 py-0.5 rounded-full text-[10px] bg-emerald-200 text-emerald-900 font-bold">
-                  พร้อมใช้งาน (Active)
+                  ต้องยืนยันการรับข้อความใน LINE
                 </span>
               </div>
               <p className="text-xs text-emerald-900 mt-0.5">
@@ -258,11 +260,12 @@ export default function AdminSettingsPage() {
             <span>ขั้นตอนการนำ Webhook URL ไปเปิดใช้งานใน LINE Developers:</span>
           </p>
           <ol className="list-decimal list-inside space-y-1 text-gray-700 pl-1 leading-relaxed text-[11px]">
-            <li>เข้าสู่ <a href="https://developers.line.biz" target="_blank" rel="noreferrer" className="text-[#06C755] font-bold underline">LINE Developers Console</a> แล้วเลือก Messaging API Channel ของ <strong>@chantakorn</strong></li>
+            <li>เข้าสู่ <a href="https://developers.line.biz" target="_blank" rel="noreferrer" className="text-[#06C755] font-bold underline">LINE Developers Console</a> แล้วเลือก Messaging API Channel ของ <strong>@930xzcyi</strong></li>
             <li>ไปที่แท็บ <strong>&quot;Messaging API&quot;</strong> แล้วเลื่อนลงมาที่ส่วน <strong>&quot;Webhook settings&quot;</strong></li>
             <li>วาง URL ด้านบนลงในช่อง <strong>&quot;Webhook URL&quot;</strong> แล้วกดปุ่ม <strong>&quot;Update&quot;</strong></li>
             <li>เปิดใช้งานสวิตช์ <strong>&quot;Use webhook&quot;</strong> ให้เป็น <strong>&quot;Enabled&quot;</strong></li>
-            <li>กดปุ่ม <strong>&quot;Verify&quot;</strong> — ระบบจะตอบรับสถานะ <strong>Success 200 OK</strong> ทันที</li>
+            <li>กดปุ่ม <strong>&quot;Verify&quot;</strong> และตรวจว่าได้ <strong>Success</strong></li>
+            <li>ส่ง <strong>ดูทรัพย์</strong> จากบัญชี LINE ผู้ใช้ แล้วตรวจว่าได้รับการ์ดทรัพย์และเปิดรายละเอียดได้</li>
           </ol>
         </div>
       </section>
@@ -279,11 +282,11 @@ export default function AdminSettingsPage() {
 
         <div className="space-y-3">
           <p className="text-xs text-gray-600">
-            เลือกหรือพิมพ์ข้อความที่ต้องการทดสอบ เพื่อตรวจสอบว่า Webhook ประมวลผลและตอบกลับข้อมูล Flex Message ถูกต้อง:
+            เลือกหรือพิมพ์ข้อความเพื่อทดสอบการประมวลผลเท่านั้น การจำลองไม่ส่งข้อความเข้า LINE และไม่บันทึกข้อมูลลงกล่องข้อความลูกค้า:
           </p>
 
           <div className="flex flex-wrap items-center gap-2">
-            {['สวัสดี', 'บ้านเดี่ยว หาดใหญ่', 'ที่ดิน สิงหนคร', 'ฝากขายบ้าน', 'ติดต่อแอดมิน', 'ประเมินราคา'].map((keyword) => (
+            {['ดูทรัพย์', 'สวัสดี', 'บ้านเดี่ยว หาดใหญ่', 'ที่ดิน สิงหนคร', 'ฝากขายบ้าน', 'ติดต่อแอดมิน', 'ประเมินราคา'].map((keyword) => (
               <button
                 key={keyword}
                 type="button"
@@ -322,9 +325,11 @@ export default function AdminSettingsPage() {
             <div className="mt-3 p-3.5 bg-gray-900 text-emerald-400 rounded-xl font-mono text-[11px] space-y-1.5 overflow-x-auto shadow-inner">
               <div className="flex items-center justify-between text-gray-400 border-b border-gray-800 pb-1">
                 <span>ผลการทดสอบ Webhook (เวลา {webhookTestResult.timestamp})</span>
-                <span className="text-emerald-400 font-bold">Status: {webhookTestResult.status} (OK)</span>
+                <span className={webhookTestResult.success ? 'text-emerald-400 font-bold' : 'text-red-400 font-bold'}>
+                  Status: {webhookTestResult.status} ({webhookTestResult.success ? 'จำลองสำเร็จ' : 'ไม่สำเร็จ'})
+                </span>
               </div>
-              <pre className="whitespace-pre-wrap">{JSON.stringify(webhookTestResult.data, null, 2)}</pre>
+              <pre className="whitespace-pre-wrap">{JSON.stringify(webhookTestResult.data || { error: webhookTestResult.error }, null, 2)}</pre>
             </div>
           )}
         </div>

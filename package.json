@@ -12,7 +12,7 @@
     "build:pages": "node scripts/build-pages.mjs",
     "preview:pages": "node scripts/preview-pages.mjs",
     "preview:worker": "wrangler dev --config wrangler.jsonc",
-    "deploy:worker": "wrangler deploy --config wrangler.jsonc --keep-vars"
+    "deploy:worker": "node scripts/deploy-worker.mjs"
   },
   "engines": {
     "node": ">=18"
