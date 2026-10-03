@@ -588,7 +588,7 @@ export async function GET(req: Request) {
 
   return jsonResponse({
     status: isChannelAccessTokenConfigured && isChannelSecretConfigured ? 'configured' : 'configuration_required',
-    buildRevision: process.env.APP_BUILD_SHA || 'unknown',
+    buildRevision: process.env.VERCEL_GIT_COMMIT_SHA || process.env.APP_BUILD_SHA || 'unknown',
     credentialValidation: 'presence_only',
     service: 'LINE Messaging API Webhook for Chantakorn Property',
     webhookEndpoint: `${hostOrigin}/api/line/webhook`,

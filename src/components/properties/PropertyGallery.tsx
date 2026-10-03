@@ -143,6 +143,7 @@ export default function PropertyGallery({ id, title, images, videoUrl }: Propert
           alt={`${title} - รูปที่ ${selectedIndex + 1}`}
           fill
           priority
+          unoptimized={typeof photoList[selectedIndex] === 'string' && photoList[selectedIndex].startsWith('data:')}
           className="object-cover transition-transform duration-500 group-hover:scale-102"
         />
 
@@ -195,6 +196,7 @@ export default function PropertyGallery({ id, title, images, videoUrl }: Propert
                 src={img}
                 alt={`Thumbnail ${idx + 1}`}
                 fill
+                unoptimized={typeof img === 'string' && img.startsWith('data:')}
                 className="object-cover"
               />
             </button>
@@ -226,6 +228,7 @@ export default function PropertyGallery({ id, title, images, videoUrl }: Propert
                 src={photoList[selectedIndex]}
                 alt={`Full preview ${selectedIndex + 1}`}
                 fill
+                unoptimized={typeof photoList[selectedIndex] === 'string' && photoList[selectedIndex].startsWith('data:')}
                 className="object-contain"
               />
             </div>
@@ -254,7 +257,13 @@ export default function PropertyGallery({ id, title, images, videoUrl }: Propert
                   selectedIndex === idx ? 'ring-2 ring-gold-400' : 'opacity-50 hover:opacity-80'
                 }`}
               >
-                <Image src={img} alt={`Thumb ${idx}`} fill className="object-cover" />
+                <Image
+                  src={img}
+                  alt={`Thumb ${idx}`}
+                  fill
+                  unoptimized={typeof img === 'string' && img.startsWith('data:')}
+                  className="object-cover"
+                />
               </button>
             ))}
           </div>

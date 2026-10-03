@@ -374,7 +374,7 @@ export default function AdminSettingsPage() {
         {/* LINE Notification Settings Form */}
         <form onSubmit={handleSaveLineSettings} className="space-y-4 pt-1">
           <p className="rounded-xl bg-emerald-50 p-3 text-sm text-emerald-900">
-            แจ้งเตือนถึง LINE ส่วนตัวของเจ้าของบัญชีที่ตั้งค่าไว้ กดทดสอบเพื่อส่งข้อความจริง หากต้องเปลี่ยนบัญชีหรือผู้รับ ให้ผู้ดูแลปรับค่าใน Cloudflare
+            แจ้งเตือนถึงบัญชีเจ้าหน้าที่ที่ผู้ดูแลกำหนดไว้ กดทดสอบเพื่อส่งข้อความจริง หากต้องเปลี่ยนบัญชีหรือผู้รับ ให้ผู้ดูแลปรับค่าใน Vercel production
           </p>
 
           {/* Autonotify toggles */}
@@ -427,7 +427,7 @@ export default function AdminSettingsPage() {
 
             {saveSuccess && (
               <span className="text-xs text-emerald-600 font-bold bg-emerald-50 border border-emerald-200 px-3 py-1.5 rounded-lg animate-in fade-in">
-                ✓ บันทึกสถานะการแจ้งเตือนแล้ว; LINE credentials ต้องตั้งใน Cloudflare Workers
+                ✓ บันทึกสถานะการแจ้งเตือนแล้ว; LINE credentials ต้องตั้งใน Vercel production
               </span>
             )}
           </div>

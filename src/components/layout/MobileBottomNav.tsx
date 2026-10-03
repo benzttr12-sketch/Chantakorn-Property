@@ -7,7 +7,8 @@ import { Home, Search, Heart, PhoneCall } from 'lucide-react';
 import { getFavoriteIds } from '@/lib/store/properties-store';
 
 export default function MobileBottomNav() {
-  const pathname = usePathname();
+  const rawPathname = usePathname();
+  const pathname = rawPathname || '';
   const [favCount, setFavCount] = useState(0);
 
   useEffect(() => {

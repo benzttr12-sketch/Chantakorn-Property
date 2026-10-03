@@ -37,46 +37,15 @@ npm run build:pages
 npm run preview:pages
 ```
 
-เปิด http://localhost:4173 ไฟล์สำหรับเผยแพร่อยู่ใน `.next-pages/` ไม่ต้อง commit โฟลเดอร์นี้
+เปิด http://localhost:4173 ไฟล์สำหรับเผยแพร่อยู่ใน `out/` ไม่ต้อง commit โฟลเดอร์นี้
 
-`build:pages` เลือกข้อมูลตัวอย่างและปิดล็อกอินทดลองโดยค่าเริ่มต้น แม้ในเครื่องมี `.env.local` สำหรับฐานข้อมูลจริง เพื่อให้ผลการ build สำหรับสาธารณะคาดเดาได้; workflow เผยแพร่ตั้ง backend เป็น Firebase โดยค่าเริ่มต้น
-GitHub Pages รองรับเฉพาะไฟล์ static; API ทำงานแยกบน Cloudflare Worker ฟรี แล้วหน้าเว็บเรียกผ่าน `NEXT_PUBLIC_API_BASE_URL`
+`build:pages` เลือกข้อมูลตัวอย่างและปิดล็อกอินทดลองโดยค่าเริ่มต้น แม้ในเครื่องมี `.env.local` สำหรับฐานข้อมูลจริง เพื่อให้ผลการ build สำหรับสาธารณะคาดเดาได้
 
-## ใช้งาน API บน Cloudflare Workers
+## LINE production บน Vercel
 
-API ใช้ Cloudflare Worker แยกจากหน้าเว็บ static บน GitHub Pages เพื่อให้ Worker อยู่ภายในขนาด script ฟรีและใช้ Firestore REST แทน Firebase Node SDK ทดสอบในเครื่องได้ด้วย:
+ตั้ง `LINE_CHANNEL_ACCESS_TOKEN` และ `LINE_CHANNEL_SECRET` จาก Messaging API channel เดียวกันของ OA `@930xzcyi` ใน Vercel Production Environment Variables แล้ว redeploy ตั้ง Webhook URL เป็น `https://chantakoprnroperty.vercel.app/api/line/webhook` ใน LINE Developers Console กด Verify และเปิด Use webhook
 
-```sh
-npm run preview:worker
-```
-
-การเผยแพร่จากเครื่องที่ล็อกอิน Cloudflare แล้ว:
-
-```sh
-npx wrangler login
-npm run deploy:worker
-```
-
-ตั้ง Secrets ใน Cloudflare Dashboard → Workers & Pages → `chantakorn-property-api` → Settings → Variables and Secrets:
-
-- `GEMINI_API_KEY`
-- `LINE_CHANNEL_ACCESS_TOKEN`
-- `LINE_CHANNEL_SECRET`
-- `LINE_TARGET_USER_ID` (จำเป็นเฉพาะแจ้งเตือนส่วนตัวถึงเจ้าของบัญชี; ไม่ต้องใช้สำหรับตอบลูกค้าผ่าน webhook)
-
-Gemini ใช้ `gemini-3.5-flash-lite` โดยตรง หากเรียก AI ไม่สำเร็จจะแสดงข้อผิดพลาด ไม่สลับโมเดลหรือแสดงผลจำลองแทน ส่วนคำถามที่พบบ่อยแบบคัดสรรยังเปิดอ่านได้ตามปกติ
-
-การแจ้งเตือนเมื่อพนักงานลงประกาศใหม่ส่งข้อความส่วนตัวถึง `LINE_TARGET_USER_ID` ของเจ้าของบัญชีเท่านั้น เจ้าของบัญชีต้องเพิ่มเพื่อน LINE OA และไม่บล็อกบัญชี ระบบไม่ broadcast และไม่ใช้ LINE Notify เมื่อ API ปฏิเสธข้อความจะรายงานข้อผิดพลาด
-
-ฟอร์มฝากขาย `/sell` บันทึกข้อมูลก่อน แล้วเปิดแชต LINE OA พร้อมข้อความสรุปให้ลูกค้ากดส่งเอง ข้อความจึงจะปรากฏในแชต OA เส้นทางนี้ไม่ต้องใช้ `LINE_TARGET_USER_ID` สำหรับการตอบด้วยการ์ดทรัพย์ ให้ใช้ token และ secret จาก Messaging API channel เดียวกันของ OA `@930xzcyi` และตั้ง webhook เป็น `https://chantakorn-property-api.chantakorn-property.workers.dev/api/line/webhook` ใน LINE Developers Console แล้วกด Verify และเปิด Use webhook ห้ามใช้ GitHub Pages เป็นปลายทาง webhook เพราะรองรับเฉพาะไฟล์ static
-
-ต้อง deploy Worker แยกด้วย `npm run deploy:worker` จาก checkout ที่ commit การแก้ไขแล้ว; workflow GitHub Pages ไม่ได้ deploy API คำสั่งนี้เก็บตัวแปรเดิมและใส่ commit SHA ใน `APP_BUILD_SHA` โดยอัตโนมัติ ตรวจ `GET /api/line/webhook` ว่า `buildRevision` ตรงกับ commit ที่เผยแพร่และ `status` เป็น `configured` สถานะนี้ตรวจเพียงว่ามีค่า credentials ไม่ยืนยันว่า LINE ยอมรับ token หรือส่งข้อความสำเร็จ ดู [ขั้นตอนเปิดใช้และทดสอบ LINE production](docs/line-production.md) ก่อนสรุปว่าใช้งานจริงได้
-
-หลัง deploy ให้ตั้ง GitHub repository variable `NEXT_PUBLIC_API_BASE_URL` เป็น Worker URL เช่น `https://chantakorn-property-api.<account>.workers.dev` แล้วรัน GitHub Pages workflow ใหม่ ตั้ง `ALLOWED_ORIGINS` ใน Worker ให้ตรงกับ origin ของเว็บไซต์ (ค่าเริ่มต้นคือ `https://benzttr12-sketch.github.io`) และตั้ง `NEXT_PUBLIC_SITE_URL` ให้เป็น URL หน้าเว็บจริง
-
-API สำหรับงานพนักงานตรวจ Firebase ID token และ role `ADMIN`/`AGENT` จาก Firestore ทุกครั้ง ส่วน LINE webhook ต้องส่ง `x-line-signature` ที่ตรวจด้วย channel secret ได้ ฟอร์มลูกค้าสาธารณะส่งคำถามและฝากขายได้โดยไม่มี token ต้อง deploy `firestore.rules` ที่แก้ให้ settings อ่าน/เขียนได้เฉพาะพนักงานก่อนใช้งาน secrets จริง
-
-เอกสารตั้งค่าที่เกี่ยวข้อง: [Cloudflare Workers](https://developers.cloudflare.com/workers/), [ตัวแปรและ secrets](https://developers.cloudflare.com/workers/configuration/secrets/), [Workers pricing และข้อจำกัด](https://developers.cloudflare.com/workers/platform/pricing/)
+`GET /api/line/webhook` แสดงสถานะและ commit (`buildRevision`) โดยไม่แสดง secrets คำว่า `configured` ตรวจเพียงว่ามีค่า ต้องส่ง `ดูทรัพย์` จากบัญชี LINE ผู้ใช้และเปิดรายละเอียดจากการ์ดเพื่อยืนยันการส่งจริง `LINE_TARGET_USER_ID` และ `LINE_ADMIN_USER_IDS` ใช้เฉพาะ private staff notifications ไม่ต้องใช้สำหรับการตอบลูกค้า ห้ามตั้ง GitHub Pages เป็น webhook หรือเก็บ secrets ในหน้าเว็บ/Firestore ดู [ขั้นตอนเปิดใช้และทดสอบ](docs/line-production.md)
 
 ## เผยแพร่บน GitHub Pages
 
@@ -85,7 +54,7 @@ API สำหรับงานพนักงานตรวจ Firebase ID tok
 3. ไปที่ **Actions → Build and deploy website → Run workflow** หรือ push commit ใหม่
 4. รอ job `build` และ `deploy` สำเร็จ แล้วเปิด URL ที่แสดงใน environment `github-pages`
 
-Workflow `.github/workflows/pages.yml` จะติดตั้ง dependencies จาก `bun.lock`, ตรวจ lint/types, สร้าง static export และเผยแพร่เว็บ เส้นทาง CSS/JavaScript และลิงก์รองรับชื่อ repository ใน URL แล้ว
+Workflow `.github/workflows/pages.yml` จะติดตั้งด้วย `npm ci`, ตรวจ lint/types, สร้าง static export และเผยแพร่เว็บ เส้นทาง CSS/JavaScript และลิงก์รองรับชื่อ repository ใน URL แล้ว
 
 URL ตามชื่อ repository ปัจจุบันคือ `https://benzttr12-sketch.github.io/Chantakorn-Property/` โดยจะใช้ได้หลัง deploy สำเร็จและเปิด Pages แล้วเท่านั้น
 

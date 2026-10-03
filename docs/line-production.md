@@ -1,73 +1,62 @@
 # เปิดใช้ LINE production
 
-หน้าเว็บ GitHub Pages และ Cloudflare Worker เป็นคนละ deployment การ merge PR และ workflow Pages สำเร็จไม่ยืนยันว่า API ได้รับโค้ดรุ่นเดียวกัน
+Runtime ปัจจุบันของ repository คือ Next.js บน Vercel ส่วน GitHub Pages เป็น static site และรับ webhook ไม่ได้ Cloudflare Worker จากรุ่นก่อนเป็น deployment แยกและไม่ได้ตามโค้ด main อัตโนมัติ
 
-## การตั้งค่าใน LINE และ Cloudflare
+## ตั้งค่าที่ Vercel และ LINE
 
-1. เลือก Messaging API channel ที่ผูกกับ OA `@930xzcyi` ใน LINE Developers Console
-2. ใช้ channel access token จากแท็บ Messaging API และ channel secret จาก Basic settings ของ channel เดียวกัน หากมีค่าที่ใช้งานได้อยู่แล้ว ไม่ต้องออกใหม่
-3. ใน Cloudflare → Workers & Pages → `chantakorn-property-api` → Settings → Variables and Secrets ตั้ง `LINE_CHANNEL_ACCESS_TOKEN` และ `LINE_CHANNEL_SECRET` เป็น Secret แล้ว Deploy ห้ามใส่ค่าใน Git, `NEXT_PUBLIC_*` หรือหน้าเว็บ
-4. ตั้ง `NEXT_PUBLIC_SITE_URL` เป็น `https://benzttr12-sketch.github.io/Chantakorn-Property` เพื่อให้ลิงก์การ์ดไปยังเว็บไซต์ และ `ALLOWED_ORIGINS` เป็น `https://benzttr12-sketch.github.io` สำหรับการเรียก API จากหน้าเว็บ
-5. `LINE_TARGET_USER_ID` จำเป็นเฉพาะ private push ถึงเจ้าหน้าที่ ไม่จำเป็นสำหรับ Reply API ที่ตอบบัญชีลูกค้าผู้ส่งข้อความ
+1. LINE Developers Console: เลือก Messaging API channel ของ OA `@930xzcyi`
+2. Vercel project → Settings → Environment Variables → Production: ตั้ง `LINE_CHANNEL_ACCESS_TOKEN` และ `LINE_CHANNEL_SECRET` จาก LINE channel เดียวกัน แล้ว redeploy production
+3. ตั้ง `NEXT_PUBLIC_SITE_URL=https://chantakoprnroperty.vercel.app` เพื่อให้การ์ดเปิดหน้าเว็บจริง
+4. `LINE_TARGET_USER_ID` และ `LINE_ADMIN_USER_IDS` (คั่นด้วย comma) ใช้เฉพาะ private push ถึงเจ้าหน้าที่ที่อนุมัติ ไม่จำเป็นสำหรับการตอบลูกค้าผ่าน webhook ห้ามเพิ่มลูกค้าผู้ทักเข้ารายชื่อแอดมินโดยอัตโนมัติ
 
-## เผยแพร่โค้ดและตรวจรุ่น
+เก็บ token/secret ฝั่งเซิร์ฟเวอร์เท่านั้น ไม่เก็บใน source, localStorage หรือ Firestore settings และไม่ส่งค่ากลับไปหน้าเว็บ หากค่าเคยถูกเผยแพร่ ผู้ดูแลต้องเปลี่ยนค่าที่ LINE และ Vercel และ redeploy; การนำค่าออกจาก source ไม่ยกเลิกค่าที่หลุดไปแล้ว
 
-จาก checkout ที่สะอาดและ commit แล้ว:
+## ตรวจ deployment
 
-```sh
-npm test
-npm run lint
-npm run typecheck
-npm run deploy:worker -- --dry-run
-npm run deploy:worker
-```
+เปิด `https://chantakoprnroperty.vercel.app/api/line/webhook`:
 
-`deploy:worker` รักษาตัวแปรและ secrets เดิม และกำหนด `APP_BUILD_SHA` จาก Git HEAD ห้าม deploy ขณะมีไฟล์แก้ไขที่ยังไม่ commit เพราะ SHA จะระบุโค้ดที่เผยแพร่ไม่ได้
-
-เปิด `https://chantakorn-property-api.chantakorn-property.workers.dev/api/line/webhook` แล้วตรวจ:
-
-- `buildRevision` ตรงกับ commit ที่ deploy
 - `status: configured` และ credential flags ทั้งสองเป็น `true`
-- `credentialValidation: presence_only` หมายถึงตรวจว่ามีค่าเท่านั้น ยังไม่ได้ตรวจ token กับ LINE
+- `buildRevision` ตรงกับ commit ของ Vercel production deployment (`VERCEL_GIT_COMMIT_SHA`)
+- `credentialValidation: presence_only` หมายถึงตรวจว่ามีค่าเท่านั้น ไม่ยืนยันว่า token ใช้ได้หรือส่งจริง
 
-สำหรับหน้าเว็บ ให้ตั้ง GitHub repository variable `NEXT_PUBLIC_API_BASE_URL` เป็น `https://chantakorn-property-api.chantakorn-property.workers.dev` แล้วเผยแพร่ Pages ใหม่เมื่อเปลี่ยนค่านี้
+โค้ดจะปฏิเสธลายเซ็นไม่ถูกต้อง/ไม่มี secret และรายงานข้อผิดพลาดเมื่อ Reply API ไม่ยอมรับข้อความ ไม่ใช้ข้อมูลตัวอย่างแทน Firestore และเลือกเฉพาะรายการ `published: true`
 
 ## เปิด webhook
 
-ใน LINE Developers Console → Messaging API → Webhook settings:
+LINE Developers Console → Messaging API → Webhook settings:
 
-1. ตั้ง Webhook URL เป็น `https://chantakorn-property-api.chantakorn-property.workers.dev/api/line/webhook`
+1. ตั้ง Webhook URL เป็น `https://chantakoprnroperty.vercel.app/api/line/webhook`
 2. กด Update แล้ว Verify ให้ได้ Success และเปิด Use webhook
-3. ตรวจ Auto-reply และ Greeting ใน LINE OA Manager หากตั้งให้บอตจัดการคำตอบ ให้ปิดข้อความสำเร็จรูปที่ซ้ำกัน
+3. ใน LINE OA Manager ปิด Auto-reply และ Greeting ที่ซ้ำกับคำตอบจากบอต
 
-หนึ่ง channel ตั้ง webhook ได้หนึ่ง endpoint หากเลือกใช้ Vercel แทน Worker ต้องตั้ง secrets และตรวจรุ่นใน Vercel และใช้ production URL ที่ LINE เข้าถึงได้โดยไม่ต้องล็อกอิน ห้ามใช้ Preview ที่มี deployment protection
+หนึ่ง channel ตั้ง webhook ได้หนึ่ง endpoint ห้ามใช้ Preview ที่ต้องล็อกอิน ถ้าเลือก Cloudflare ในอนาคต ต้อง deploy API แยกและตั้ง secrets ใน Worker แล้วเปลี่ยน URL โดยตรวจ flow จริงอีกครั้ง การตั้ง secrets ที่ Cloudflare ไม่ตั้งค่า Vercel ให้ด้วย
 
 ## ทดสอบข้อความจริง
 
-1. ยืนยันว่า Firestore ของ Worker มีทรัพย์ `published: true` พร้อม slug และหน้าเว็บอ่านข้อมูลจากฐานเดียวกัน
+1. ยืนยันว่า Firestore ของ production มีทรัพย์ `published: true` พร้อม slug
 2. เพิ่มเพื่อน/ปลดบล็อก OA `@930xzcyi` จากบัญชี LINE ผู้ใช้
-3. ส่งข้อความ `ดูทรัพย์` แล้วตรวจว่าได้รับการ์ดของทรัพย์ที่เผยแพร่จริง ไม่มีร่างหรือข้อมูลตัวอย่าง
-4. กดดูรายละเอียดบนเว็บจากการ์ด ตรวจว่าเปิด `/properties/detail/?slug=...` และแสดงรายการตรงกัน
-5. ตรวจ Worker logs รายการ `[LINE Webhook] Processing result`: สำหรับข้อความหนึ่ง event ควรมี `successfulReplies: 1`, `failedReplies: 0`, `simulation: false` และไม่มี error จาก Reply API เก็บหลักฐานการได้รับการ์ดและเปิดรายละเอียดจริง
+3. ส่ง `ดูทรัพย์` แล้วตรวจว่าได้รับการ์ดทรัพย์ที่เผยแพร่จริง ไม่มีร่างหรือข้อมูลตัวอย่าง
+4. กดดูรายละเอียดจากการ์ด ตรวจว่าหน้าเว็บแสดงรายการตรงกัน
+5. ตรวจ logs `[LINE Webhook] Processing result`: สำหรับข้อความหนึ่ง event ควรมี `successfulReplies: 1`, `failedReplies: 0`, `simulation: false` เก็บหลักฐานการได้รับการ์ดและเปิดรายละเอียดจริง
 
-Verify ส่ง `events: []` จึงตรวจได้เพียงการเชื่อมต่อและลายเซ็น ไม่ได้ทดสอบ Reply API HTTP 200 อย่างเดียวก็ยังไม่ยืนยันการส่ง เพราะ webhook อาจส่ง `success: false` และ `failedReplies` มากกว่า 0 ต้องดู logs และการได้รับข้อความจริงประกอบ
+Verify ส่ง `events: []` จึงตรวจเพียงการเชื่อมต่อและลายเซ็น ไม่เรียก Reply API HTTP 200 อย่างเดียวก็ไม่ยืนยันการส่ง เพราะ response อาจเป็น `success: false` และ `failedReplies` มากกว่า 0
 
-ปุ่มจำลองในหน้าตั้งค่าสำหรับพนักงานตรวจการประมวลผลเท่านั้น ไม่เรียก LINE Reply API และไม่สร้าง inquiry ผลจะระบุ `simulation: true`, `simulatedReplies` และ `successfulReplies: 0`
+ปุ่มจำลองในหน้าตั้งค่าสำหรับพนักงานตรวจการประมวลผลเท่านั้น ไม่เรียก LINE และไม่สร้าง inquiry ผลระบุ `simulation: true`, `simulatedReplies` และ `successfulReplies: 0`
 
-สำหรับ `/sell` ให้ทดสอบอีกเส้นทาง: บันทึกฟอร์ม → เปิดแชต OA → ลูกค้ากด Send → ตรวจว่าแชตได้รับข้อความและ inbox ไม่มีรายการซ้ำจาก `[CP-WEB-FORM:...]`
+ฟอร์ม `/sell` เป็นอีกเส้นทาง: บันทึกฟอร์ม → เปิดแชต OA → ลูกค้ากด Send → ตรวจว่ามีข้อความและไม่สร้าง inbox ซ้ำจาก `[CP-WEB-FORM:...]`
 
 ## ตรวจปัญหา
 
 | อาการ | สิ่งที่ตรวจ |
 |---|---|
-| `configuration_required` | Secret ชื่อถูกต้องและ deploy ใน runtime ที่ webhook ชี้ไป |
-| `buildRevision` ไม่ตรงหรือเป็น `unknown` | Deploy Worker ด้วยคำสั่งของ repository จาก commit ที่ต้องการ |
+| `configuration_required` | Environment Variables ของ Vercel production และ redeploy หลังเปลี่ยนค่า |
+| `buildRevision` ไม่ตรง | commit และ alias ของ production deployment |
 | Verify ไม่ผ่าน / webhook 401 | Secret ของ channel, URL, การเข้าถึง HTTPS และลายเซ็นของ body เดิม |
 | Reply API 401 | Access token หมดอายุ/ถูกยกเลิกหรือเป็นคนละ channel |
 | Reply API 400 | รูปแบบ Flex และ reply token จาก event จริง |
-| มีข้อความต้อนรับแต่ไม่มีการ์ดทรัพย์ | Query Firestore, rules และข้อมูล `published: true`; โค้ดไม่ใช้ข้อมูลตัวอย่างแทน |
-| การ์ดเปิดรายละเอียดผิดที่ | `NEXT_PUBLIC_SITE_URL` ใน Worker และ slug ของรายการ |
+| ไม่มีการ์ดทรัพย์ | Query Firestore, rules และข้อมูล `published: true` |
+| รายละเอียดเปิดผิดที่ | `NEXT_PUBLIC_SITE_URL` และ slug |
 
-หาก deployment ทำให้ flow เดิมเสีย ใช้ Cloudflare deployment ก่อนหน้าเพื่อ rollback และตรวจ webhook ซ้ำ ห้ามเปลี่ยนหรือแสดงค่า secrets เพื่อแก้ปัญหาเฉพาะหน้า
+หาก deployment ใหม่ทำให้ flow เดิมเสีย ให้ rollback ใน Vercel แล้วตรวจ webhook ซ้ำ ไม่เปลี่ยนหรือแสดง secrets เพื่อแก้เฉพาะหน้า
 
-อ้างอิง: [LINE bot settings](https://developers.line.biz/en/docs/messaging-api/building-bot/), [verify webhook](https://developers.line.biz/en/docs/messaging-api/verify-webhook-url/), [signature verification](https://developers.line.biz/en/docs/messaging-api/verify-webhook-signature/), [Cloudflare secrets](https://developers.cloudflare.com/workers/configuration/secrets/)
+อ้างอิง: [LINE settings](https://developers.line.biz/en/docs/messaging-api/building-bot/), [verify webhook](https://developers.line.biz/en/docs/messaging-api/verify-webhook-url/), [signature verification](https://developers.line.biz/en/docs/messaging-api/verify-webhook-signature/)

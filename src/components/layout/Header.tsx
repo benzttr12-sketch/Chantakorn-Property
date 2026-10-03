@@ -32,7 +32,8 @@ export default function Header() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [favCount, setFavCount] = useState(0);
   const [currentUser, setCurrentUser] = useState<UserProfile | null>(null);
-  const pathname = usePathname();
+  const rawPathname = usePathname();
+  const pathname = rawPathname || '';
 
   useEffect(() => {
     const handleScroll = () => {

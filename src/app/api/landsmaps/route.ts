@@ -1,7 +1,7 @@
-import { jsonResponse } from '@/lib/api-response';
+import { NextRequest, NextResponse } from 'next/server';
 import { generateLandsMapsParcelInfo, estimateTreasuryAppraisalRate, calculateLandTransferFees } from '@/lib/landsmaps';
 
-export async function POST(req: Request) {
+export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
     const {
@@ -35,7 +35,7 @@ export async function POST(req: Request) {
       Boolean(isOwnedOver5Years)
     );
 
-    return jsonResponse({
+    return NextResponse.json({
       success: true,
       timestamp: new Date().toISOString(),
       source: 'https://landsmaps.dol.go.th/',
@@ -45,7 +45,7 @@ export async function POST(req: Request) {
       },
     });
   } catch (error: any) {
-    return jsonResponse(
+    return NextResponse.json(
       {
         success: false,
         error: error?.message || 'Failed to parse parcel data from DOL LandsMaps',
@@ -55,7 +55,7 @@ export async function POST(req: Request) {
   }
 }
 
-export async function GET(req: Request) {
+export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const chanoteNo = searchParams.get('chanoteNo') || '12345';
   const district = searchParams.get('district') || 'หาดใหญ่';
@@ -78,7 +78,7 @@ export async function GET(req: Request) {
     chanoteNo
   );
 
-  return jsonResponse({
+  return NextResponse.json({
     success: true,
     timestamp: new Date().toISOString(),
     source: 'https://landsmaps.dol.go.th/',

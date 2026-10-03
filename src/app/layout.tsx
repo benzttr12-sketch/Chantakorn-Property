@@ -56,7 +56,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="th">
+    <html lang="th" data-scroll-behavior="smooth">
       <body className={`${promptFont.className} bg-surface-bg text-brand-text flex flex-col min-h-screen antialiased`}>
         <Header />
         <main className="flex-grow">

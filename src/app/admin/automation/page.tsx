@@ -1,7 +1,5 @@
 'use client';
 
-import { fetchStaffApi } from '@/lib/staff-api';
-
 import React, { useState, useEffect, useMemo, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
@@ -75,9 +73,9 @@ import {
 function AutomationContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const initialTab = searchParams.get('tab') || 'marketing';
-  const initialPropId = searchParams.get('propertyId') || '';
-  const initialInquiryId = searchParams.get('inquiryId') || '';
+  const initialTab = searchParams?.get('tab') || 'marketing';
+  const initialPropId = searchParams?.get('propertyId') || '';
+  const initialInquiryId = searchParams?.get('inquiryId') || '';
 
   const [activeTab, setActiveTab] = useState<'marketing' | 'best_time' | 'leads' | 'valuation' | 'contracts' | 'scripts' | 'media_studio'>(
     (initialTab as any) || 'marketing'
@@ -150,7 +148,7 @@ function AutomationContent() {
   const handleGenerateMedia = async (action: 'generate_video' | 'edit_image') => {
     setIsMediaLoading(true);
     try {
-      const res = await fetchStaffApi('/api/ai/property-media-studio', {
+      const res = await fetch('/api/ai/property-media-studio', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -237,7 +235,7 @@ function AutomationContent() {
     if (!selectedProperty) return;
     setIsAiGenerating(true);
     try {
-      const res = await fetchStaffApi('/api/ai/automate', {
+      const res = await fetch('/api/ai/automate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -250,7 +248,6 @@ function AutomationContent() {
         }),
       });
       const data = await res.json();
-      if (!res.ok || !data.success || !data.text) throw new Error(data.error || 'Gemini ไม่ส่งคำตอบกลับมา');
       if (data.success && data.text) {
         setGeneratedPost(prev => ({
           headline: prev?.headline || 'AI Generated Post',
@@ -260,8 +257,8 @@ function AutomationContent() {
           fullPost: data.text,
         }));
       }
-    } catch (error) {
-      window.alert(error instanceof Error ? error.message : 'เรียก Gemini ไม่สำเร็จ');
+    } catch {
+      // Fallback already active
     } finally {
       setIsAiGenerating(false);
     }

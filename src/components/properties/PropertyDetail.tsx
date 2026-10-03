@@ -21,12 +21,11 @@ import {
 import PropertyGallery from '@/components/properties/PropertyGallery';
 import PropertySpecs from '@/components/properties/PropertySpecs';
 import PropertyVideoTour from '@/components/properties/PropertyVideoTour';
-import MortgageCalculator from '@/components/tools/MortgageCalculator';
 import AgentCard from '@/components/properties/AgentCard';
 import PropertyInquiryForm from '@/components/properties/PropertyInquiryForm';
 import PropertyCard from '@/components/properties/PropertyCard';
 import PropertyMap from '@/components/properties/PropertyMap';
-import PropertyFengShui from '@/components/properties/PropertyFengShui';
+import LandsMapsParcelViewer from '@/components/landsmaps/LandsMapsParcelViewer';
 import SendToLineButton from '@/components/properties/SendToLineButton';
 import { fetchPropertyBySlug, fetchProperties } from '@/lib/store/properties-store';
 import { formatPrice, getPropertyStatusBadge, formatThaiNumber, formatPropertyCode, formatLineUrl } from '@/lib/utils';
@@ -289,15 +288,10 @@ export default function PropertyDetail({ slug, initialProperty = null }: { slug:
                   รายละเอียดทรัพย์
                 </h3>
                 <div className="prose prose-sm max-w-none text-gray-700 leading-relaxed space-y-3 whitespace-pre-line">
-                  {property.description}
-                </div>
-              </div>
-
-              {/* Verified Badge Guarantee */}
-              <div className="p-4 rounded-xl bg-emerald-50/70 border border-emerald-200 flex items-center space-x-3">
-                <ShieldCheck className="w-6 h-6 text-emerald-600 flex-shrink-0" />
-                <div className="text-xs text-emerald-900">
-                  <strong>การันตีความถูกต้องโดย Chantakorn Property:</strong> ตรวจสอบเอกสารสิทธิ์ โฉนดที่ดิน และความถูกต้องของข้อมูลทรัพย์เรียบร้อยแล้ว ปลอดภาระหนี้ซ้อน
+                  {(property.description || '')
+                    .replace(/📌 ข้อมูลรูปแปลงโฉนดที่ดิน \(DOL LandsMaps\):[\s\S]*/gi, '')
+                    .replace(/🛡️? ?การันตีความถูกต้องโดย Chantakorn Property:[\s\S]*/gi, '')
+                    .trim()}
                 </div>
               </div>
             </div>
@@ -334,17 +328,8 @@ export default function PropertyDetail({ slug, initialProperty = null }: { slug:
             {/* 5. Property Information Specifications */}
             <PropertySpecs property={property} />
 
-            {/* 5.1 Consignment & Loan Calculator for Properties */}
-            {property.price > 0 && (
-              <div className="scroll-mt-24">
-                <MortgageCalculator
-                  initialPrice={property.price}
-                  compact={true}
-                  title={`ประมาณการวงเงินขายฝาก-จำนองสำหรับ ${property.title}`}
-                  subtitle={`คำนวณวงเงินรับขายฝาก ดอกเบี้ยรายเดือน และค่าใช้จ่ายกรมที่ดินจากมูลค่าทรัพย์ ฿${formatThaiNumber(property.price)}`}
-                />
-              </div>
-            )}
+            {/* 5.1 Official Cadastral Land Parcel Map & DOL LandsMaps Verification */}
+            <LandsMapsParcelViewer property={property} />
 
             {/* 6. Features & Amenities */}
             {property.features && property.features.length > 0 && (
@@ -365,9 +350,6 @@ export default function PropertyDetail({ slug, initialProperty = null }: { slug:
               </div>
             )}
 
-            {/* 6.1 Automated Feng Shui & Auspicious Energy Analysis */}
-            <PropertyFengShui property={property} />
-
             {/* 7. Location & Interactive Map */}
             <div className="bg-white rounded-2xl p-6 border border-surface-border shadow-card">
               <div className="flex items-center justify-between mb-4 pb-2 border-b border-gray-100">
@@ -381,12 +363,13 @@ export default function PropertyDetail({ slug, initialProperty = null }: { slug:
               </div>
 
               {/* Map View */}
-              <div className="h-72 w-full rounded-xl overflow-hidden mb-6 border border-gray-200">
+              <div className="h-80 sm:h-96 w-full rounded-2xl overflow-hidden mb-6 border border-gray-200 shadow-sm relative">
                 <PropertyMap
                   properties={[property]}
                   selectedProperty={property}
-                  zoom={14}
+                  zoom={15}
                   height="100%"
+                  showDistrictPills={false}
                 />
               </div>
 

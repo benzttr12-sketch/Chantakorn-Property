@@ -8,7 +8,6 @@
 
 # next.js
 /.next/
-/.next-pages/
 /out/
 
 # production
@@ -17,8 +16,6 @@
 /.tools/
 /.sites-artifacts/
 /.wrangler/
-/.open-next/
-/.dev.vars
 
 # misc
 .DS_Store

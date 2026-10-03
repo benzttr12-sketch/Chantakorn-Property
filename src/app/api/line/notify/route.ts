@@ -9,6 +9,7 @@ interface LineSettings {
   channelAccessToken?: string;
   channelSecret?: string;
   targetUserId?: string;
+  adminUserIds?: string[];
   autoNotifyNewProperty?: boolean;
   autoNotifyConsignment?: boolean;
 }
@@ -27,6 +28,7 @@ async function getLineSettings(token?: string): Promise<LineSettings> {
     channelAccessToken: process.env.LINE_CHANNEL_ACCESS_TOKEN || '',
     channelSecret: process.env.LINE_CHANNEL_SECRET || '',
     targetUserId: process.env.LINE_TARGET_USER_ID || '',
+    adminUserIds: (process.env.LINE_ADMIN_USER_IDS || '').split(',').map((id) => id.trim()).filter(Boolean),
     autoNotifyNewProperty: true,
     autoNotifyConsignment: true,
   };
@@ -113,14 +115,16 @@ export async function POST(req: Request) {
       cachedSettings = null;
       return jsonResponse({
         success: true,
-        message: 'บันทึกสถานะการแจ้งเตือนแล้ว ส่วน LINE secrets ต้องตั้งใน Cloudflare Workers'
+        message: 'บันทึกสถานะการแจ้งเตือนแล้ว ส่วน LINE secrets ต้องตั้งใน Vercel production'
       });
     }
 
     const token = req.headers.get('authorization')?.match(/^Bearer\s+(.+)$/i)?.[1];
     const storedSettings = await getLineSettings(token);
     const lineAccessToken = storedSettings.channelAccessToken || '';
-    const lineTargetUserId = storedSettings.targetUserId || '';
+    const recipients = Array.from(new Set([
+      storedSettings.targetUserId || '', ...(storedSettings.adminUserIds || []),
+    ].map((id) => id.trim()).filter(Boolean)));
 
     const hostOrigin = (process.env.NEXT_PUBLIC_SITE_URL || new URL(req.url).origin).replace(/\/+$/, '');
 
@@ -412,16 +416,18 @@ LINE Official Account: ${OFFICIAL_LINE_OA_URL}`;
       if (!heroImg) delete flexMessagePayload.contents.hero;
     }
 
-    if (!lineAccessToken.trim() || !/^U[0-9a-f]{32}$/i.test(lineTargetUserId.trim())) {
+    if (!lineAccessToken.trim() || recipients.length === 0 || recipients.some((id) => !/^U[0-9a-f]{32}$/i.test(id))) {
       return jsonResponse({ success: false, isRealSent: false, error: 'ยังไม่ได้ตั้งค่าโทเค็นและผู้รับ LINE ส่วนตัวให้ครบถ้วน' }, { status: 503 });
     }
 
-    // Fail closed: customer details are sent only to the configured owner.
+    // Send only to staff recipients explicitly configured in the server runtime.
+    let acceptedRecipients = 0;
+    for (const recipient of recipients) {
     const response = await fetch('https://api.line.me/v2/bot/message/push', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${lineAccessToken.trim()}` },
       body: JSON.stringify({
-        to: lineTargetUserId.trim(),
+        to: recipient,
         messages: [{ type: 'text', text: messageText.slice(0, 5000) }, { ...flexMessagePayload, altText: flexMessagePayload.altText.slice(0, 400) }],
       }),
     });
@@ -432,10 +438,12 @@ LINE Official Account: ${OFFICIAL_LINE_OA_URL}`;
       const error = response.status === 401 ? 'โทเค็น LINE ไม่ถูกต้องหรือหมดอายุ'
         : response.status === 429 ? 'LINE จำกัดการส่งข้อความหรือโควตาประจำเดือนเต็ม'
         : 'LINE ไม่รับข้อความ กรุณาตรวจผู้รับและรูปแบบข้อมูล';
-      return jsonResponse({ success: false, isRealSent: false, error, requestId }, { status: 502 });
+      return jsonResponse({ success: false, isRealSent: false, error, requestId, acceptedRecipients }, { status: 502 });
+    }
+    acceptedRecipients += 1;
     }
     return jsonResponse({
-      success: true, isRealSent: true, simulated: false, requestId,
+      success: true, isRealSent: true, simulated: false, acceptedRecipients,
       deliveryStatus: 'accepted',
       message: 'LINE รับคำขอส่งข้อความถึงเจ้าของบัญชีแล้ว',
     });

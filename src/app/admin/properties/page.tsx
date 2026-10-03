@@ -43,6 +43,7 @@ import PropertyHistoryModal from '@/components/admin/PropertyHistoryModal';
 import AdminLandsMapsOverlayModal from '@/components/admin/AdminLandsMapsOverlayModal';
 import CollapsiblePropertyRow from '@/components/admin/CollapsiblePropertyRow';
 import CollapsiblePropertyCard from '@/components/admin/CollapsiblePropertyCard';
+import SendToLineModal from '@/components/properties/SendToLineModal';
 import { 
   fetchAdminProperties, 
   updateProperty, 
@@ -103,6 +104,15 @@ export default function AdminPropertiesPage() {
   // DOL LandsMaps Overlay Modal State
   const [landsMapsModalProperty, setLandsMapsModalProperty] = useState<Property | null>(null);
   const [isLandsMapsModalOpen, setIsLandsMapsModalOpen] = useState(false);
+
+  // Direct LINE OA Share Modal State
+  const [lineModalProperty, setLineModalProperty] = useState<Property | null>(null);
+  const [isLineModalOpen, setIsLineModalOpen] = useState(false);
+
+  const handleOpenLineModal = (prop: Property) => {
+    setLineModalProperty(prop);
+    setIsLineModalOpen(true);
+  };
 
   const handleOpenHistory = (prop: Property) => {
     setHistoryModalProperty(prop);
@@ -995,6 +1005,7 @@ export default function AdminPropertiesPage() {
                     copiedSnippetId={copiedSnippetId}
                     onOpenLandsMaps={handleOpenLandsMapsOverlay}
                     onOpenHistoryModal={handleOpenHistory}
+                    onOpenLineModal={handleOpenLineModal}
                     onDuplicate={handleDuplicate}
                     onDeleteConfirm={(id) => setDeleteConfirmId(id)}
                     onUpdateNotes={handleUpdatePropertyNotes}
@@ -1145,6 +1156,27 @@ export default function AdminPropertiesPage() {
         allProperties={properties}
         onPropertyUpdated={loadData}
       />
+
+      {/* Direct LINE OA Share Modal */}
+      {lineModalProperty && (
+        <SendToLineModal
+          isOpen={isLineModalOpen}
+          onClose={() => {
+            setIsLineModalOpen(false);
+            setLineModalProperty(null);
+          }}
+          autoSend={true}
+          property={{
+            id: lineModalProperty.id,
+            title: lineModalProperty.title,
+            price: lineModalProperty.price,
+            status: lineModalProperty.status,
+            district: lineModalProperty.district,
+            province: lineModalProperty.province,
+            slug: lineModalProperty.slug,
+          }}
+        />
+      )}
 
       {/* Inline Update Success Toast Notification */}
       {inlineSuccessToast && (

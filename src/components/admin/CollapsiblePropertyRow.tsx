@@ -1,10 +1,5 @@
 'use client';
 
-import { buildLinePropertyPayload } from '@/lib/line-property-payload';
-
-
-import { fetchStaffApi } from '@/lib/staff-api';
-
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
@@ -81,6 +76,7 @@ interface CollapsiblePropertyRowProps {
   onDuplicate: (property: Property) => void;
   onDeleteConfirm: (id: string) => void;
   onUpdateNotes?: (id: string, notes: string) => Promise<void>;
+  onOpenLineModal?: (property: Property) => void;
   completionScore: number;
   busy: boolean;
 }
@@ -113,6 +109,7 @@ export default function CollapsiblePropertyRow({
   onDuplicate,
   onDeleteConfirm,
   onUpdateNotes,
+  onOpenLineModal,
   completionScore,
   busy
 }: CollapsiblePropertyRowProps) {
@@ -148,25 +145,11 @@ export default function CollapsiblePropertyRow({
   const [notesSuccess, setNotesSuccess] = useState(false);
   const [notesError, setNotesError] = useState('');
 
-  const [sendingLine, setSendingLine] = useState(false);
-  const [lineSent, setLineSent] = useState(false);
-
-  const handleSendToLine = async () => {
-    setSendingLine(true);
-    try {
-      const res = await fetchStaffApi('/api/line/notify', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(buildLinePropertyPayload(property)),
-      });
-      const data = await res.json();
-      if (!res.ok || !data.isRealSent) throw new Error(data.error || 'ส่งข้อความเข้า LINE ไม่สำเร็จ');
-      setLineSent(true);
-      setTimeout(() => setLineSent(false), 3000);
-    } catch (err) {
-      window.alert(err instanceof Error ? err.message : 'ส่งข้อความเข้า LINE ไม่สำเร็จ');
-    } finally {
-      setSendingLine(false);
+  const handleSendToLine = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (onOpenLineModal) {
+      onOpenLineModal(property);
     }
   };
 
@@ -686,18 +669,12 @@ export default function CollapsiblePropertyRow({
 
             <button
               type="button"
-              disabled={sendingLine}
               onClick={handleSendToLine}
-              className="p-1.5 text-[#06C755] hover:text-[#05b34c] hover:bg-emerald-50 rounded-lg cursor-pointer transition-colors"
-              title="เด้งแจ้งเตือนเข้า LINE OA (https://lin.ee/NMSe28T3)"
+              className="p-1.5 text-[#06C755] hover:text-white hover:bg-[#06C755] bg-emerald-50 rounded-lg cursor-pointer transition-all border border-emerald-200 hover:border-[#06C755] shadow-xs active:scale-95"
+              title="ส่งข้อมูลทรัพย์ไปยัง LINE OA (@930xzcyi)"
+              aria-label="ส่งข้อมูลทรัพย์ไปยัง LINE OA"
             >
-              {sendingLine ? (
-                <Loader2 className="w-4 h-4 animate-spin text-[#06C755]" />
-              ) : lineSent ? (
-                <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-              ) : (
-                <MessageCircle className="w-4 h-4 fill-current text-[#06C755]" />
-              )}
+              <MessageCircle className="w-4 h-4 fill-current" />
             </button>
 
             <Link

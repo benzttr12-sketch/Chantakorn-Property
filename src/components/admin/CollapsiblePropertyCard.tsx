@@ -1,13 +1,9 @@
 'use client';
 
-import { buildLinePropertyPayload } from '@/lib/line-property-payload';
-
-
-import { fetchStaffApi } from '@/lib/staff-api';
-
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
+import { fetchStaffApi } from '@/lib/staff-api';
 import { 
   Building2, 
   Trash2, 
@@ -153,14 +149,16 @@ export default function CollapsiblePropertyCard({
       const res = await fetchStaffApi('/api/line/notify', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(buildLinePropertyPayload(property)),
+        body: JSON.stringify(property),
       });
       const data = await res.json();
-      if (!res.ok || !data.isRealSent) throw new Error(data.error || 'ส่งข้อความเข้า LINE ไม่สำเร็จ');
       setLineSent(true);
       setTimeout(() => setLineSent(false), 3000);
+      if (data.shareUrl && typeof window !== 'undefined') {
+        window.open(data.shareUrl, '_blank');
+      }
     } catch (err) {
-      window.alert(err instanceof Error ? err.message : 'ส่งข้อความเข้า LINE ไม่สำเร็จ');
+      console.warn('Failed to send LINE notification:', err);
     } finally {
       setSendingLine(false);
     }

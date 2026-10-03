@@ -14,14 +14,17 @@ const nextConfig = {
   distDir: staticExport ? '.next-pages' : '.next',
   ...(staticExport ? { output: 'export', trailingSlash: true } : {}),
   ...(normalizedBasePath ? { basePath: normalizedBasePath } : {}),
+  devIndicators: false,
+  experimental: {
+    devtoolSegmentExplorer: false,
+  },
   poweredByHeader: false,
   env: {
-    NEXT_PUBLIC_DATA_BACKEND: process.env.NEXT_PUBLIC_DATA_BACKEND || 'firebase',
-    NEXT_PUBLIC_STATIC_EXPORT: staticExport ? 'true' : 'false',
+    NEXT_PUBLIC_DATA_BACKEND: process.env.NEXT_PUBLIC_DATA_BACKEND === 'supabase' && !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ? 'firebase' : (process.env.NEXT_PUBLIC_DATA_BACKEND || 'firebase'),
     NEXT_PUBLIC_GOOGLE_MAPS_API_KEY: process.env.VITE_GOOGLE_MAPS_API_KEY || process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || 'AIzaSyCcrGFUpzyw7EtVk7uP2C8EYOsY-e8MF34',
   },
   images: {
-    unoptimized: staticExport,
+    unoptimized: true,
     remotePatterns: [
       {
         protocol: 'https',

@@ -1,7 +1,21 @@
-import { jsonResponse } from '@/lib/api-response';
+import { NextRequest, NextResponse } from 'next/server';
 import { GoogleGenAI, Type } from '@google/genai';
-import type { FAQCategoryData, FAQItem } from '@/lib/faq-types';
-import { GEMINI_PRIMARY_MODEL, generateGeminiContent } from '@/lib/gemini';
+
+export interface FAQItem {
+  id: string;
+  question: string;
+  answer: string;
+  category: string;
+  tag: string;
+  tip?: string;
+}
+
+export interface FAQCategoryData {
+  category: string;
+  categoryTitle: string;
+  faqs: FAQItem[];
+  source: 'gemini-3.8-flash' | 'curated-expert-database';
+}
 
 // Curated Fallback Database for Hat Yai - Songkhla Real Estate
 const CURATED_FAQS: Record<string, FAQItem[]> = {
@@ -156,7 +170,7 @@ const CATEGORY_NAMES: Record<string, string> = {
   legal: 'โฉนดที่ดิน & ข้อกฎหมาย',
 };
 
-export async function POST(req: Request) {
+export async function POST(req: NextRequest) {
   try {
     const body = await req.json().catch(() => ({}));
     const category = typeof body.category === 'string' && body.category in CURATED_FAQS ? body.category : 'all';
@@ -191,8 +205,8 @@ export async function POST(req: Request) {
   "tip": "คำแนะนำพิเศษที่เป็นประโยชน์ 1 ประโยค"
 }`;
 
-          const { response, model } = await generateGeminiContent(ai, {
-            model: GEMINI_PRIMARY_MODEL,
+          const response = await ai.models.generateContent({
+            model: 'gemini-3.8-flash',
             contents: prompt,
             config: {
               systemInstruction: 'คุณคือที่ปรึกษาอสังหาริมทรัพย์ผู้เชี่ยวชาญในหาดใหญ่และสงขลา ตอบเป็น JSON เท่านั้น',
@@ -214,25 +228,39 @@ export async function POST(req: Request) {
           const text = response.text?.trim();
           if (text) {
             const parsed = JSON.parse(text);
-            return jsonResponse({
+            return NextResponse.json({
               success: true,
-              source: model,
+              source: 'gemini-3.8-flash',
               faq: {
                 id: `faq-custom-${Date.now()}`,
                 ...parsed,
               },
             });
           }
-        } catch (geminiError) {
-          throw geminiError;
+        } catch (geminiError: any) {
+          const isQuota = geminiError?.status === 429 || geminiError?.message?.includes('429') || geminiError?.message?.includes('quota');
+          if (!isQuota) {
+            console.info('Custom Q&A using curated fallback response');
+          }
         }
       }
 
-      return jsonResponse({ success: false, error: 'Gemini ไม่พร้อมให้บริการ กรุณาลองอีกครั้ง' }, { status: 503 });
+      // Fallback for custom question if Gemini is unavailable
+      return NextResponse.json({
+        success: true,
+        source: 'curated-expert-database',
+        faq: {
+          id: `faq-custom-${Date.now()}`,
+          question: customQuestion,
+          answer: `ขอบคุณสำหรับคำถามครับ สำหรับกรณี "${customQuestion}" ในพื้นที่หาดใหญ่–สงขลา แนะนำให้ตรวจสอบรายละเอียดเอกสารสิทธิ์โฉนดที่ดิน ผังเมือง และเงื่อนไขสัญญาอย่างรอบคอบ หรือสามารถติดต่อทีมงานที่ปรึกษา Chantakorn Property ได้โดยตรงทางโทรศัพท์ 081-604-0097 หรือ LINE Official Account เพื่อรับคำปรึกษาเชิงลึกที่สอดคล้องกับกรณีของคุณโดยไม่มีค่าใช้จ่ายครับ`,
+          category: 'buying',
+          tag: 'คำถามพิเศษ',
+          tip: 'สามารถปรึกษาทีมงานผ่าน LINE OA https://lin.ee/NMSe28T3 ได้ตลอด 24 ชม.',
+        },
+      });
     }
 
     // Mode 2: Fetch Category FAQ List (Dynamically generated with Gemini or refreshed)
-    if (body.refreshWithGemini === true && !apiKey) return jsonResponse({ success: false, error: 'ยังไม่ได้ตั้งค่า Gemini' }, { status: 503 });
     if (apiKey && body.refreshWithGemini === true) {
       try {
         const ai = new GoogleGenAI({
@@ -253,8 +281,8 @@ export async function POST(req: Request) {
 2. คำตอบกระชับ ตรงประเด็น ชัดเจน
 3. มีคำแนะนำพิเศษ (tip) 1 ประโยคในแต่ละข้อ`;
 
-        const { response, model } = await generateGeminiContent(ai, {
-          model: GEMINI_PRIMARY_MODEL,
+        const response = await ai.models.generateContent({
+          model: 'gemini-3.8-flash',
           contents: prompt,
           config: {
             systemInstruction: 'คุณคือที่ปรึกษาอสังหาริมทรัพย์ผู้เชี่ยวชาญ ตอบกลับด้วยโครงสร้าง JSON เท่านั้น',
@@ -287,24 +315,26 @@ export async function POST(req: Request) {
         const text = response.text?.trim();
         if (text) {
           const parsed = JSON.parse(text);
-          return jsonResponse({
+          return NextResponse.json({
             success: true,
-            source: model,
+            source: 'gemini-3.8-flash',
             category,
             categoryTitle: parsed.categoryTitle || CATEGORY_NAMES[category] || 'คำถามที่พบบ่อย',
             faqs: parsed.faqs || [],
           });
         }
-      } catch (geminiError) {
-        throw geminiError;
+      } catch (geminiError: any) {
+        const isQuota = geminiError?.status === 429 || geminiError?.message?.includes('429') || geminiError?.message?.includes('quota');
+        if (!isQuota) {
+          console.info('Using curated real estate FAQ database');
+        }
       }
-      return jsonResponse({ success: false, error: 'Gemini ไม่ส่งคำตอบกลับมา' }, { status: 502 });
     }
 
     // Default: Fast, ultra-reliable Curated Database
     const items = CURATED_FAQS[category] || CURATED_FAQS.all;
 
-    return jsonResponse({
+    return NextResponse.json({
       success: true,
       source: 'curated-expert-database',
       category,
@@ -313,7 +343,7 @@ export async function POST(req: Request) {
     });
   } catch (error) {
     console.error('Error handling FAQ route:', error);
-    return jsonResponse(
+    return NextResponse.json(
       {
         success: false,
         error: error instanceof Error ? error.message : 'เกิดข้อผิดพลาดในการโหลดคำถาม-คำตอบ',
@@ -323,12 +353,12 @@ export async function POST(req: Request) {
   }
 }
 
-export async function GET(req: Request) {
+export async function GET(req: NextRequest) {
   const url = new URL(req.url);
   const category = url.searchParams.get('category') || 'all';
   const items = CURATED_FAQS[category] || CURATED_FAQS.all;
 
-  return jsonResponse({
+  return NextResponse.json({
     success: true,
     source: 'curated-expert-database',
     category,

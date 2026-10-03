@@ -263,17 +263,23 @@ export default function AdminLandsMapsOverlayModal({
         // Add custom zoom control at top-right
         L.control.zoom({ position: 'topright' }).addTo(map);
 
-        // Tile Layer Definitions
-        let tileUrl = 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png';
-        let attribution = '&copy; OpenStreetMap &copy; CARTO | DOL LandsMaps';
+        // Tile Layer Definitions (High-res, watermark-free)
+        let tileUrl = 'https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}';
+        let attribution = '&copy; Google Maps &copy; DOL LandsMaps';
 
-        if (mapLayer === 'satellite') {
-          tileUrl = 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}';
-          attribution = 'Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye';
+        if (mapLayer === 'standard') {
+          tileUrl = 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
+          attribution = '&copy; OpenStreetMap contributors | DOL LandsMaps';
+        } else if (mapLayer === 'satellite') {
+          tileUrl = 'https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}';
+          attribution = '&copy; Google Satellite &copy; DOL Cadastral Imagery';
+        } else {
+          tileUrl = 'https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}';
+          attribution = '&copy; Google Maps &copy; DOL LandsMaps Cadastre';
         }
 
         tileLayerRef.current = L.tileLayer(tileUrl, {
-          maxZoom: 19,
+          maxZoom: 20,
           attribution,
         }).addTo(map);
 
@@ -283,16 +289,22 @@ export default function AdminLandsMapsOverlayModal({
         // Update tile layer if changed
         if (tileLayerRef.current) {
           mapInstanceRef.current.removeLayer(tileLayerRef.current);
-          let tileUrl = 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png';
-          let attribution = '&copy; OpenStreetMap &copy; CARTO | DOL LandsMaps';
+          let tileUrl = 'https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}';
+          let attribution = '&copy; Google Maps &copy; DOL LandsMaps';
 
-          if (mapLayer === 'satellite') {
-            tileUrl = 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}';
-            attribution = 'Tiles &copy; Esri &mdash; DOL Cadastral Imagery';
+          if (mapLayer === 'standard') {
+            tileUrl = 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
+            attribution = '&copy; OpenStreetMap contributors | DOL LandsMaps';
+          } else if (mapLayer === 'satellite') {
+            tileUrl = 'https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}';
+            attribution = '&copy; Google Satellite &copy; DOL Cadastral Imagery';
+          } else {
+            tileUrl = 'https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}';
+            attribution = '&copy; Google Maps &copy; DOL LandsMaps Cadastre';
           }
 
           tileLayerRef.current = L.tileLayer(tileUrl, {
-            maxZoom: 19,
+            maxZoom: 20,
             attribution,
           }).addTo(mapInstanceRef.current);
         }
@@ -483,12 +495,9 @@ export default function AdminLandsMapsOverlayModal({
     if (!activeProperty) return;
     setSaving(true);
     try {
-      const updatedDescription = activeProperty.description.includes('📌 ข้อมูลรูปแปลงโฉนดที่ดิน (DOL LandsMaps):')
-        ? activeProperty.description.replace(
-            /📌 ข้อมูลรูปแปลงโฉนดที่ดิน \(DOL LandsMaps\):[\s\S]*/,
-            `📌 ข้อมูลรูปแปลงโฉนดที่ดิน (DOL LandsMaps):\n• เลขที่โฉนด: ${chanoteNo}\n• ระวาง: ${mapSheet}\n• เลขที่ดิน: ${landNo} | หน้าสำรวจ: ${surveyPage}\n• ราคาประเมินกรมธนารักษ์: ฿${appraisalRate.toLocaleString()} / ตร.ว. (รวม ฿${totalAppraisalVal.toLocaleString()})`
-          )
-        : `${activeProperty.description}\n\n📌 ข้อมูลรูปแปลงโฉนดที่ดิน (DOL LandsMaps):\n• เลขที่โฉนด: ${chanoteNo}\n• ระวาง: ${mapSheet}\n• เลขที่ดิน: ${landNo} | หน้าสำรวจ: ${surveyPage}\n• ราคาประเมินกรมธนารักษ์: ฿${appraisalRate.toLocaleString()} / ตร.ว. (รวม ฿${totalAppraisalVal.toLocaleString()})`;
+      const updatedDescription = (activeProperty.description || '')
+        .replace(/📌 ข้อมูลรูปแปลงโฉนดที่ดิน \(DOL LandsMaps\):[\s\S]*/gi, '')
+        .trim();
 
       await updateProperty(activeProperty.id, {
         description: updatedDescription,

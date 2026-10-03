@@ -1,5 +1,3 @@
-'use client';
-
 // src/lib/firebase/client.ts
 // Firebase configuration for Chantakorn Property
 import { initializeApp, getApps, getApp, FirebaseApp } from 'firebase/app';
@@ -89,7 +87,11 @@ export function handleFirestoreError(error: unknown, operationType: OperationTyp
     operationType,
     path
   };
-  console.error('Firestore Error: ', JSON.stringify(errInfo));
+  try {
+    console.error('Firestore Error: ', JSON.stringify(errInfo));
+  } catch {
+    console.error('Firestore Error: ', errInfo.error, operationType, path);
+  }
   return errInfo;
 }
 

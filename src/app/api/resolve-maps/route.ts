@@ -1,17 +1,13 @@
-import { jsonResponse } from '@/lib/api-response';
+import { NextRequest, NextResponse } from 'next/server';
 import { parseGoogleMapsCoordinates, isValidLatLng } from '@/lib/utils';
-import { requireStaff } from '@/lib/server-auth';
 
-export async function POST(req: Request) {
-  const denied = await requireStaff(req);
-  if (denied) return denied;
-
+export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
     const { url } = body;
 
     if (!url || typeof url !== 'string') {
-      return jsonResponse({ error: 'กรุณาระบุ URL ของ Google Maps' }, { status: 400 });
+      return NextResponse.json({ error: 'กรุณาระบุ URL ของ Google Maps' }, { status: 400 });
     }
 
     const trimmed = url.trim();
@@ -19,7 +15,7 @@ export async function POST(req: Request) {
     // 1. ตรวจสอบพิกัดแบบทันทีด้วย parseGoogleMapsCoordinates
     const directParsed = parseGoogleMapsCoordinates(trimmed);
     if (directParsed) {
-      return jsonResponse({
+      return NextResponse.json({
         success: true,
         lat: directParsed.lat,
         lng: directParsed.lng,
@@ -32,14 +28,14 @@ export async function POST(req: Request) {
     try {
       targetUrl = new URL(trimmed.startsWith('http') ? trimmed : `https://${trimmed}`);
     } catch {
-      return jsonResponse({ error: 'URL ไม่ถูกต้อง' }, { status: 400 });
+      return NextResponse.json({ error: 'URL ไม่ถูกต้อง' }, { status: 400 });
     }
 
     // ตรวจสอบโดเมน Google
     const hostname = targetUrl.hostname.toLowerCase();
     const isGoogle = hostname.includes('google') || hostname.includes('goo.gl');
     if (!isGoogle) {
-      return jsonResponse({ error: 'รองรับเฉพาะลิงก์ Google Maps เท่านั้น' }, { status: 400 });
+      return NextResponse.json({ error: 'รองรับเฉพาะลิงก์ Google Maps เท่านั้น' }, { status: 400 });
     }
 
     // 3. ยิง HTTP GET เพื่อตาม Redirect ไปยัง URL ปลายทางที่มีพิกัดจริง
@@ -59,7 +55,7 @@ export async function POST(req: Request) {
     // 4. ตรวจสอบพิกัดจาก URL ปลายทางหลัง Redirect
     const urlParsed = parseGoogleMapsCoordinates(finalUrl);
     if (urlParsed) {
-      return jsonResponse({
+      return NextResponse.json({
         success: true,
         lat: urlParsed.lat,
         lng: urlParsed.lng,
@@ -72,7 +68,7 @@ export async function POST(req: Request) {
     const html = await response.text();
     const htmlParsed = parseGoogleMapsCoordinates(html);
     if (htmlParsed) {
-      return jsonResponse({
+      return NextResponse.json({
         success: true,
         lat: htmlParsed.lat,
         lng: htmlParsed.lng,
@@ -87,7 +83,7 @@ export async function POST(req: Request) {
       const lat = parseFloat(staticMapMatch[1]);
       const lng = parseFloat(staticMapMatch[2]);
       if (isValidLatLng(lat, lng)) {
-        return jsonResponse({
+        return NextResponse.json({
           success: true,
           lat,
           lng,
@@ -103,7 +99,7 @@ export async function POST(req: Request) {
       const lat = parseFloat(stateMatch[1]);
       const lng = parseFloat(stateMatch[2]);
       if (isValidLatLng(lat, lng)) {
-        return jsonResponse({
+        return NextResponse.json({
           success: true,
           lat,
           lng,
@@ -113,11 +109,11 @@ export async function POST(req: Request) {
       }
     }
 
-    return jsonResponse({
+    return NextResponse.json({
       error: 'ไม่พบพิกัดในลิงก์นี้ กรุณาคัดลอกพิกัดตัวเลข (เช่น 7.0084, 100.4747) หรือลิงก์ที่มีพิกัดจากเบราว์เซอร์',
     }, { status: 422 });
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'เกิดข้อผิดพลาดในการตรวจสอบลิงก์ Google Maps';
-    return jsonResponse({ error: message }, { status: 500 });
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }
