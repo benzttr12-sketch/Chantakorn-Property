@@ -6,7 +6,7 @@ const path = require('node:path');
 const vm = require('node:vm');
 const ts = require('typescript');
 
-function load(file, { env = {}, fetch = async () => { throw Error('Unexpected request'); }, firestore = {} } = {}) {
+function load(file, { env = {}, fetch = async () => { throw Error('Unexpected request'); }, firestore = {}, requireStaff = async () => null } = {}) {
   const module = { exports: {} };
   const source = ts.transpileModule(fs.readFileSync(path.join(__dirname, '../src', file), 'utf8'), {
     compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
@@ -17,7 +17,7 @@ function load(file, { env = {}, fetch = async () => { throw Error('Unexpected re
     fetch, process: { env }, console: { log() {}, info() {}, warn() {}, error() {} },
     require(name) {
       if (name === '@/lib/api-response') return { jsonResponse: (body, init) => Response.json(body, init) };
-      if (name === '@/lib/server-auth') return { requireStaff: async () => null };
+      if (name === '@/lib/server-auth') return { requireStaff };
       if (name === '@/lib/firestore-rest') return {
         createFirestoreDocument: firestore.createFirestoreDocument || (async () => ({ ok: true })),
         listFirestoreDocuments: firestore.listFirestoreDocuments || (async () => []),
@@ -111,6 +111,17 @@ test('staff simulation neither writes customer records nor sends real replies', 
   assert.equal(result.successfulReplies, 0);
   assert.equal(writes, 0);
   assert.equal(sends, 0);
+});
+
+test('anonymous callers cannot bypass signatures with the simulation header', async () => {
+  const api = load('app/api/line/webhook/route.ts', {
+    requireStaff: async () => Response.json({ error: 'Unauthorized' }, { status: 401 }),
+    firestore: { createFirestoreDocument: async () => { throw Error('Unexpected write'); } },
+  });
+  const response = await api.POST(new Request('https://example.com/api/line/webhook', {
+    method: 'POST', headers: { 'x-line-simulation': 'true' }, body: JSON.stringify({ events: [] }),
+  }));
+  assert.equal(response.status, 401);
 });
 
 test('webhook does not claim to have replied when the LINE token is missing', async () => {

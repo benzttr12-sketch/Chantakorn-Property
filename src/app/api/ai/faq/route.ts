@@ -1,21 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { GoogleGenAI, Type } from '@google/genai';
 
-export interface FAQItem {
-  id: string;
-  question: string;
-  answer: string;
-  category: string;
-  tag: string;
-  tip?: string;
-}
-
-export interface FAQCategoryData {
-  category: string;
-  categoryTitle: string;
-  faqs: FAQItem[];
-  source: 'gemini-3.8-flash' | 'curated-expert-database';
-}
+import type { FAQItem, FAQCategoryData } from '@/lib/faq-types';
 
 // Curated Fallback Database for Hat Yai - Songkhla Real Estate
 const CURATED_FAQS: Record<string, FAQItem[]> = {

@@ -17,7 +17,7 @@ import {
   FileCheck,
   Scale
 } from 'lucide-react';
-import { FAQItem } from '@/app/api/ai/faq/route';
+import type { FAQItem } from '@/lib/faq-types';
 
 const CATEGORIES = [
   { id: 'all', label: 'ทั้งหมด', icon: HelpCircle },

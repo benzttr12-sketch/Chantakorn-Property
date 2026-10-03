@@ -11,6 +11,8 @@ Runtime ปัจจุบันของ repository คือ Next.js บน Ve
 
 เก็บ token/secret ฝั่งเซิร์ฟเวอร์เท่านั้น ไม่เก็บใน source, localStorage หรือ Firestore settings และไม่ส่งค่ากลับไปหน้าเว็บ หากค่าเคยถูกเผยแพร่ ผู้ดูแลต้องเปลี่ยนค่าที่ LINE และ Vercel และ redeploy; การนำค่าออกจาก source ไม่ยกเลิกค่าที่หลุดไปแล้ว
 
+Firestore rules ต้องป้องกัน settings, profiles และกล่องข้อความลูกค้าด้วยสิทธิ์พนักงาน ห้ามเปิดสาธารณะหรือให้ผู้ใช้เปลี่ยน role ของตนเอง และต้อง deploy rules ไปยัง database ที่ระบุใน `firebase.json` แยกจากการ deploy Vercel
+
 ## ตรวจ deployment
 
 เปิด `https://chantakoprnroperty.vercel.app/api/line/webhook`:
