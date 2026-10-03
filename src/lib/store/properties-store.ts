@@ -6,6 +6,7 @@ import { formatPropertyCode } from '@/lib/format-code';
 import { supabase } from '@/lib/supabase/client';
 import { db } from '@/lib/firebase/client';
 import { dataBackend } from '@/lib/backend';
+import { fetchStaffApi } from '@/lib/staff-api';
 import { 
   collection, 
   getDocs, 
@@ -254,7 +255,7 @@ function generateShortPropertyId(): string {
 async function triggerLineNotification(property: Property) {
   if (typeof window === 'undefined' || typeof fetch === 'undefined') return;
   try {
-    const res = await fetch('/api/line/notify', {
+    const res = await fetchStaffApi('/api/line/notify', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(property),

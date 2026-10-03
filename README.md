@@ -37,9 +37,15 @@ npm run build:pages
 npm run preview:pages
 ```
 
-เปิด http://localhost:4173 ไฟล์สำหรับเผยแพร่อยู่ใน `out/` ไม่ต้อง commit โฟลเดอร์นี้
+เปิด http://localhost:4173 ไฟล์สำหรับเผยแพร่อยู่ใน `.next-pages/` ไม่ต้อง commit โฟลเดอร์นี้
 
 `build:pages` เลือกข้อมูลตัวอย่างและปิดล็อกอินทดลองโดยค่าเริ่มต้น แม้ในเครื่องมี `.env.local` สำหรับฐานข้อมูลจริง เพื่อให้ผลการ build สำหรับสาธารณะคาดเดาได้
+
+## LINE production บน Vercel
+
+ตั้ง `LINE_CHANNEL_ACCESS_TOKEN` และ `LINE_CHANNEL_SECRET` จาก Messaging API channel เดียวกันของ OA `@930xzcyi` ใน Vercel Production Environment Variables แล้ว redeploy ตั้ง Webhook URL เป็น `https://chantakoprnroperty.vercel.app/api/line/webhook` ใน LINE Developers Console กด Verify และเปิด Use webhook
+
+`GET /api/line/webhook` แสดงสถานะและ commit (`buildRevision`) โดยไม่แสดง secrets คำว่า `configured` ตรวจเพียงว่ามีค่า ต้องส่ง `ดูทรัพย์` จากบัญชี LINE ผู้ใช้และเปิดรายละเอียดจากการ์ดเพื่อยืนยันการส่งจริง `LINE_TARGET_USER_ID` และ `LINE_ADMIN_USER_IDS` ใช้เฉพาะ private staff notifications ไม่ต้องใช้สำหรับการตอบลูกค้า ห้ามตั้ง GitHub Pages เป็น webhook หรือเก็บ secrets ในหน้าเว็บ/Firestore ดู [ขั้นตอนเปิดใช้และทดสอบ](docs/line-production.md)
 
 ## เผยแพร่บน GitHub Pages
 

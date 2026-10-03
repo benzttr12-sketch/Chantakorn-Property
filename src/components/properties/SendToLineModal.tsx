@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { PropertyLineData, generatePropertyLineMessage, getLineShareUrl, OFFICIAL_LINE_OA_URL } from '@/lib/line-inquiry';
 import { OFFICIAL_LINE_BASIC_ID } from '@/lib/line-auth';
+import { fetchStaffApi } from '@/lib/staff-api';
 
 interface SendToLineModalProps {
   isOpen: boolean;
@@ -76,7 +77,7 @@ export default function SendToLineModal({ isOpen, onClose, property, autoSend = 
     setPushMessage('');
 
     try {
-      const res = await fetch('/api/line/notify', {
+      const res = await fetchStaffApi('/api/line/notify', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -97,7 +98,7 @@ export default function SendToLineModal({ isOpen, onClose, property, autoSend = 
       const data = await res.json();
       if (data.success && data.isRealSent) {
         setPushSuccess(true);
-        setPushMessage('🚀 ส่งข้อความแจ้งเตือน Flex Card เด้งเข้า LINE OA (@930xzcyi) สำเร็จเรียบร้อยแล้ว!');
+        setPushMessage('LINE รับคำขอส่งการ์ดถึงเจ้าหน้าที่ที่ตั้งค่าไว้แล้ว กรุณาตรวจการได้รับข้อความใน LINE');
       } else if (data.success) {
         setPushSuccess(true);
         setPushMessage('✨ จัดเตรียมข้อความสำเร็จ พร้อมส่งต่อเข้า LINE OA');
