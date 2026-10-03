@@ -907,6 +907,7 @@ export default function AdminPropertiesPage() {
               copiedSnippetId={copiedSnippetId}
               onOpenLandsMaps={handleOpenLandsMapsOverlay}
               onOpenHistoryModal={handleOpenHistory}
+              onOpenLineModal={handleOpenLineModal}
               onDuplicate={handleDuplicate}
               onDeleteConfirm={(id) => setDeleteConfirmId(id)}
               onUpdateNotes={handleUpdatePropertyNotes}
@@ -1172,8 +1173,14 @@ export default function AdminPropertiesPage() {
             price: lineModalProperty.price,
             status: lineModalProperty.status,
             district: lineModalProperty.district,
+            subdistrict: lineModalProperty.subdistrict,
             province: lineModalProperty.province,
             slug: lineModalProperty.slug,
+            cover_image: lineModalProperty.cover_image,
+            images: lineModalProperty.images,
+            property_type: lineModalProperty.property_type,
+            video_url: lineModalProperty.video_url,
+            agent: lineModalProperty.agent,
           }}
         />
       )}

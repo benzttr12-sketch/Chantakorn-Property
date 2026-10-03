@@ -88,7 +88,7 @@ export default function MarketIntelligenceSection() {
       },
     ],
     searchQueries: ['มอเตอร์เวย์ หาดใหญ่ สะเดา M84 ล่าสุด', 'ราคาที่ดิน สงขลา แนวโน้ม', 'ทางด่วน หาดใหญ่ มาเลเซีย'],
-    timestamp: new Date().toLocaleDateString('th-TH', { year: 'numeric', month: 'long', day: 'numeric' }),
+    timestamp: '2 ตุลาคม 2569',
   });
 
   const handleFetchInsight = async (queryText: string, topicId?: string) => {

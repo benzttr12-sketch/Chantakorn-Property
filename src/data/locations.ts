@@ -349,7 +349,7 @@ export const LOCATIONS: LocationItem[] = [
     name: "บ้านพรุ (หาดใหญ่)",
     nameEn: "Ban Phru",
     district: "หาดใหญ่",
-    image: "https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?auto=format&fit=crop&w=800&q=80",
+    image: "https://images.unsplash.com/photo-1580587771525-78b9dba3b914?auto=format&fit=crop&w=800&q=80",
     propertyCount: 24,
     description: "บรรยากาศร่มรื่น สวนสาธารณะพรุค้างคาว ใกล้ ม.หาดใหญ่ เหมาะแก่การอยู่อาศัยของครอบครัวคุณภาพ"
   },

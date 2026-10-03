@@ -37,7 +37,7 @@ export default function PropertyGallery({ id, title, images, videoUrl }: Propert
   }, [id]);
 
   const photoList = images && images.length > 0 ? images : [
-    'https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?auto=format&fit=crop&w=1200&q=80'
+    'https://images.unsplash.com/photo-1580587771525-78b9dba3b914?auto=format&fit=crop&w=1200&q=80'
   ];
 
   const handleShare = async () => {

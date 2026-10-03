@@ -89,7 +89,7 @@ import PropertyFormProgress, { FormValidationItem } from '@/components/admin/Pro
 
 // ตัวอย่างรูปภาพคุณภาพสูง สำหรับปุ่ม "ใส่รูปภาพตัวอย่างทันที 1 คลิก"
 const SAMPLE_HOUSE_PHOTOS = [
-  'https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?auto=format&fit=crop&w=1200&q=80',
+  'https://images.unsplash.com/photo-1580587771525-78b9dba3b914?auto=format&fit=crop&w=1200&q=80',
   'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=1200&q=80',
   'https://images.unsplash.com/photo-1600566753190-17f0baa2a6c3?auto=format&fit=crop&w=1200&q=80',
   'https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?auto=format&fit=crop&w=1200&q=80',
@@ -3169,17 +3169,27 @@ function PropertyEditor() {
 
               <div className="space-y-2 pt-2">
                 <a
+                  href={`https://line.me/R/oaMessage/${encodeURIComponent('@930xzcyi')}/?${encodeURIComponent(`📢 ลงประกาศอสังหาริมทรัพย์ใหม่บนเว็บไซต์ Chantakorn Property!\n🏡 ${createdSuccessData.title}\n💰 ราคา: ฿${createdSuccessData.price?.toLocaleString() || 0} บาท\n🔗 ดูรายละเอียด:\n👉 ${typeof window !== 'undefined' ? window.location.origin : ''}/properties/${encodeURIComponent(createdSuccessData.slug)}`)}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="w-full py-3.5 bg-gradient-to-r from-emerald-600 via-[#06C755] to-emerald-500 hover:from-emerald-500 hover:to-[#05b34c] text-white font-black text-xs sm:text-sm rounded-xl flex items-center justify-center gap-2 shadow-lg transition-all cursor-pointer active:scale-95 group"
+                >
+                  <MessageCircle className="w-4 h-4 fill-current group-hover:scale-110 transition-transform" />
+                  <span>🚀 กดส่งประกาศนี้เข้าห้องแชท LINE OA ทันที</span>
+                  <ExternalLink className="w-3.5 h-3.5 opacity-90" />
+                </a>
+
+                <a
                   href="https://lin.ee/NMSe28T3"
                   target="_blank"
                   rel="noreferrer"
-                  className="w-full py-3 bg-[#06C755] hover:bg-[#05b34c] text-white font-bold text-xs sm:text-sm rounded-xl flex items-center justify-center gap-2 shadow-md transition-all cursor-pointer active:scale-95"
+                  className="w-full py-2 bg-gray-50 hover:bg-emerald-50 text-emerald-800 border border-emerald-200 font-bold text-xs rounded-xl flex items-center justify-center gap-1.5 transition-all cursor-pointer"
                 >
-                  <MessageCircle className="w-4 h-4 fill-current" />
-                  <span>เปิดดูใน LINE OA (https://lin.ee/NMSe28T3)</span>
-                  <ExternalLink className="w-3.5 h-3.5" />
+                  <MessageCircle className="w-3.5 h-3.5 fill-current text-[#06C755]" />
+                  <span>เปิดโปรไฟล์ LINE OA (@930xzcyi)</span>
                 </a>
 
-                <div className="grid grid-cols-2 gap-2">
+                <div className="grid grid-cols-2 gap-2 pt-1">
                   <Link
                     href={`/properties/${createdSuccessData.slug}`}
                     target="_blank"

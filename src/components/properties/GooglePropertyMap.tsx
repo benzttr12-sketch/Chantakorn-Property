@@ -371,7 +371,7 @@ export default function GooglePropertyMap({
                   {/* Thumbnail Image */}
                   <div className="relative h-28 w-full rounded-xl overflow-hidden bg-slate-100 mb-2">
                     <Image
-                      src={activePopupProperty.cover_image || activePopupProperty.images?.[0] || 'https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?auto=format&fit=crop&w=600&q=80'}
+                      src={activePopupProperty.cover_image || activePopupProperty.images?.[0] || 'https://images.unsplash.com/photo-1580587771525-78b9dba3b914?auto=format&fit=crop&w=600&q=80'}
                       alt={activePopupProperty.title}
                       fill
                       className="object-cover"
@@ -473,7 +473,7 @@ export default function GooglePropertyMap({
                 >
                   <div className="relative w-20 h-20 rounded-xl overflow-hidden bg-slate-100 shrink-0">
                     <Image
-                      src={p.cover_image || p.images?.[0] || 'https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?auto=format&fit=crop&w=300&q=80'}
+                      src={p.cover_image || p.images?.[0] || 'https://images.unsplash.com/photo-1580587771525-78b9dba3b914?auto=format&fit=crop&w=300&q=80'}
                       alt={p.title}
                       fill
                       className="object-cover"

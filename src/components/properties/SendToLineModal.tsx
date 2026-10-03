@@ -15,7 +15,13 @@ import {
   Sparkles,
   Loader2
 } from 'lucide-react';
-import { PropertyLineData, generatePropertyLineMessage, getLineShareUrl, OFFICIAL_LINE_OA_URL } from '@/lib/line-inquiry';
+import { 
+  PropertyLineData, 
+  generatePropertyLineMessage, 
+  getLineShareUrl, 
+  getLineOaDirectMessageUrl,
+  OFFICIAL_LINE_OA_URL 
+} from '@/lib/line-inquiry';
 import { OFFICIAL_LINE_BASIC_ID } from '@/lib/line-auth';
 import { fetchStaffApi } from '@/lib/staff-api';
 
@@ -44,6 +50,7 @@ export default function SendToLineModal({ isOpen, onClose, property, autoSend = 
 
   const message = property ? generatePropertyLineMessage(property, origin) : '';
   const lineShareUrl = getLineShareUrl(message);
+  const lineOaDirectUrl = property ? getLineOaDirectMessageUrl(message) : OFFICIAL_LINE_OA_URL;
 
   const handleCopyText = async () => {
     if (!message) return;
@@ -91,6 +98,8 @@ export default function SendToLineModal({ isOpen, onClose, property, autoSend = 
           id: property.id,
           cover_image: property.cover_image || (property.images && property.images[0]) || undefined,
           images: property.images || undefined,
+          property_type: property.property_type,
+          video_url: property.video_url,
           agent: property.agent || undefined,
         })
       });
@@ -181,18 +190,21 @@ export default function SendToLineModal({ isOpen, onClose, property, autoSend = 
             </button>
           </div>
 
-          {/* Action 1 (Primary): Direct Native Link to Official LINE OA */}
+          {/* Action 1 (Primary): Direct 1-Click Message to Official LINE OA (@930xzcyi) */}
           <div className="space-y-2.5 pt-1">
             <a
-              href={OFFICIAL_LINE_OA_URL}
+              href={lineOaDirectUrl}
               target="_blank"
               rel="noopener noreferrer"
-              onClick={handleCopyText}
-              className="w-full py-3.5 px-4 bg-[#06C755] hover:bg-[#05b34c] active:scale-[0.99] text-white rounded-2xl font-bold text-sm shadow-md flex items-center justify-center space-x-2 transition-all cursor-pointer group"
+              onClick={() => {
+                handleCopyText();
+                if (!pushSuccess) handleDirectPushNotify();
+              }}
+              className="w-full py-4 px-4 bg-gradient-to-r from-emerald-600 via-[#06C755] to-emerald-500 hover:from-emerald-500 hover:to-[#05b34c] active:scale-[0.99] text-white rounded-2xl font-black text-sm sm:text-base shadow-lg hover:shadow-xl flex items-center justify-center space-x-2 transition-all cursor-pointer group"
             >
-              <MessageCircle className="w-4 h-4 fill-current group-hover:scale-110 transition-transform" />
-              <span>เปิดแชทคุยใน LINE OA ทันที</span>
-              <ExternalLink className="w-3.5 h-3.5 ml-1 opacity-80" />
+              <MessageCircle className="w-5 h-5 fill-current group-hover:scale-110 transition-transform" />
+              <span>🚀 กดส่งข้อมูลทรัพย์เข้าห้องแชท LINE OA ทันที</span>
+              <ExternalLink className="w-4 h-4 ml-1 opacity-90" />
             </a>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
@@ -211,26 +223,25 @@ export default function SendToLineModal({ isOpen, onClose, property, autoSend = 
                 ) : pushSuccess ? (
                   <>
                     <Check className="w-3.5 h-3.5 text-emerald-400" />
-                    <span className="text-emerald-300">แจ้งเตือนสำเร็จแล้ว</span>
+                    <span className="text-emerald-300">แจ้งเตือนเข้าระบบแล้ว</span>
                   </>
                 ) : (
                   <>
                     <Sparkles className="w-3.5 h-3.5 text-gold-400" />
-                    <span>ส่งแจ้งเตือนเข้าระบบ</span>
+                    <span>⚡ แจ้งเตือนเข้าหลังบ้าน LINE</span>
                   </>
                 )}
               </button>
 
-              {/* Action 3: LINE Share to Friends / Groups */}
+              {/* Action 3: Open Empty LINE OA Chat */}
               <a
-                href={lineShareUrl}
+                href={OFFICIAL_LINE_OA_URL}
                 target="_blank"
                 rel="noopener noreferrer"
-                onClick={handleCopyText}
                 className="py-2.5 px-3 bg-white hover:bg-emerald-50 text-emerald-800 border border-emerald-300 rounded-xl font-bold text-xs flex items-center justify-center space-x-1.5 transition-colors cursor-pointer"
               >
-                <Share2 className="w-3.5 h-3.5 text-emerald-600" />
-                <span>แชร์ข้อความเข้า LINE</span>
+                <MessageCircle className="w-3.5 h-3.5 text-[#06C755] fill-current" />
+                <span>เปิดห้องแชท LINE OA</span>
               </a>
             </div>
 

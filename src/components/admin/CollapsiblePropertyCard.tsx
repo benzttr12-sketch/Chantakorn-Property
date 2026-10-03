@@ -72,6 +72,7 @@ interface CollapsiblePropertyCardProps {
   copiedSnippetId?: string | null;
   onOpenLandsMaps: (property: Property) => void;
   onOpenHistoryModal: (property: Property) => void;
+  onOpenLineModal?: (property: Property) => void;
   onDuplicate: (property: Property) => void;
   onDeleteConfirm: (id: string) => void;
   onUpdateNotes?: (id: string, notes: string) => Promise<void>;
@@ -104,6 +105,7 @@ export default function CollapsiblePropertyCard({
   copiedSnippetId,
   onOpenLandsMaps,
   onOpenHistoryModal,
+  onOpenLineModal,
   onDuplicate,
   onDeleteConfirm,
   onUpdateNotes,
@@ -153,9 +155,10 @@ export default function CollapsiblePropertyCard({
       });
       const data = await res.json();
       setLineSent(true);
-      setTimeout(() => setLineSent(false), 3000);
-      if (data.shareUrl && typeof window !== 'undefined') {
-        window.open(data.shareUrl, '_blank');
+      setTimeout(() => setLineSent(false), 4000);
+      const targetUrl = data.lineOaMessageUrl || data.shareUrl;
+      if (targetUrl && typeof window !== 'undefined') {
+        window.open(targetUrl, '_blank');
       }
     } catch (err) {
       console.warn('Failed to send LINE notification:', err);
@@ -640,10 +643,14 @@ export default function CollapsiblePropertyCard({
             disabled={sendingLine}
             onClick={(e) => {
               e.stopPropagation();
-              handleSendToLine();
+              if (onOpenLineModal) {
+                onOpenLineModal(property);
+              } else {
+                handleSendToLine();
+              }
             }}
             className="p-1.5 text-[#06C755] hover:bg-emerald-50 rounded-lg border border-emerald-200"
-            title="เด้งแจ้งเตือนเข้า LINE OA (https://lin.ee/NMSe28T3)"
+            title="ส่งทรัพย์เข้า LINE OA (@930xzcyi)"
           >
             {sendingLine ? (
               <Loader2 className="w-3.5 h-3.5 animate-spin text-[#06C755]" />

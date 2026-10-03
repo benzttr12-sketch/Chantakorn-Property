@@ -15,12 +15,17 @@ import {
   Maximize, 
   MapPin, 
   X,
-  Sparkles
+  Sparkles,
+  ExternalLink,
+  Copy,
+  Check,
+  Share2
 } from 'lucide-react';
 import { submitInquiry } from '@/lib/store/properties-store';
 import { compressMultipleImages } from '@/lib/image-compressor';
 import { DISTRICTS_LIST } from '@/data/locations';
 import AutoPinLandsMapsValuation from '@/components/landsmaps/AutoPinLandsMapsValuation';
+import { getLineOaDirectMessageUrl, generateConsignmentLineMessage, OFFICIAL_LINE_BASIC_ID } from '@/lib/line-inquiry';
 
 export default function SellPage() {
   const [name, setName] = useState('');
@@ -39,6 +44,17 @@ export default function SellPage() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [submitted, setSubmitted] = useState(false);
+  const [submittedData, setSubmittedData] = useState<{
+    name: string;
+    phone: string;
+    line_id?: string;
+    property_type?: string;
+    expected_price?: number;
+    district?: string;
+    province?: string;
+    description?: string;
+  } | null>(null);
+  const [copiedMessage, setCopiedMessage] = useState(false);
 
   const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const input = e.currentTarget;
@@ -102,6 +118,18 @@ export default function SellPage() {
         },
       });
 
+      const dataSnapshot = {
+        name: name.trim(),
+        phone: phone.trim(),
+        line_id: lineId.trim(),
+        property_type: propertyType,
+        expected_price: Number(expectedPrice),
+        district,
+        province,
+        description: description.trim(),
+      };
+      setSubmittedData(dataSnapshot);
+
       // Send alert to LINE Official Account
       fetch('/api/line/notify', {
         method: 'POST',
@@ -127,6 +155,18 @@ export default function SellPage() {
       setError(err instanceof Error ? err.message : 'ส่งข้อมูลไม่สำเร็จ กรุณาลองอีกครั้ง หรือติดต่อโทร 081-604-0097');
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const consignmentMessage = submittedData ? generateConsignmentLineMessage(submittedData) : '';
+  const lineOaDirectUrl = consignmentMessage ? getLineOaDirectMessageUrl(consignmentMessage) : 'https://lin.ee/NMSe28T3';
+
+  const handleCopyConsignmentText = () => {
+    if (!consignmentMessage) return;
+    if (typeof navigator !== 'undefined' && navigator.clipboard) {
+      navigator.clipboard.writeText(consignmentMessage);
+      setCopiedMessage(true);
+      setTimeout(() => setCopiedMessage(false), 3000);
     }
   };
 
@@ -165,26 +205,103 @@ export default function SellPage() {
       <div id="consignment-form" className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 -mt-10 relative z-20">
         <div className="bg-white rounded-3xl p-6 sm:p-10 border border-surface-border shadow-xl">
           {submitted ? (
-            <div className="text-center py-12 space-y-4">
+            <div className="text-center py-8 space-y-6 max-w-2xl mx-auto">
               <div className="w-20 h-20 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto shadow-inner">
                 <CheckCircle2 className="w-12 h-12" />
               </div>
-              <h2 className="text-2xl sm:text-3xl font-extrabold text-navy-950">
-                ได้รับข้อมูลของคุณแล้ว
-              </h2>
-              <p className="text-base text-gray-600 max-w-lg mx-auto leading-relaxed">
-                ทีมงาน <strong className="text-navy-950">Chantakorn Property</strong> จะติดต่อกลับโดยเร็วที่สุดเพื่อยืนยันข้อมูล นัดหมายลงพื้นที่ถ่ายภาพ และเริ่มแผนการตลาดครับ
-              </p>
-              <div className="pt-6">
-                <a
-                  href="https://lin.ee/NMSe28T3"
-                  target="_blank"
-                  rel="noreferrer"
-                  className="inline-flex items-center space-x-2 px-6 py-3 bg-[#06C755] hover:bg-[#05b34c] text-white font-bold text-sm rounded-xl shadow-md transition-all"
+              
+              <div className="space-y-2">
+                <h2 className="text-2xl sm:text-3xl font-extrabold text-navy-950">
+                  บันทึกข้อมูลฝากขายเรียบร้อยแล้ว!
+                </h2>
+                <p className="text-sm text-gray-600 leading-relaxed">
+                  ระบบได้บันทึกข้อมูลและส่งแจ้งเตือนเข้าสู่ระบบหลังบ้าน Chantakorn Property แล้ว
+                  <br />
+                  <strong className="text-emerald-700 font-semibold">ท่านสามารถกดปุ่มด้านล่างเพื่อส่งข้อมูลทรัพย์นี้เข้าสู่แชท LINE OA เพื่อคุยกับทีมงานได้ทันที:</strong>
+                </p>
+              </div>
+
+              {/* Direct LINE OA Action Card */}
+              <div className="bg-gradient-to-br from-emerald-50 via-teal-50 to-emerald-50 rounded-2xl p-5 border-2 border-emerald-300 shadow-md text-left space-y-4">
+                <div className="flex items-center justify-between border-b border-emerald-200 pb-3">
+                  <div className="flex items-center gap-2">
+                    <span className="w-3 h-3 rounded-full bg-[#06C755] animate-ping" />
+                    <span className="font-extrabold text-xs sm:text-sm text-emerald-950">LINE Official Account:</span>
+                    <span className="font-mono font-bold text-[#06C755]">{OFFICIAL_LINE_BASIC_ID}</span>
+                  </div>
+                  <span className="text-[11px] font-bold text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded-full">
+                    พร้อมส่งเข้าแชท 1 คลิก
+                  </span>
+                </div>
+
+                {submittedData && (
+                  <div className="bg-white/90 rounded-xl p-3.5 border border-emerald-200 text-xs text-navy-950 space-y-1.5 shadow-inner">
+                    <div className="font-bold flex items-center justify-between">
+                      <span>👤 ผู้ติดต่อ: {submittedData.name} ({submittedData.phone})</span>
+                      <span className="text-[#059669] font-black">
+                        ฿{submittedData.expected_price ? Number(submittedData.expected_price).toLocaleString() : 'ตามตกลง'}
+                      </span>
+                    </div>
+                    <div className="text-gray-600">
+                      📍 ประเภท: {submittedData.property_type === 'house' ? 'บ้านเดี่ยว' : submittedData.property_type === 'land' ? 'ที่ดิน' : submittedData.property_type === 'condo' ? 'คอนโด' : submittedData.property_type} · ทำเล: {submittedData.district} จ.{submittedData.province}
+                    </div>
+                  </div>
+                )}
+
+                {/* Primary Action Button: 1-Click Send into LINE OA Chat */}
+                <div className="space-y-2 pt-1">
+                  <a
+                    href={lineOaDirectUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    onClick={handleCopyConsignmentText}
+                    className="w-full py-4 px-6 bg-gradient-to-r from-emerald-600 via-[#06C755] to-emerald-500 hover:from-emerald-500 hover:to-[#05b34c] text-white font-black text-sm sm:text-base rounded-2xl shadow-lg hover:shadow-xl flex items-center justify-center gap-2 transition-all cursor-pointer active:scale-95 group"
+                  >
+                    <MessageCircle className="w-5 h-5 fill-current group-hover:scale-110 transition-transform" />
+                    <span>🚀 กดส่งข้อมูลทรัพย์เข้าห้องแชท LINE OA ทันที</span>
+                    <ExternalLink className="w-4 h-4 ml-1 opacity-90" />
+                  </a>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+                    <button
+                      type="button"
+                      onClick={handleCopyConsignmentText}
+                      className="py-2.5 px-4 bg-white hover:bg-emerald-50 text-emerald-900 border border-emerald-300 font-bold text-xs rounded-xl flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                    >
+                      {copiedMessage ? <Check className="w-4 h-4 text-emerald-600" /> : <Copy className="w-4 h-4 text-emerald-600" />}
+                      <span>{copiedMessage ? 'คัดลอกข้อความแล้ว!' : 'คัดลอกข้อความฝากขาย'}</span>
+                    </button>
+
+                    <a
+                      href="https://lin.ee/NMSe28T3"
+                      target="_blank"
+                      rel="noreferrer"
+                      className="py-2.5 px-4 bg-navy-950 hover:bg-navy-900 text-gold-400 font-bold text-xs rounded-xl flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                    >
+                      <MessageCircle className="w-4 h-4 fill-current text-[#06C755]" />
+                      <span>เปิดโปรไฟล์ LINE OA</span>
+                    </a>
+                  </div>
+                </div>
+              </div>
+
+              {/* Reset / Submit Another */}
+              <div className="pt-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSubmitted(false);
+                    setName('');
+                    setPhone('');
+                    setLineId('');
+                    setExpectedPrice('');
+                    setDescription('');
+                    setUploadedPhotos([]);
+                  }}
+                  className="text-xs text-gray-500 hover:text-navy-950 font-semibold underline cursor-pointer"
                 >
-                  <MessageCircle className="w-4 h-4 fill-current" />
-                  <span>แจ้งข้อมูลด่วนทาง LINE Official Account</span>
-                </a>
+                  ← ฝากขายอสังหาริมทรัพย์รายการอื่นเพิ่มเติม
+                </button>
               </div>
             </div>
           ) : (
