@@ -5,7 +5,7 @@ const path = require('node:path');
 const vm = require('node:vm');
 const ts = require('typescript');
 
-function load({ staff = false, env = {}, fetch = async () => { throw Error('Unexpected LINE request'); } } = {}) {
+function load({ staff = false, env = {}, firestore = {}, fetch = async () => { throw Error('Unexpected LINE request'); } } = {}) {
   const module = { exports: {} };
   const source = ts.transpileModule(fs.readFileSync(path.join(__dirname, '../src/app/api/line/notify/route.ts'), 'utf8'), {
     compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
@@ -16,9 +16,13 @@ function load({ staff = false, env = {}, fetch = async () => { throw Error('Unex
     require(name) {
       if (name === '@/lib/api-response') return { jsonResponse: (body, init) => Response.json(body, init) };
       if (name === '@/lib/server-auth') return { requireStaff: async () => staff ? null : Response.json({ error: 'Unauthorized' }, { status: 401 }) };
+      if (name === '@/lib/property-image-cache') return {
+        resolvePropertyHeroImageUrl: property => property.cover_image?.startsWith('https://')
+          ? property.cover_image : 'https://images.example.test/resolved-home.jpg',
+      };
       if (name === '@/lib/firestore-rest') return {
-        getFirestoreDocument: async () => Response.json({}, { status: 404 }),
-        patchFirestoreDocument: async () => { throw Error('Unexpected settings write'); },
+        getFirestoreDocument: firestore.getFirestoreDocument || (async () => Response.json({}, { status: 404 })),
+        patchFirestoreDocument: firestore.patchFirestoreDocument || (async () => { throw Error('Unexpected settings write'); }),
       };
       throw Error(name);
     },
@@ -74,4 +78,93 @@ test('a rejected LINE push is never reported as successful delivery', async () =
   assert.equal(result.success, false);
   assert.equal(result.isRealSent, false);
   assert.equal(result.acceptedRecipients, 0);
+});
+
+test('legacy database credentials cannot override the rotated runtime credential', async () => {
+  let authorization;
+  const api = load({
+    staff: true,
+    env: { LINE_CHANNEL_ACCESS_TOKEN: 'replacement-runtime-token', LINE_TARGET_USER_ID: owner },
+    firestore: { getFirestoreDocument: async () => Response.json({ fields: {
+      channel_access_token: { stringValue: 'legacy-database-token' },
+      channel_secret: { stringValue: 'legacy-database-secret' },
+    } }) },
+    fetch: async (_url, init) => { authorization = init.headers.Authorization; return Response.json({}); },
+  });
+  const response = await api.POST(new Request('https://example.com/api/line/notify', {
+    method: 'POST', headers: { Authorization: 'Bearer staff-session' }, body: JSON.stringify({ title: 'Home' }),
+  }));
+  assert.equal(response.status, 200);
+  assert.equal(authorization, 'Bearer replacement-runtime-token');
+});
+
+test('saving preferences never persists submitted LINE credentials', async () => {
+  let fields;
+  const api = load({ staff: true, firestore: {
+    patchFirestoreDocument: async (_collection, _id, value) => { fields = value; return Response.json({}); },
+  } });
+  const response = await api.POST(new Request('https://example.com/api/line/notify', {
+    method: 'POST', headers: { Authorization: 'Bearer staff-session' },
+    body: JSON.stringify({ action: 'save_settings', channelSecret: 'must-not-persist',
+      channelAccessToken: 'must-not-persist', autoNotifyNewProperty: false, autoNotifyConsignment: true }),
+  }));
+  assert.equal(response.status, 200);
+  assert.deepEqual(Object.keys(fields).sort(), ['auto_notify_consignment', 'auto_notify_new_property', 'updated_at']);
+  assert.equal(JSON.stringify(fields).includes('must-not-persist'), false);
+});
+
+test('disabled listing notifications remain disabled without calling LINE', async () => {
+  const api = load({ staff: true, firestore: {
+    getFirestoreDocument: async () => Response.json({ fields: { auto_notify_new_property: { booleanValue: false } } }),
+  } });
+  const response = await api.POST(new Request('https://example.com/api/line/notify', {
+    method: 'POST', headers: { Authorization: 'Bearer staff-session' }, body: JSON.stringify({ title: 'Home' }),
+  }));
+  const result = await response.json();
+  assert.equal(result.simulated, true);
+  assert.equal(result.isRealSent, false);
+});
+
+test('anonymous inquiries preserve readable consignment preferences and do not poison staff settings', async () => {
+  let reads = 0;
+  const api = load({ staff: true, firestore: {
+    getFirestoreDocument: async () => {
+      reads += 1;
+      return Response.json({ fields: {
+        auto_notify_consignment: { booleanValue: false }, auto_notify_new_property: { booleanValue: false },
+      } });
+    },
+  } });
+  const response = await api.POST(request({ inquiry_type: 'inquiry' }));
+  assert.equal((await response.json()).isRealSent, false);
+  const config = await (await api.GET(new Request('https://example.com/api/line/notify', {
+    headers: { Authorization: 'Bearer staff-session' },
+  }))).json();
+  assert.equal(config.autoNotifyConsignment, false);
+  assert.equal(config.autoNotifyNewProperty, false);
+  assert.equal(reads, 1);
+});
+
+test('a denied anonymous preference read does not cache defaults for a later staff request', async () => {
+  const api = load({ staff: true, firestore: {
+    getFirestoreDocument: async (_collection, _id, token) => token
+      ? Response.json({ fields: { auto_notify_consignment: { booleanValue: false } } })
+      : Response.json({}, { status: 403 }),
+  } });
+  await api.POST(request({ inquiry_type: 'inquiry' }));
+  const config = await (await api.GET(new Request('https://example.com/api/line/notify', {
+    headers: { Authorization: 'Bearer staff-session' },
+  }))).json();
+  assert.equal(config.autoNotifyConsignment, false);
+});
+
+test('staff can send an existing large property payload with a resolved public image', async () => {
+  let payload;
+  const api = load({ staff: true, env: { LINE_CHANNEL_ACCESS_TOKEN: 'runtime-token', LINE_TARGET_USER_ID: owner },
+    fetch: async (_url, init) => { payload = JSON.parse(init.body); return Response.json({}); },
+  });
+  const response = await api.POST(request({ title: 'Home', images: ['data:image/png;base64,' + 'a'.repeat(20000)] }));
+  assert.equal(response.status, 200);
+  assert.equal(payload.messages[1].contents.hero.url, 'https://images.example.test/resolved-home.jpg');
+  assert.equal(JSON.stringify(payload).includes('data:image/'), false);
 });

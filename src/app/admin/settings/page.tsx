@@ -1,18 +1,15 @@
 'use client';
 
+import { fetchStaffApi } from '@/lib/staff-api';
+import { apiUrl } from '@/lib/api-url';
+
 import React, { useState, useEffect } from 'react';
 import { Database, ShieldCheck, Loader2, Check, ExternalLink, Send, MessageCircle, Info, Copy, Globe, RefreshCw, Sparkles, Terminal } from 'lucide-react';
 import { dataBackend } from '@/lib/backend';
 
 export default function AdminSettingsPage() {
-  const [channelId, setChannelId] = useState('2011760874');
-  const [lineToken, setLineToken] = useState('');
-  const [lineSecret, setLineSecret] = useState('');
-  const [lineNotifyToken, setLineNotifyToken] = useState('');
-  const [targetUserId, setTargetUserId] = useState('');
   const [autoNotify, setAutoNotify] = useState(true);
   const [autoNotifyConsignment, setAutoNotifyConsignment] = useState(true);
-  const [systemConfig, setSystemConfig] = useState<any>(null);
 
   const [saving, setSaving] = useState(false);
   const [loadingConfig, setLoadingConfig] = useState(true);
@@ -37,25 +34,25 @@ export default function AdminSettingsPage() {
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      setWebhookUrl(`${window.location.origin}/api/line/webhook`);
+      setWebhookUrl(new URL(apiUrl('/api/line/webhook'), window.location.origin).toString());
     }
   }, []);
 
   // Load config on mount
   useEffect(() => {
     let isMounted = true;
+    // Remove credentials saved by older versions; configuration now stays on the server.
+    try {
+      for (const key of ['line_channel_access_token', 'line_channel_secret', 'line_notify_token']) {
+        localStorage.removeItem(key);
+      }
+    } catch { /* Storage can be disabled; never read it as a configuration fallback. */ }
     async function loadConfig() {
       try {
-        const res = await fetch('/api/line/notify');
+        const res = await fetchStaffApi('/api/line/notify');
         if (res.ok) {
           const data = await res.json();
           if (isMounted) {
-            setSystemConfig(data);
-            if (data.channelId) setChannelId(data.channelId);
-            if (data.channelAccessToken) setLineToken(data.channelAccessToken);
-            if (data.channelSecret) setLineSecret(data.channelSecret);
-            if (data.targetUserId) setTargetUserId(data.targetUserId);
-            if (data.lineNotifyToken) setLineNotifyToken(data.lineNotifyToken);
             if (data.autoNotifyNewProperty !== undefined) setAutoNotify(data.autoNotifyNewProperty);
             if (data.autoNotifyConsignment !== undefined) setAutoNotifyConsignment(data.autoNotifyConsignment);
           }
@@ -64,19 +61,6 @@ export default function AdminSettingsPage() {
         console.warn('Could not fetch LINE settings from server:', err);
       } finally {
         if (isMounted) {
-          // Check local storage fallback
-          if (typeof window !== 'undefined') {
-            const localChannelId = localStorage.getItem('line_channel_id');
-            const localToken = localStorage.getItem('line_channel_access_token');
-            const localSecret = localStorage.getItem('line_channel_secret');
-            const localNotify = localStorage.getItem('line_notify_token');
-            const localTarget = localStorage.getItem('line_target_user_id');
-            if (localChannelId) setChannelId(localChannelId);
-            if (localToken) setLineToken(localToken);
-            if (localSecret) setLineSecret(localSecret);
-            if (localNotify) setLineNotifyToken(localNotify);
-            if (localTarget) setTargetUserId(localTarget);
-          }
           setLoadingConfig(false);
         }
       }
@@ -84,13 +68,6 @@ export default function AdminSettingsPage() {
     loadConfig();
     return () => { isMounted = false; };
   }, []);
-
-  const handleFillDefaultCredentials = () => {
-    setChannelId('2011760874');
-    setLineSecret('f0bf93dfa53dfdb33c7a81b0b2a80a44');
-    setTargetUserId('');
-    setSaveSuccess(false);
-  };
 
   const handleCopyWebhookUrl = () => {
     if (!webhookUrl) return;
@@ -105,26 +82,11 @@ export default function AdminSettingsPage() {
     setSaveSuccess(false);
 
     try {
-      if (typeof window !== 'undefined') {
-        localStorage.setItem('line_channel_id', channelId.trim());
-        localStorage.setItem('line_channel_access_token', lineToken.trim());
-        localStorage.setItem('line_channel_secret', lineSecret.trim());
-        localStorage.setItem('line_notify_token', lineNotifyToken.trim());
-        localStorage.setItem('line_target_user_id', targetUserId.trim());
-        localStorage.setItem('line_auto_notify', String(autoNotify));
-        localStorage.setItem('line_auto_notify_consignment', String(autoNotifyConsignment));
-      }
-
-      const res = await fetch('/api/line/notify', {
+      const res = await fetchStaffApi('/api/line/notify', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           action: 'save_settings',
-          channelId: channelId.trim(),
-          channelAccessToken: lineToken.trim(),
-          channelSecret: lineSecret.trim(),
-          lineNotifyToken: lineNotifyToken.trim(),
-          targetUserId: targetUserId.trim(),
           autoNotifyNewProperty: autoNotify,
           autoNotifyConsignment: autoNotifyConsignment,
         })
@@ -146,7 +108,7 @@ export default function AdminSettingsPage() {
     setTestResult(null);
 
     try {
-      const res = await fetch('/api/line/notify', {
+      const res = await fetchStaffApi('/api/line/notify', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -158,10 +120,7 @@ export default function AdminSettingsPage() {
           status: 'sale',
           district: 'หาดใหญ่',
           subdistrict: 'คอหงส์',
-          cover_image: '/api/properties/sample/image',
-          overrideToken: lineToken.trim() || undefined,
-          overrideNotifyToken: lineNotifyToken.trim() || undefined,
-          overrideTargetId: targetUserId.trim() || undefined,
+          cover_image: 'https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?auto=format&fit=crop&w=1200&q=80',
           agent: {
             name: 'คุณเบนซ์ (แอดมิน Chantakorn)',
             phone: '081-604-0097',
@@ -171,15 +130,11 @@ export default function AdminSettingsPage() {
       });
 
       const data = await res.json();
-      if (data.success) {
+      if (res.ok && data.isRealSent) {
         setTestResult({
           success: true,
           isRealSent: data.isRealSent,
-          message: data.isRealSent 
-            ? '🚀 ส่งแจ้งเตือน Flex Message ไปยัง LINE OA จริงสำเร็จเรียบร้อย!' 
-            : '✨ ระบบได้ประมวลผลข้อความและสร้างลิงก์แจ้งเตือนด่วนเข้า LINE OA เรียบร้อยแล้ว (สามารถคลิกปุ่มแชร์เข้า LINE ได้ทันที)',
-          shareUrl: data.shareUrl,
-          lineOaUrl: data.lineOaUrl || 'https://lin.ee/NMSe28T3',
+          message: data.message || 'LINE รับคำขอส่งข้อความถึงเจ้าของบัญชีแล้ว',
           error: data.error
         });
       } else {
@@ -199,62 +154,20 @@ export default function AdminSettingsPage() {
     }
   };
 
-  // 1. Webhook Verify Test Handler (Simulates LINE Developers Console Verify Button)
-  const handleTestWebhookVerify = async () => {
-    setTestWebhookRunning(true);
-    setWebhookTestResult(null);
-
-    try {
-      const res = await fetch('/api/line/webhook', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-line-signature': 'simulated_test_signature'
-        },
-        body: JSON.stringify({
-          destination: 'U93b6e8d9cb5b76f9a9a4a4fda959bd9a',
-          events: []
-        })
-      });
-
-      const data = await res.json();
-      setWebhookTestResult({
-        type: 'verify_ping',
-        status: res.status,
-        data,
-        isSuccess: res.status === 200 && data.success,
-        message: res.status === 200 && data.success
-          ? '✅ สัญญาณ Verify ตอบรับ HTTP 200 OK สมบูรณ์! (LINE Developers Console จะแสดง Verified สำเร็จ)'
-          : `❌ สัญญาณ Verify ผิดพลาด (HTTP ${res.status})`,
-        timestamp: new Date().toLocaleTimeString('th-TH')
-      });
-    } catch (err: any) {
-      setWebhookTestResult({
-        type: 'verify_ping',
-        status: 'error',
-        error: err.message || String(err),
-        timestamp: new Date().toLocaleTimeString('th-TH')
-      });
-    } finally {
-      setTestWebhookRunning(false);
-    }
-  };
-
-  // 2. Webhook Chat Message Simulator Test Handler
+  // Webhook Simulator Test Handler
   const handleTestWebhookSimulator = async () => {
     setTestWebhookRunning(true);
     setWebhookTestResult(null);
 
     try {
       const mockEvent = {
-        destination: 'U93b6e8d9cb5b76f9a9a4a4fda959bd9a',
         events: [
           {
             type: 'message',
-            replyToken: '00000000000000000000000000000000',
+            replyToken: 'test_simulated_token_123',
             source: {
               type: 'user',
-              userId: targetUserId.trim() || 'U_test_admin_user'
+              userId: 'U_test_admin_user'
             },
             timestamp: Date.now(),
             message: {
@@ -266,28 +179,26 @@ export default function AdminSettingsPage() {
         ]
       };
 
-      const res = await fetch('/api/line/webhook', {
+      const res = await fetchStaffApi('/api/line/webhook', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'x-line-signature': 'simulated_test_signature'
+          'x-line-simulation': 'true'
         },
         body: JSON.stringify(mockEvent)
       });
 
       const data = await res.json();
       setWebhookTestResult({
-        type: 'chat_keyword',
+        success: res.ok && data.success === true,
         status: res.status,
         data,
         simulatedKeyword: webhookSimKeyword,
-        isSuccess: res.status === 200,
-        message: `✅ จำลองข้อความคำค้นหา "${webhookSimKeyword}" สำเร็จ! ระบบประมวลผลการตอบกลับเรียบร้อย`,
         timestamp: new Date().toLocaleTimeString('th-TH')
       });
     } catch (err: any) {
       setWebhookTestResult({
-        type: 'chat_keyword',
+        success: false,
         status: 'error',
         error: err.message || String(err),
         timestamp: new Date().toLocaleTimeString('th-TH')
@@ -318,7 +229,7 @@ export default function AdminSettingsPage() {
               <div className="flex items-center gap-2">
                 <h2 className="text-base font-extrabold text-navy-950">LINE Messaging API Webhook URL</h2>
                 <span className="px-2 py-0.5 rounded-full text-[10px] bg-emerald-200 text-emerald-900 font-bold">
-                  พร้อมใช้งาน (Active)
+                  ต้องยืนยันการรับข้อความใน LINE
                 </span>
               </div>
               <p className="text-xs text-emerald-900 mt-0.5">
@@ -355,41 +266,33 @@ export default function AdminSettingsPage() {
             <span>ขั้นตอนการนำ Webhook URL ไปเปิดใช้งานใน LINE Developers:</span>
           </p>
           <ol className="list-decimal list-inside space-y-1 text-gray-700 pl-1 leading-relaxed text-[11px]">
-            <li>เข้าสู่ <a href="https://developers.line.biz" target="_blank" rel="noreferrer" className="text-[#06C755] font-bold underline">LINE Developers Console</a> แล้วเลือก Messaging API Channel ของ <strong>@chantakorn</strong></li>
+            <li>เข้าสู่ <a href="https://developers.line.biz" target="_blank" rel="noreferrer" className="text-[#06C755] font-bold underline">LINE Developers Console</a> แล้วเลือก Messaging API Channel ของ <strong>@930xzcyi</strong></li>
             <li>ไปที่แท็บ <strong>&quot;Messaging API&quot;</strong> แล้วเลื่อนลงมาที่ส่วน <strong>&quot;Webhook settings&quot;</strong></li>
             <li>วาง URL ด้านบนลงในช่อง <strong>&quot;Webhook URL&quot;</strong> แล้วกดปุ่ม <strong>&quot;Update&quot;</strong></li>
             <li>เปิดใช้งานสวิตช์ <strong>&quot;Use webhook&quot;</strong> ให้เป็น <strong>&quot;Enabled&quot;</strong></li>
-            <li>กดปุ่ม <strong>&quot;Verify&quot;</strong> — ระบบจะตอบรับสถานะ <strong>Success 200 OK</strong> ทันที</li>
+            <li>กดปุ่ม <strong>&quot;Verify&quot;</strong> และตรวจว่าได้ <strong>Success</strong></li>
+            <li>ส่ง <strong>ดูทรัพย์</strong> จากบัญชี LINE ผู้ใช้ แล้วตรวจว่าได้รับการ์ดทรัพย์และเปิดรายละเอียดได้</li>
           </ol>
         </div>
       </section>
 
       {/* 2. Webhook Simulator / Test Console */}
       <section className="space-y-4 rounded-2xl border border-surface-border bg-white p-6 shadow-sm">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-gray-100">
+        <div className="flex items-center justify-between pb-3 border-b border-gray-100">
           <div className="flex items-center gap-2">
             <Terminal className="w-5 h-5 text-gold-600" />
-            <h2 className="text-base font-bold text-navy-950">ทดสอบและตรวจสอบการทำงานของ Webhook (Test & Verify)</h2>
+            <h2 className="text-base font-bold text-navy-950">ทดสอบจำลองส่งคำสั่ง Webhook (Event Simulator)</h2>
           </div>
-          <button
-            type="button"
-            disabled={testWebhookRunning}
-            onClick={handleTestWebhookVerify}
-            className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white font-bold text-xs rounded-xl flex items-center justify-center gap-1.5 shadow-sm transition-all cursor-pointer disabled:opacity-50 self-start sm:self-auto"
-            title="ส่งคำสั่ง Verify เหมือนปุ่ม Verify ใน LINE Developers Console"
-          >
-            {testWebhookRunning ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <ShieldCheck className="w-3.5 h-3.5 text-white" />}
-            <span>⚡ ทดสอบส่งคำสั่งเชื่อมต่อ (Verify Webhook)</span>
-          </button>
+          <span className="text-xs text-gray-500 font-medium">จำลองการพิมพ์ข้อความจากลูกค้า LINE OA</span>
         </div>
 
         <div className="space-y-3">
           <p className="text-xs text-gray-600">
-            จำลองการพิมพ์ข้อความจากลูกค้า LINE OA เพื่อตรวจสอบว่าระบบตอบกลับอัตโนมัติ (Flex Message / Carousel) ทำงานได้ถูกต้อง:
+            เลือกหรือพิมพ์ข้อความเพื่อทดสอบการประมวลผลเท่านั้น การจำลองไม่ส่งข้อความเข้า LINE และไม่บันทึกข้อมูลลงกล่องข้อความลูกค้า:
           </p>
 
           <div className="flex flex-wrap items-center gap-2">
-            {['สวัสดี', 'บ้านเดี่ยว หาดใหญ่', 'ที่ดิน สิงหนคร', 'ฝากขายบ้าน', 'ติดต่อแอดมิน', 'ประเมินราคา'].map((keyword) => (
+            {['ดูทรัพย์', 'สวัสดี', 'บ้านเดี่ยว หาดใหญ่', 'ที่ดิน สิงหนคร', 'ฝากขายบ้าน', 'ติดต่อแอดมิน', 'ประเมินราคา'].map((keyword) => (
               <button
                 key={keyword}
                 type="button"
@@ -420,28 +323,19 @@ export default function AdminSettingsPage() {
               className="px-5 py-2.5 bg-navy-950 hover:bg-navy-900 text-gold-400 font-bold text-xs rounded-xl flex items-center gap-1.5 shadow-sm transition-all cursor-pointer disabled:opacity-50 flex-shrink-0"
             >
               {testWebhookRunning ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
-              <span>{testWebhookRunning ? 'กำลังประมวลผล...' : 'ทดสอบจำลองแชท'}</span>
+              <span>{testWebhookRunning ? 'กำลังประมวลผล...' : 'ทดสอบ Webhook'}</span>
             </button>
           </div>
 
           {webhookTestResult && (
-            <div className={`mt-3 p-4 rounded-2xl font-mono text-[11px] space-y-2 overflow-x-auto shadow-inner border ${
-              webhookTestResult.isSuccess ? 'bg-gray-950 text-emerald-400 border-emerald-500/50' : 'bg-red-950/80 text-red-200 border-red-500/50'
-            }`}>
-              <div className="flex items-center justify-between border-b border-gray-800 pb-1.5">
-                <span className="font-sans font-bold">
-                  {webhookTestResult.type === 'verify_ping' ? '📡 ผลการทดสอบ Verify Webhook' : '💬 ผลการทดสอบจำลองข้อความแชท'} ({webhookTestResult.timestamp})
-                </span>
-                <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${webhookTestResult.isSuccess ? 'bg-emerald-500/20 text-emerald-300' : 'bg-red-500/20 text-red-300'}`}>
-                  HTTP Status: {webhookTestResult.status}
+            <div className="mt-3 p-3.5 bg-gray-900 text-emerald-400 rounded-xl font-mono text-[11px] space-y-1.5 overflow-x-auto shadow-inner">
+              <div className="flex items-center justify-between text-gray-400 border-b border-gray-800 pb-1">
+                <span>ผลการทดสอบ Webhook (เวลา {webhookTestResult.timestamp})</span>
+                <span className={webhookTestResult.success ? 'text-emerald-400 font-bold' : 'text-red-400 font-bold'}>
+                  Status: {webhookTestResult.status} ({webhookTestResult.success ? 'จำลองสำเร็จ' : 'ไม่สำเร็จ'})
                 </span>
               </div>
-              {webhookTestResult.message && (
-                <p className="font-sans text-xs font-semibold text-white/90">
-                  {webhookTestResult.message}
-                </p>
-              )}
-              <pre className="whitespace-pre-wrap text-[10px] opacity-80">{JSON.stringify(webhookTestResult.data || webhookTestResult.error, null, 2)}</pre>
+              <pre className="whitespace-pre-wrap">{JSON.stringify(webhookTestResult.data || { error: webhookTestResult.error }, null, 2)}</pre>
             </div>
           )}
         </div>
@@ -464,26 +358,17 @@ export default function AdminSettingsPage() {
                 </span>
               </div>
               <p className="text-xs text-brand-muted mt-0.5">
-                LINE OA URL: <a href="https://lin.ee/NMSe28T3" target="_blank" rel="noreferrer" className="text-[#06C755] hover:underline font-bold">https://lin.ee/NMSe28T3</a> · LINE Basic ID: <strong>@930xzcyi</strong> (@chantakorn)
+                LINE OA URL: <a href="https://lin.ee/NMSe28T3" target="_blank" rel="noreferrer" className="text-[#06C755] hover:underline font-bold">https://lin.ee/NMSe28T3</a> · LINE ID: <strong>@chantakorn</strong>
               </p>
             </div>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2">
-            <button
-              type="button"
-              onClick={handleFillDefaultCredentials}
-              className="px-3.5 py-2 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 font-bold text-xs rounded-xl flex items-center justify-center gap-1.5 shadow-xs transition-all cursor-pointer"
-              title="เติมค่า Channel ID, Channel Secret และ Target User ID เริ่มต้นสำเร็จ"
-            >
-              <Sparkles className="w-3.5 h-3.5 text-amber-600" />
-              <span>⚡ ใช้ค่าพารามิเตอร์ระบบมาตรฐาน (1-Click Presets)</span>
-            </button>
+          <div className="flex items-center gap-2">
             <a 
               href="https://lin.ee/NMSe28T3" 
               target="_blank" 
               rel="noreferrer"
-              className="px-4 py-2 bg-[#06C755] hover:bg-[#05b34c] text-white font-bold text-xs rounded-xl flex items-center justify-center gap-1.5 shadow-sm transition-all cursor-pointer active:scale-95"
+              className="px-4 py-2.5 bg-[#06C755] hover:bg-[#05b34c] text-white font-bold text-xs rounded-xl flex items-center justify-center gap-1.5 shadow-sm transition-all cursor-pointer active:scale-95"
             >
               <MessageCircle className="w-4 h-4 fill-current" />
               <span>เปิดดู LINE OA (NMSe28T3)</span>
@@ -492,110 +377,11 @@ export default function AdminSettingsPage() {
           </div>
         </div>
 
-        {/* User ID Auto-Registration Instructions */}
-        <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-4 text-xs space-y-2 text-emerald-950">
-          <div className="flex items-center gap-2 font-bold text-sm text-[#059669]">
-            <Sparkles className="w-4 h-4" />
-            <span>วิธีผูกและลงทะเบียนผู้รับการแจ้งเตือนส่วนตัว (Admin LINE User ID Auto-Detection):</span>
-          </div>
-          <p className="leading-relaxed text-gray-700">
-            ระบบสามารถตรวจจับและลงทะเบียนผู้รับแจ้งเตือนส่วนตัวให้อัตโนมัติ โดยที่ไม่ต้องพิมพ์คีย์ User ID เอง:
-          </p>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-1 font-semibold">
-            <div className="bg-white p-3 rounded-xl border border-emerald-200 text-center space-y-1">
-              <span className="block font-bold text-emerald-700 text-xs">ขั้นตอนที่ 1</span>
-              <span className="text-[11px] text-gray-700 block">เปิดแชทกับ LINE OA <a href="https://lin.ee/NMSe28T3" target="_blank" rel="noreferrer" className="text-[#06C755] underline font-bold">@930xzcyi</a></span>
-            </div>
-            <div className="bg-white p-3 rounded-xl border border-emerald-200 text-center space-y-1">
-              <span className="block font-bold text-emerald-700 text-xs">ขั้นตอนที่ 2</span>
-              <span className="text-[11px] text-gray-700 block">พิมพ์คำว่า <code className="bg-emerald-100 text-emerald-900 px-1.5 py-0.5 rounded font-bold">#admin</code> หรือ <code className="bg-emerald-100 text-emerald-900 px-1.5 py-0.5 rounded font-bold">รับแจ้งเตือน</code></span>
-            </div>
-            <div className="bg-white p-3 rounded-xl border border-emerald-200 text-center space-y-1">
-              <span className="block font-bold text-emerald-700 text-xs">ขั้นตอนที่ 3</span>
-              <span className="text-[11px] text-gray-700 block">ระบบบันทึก User ID เป็นผู้รับการแจ้งเตือนเด้งส่วนตัวทันที!</span>
-            </div>
-          </div>
-        </div>
-
         {/* LINE Notification Settings Form */}
         <form onSubmit={handleSaveLineSettings} className="space-y-4 pt-1">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="space-y-1">
-              <label className="block text-xs font-bold text-gray-700">
-                LINE Channel ID (10 หลัก)
-              </label>
-              <input
-                type="text"
-                value={channelId}
-                onChange={(e) => setChannelId(e.target.value)}
-                placeholder="2011760874"
-                className="w-full bg-gray-50 border border-gray-200 rounded-xl p-2.5 text-xs text-navy-950 focus:bg-white focus:ring-2 focus:ring-[#06C755] outline-none font-mono"
-              />
-              <p className="text-[10px] text-gray-500 leading-relaxed">
-                * Channel ID จากแท็บ Basic settings
-              </p>
-            </div>
-
-            <div className="space-y-1">
-              <label className="block text-xs font-bold text-gray-700">
-                LINE Channel Secret (32 หลัก)
-              </label>
-              <input
-                type="password"
-                value={lineSecret}
-                onChange={(e) => setLineSecret(e.target.value)}
-                placeholder={systemConfig?.maskedSecret ? `คงค่าเดิม (${systemConfig.maskedSecret})` : "วาง Channel Secret"}
-                className="w-full bg-gray-50 border border-gray-200 rounded-xl p-2.5 text-xs text-navy-950 focus:bg-white focus:ring-2 focus:ring-[#06C755] outline-none font-mono"
-              />
-              <p className="text-[10px] text-gray-500 leading-relaxed">
-                * ตรวจสอบความถูกต้องปลอดภัยของ Webhook
-              </p>
-            </div>
-
-            <div className="space-y-1">
-              <label className="block text-xs font-bold text-gray-700">
-                Channel Access Token (ทางเลือก)
-              </label>
-              <input
-                type="password"
-                value={lineToken}
-                onChange={(e) => setLineToken(e.target.value)}
-                placeholder="เว้นว่างได้ (ระบบต่ออายุอัตโนมัติ)"
-                className="w-full bg-gray-50 border border-gray-200 rounded-xl p-2.5 text-xs text-navy-950 focus:bg-white focus:ring-2 focus:ring-[#06C755] outline-none font-mono"
-              />
-              <p className="text-[10px] text-emerald-600 font-semibold leading-relaxed">
-                ✓ ระบบแลกเปลี่ยน Token จาก Channel ID อัตโนมัติ
-              </p>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-1">
-              <label className="block text-xs font-bold text-gray-700">
-                Target User ID / Group ID (Messaging API Push Target)
-              </label>
-              <input
-                type="text"
-                value={targetUserId}
-                onChange={(e) => setTargetUserId(e.target.value)}
-                placeholder="ระบุ User ID เช่น U123... หรือ Group ID"
-                className="w-full bg-gray-50 border border-gray-200 rounded-xl p-2.5 text-xs text-navy-950 focus:bg-white focus:ring-2 focus:ring-[#06C755] outline-none font-mono"
-              />
-            </div>
-
-            <div className="space-y-1">
-              <label className="block text-xs font-bold text-gray-700">
-                LINE Notify Token (ทางเลือกสำหรับกลุ่มทีมงาน)
-              </label>
-              <input
-                type="password"
-                value={lineNotifyToken}
-                onChange={(e) => setLineNotifyToken(e.target.value)}
-                placeholder="วาง Token ของ LINE Notify (ถ้ามี)"
-                className="w-full bg-gray-50 border border-gray-200 rounded-xl p-2.5 text-xs text-navy-950 focus:bg-white focus:ring-2 focus:ring-[#06C755] outline-none font-mono"
-              />
-            </div>
-          </div>
+          <p className="rounded-xl bg-emerald-50 p-3 text-sm text-emerald-900">
+            แจ้งเตือนถึงบัญชีเจ้าหน้าที่ที่ผู้ดูแลกำหนดไว้ กดทดสอบเพื่อส่งข้อความจริง หากต้องเปลี่ยนบัญชีหรือผู้รับ ให้ผู้ดูแลปรับค่าใน Vercel production
+          </p>
 
           {/* Autonotify toggles */}
           <div className="space-y-2 pt-2 border-t border-gray-100">
@@ -647,7 +433,7 @@ export default function AdminSettingsPage() {
 
             {saveSuccess && (
               <span className="text-xs text-emerald-600 font-bold bg-emerald-50 border border-emerald-200 px-3 py-1.5 rounded-lg animate-in fade-in">
-                ✓ บันทึกการตั้งค่าลงระบบเรียบร้อยแล้ว!
+                ✓ บันทึกสถานะการแจ้งเตือนแล้ว; LINE credentials ต้องตั้งใน Vercel production
               </span>
             )}
           </div>
@@ -666,7 +452,7 @@ export default function AdminSettingsPage() {
               </span>
               {testResult.isRealSent && (
                 <span className="px-2 py-0.5 bg-emerald-200 text-emerald-900 text-[10px] rounded-full font-bold">
-                  Real API Push / Broadcast
+                  ส่งถึงเจ้าของบัญชี
                 </span>
               )}
             </div>
