@@ -18,6 +18,9 @@ function load(file, { env = {}, fetch = async () => { throw Error('Unexpected re
     require(name) {
       if (name === '@/lib/api-response') return { jsonResponse: (body, init) => Response.json(body, init) };
       if (name === '@/lib/server-auth') return { requireStaff };
+      if (name === '@/lib/property-image-cache') return {
+        resolvePropertyHeroImageUrl: property => property.cover_image || 'https://images.example.test/home.jpg',
+      };
       if (name === '@/lib/firestore-rest') return {
         createFirestoreDocument: firestore.createFirestoreDocument || (async () => ({ ok: true })),
         listFirestoreDocuments: firestore.listFirestoreDocuments || (async () => []),

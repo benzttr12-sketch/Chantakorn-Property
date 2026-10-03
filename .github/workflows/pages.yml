@@ -19,11 +19,15 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
           cache: npm
       - run: npm ci
+      - name: Check for exposed LINE credentials
+        run: python3 scripts/check-line-credentials.py --index
       - run: npm run lint
       - run: npm run typecheck
       - run: npm test
