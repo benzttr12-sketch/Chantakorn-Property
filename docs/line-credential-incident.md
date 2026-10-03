@@ -35,7 +35,7 @@ The patch removes the current client literal and restores the repository's exist
 
 This intentionally ends browser/Firestore credential configuration and automatic OAuth issuance. Supply an explicit access token in the server runtime. Group/broadcast fallback, LINE Notify tokens, and enrolling customers as staff recipients are not part of the server-only flow. LINE Notify itself ended service on March 31, 2025.
 
-Local validation: lint, typecheck, all 31 tests, the production build, and static export passed. Static export required a temporary directory on the repository's filesystem because the existing build script uses `rename` across the default `/tmp` mount. The proposed staged patch and production artifacts contained zero matches for the incident credential. A full local-history scan found four contaminated blobs across the two affected paths. The scanner was also checked against a synthetic reintroduced client preset in a shallow repository and against a bare history mirror. These checks establish source cleanup, not provider revocation or validation of an as-yet-unsupplied replacement. Notification preference reads remain subject to deployed Firestore permissions.
+Local validation: lint, typecheck, all 44 tests, the production build, and static export passed. The patch also preserves the published-property photo endpoints and uploaded-cover handling deployed from `5e5cf6cf8347da8f2ced5d70e17fac516b948920`. Static export required a temporary directory on the repository's filesystem because the existing build script uses `rename` across the default `/tmp` mount. The proposed staged patch and production artifacts contained zero matches for the incident credential. A full local-history scan found four contaminated blobs across the two affected paths. The scanner was also checked against a synthetic reintroduced client preset in a shallow repository and against a bare history mirror. These checks establish source cleanup, not provider revocation or validation of an as-yet-unsupplied replacement. Notification preference reads remain subject to deployed Firestore permissions.
 
 Commit/merge and deploy this patch before supplying replacement credentials to the app. The local change alone does not alter GitHub `main`, deployed bundles, or provider credentials. If immediate deployment is impossible, restrict the exposed deployment and rotate the provider secret immediately, then keep the replacement out of that deployment until the patch is live.
 
@@ -61,7 +61,7 @@ From a real terminal in the patched repository, scan source and the staged snaps
 
 ```sh
 python3 scripts/check-line-credentials.py
-git add src/app/admin/settings/page.tsx src/app/api/line/notify/route.ts src/app/api/line/webhook/route.ts tests/line-notify.test.cjs tests/line-webhook.test.cjs scripts/check-line-credentials.py .github/workflows/pages.yml docs/line-credential-incident.md
+git add src/app/admin/settings/page.tsx src/app/api/line/notify/route.ts src/app/api/line/webhook/route.ts src/app/api/line/property-image/route.ts 'src/app/api/properties/[id]/image/route.ts' src/lib/line-property-image.ts tests/line-notify.test.cjs tests/line-webhook.test.cjs scripts/check-line-credentials.py .github/workflows/pages.yml docs/line-credential-incident.md
 python3 scripts/check-line-credentials.py --index --prompt
 npm run lint
 npm run typecheck

@@ -2,7 +2,7 @@ import { jsonResponse } from '@/lib/api-response';
 import { Property } from '@/lib/types';
 import { requireStaff } from '@/lib/server-auth';
 import { createFirestoreDocument, listFirestoreDocuments } from '@/lib/firestore-rest';
-import { resolvePropertyHeroImageUrl } from '@/lib/property-image-cache';
+import { getLinePropertyImageUrl } from '@/lib/line-property-image';
 
 const OFFICIAL_LINE_OA_URL = 'https://lin.ee/NMSe28T3';
 const DEFAULT_PHONE = '081-604-0097';
@@ -152,19 +152,19 @@ async function searchProperties(keyword: string): Promise<Property[]> {
 }
 
 // Build LINE Flex Carousel for Properties
-function buildPropertyCarouselFlex(properties: Property[], hostOrigin: string, queryTitle: string): any {
+function buildPropertyCarouselFlex(properties: Property[], hostOrigin: string, queryTitle: string, imageOrigin: string): any {
   const bubbles = properties.slice(0, 10).map((p) => {
     const priceFormatted = p.price
       ? new Intl.NumberFormat('th-TH', { style: 'currency', currency: 'THB', maximumFractionDigits: 0 }).format(p.price)
       : 'ราคาพิเศษ';
     const actionText = p.status === 'rent' ? 'ปล่อยเช่า' : 'เสนอขาย';
     const detailUrl = p.slug ? `${hostOrigin}/properties/detail/?slug=${encodeURIComponent(p.slug)}` : `${hostOrigin}/properties/`;
-    const coverImg = resolvePropertyHeroImageUrl(p, hostOrigin);
+    const coverImg = getLinePropertyImageUrl(p, imageOrigin);
 
     return {
       type: 'bubble',
       size: 'kilo',
-      hero: {
+      ...(coverImg ? { hero: {
         type: 'image',
         url: coverImg,
         size: 'full',
@@ -174,7 +174,7 @@ function buildPropertyCarouselFlex(properties: Property[], hostOrigin: string, q
           type: 'uri',
           uri: detailUrl,
         },
-      },
+      } } : {}),
       body: {
         type: 'box',
         layout: 'vertical',
@@ -635,7 +635,8 @@ export async function POST(req: Request) {
     }
 
     const events: any[] = body.events || [];
-    const hostOrigin = (process.env.NEXT_PUBLIC_SITE_URL || new URL(req.url).origin).replace(/\/+$/, '');
+    const imageOrigin = new URL(req.url).origin;
+    const hostOrigin = (process.env.NEXT_PUBLIC_SITE_URL || imageOrigin).replace(/\/+$/, '');
     let failedReplies = 0;
     let successfulReplies = 0;
     let simulatedReplies = 0;
@@ -731,7 +732,7 @@ export async function POST(req: Request) {
         else {
           const matchedProperties = await searchProperties(userText);
           if (matchedProperties.length > 0) {
-            const carouselMsg = buildPropertyCarouselFlex(matchedProperties, hostOrigin, userText);
+            const carouselMsg = buildPropertyCarouselFlex(matchedProperties, hostOrigin, userText, imageOrigin);
             await reply(replyToken, [carouselMsg]);
           } else {
             // Friendly Fallback
@@ -755,7 +756,7 @@ export async function POST(req: Request) {
           const keyword = params.get('keyword') || 'all';
           const properties = await searchProperties(keyword);
           if (properties.length > 0) {
-            const carousel = buildPropertyCarouselFlex(properties, hostOrigin, keyword);
+            const carousel = buildPropertyCarouselFlex(properties, hostOrigin, keyword, imageOrigin);
             await reply(replyToken, [carousel]);
           } else {
             await reply(replyToken, [buildWelcomeFlex(hostOrigin)]);
