@@ -1,3 +1,5 @@
+import { createHash } from 'node:crypto';
+
 type PropertyPhoto = { id?: string; cover_image?: string; images?: string[] };
 
 const EMBEDDED_IMAGE = /^data:image\/(?:jpeg|png|webp);base64,[A-Za-z0-9+/]+={0,2}$/i;
@@ -25,7 +27,8 @@ export function getLinePropertyImageUrl(property: PropertyPhoto, imageOrigin: st
   if (!image) return null;
   if (image.startsWith('data:')) {
     if (!property.id) return null;
-    return `${imageOrigin}/api/line/property-image?id=${encodeURIComponent(property.id)}`;
+    const version = createHash('sha256').update(image).digest('hex').slice(0, 16);
+    return `${imageOrigin}/api/line/property-image?id=${encodeURIComponent(property.id)}&v=${version}`;
   }
   return image;
 }

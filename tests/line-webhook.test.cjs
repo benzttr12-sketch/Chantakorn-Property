@@ -1,6 +1,6 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { createHmac, webcrypto } = require('node:crypto');
+const { createHash, createHmac, webcrypto } = require('node:crypto');
 const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
@@ -23,6 +23,7 @@ function load(file, { env = {}, fetch = async () => { throw Error('Unexpected re
       if (name === '@/app/api/line/property-image/route') return load('app/api/line/property-image/route.ts', { env, fetch, firestore, requireStaff });
       if (name === 'sharp') return { default: sharp };
       if (name === 'node:buffer') return require(name);
+      if (name === 'node:crypto') return require(name);
       if (name === '@/lib/firestore-rest') return {
         createFirestoreDocument: firestore.createFirestoreDocument || (async () => ({ ok: true })),
         listFirestoreDocuments: firestore.listFirestoreDocuments || (async () => []),
@@ -214,10 +215,26 @@ test('uploaded cover uses the webhook host image endpoint while details use the 
     cover_image: uploadedCover, images: ['https://photos.example.com/other-photo.jpg'],
   }]);
   const bubble = sent.messages[0].contents.contents[0];
-  assert.equal(bubble.hero.url, 'https://api.example.com/api/line/property-image?id=home%20one');
+  const imageVersion = createHash('sha256').update(uploadedCover).digest('hex').slice(0, 16);
+  assert.equal(bubble.hero.url, `https://api.example.com/api/line/property-image?id=home%20one&v=${imageVersion}`);
   assert.equal(bubble.footer.contents[0].action.uri, 'https://site.example.com/property-site/properties/detail/?slug=home%20one');
   assert.equal(JSON.stringify(sent).includes(uploadedCover), false);
   assert.equal(JSON.stringify(sent).includes('data:image'), false);
+});
+
+test('changing an uploaded property cover changes its LINE image URL while identical photos remain stable', async () => {
+  const makePhoto = async (background) => `data:image/webp;base64,${(await sharp({ create: { width: 32, height: 24, channels: 3, background } }).webp().toBuffer()).toString('base64')}`;
+  const originalPhoto = await makePhoto({ r: 240, g: 20, b: 30 });
+  const changedPhoto = await makePhoto({ r: 40, g: 140, b: 90 });
+  const sent = await propertyReply([originalPhoto, changedPhoto, originalPhoto].map((cover_image, index) => ({
+    id: 'same-property', title: `Photo ${index}`, published: true, slug: 'same-property', cover_image, images: [],
+  })));
+  const imageUrls = sent.messages[0].contents.contents.map(bubble => bubble.hero.url);
+  assert.notEqual(imageUrls[0], imageUrls[1]);
+  assert.equal(imageUrls[0], imageUrls[2]);
+  for (const imageUrl of imageUrls) {
+    assert.match(imageUrl, /^https:\/\/api\.example\.com\/api\/line\/property-image\?id=same-property&v=[0-9a-f]{16}$/);
+  }
 });
 
 test('property carousel falls back to the first usable uploaded gallery image', async () => {
