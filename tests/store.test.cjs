@@ -6,7 +6,7 @@ const vm = require('node:vm');
 const ts = require('typescript');
 const { webcrypto } = require('node:crypto');
 
-function loadStore({ backend = 'local', supabase = null, firebase = false, firebaseError = null, demoAuth = false } = {}) {
+function loadStore({ backend = 'local', supabase = null, firebase = false, firebaseError = null, firebaseDocuments = [], demoAuth = false } = {}) {
   const sourceRoot = path.resolve(__dirname, '../src');
   const cache = new Map();
   const storage = new Map();
@@ -46,10 +46,16 @@ function loadStore({ backend = 'local', supabase = null, firebase = false, fireb
         getApp: () => ({}),
       };
       if (name === 'firebase/firestore') return {
-        collection: () => ({}), query: () => ({}), where: () => ({}), doc: () => ({}),
-        getDocs: async () => { if (firebaseError) throw firebaseError; return { docs: [] }; },
+        collection: () => ({}), query: () => ({}), where: () => ({}), doc: (_db, collection, id) => ({ collection, id }),
+        getDocs: async () => { if (firebaseError) throw firebaseError; return { docs: firebaseDocuments.map(item => ({ id: item.id, data: () => ({ ...item }) })) }; },
         getDocFromServer: async () => ({ exists: () => false, data: () => ({}) }),
-        setDoc: async () => { if (firebaseError) throw firebaseError; },
+        setDoc: async (reference, value) => {
+          if (firebaseError) throw firebaseError;
+          if (reference.collection === 'properties') {
+            const index = firebaseDocuments.findIndex(item => item.id === reference.id);
+            if (index >= 0) firebaseDocuments[index] = value;
+          }
+        },
         getFirestore: () => ({}),
       };
       if (!name.startsWith('.') && !name.startsWith('@/')) {
@@ -171,4 +177,19 @@ test('security-sensitive Firebase paths have regression guards', () => {
   assert.doesNotMatch(authHelpers, /ADMIN_EMAILS|endsWith\(['"]@chantakornproperty\.com/);
   assert.doesNotMatch(adminLayout, /localStorage/);
   assert.match(adminLayout, /getDocFromServer/);
+});
+
+test('unrelated Firebase edits never turn missing coordinates into a real parcel pin', async () => {
+  const sample = loadStore().store.getLocalProperties()[0];
+  const records = [{ ...sample, id: 'missing-coordinates', latitude: null, longitude: null }];
+  const { store } = loadStore({ backend: 'firebase', firebase: true, firebaseDocuments: records });
+  assert.equal((await store.fetchAdminProperties())[0].coordinates_available, false);
+  await store.updateProperty('missing-coordinates', { price: 1000000 });
+  assert.equal(records[0].coordinates_available, false);
+  assert.equal((await store.fetchAdminProperties())[0].coordinates_available, false);
+  await store.updateProperty('missing-coordinates', { latitude: 7.21, longitude: 100.56 });
+  const result = (await store.fetchAdminProperties())[0];
+  assert.equal(result.coordinates_available, true);
+  assert.equal(result.latitude, 7.21);
+  assert.equal(result.longitude, 100.56);
 });
