@@ -13,6 +13,8 @@ export default function AdminSettingsPage() {
 
   const [saving, setSaving] = useState(false);
   const [loadingConfig, setLoadingConfig] = useState(true);
+  const [lineConfig, setLineConfig] = useState<{ isChannelTokenConfigured: boolean; isRecipientConfigured: boolean } | null>(null);
+  const [configError, setConfigError] = useState('');
   const [testing, setTesting] = useState(false);
   const [copiedWebhook, setCopiedWebhook] = useState(false);
   const [testWebhookRunning, setTestWebhookRunning] = useState(false);
@@ -50,14 +52,17 @@ export default function AdminSettingsPage() {
     async function loadConfig() {
       try {
         const res = await fetchStaffApi('/api/line/notify');
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'ตรวจการตั้งค่า LINE ไม่สำเร็จ');
         if (res.ok) {
-          const data = await res.json();
           if (isMounted) {
+            setLineConfig({ isChannelTokenConfigured: Boolean(data.isChannelTokenConfigured), isRecipientConfigured: Boolean(data.isRecipientConfigured) });
             if (data.autoNotifyNewProperty !== undefined) setAutoNotify(data.autoNotifyNewProperty);
             if (data.autoNotifyConsignment !== undefined) setAutoNotifyConsignment(data.autoNotifyConsignment);
           }
         }
       } catch (err) {
+        if (isMounted) setConfigError(err instanceof Error ? err.message : 'ตรวจการตั้งค่า LINE ไม่สำเร็จ');
         console.warn('Could not fetch LINE settings from server:', err);
       } finally {
         if (isMounted) {
@@ -114,6 +119,7 @@ export default function AdminSettingsPage() {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
+          isTest: true,
           title: 'ทดสอบระบบแจ้งเตือน Chantakorn Property',
           slug: 'test-property',
           price: 3890000,
@@ -140,7 +146,7 @@ export default function AdminSettingsPage() {
       } else {
         setTestResult({
           success: false,
-          message: data.error || 'เกิดข้อผิดพลาดในการส่งข้อความทดสอบ',
+          message: data.error || data.message || 'เกิดข้อผิดพลาดในการส่งข้อความทดสอบ',
           error: data.error
         });
       }
@@ -352,13 +358,12 @@ export default function AdminSettingsPage() {
             <div>
               <div className="flex items-center gap-2">
                 <h2 className="text-lg font-bold text-navy-950">LINE Messaging API Credentials</h2>
-                <span className="px-2.5 py-0.5 rounded-full text-[11px] bg-emerald-100 text-emerald-800 border border-emerald-300 font-extrabold flex items-center gap-1.5 shadow-xs">
-                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-                  ระบบพร้อมเชื่อมต่อ
+                <span className="px-2.5 py-0.5 rounded-full text-[11px] bg-gray-100 text-gray-800 border border-gray-300 font-extrabold flex items-center gap-1.5 shadow-xs">
+                  {loadingConfig ? 'กำลังตรวจการตั้งค่า' : configError ? 'ตรวจสถานะไม่สำเร็จ' : lineConfig?.isChannelTokenConfigured && lineConfig?.isRecipientConfigured ? 'ตั้งค่าการส่งครบ' : 'ยังไม่พร้อมส่งแจ้งเตือน'}
                 </span>
               </div>
               <p className="text-xs text-brand-muted mt-0.5">
-                LINE OA URL: <a href="https://lin.ee/NMSe28T3" target="_blank" rel="noreferrer" className="text-[#06C755] hover:underline font-bold">https://lin.ee/NMSe28T3</a> · LINE ID: <strong>@chantakorn</strong>
+                LINE OA URL: <a href="https://lin.ee/NMSe28T3" target="_blank" rel="noreferrer" className="text-[#06C755] hover:underline font-bold">https://lin.ee/NMSe28T3</a> · LINE ID: <strong>@930xzcyi</strong>
               </p>
             </div>
           </div>
@@ -382,6 +387,10 @@ export default function AdminSettingsPage() {
           <p className="rounded-xl bg-emerald-50 p-3 text-sm text-emerald-900">
             แจ้งเตือนถึงบัญชีเจ้าหน้าที่ที่ผู้ดูแลกำหนดไว้ กดทดสอบเพื่อส่งข้อความจริง หากต้องเปลี่ยนบัญชีหรือผู้รับ ให้ผู้ดูแลปรับค่าใน Vercel production
           </p>
+          {configError && <p role="alert" className="text-sm text-red-700">{configError}</p>}
+          {lineConfig && !lineConfig.isChannelTokenConfigured && <p className="text-sm text-red-700">ยังไม่ได้ตั้ง access token สำหรับส่งข้อความ</p>}
+          {lineConfig && !lineConfig.isRecipientConfigured && <p className="text-sm text-red-700">ยังไม่ได้กำหนดผู้รับแจ้งเตือนที่ถูกต้อง ให้ผู้ดูแลตั้ง LINE_TARGET_USER_ID หรือ LINE_ADMIN_USER_IDS แล้ว Redeploy</p>}
+          {lineConfig?.isChannelTokenConfigured && lineConfig.isRecipientConfigured && <p className="text-xs text-gray-600">มีค่าตั้งไว้แล้ว ต้องกดทดสอบและตรวจว่าเจ้าหน้าที่ได้รับข้อความ จึงจะยืนยันการใช้งานได้</p>}
 
           {/* Autonotify toggles */}
           <div className="space-y-2 pt-2 border-t border-gray-100">

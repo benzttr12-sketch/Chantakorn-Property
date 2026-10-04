@@ -19,6 +19,16 @@ interface LineSettings {
 let cachedSettings: LineSettings | null = null;
 let lastCacheTime = 0;
 
+function configuredRecipients(settings: LineSettings): string[] {
+  return Array.from(new Set([
+    settings.targetUserId || '', ...(settings.adminUserIds || []),
+  ].map((id) => id.trim()).filter(Boolean)));
+}
+
+function validRecipient(id: string): boolean {
+  return /^U[0-9a-f]{32}$/i.test(id);
+}
+
 async function getLineSettings(token?: string): Promise<LineSettings> {
   const now = Date.now();
   if (cachedSettings && now - lastCacheTime < 30000) {
@@ -62,6 +72,7 @@ export async function GET(req: Request) {
 
   const token = req.headers.get('authorization')?.match(/^Bearer\s+(.+)$/i)?.[1];
   const settings = await getLineSettings(token);
+  const recipients = configuredRecipients(settings);
   const hostOrigin = new URL(req.url).origin || 'https://ais-dev-4fthqw6uuad4ntgghqrlse-213200673887.asia-east1.run.app';
   return jsonResponse({
     officialLineUrl: OFFICIAL_LINE_OA_URL,
@@ -69,6 +80,8 @@ export async function GET(req: Request) {
     webhookUrl: `${hostOrigin}/api/line/webhook`,
     isChannelTokenConfigured: Boolean(settings.channelAccessToken?.trim()),
     isChannelSecretConfigured: Boolean(settings.channelSecret?.trim()),
+    isRecipientConfigured: recipients.length > 0 && recipients.every(validRecipient),
+    recipientCount: recipients.filter(validRecipient).length,
     targetUserId: settings.targetUserId ? `${settings.targetUserId.slice(0, 4)}***` : null,
     autoNotifyNewProperty: settings.autoNotifyNewProperty,
     autoNotifyConsignment: settings.autoNotifyConsignment,
@@ -124,12 +137,11 @@ export async function POST(req: Request) {
     const lineAccessToken = storedSettings.channelAccessToken || '';
     const autoNotifyEnabled = publicInquiry
       ? storedSettings.autoNotifyConsignment : storedSettings.autoNotifyNewProperty;
-    if (autoNotifyEnabled === false && !body.isTest) {
+    const isStaffManualSend = !publicInquiry && (body.isTest === true || body.manualSend === true);
+    if (autoNotifyEnabled === false && !isStaffManualSend) {
       return jsonResponse({ success: true, isRealSent: false, simulated: true, message: 'ปิดการแจ้งเตือนประเภทนี้ไว้ในการตั้งค่า' });
     }
-    const recipients = Array.from(new Set([
-      storedSettings.targetUserId || '', ...(storedSettings.adminUserIds || []),
-    ].map((id) => id.trim()).filter(Boolean)));
+    const recipients = configuredRecipients(storedSettings);
 
     const hostOrigin = (process.env.NEXT_PUBLIC_SITE_URL || new URL(req.url).origin).replace(/\/+$/, '');
 
@@ -421,8 +433,14 @@ LINE Official Account: ${OFFICIAL_LINE_OA_URL}`;
       if (!heroImg) delete flexMessagePayload.contents.hero;
     }
 
-    if (!lineAccessToken.trim() || recipients.length === 0 || recipients.some((id) => !/^U[0-9a-f]{32}$/i.test(id))) {
-      return jsonResponse({ success: false, isRealSent: false, error: 'ยังไม่ได้ตั้งค่าโทเค็นและผู้รับ LINE ส่วนตัวให้ครบถ้วน' }, { status: 503 });
+    if (!lineAccessToken.trim()) {
+      return jsonResponse({ success: false, isRealSent: false, code: 'LINE_TOKEN_MISSING', error: 'ยังไม่ได้ตั้ง LINE_CHANNEL_ACCESS_TOKEN ใน Vercel Production กรุณาตั้งค่าแล้ว Redeploy' }, { status: 503 });
+    }
+    if (recipients.length === 0) {
+      return jsonResponse({ success: false, isRealSent: false, code: 'LINE_RECIPIENT_MISSING', error: 'ยังไม่ได้กำหนดผู้รับแจ้งเตือน ตั้ง LINE_TARGET_USER_ID หรือ LINE_ADMIN_USER_IDS ใน Vercel Production แล้ว Redeploy' }, { status: 503 });
+    }
+    if (!recipients.every(validRecipient)) {
+      return jsonResponse({ success: false, isRealSent: false, code: 'LINE_RECIPIENT_INVALID', error: 'ผู้รับแจ้งเตือนไม่ใช่ LINE user ID ที่ถูกต้อง ต้องเป็น U ตามด้วยเลขฐานสิบหก 32 ตัว ไม่ใช่ชื่อหรือ @LINE ID' }, { status: 503 });
     }
 
     // Send only to staff recipients explicitly configured in the server runtime.

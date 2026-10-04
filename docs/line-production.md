@@ -45,6 +45,10 @@ Verify ส่ง `events: []` จึงตรวจเพียงการเ�
 
 ปุ่มจำลองในหน้าตั้งค่าสำหรับพนักงานตรวจการประมวลผลเท่านั้น ไม่เรียก LINE และไม่สร้าง inquiry ผลระบุ `simulation: true`, `simulatedReplies` และ `successfulReplies: 0`
 
+ปุ่มส่งทรัพย์และปุ่มทดสอบส่งแจ้งเตือนของพนักงานเป็นการส่งด้วยตนเอง จึงใช้ได้แม้ปิดแจ้งเตือนอัตโนมัติไว้ การปิดสวิตช์ยังคงหยุดการแจ้งเตือนอัตโนมัติจากประกาศใหม่/ฟอร์มลูกค้า ผู้ใช้สาธารณะใช้ flags ทดสอบหรือส่งเองเพื่อข้ามสวิตช์ไม่ได้
+
+หน้าจอจะแสดงว่าส่งคำขอสำเร็จเฉพาะเมื่อ HTTP สำเร็จและ API รายงาน `success: true`, `isRealSent: true` เท่านั้น หากข้ามการส่งหรือ LINE ปฏิเสธ จะแสดงเหตุผลและให้ลองใหม่ ปุ่มเปิดแชท LINE เพียงเปิดข้อความที่เตรียมไว้ ผู้ใช้ต้องกด Send ใน LINE เอง และไม่เรียก API แจ้งเตือนพนักงาน
+
 ฟอร์ม `/sell` เป็นอีกเส้นทาง: บันทึกฟอร์ม → เปิดแชต OA → ลูกค้ากด Send → ตรวจว่ามีข้อความและไม่สร้าง inbox ซ้ำจาก `[CP-WEB-FORM:...]`
 
 ## ตรวจปัญหา
@@ -56,6 +60,8 @@ Verify ส่ง `events: []` จึงตรวจเพียงการเ�
 | Verify ไม่ผ่าน / webhook 401 | Secret ของ channel, URL, การเข้าถึง HTTPS และลายเซ็นของ body เดิม |
 | Reply API 401 | Access token หมดอายุ/ถูกยกเลิกหรือเป็นคนละ channel |
 | Reply API 400 | รูปแบบ Flex และ reply token จาก event จริง |
+| แจ้งเตือน `LINE_TOKEN_MISSING` | ตั้ง access token ที่ Vercel Production แล้ว Redeploy |
+| แจ้งเตือน `LINE_RECIPIENT_MISSING` / `LINE_RECIPIENT_INVALID` | ตั้ง `LINE_TARGET_USER_ID` หรือ `LINE_ADMIN_USER_IDS` เป็น user ID ของเจ้าหน้าที่จาก provider เดียวกัน: `U` ตามด้วย hex 32 ตัว ไม่ใช่ชื่อผู้ใช้หรือ `@LINE ID` แล้ว Redeploy; ผู้รับต้องเป็นเพื่อนกับ OA และไม่บล็อก |
 | ไม่มีการ์ดทรัพย์ | Query Firestore, rules และข้อมูล `published: true` |
 | รายละเอียดเปิดผิดที่ | `NEXT_PUBLIC_SITE_URL` และ slug |
 

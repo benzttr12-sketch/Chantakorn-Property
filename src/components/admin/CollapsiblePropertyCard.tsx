@@ -144,16 +144,23 @@ export default function CollapsiblePropertyCard({
 
   const [sendingLine, setSendingLine] = useState(false);
   const [lineSent, setLineSent] = useState(false);
+  const [lineError, setLineError] = useState('');
 
   const handleSendToLine = async () => {
     setSendingLine(true);
+    setLineSent(false);
+    setLineError('');
     try {
       const res = await fetchStaffApi('/api/line/notify', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(property),
+        body: JSON.stringify({ ...property, manualSend: true }),
       });
       const data = await res.json();
+      if (!res.ok || !data.success || !data.isRealSent) {
+        setLineError(data.error || data.message || 'ยังไม่ได้ส่งแจ้งเตือน LINE');
+        return;
+      }
       setLineSent(true);
       setTimeout(() => setLineSent(false), 4000);
       const targetUrl = data.lineOaMessageUrl || data.shareUrl;
@@ -161,6 +168,7 @@ export default function CollapsiblePropertyCard({
         window.open(targetUrl, '_blank');
       }
     } catch (err) {
+      setLineError(err instanceof Error ? err.message : 'ส่งแจ้งเตือน LINE ไม่สำเร็จ');
       console.warn('Failed to send LINE notification:', err);
     } finally {
       setSendingLine(false);
@@ -669,6 +677,7 @@ export default function CollapsiblePropertyCard({
           >
             <Sparkles className="w-3.5 h-3.5" />
           </Link>
+          {lineError && <p role="alert" className="basis-full text-xs text-red-700">{lineError}</p>}
 
           <Link
             href={propertyHref(property.slug)}
