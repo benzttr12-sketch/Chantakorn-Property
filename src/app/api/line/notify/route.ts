@@ -1,7 +1,7 @@
 import { jsonResponse } from '@/lib/api-response';
 import { requireStaff } from '@/lib/server-auth';
 import { getFirestoreDocument, patchFirestoreDocument } from '@/lib/firestore-rest';
-import { resolvePropertyHeroImageUrl } from '@/lib/property-image-cache';
+import { getLinePropertyImageUrl } from '@/lib/line-property-image';
 
 const OFFICIAL_LINE_OA_URL = 'https://lin.ee/NMSe28T3';
 const DEFAULT_PHONE = '081-604-0097';
@@ -284,7 +284,7 @@ LINE Official Account: ${OFFICIAL_LINE_OA_URL}`;
 
 LINE Official Account: ${OFFICIAL_LINE_OA_URL}`;
 
-      const heroImg = resolvePropertyHeroImageUrl(body, hostOrigin);
+      const heroImg = getLinePropertyImageUrl(body, new URL(req.url).origin);
 
       flexMessagePayload = {
         type: "flex",

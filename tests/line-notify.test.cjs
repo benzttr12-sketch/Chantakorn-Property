@@ -4,6 +4,16 @@ const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
 const ts = require('typescript');
+const { createHash } = require('node:crypto');
+
+function loadPropertyImageHelper() {
+  const module = { exports: {} };
+  const source = ts.transpileModule(fs.readFileSync(path.join(__dirname, '../src/lib/line-property-image.ts'), 'utf8'), {
+    compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
+  }).outputText;
+  vm.runInNewContext(source, { module, exports: module.exports, require, URL });
+  return module.exports;
+}
 
 function load({ staff = false, env = {}, firestore = {}, fetch = async () => { throw Error('Unexpected LINE request'); } } = {}) {
   const module = { exports: {} };
@@ -16,10 +26,7 @@ function load({ staff = false, env = {}, firestore = {}, fetch = async () => { t
     require(name) {
       if (name === '@/lib/api-response') return { jsonResponse: (body, init) => Response.json(body, init) };
       if (name === '@/lib/server-auth') return { requireStaff: async () => staff ? null : Response.json({ error: 'Unauthorized' }, { status: 401 }) };
-      if (name === '@/lib/property-image-cache') return {
-        resolvePropertyHeroImageUrl: property => property.cover_image?.startsWith('https://')
-          ? property.cover_image : 'https://images.example.test/resolved-home.jpg',
-      };
+      if (name === '@/lib/line-property-image') return loadPropertyImageHelper();
       if (name === '@/lib/firestore-rest') return {
         getFirestoreDocument: firestore.getFirestoreDocument || (async () => Response.json({}, { status: 404 })),
         patchFirestoreDocument: firestore.patchFirestoreDocument || (async () => { throw Error('Unexpected settings write'); }),
@@ -34,6 +41,25 @@ const owner = 'U' + '1'.repeat(32);
 const second = 'U' + '2'.repeat(32);
 const customer = 'U' + '3'.repeat(32);
 const request = body => new Request('https://example.com/api/line/notify', { method: 'POST', body: JSON.stringify(body) });
+
+async function propertyPush(property, env = {}) {
+  let payload;
+  const api = load({ staff: true,
+    env: { LINE_CHANNEL_ACCESS_TOKEN: 'runtime-token', LINE_TARGET_USER_ID: owner, ...env },
+    fetch: async (url, init) => {
+      assert.equal(url, 'https://api.line.me/v2/bot/message/push');
+      payload = JSON.parse(init.body);
+      return Response.json({});
+    },
+  });
+  const response = await api.POST(request({ manualSend: true, ...property }));
+  assert.equal(response.status, 200);
+  assert.equal((await response.json()).isRealSent, true);
+  assert.equal(payload.to, owner);
+  return payload;
+}
+
+const uploadedImageUrl = (id, photo) => `https://example.com/api/line/property-image?id=${encodeURIComponent(id)}&v=${createHash('sha256').update(photo).digest('hex').slice(0, 16)}`;
 
 test('anonymous callers cannot read LINE settings or send staff listing notifications', async () => {
   const api = load();
@@ -214,12 +240,64 @@ test('a denied anonymous preference read does not cache defaults for a later sta
 });
 
 test('staff can send an existing large property payload with a resolved public image', async () => {
-  let payload;
-  const api = load({ staff: true, env: { LINE_CHANNEL_ACCESS_TOKEN: 'runtime-token', LINE_TARGET_USER_ID: owner },
-    fetch: async (_url, init) => { payload = JSON.parse(init.body); return Response.json({}); },
-  });
-  const response = await api.POST(request({ title: 'Home', images: ['data:image/png;base64,' + 'a'.repeat(20000)] }));
-  assert.equal(response.status, 200);
-  assert.equal(payload.messages[1].contents.hero.url, 'https://images.example.test/resolved-home.jpg');
+  const photo = 'data:image/png;base64,' + 'a'.repeat(20000);
+  const payload = await propertyPush({ id: 'uploaded home', title: 'Home', images: [photo] });
+  assert.equal(payload.messages[1].contents.hero.url, uploadedImageUrl('uploaded home', photo));
   assert.equal(JSON.stringify(payload).includes('data:image/'), false);
+});
+
+test('notification uses the selected property cover ahead of gallery photos and video thumbnails', async () => {
+  const payload = await propertyPush({
+    id: 'selected-home', title: 'ขายที่ดิน สิงหนคร',
+    cover_image: ' https://photos.example.test/selected-cover.jpg ',
+    images: ['https://photos.example.test/other-photo.jpg'],
+    video_url: 'https://www.youtube.com/watch?v=ScMzIvxBSi4',
+  });
+  assert.equal(payload.messages[1].contents.hero.url, 'https://photos.example.test/selected-cover.jpg');
+});
+
+test('uploaded notification cover uses the API origin while detail links use the configured website', async () => {
+  const photo = 'data:image/webp;base64,UklGRg==';
+  const payload = await propertyPush({
+    id: 'home one', title: 'Uploaded home', slug: 'home one', cover_image: photo,
+    images: ['https://photos.example.test/gallery.jpg'],
+    video_url: 'https://www.youtube.com/watch?v=ScMzIvxBSi4',
+  }, { NEXT_PUBLIC_SITE_URL: 'https://static.example.test/property-site/' });
+  const hero = payload.messages[1].contents.hero;
+  assert.equal(hero.url, uploadedImageUrl('home one', photo));
+  assert.equal(hero.action.uri, 'https://static.example.test/property-site/properties/detail/?slug=home%20one');
+  assert.equal(JSON.stringify(payload).includes('data:image/'), false);
+});
+
+test('notification skips invalid covers and selects the first usable actual gallery photo', async () => {
+  const payload = await propertyPush({
+    id: 'gallery-home', title: 'Gallery home', cover_image: 'blob:local-preview',
+    images: ['javascript:alert(1)', ' https://photos.example.test/บ้าน.jpg ', 'https://photos.example.test/later.jpg'],
+    video_url: 'https://www.youtube.com/watch?v=ScMzIvxBSi4',
+  });
+  assert.equal(payload.messages[1].contents.hero.url, 'https://photos.example.test/%E0%B8%9A%E0%B9%89%E0%B8%B2%E0%B8%99.jpg');
+});
+
+test('changing an uploaded notification cover changes its URL so LINE can fetch the replacement', async () => {
+  const firstPhoto = 'data:image/png;base64,YQ==';
+  const replacementPhoto = 'data:image/png;base64,Yg==';
+  const urls = [];
+  for (const photo of [firstPhoto, replacementPhoto, firstPhoto]) {
+    const payload = await propertyPush({ id: 'same-home', title: 'Home', cover_image: photo });
+    urls.push(payload.messages[1].contents.hero.url);
+  }
+  assert.equal(urls[0], uploadedImageUrl('same-home', firstPhoto));
+  assert.equal(urls[1], uploadedImageUrl('same-home', replacementPhoto));
+  assert.notEqual(urls[0], urls[1]);
+  assert.equal(urls[0], urls[2]);
+});
+
+test('notification without a property photo omits the hero instead of showing a sample, stock, or video image', async () => {
+  for (const property of [
+    { id: 'photo-less-land', title: 'ขายที่ดิน สิงหนคร', property_type: 'land', cover_image: 'http://photos.example.test/insecure.jpg', images: [] },
+    { id: 'photo-less-home', title: 'Home', property_type: 'house', images: ['blob:local-preview'], video_url: 'https://www.youtube.com/watch?v=ScMzIvxBSi4' },
+  ]) {
+    const payload = await propertyPush(property);
+    assert.equal(Object.hasOwn(payload.messages[1].contents, 'hero'), false);
+  }
 });
