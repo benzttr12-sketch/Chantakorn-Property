@@ -4,10 +4,16 @@ import { doc, getDocFromServer, setDoc } from 'firebase/firestore';
 import { dataBackend } from '@/lib/backend';
 import { auth, db } from '@/lib/firebase/client';
 import { type LandValuationInput, validateLandValuation } from '@/lib/landsmaps';
+import { type ParcelBoundaryCollection, parseParcelBoundaryFile, validateParcelBoundaries } from '@/lib/parcel-boundaries';
 
-function storageKey(key: string): string {
+// Local/demo records are private to this loaded module and disappear on refresh.
+// Coordinates and appraisal details never enter browser storage.
+const localValuations = new Map<string, LandValuationInput>();
+const localBoundaries = new Map<string, ParcelBoundaryCollection>();
+
+function storageKey(prefix: 'land_valuation' | 'land_boundaries', key: string): string {
   if (!/^[a-zA-Z0-9_-]{1,120}$/.test(key)) throw new Error('รหัสรายการประเมินไม่ถูกต้อง');
-  return `land_valuation_${key}`;
+  return `${prefix}_${key}`;
 }
 
 async function requireFirebaseSession() {
@@ -21,7 +27,7 @@ async function requireFirebaseSession() {
 }
 
 export async function loadLandValuation(key: string): Promise<LandValuationInput | null> {
-  const id = storageKey(key);
+  const id = storageKey('land_valuation', key);
   if (dataBackend === 'firebase') {
     const { database } = await requireFirebaseSession();
     // settings is staff-only under Firestore rules. Request the server so cached data
@@ -32,13 +38,12 @@ export async function loadLandValuation(key: string): Promise<LandValuationInput
   if (dataBackend === 'supabase') {
     throw new Error('ยังไม่ได้ตั้งค่าที่เก็บรายการประเมินส่วนตัวสำหรับ Supabase');
   }
-  if (typeof window === 'undefined') throw new Error('ที่เก็บรายการประเมินในเครื่องใช้ได้เฉพาะเบราว์เซอร์นี้');
-  const saved = window.localStorage.getItem(`chantakorn_${id}`);
-  return saved === null ? null : validateLandValuation(JSON.parse(saved));
+  const saved = localValuations.get(id);
+  return saved === undefined ? null : validateLandValuation(saved);
 }
 
 export async function saveLandValuation(key: string, input: LandValuationInput): Promise<void> {
-  const id = storageKey(key);
+  const id = storageKey('land_valuation', key);
   const validated = validateLandValuation(input);
   if (dataBackend === 'firebase') {
     const { database, userId } = await requireFirebaseSession();
@@ -54,7 +59,44 @@ export async function saveLandValuation(key: string, input: LandValuationInput):
   if (dataBackend === 'supabase') {
     throw new Error('ยังไม่ได้ตั้งค่าที่เก็บรายการประเมินส่วนตัวสำหรับ Supabase');
   }
-  if (typeof window === 'undefined') throw new Error('ที่เก็บรายการประเมินในเครื่องใช้ได้เฉพาะเบราว์เซอร์นี้');
-  // Explicit demo/local backend only; production never silently falls back to this.
-  window.localStorage.setItem(`chantakorn_${id}`, JSON.stringify(validated));
+  localValuations.set(id, validated);
+}
+
+export async function loadLandBoundaries(recordId: string): Promise<ParcelBoundaryCollection | null> {
+  const id = storageKey('land_boundaries', recordId);
+  if (dataBackend === 'firebase') {
+    const { database } = await requireFirebaseSession();
+    const snapshot = await getDocFromServer(doc(database, 'settings', id));
+    if (!snapshot.exists()) return null;
+    const serialized: unknown = snapshot.data().collection_json;
+    if (typeof serialized !== 'string') throw new Error('ข้อมูลแนวเขตที่บันทึกไว้ไม่ถูกต้อง');
+    return parseParcelBoundaryFile(serialized, 'boundaries.geojson');
+  }
+  if (dataBackend === 'supabase') {
+    throw new Error('ยังไม่ได้ตั้งค่าที่เก็บแนวเขตส่วนตัวสำหรับ Supabase');
+  }
+  const saved = localBoundaries.get(id);
+  return saved === undefined ? null : validateParcelBoundaries(saved);
+}
+
+export async function saveLandBoundaries(recordId: string, collection: ParcelBoundaryCollection): Promise<void> {
+  const id = storageKey('land_boundaries', recordId);
+  // Validation copies geometry, strips unrelated properties and enforces 512 KB.
+  const validated = validateParcelBoundaries(collection);
+  if (dataBackend === 'firebase') {
+    const { database, userId } = await requireFirebaseSession();
+    await setDoc(doc(database, 'settings', id), {
+      // GeoJSON coordinates contain nested arrays, which Firestore does not support.
+      collection_json: JSON.stringify(validated),
+      source: 'user_supplied_boundary',
+      officialDataFetched: false,
+      updated_at: new Date().toISOString(),
+      updated_by: userId,
+    });
+    return;
+  }
+  if (dataBackend === 'supabase') {
+    throw new Error('ยังไม่ได้ตั้งค่าที่เก็บแนวเขตส่วนตัวสำหรับ Supabase');
+  }
+  localBoundaries.set(id, validated);
 }

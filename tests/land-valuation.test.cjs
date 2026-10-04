@@ -11,7 +11,7 @@ function load(relativePath, imports = {}, globals = {}) {
     compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
   }).outputText;
   vm.runInNewContext(source, {
-    module, exports: module.exports, Request, Response, URL, Date,
+    module, exports: module.exports, Request, Response, URL, Date, TextEncoder,
     require(name) {
       if (Object.hasOwn(imports, name)) return imports[name];
       throw Error(`Unexpected import: ${name}`);
@@ -22,6 +22,12 @@ function load(relativePath, imports = {}, globals = {}) {
 }
 
 const core = load('src/lib/landsmaps.ts');
+const boundariesCore = load('src/lib/parcel-boundaries.ts');
+const boundary = () => boundariesCore.validateParcelBoundaries({
+  type: 'Feature',
+  properties: { label: 'แปลงของฉัน', origin: 'imported' },
+  geometry: { type: 'Polygon', coordinates: [[[100.6, 7.1], [100.61, 7.1], [100.61, 7.11], [100.6, 7.1]]] },
+});
 const input = overrides => ({ ...core.EMPTY_LAND_VALUATION, landSizeSqWah: 100, ...overrides });
 const officialRate = overrides => input({
   appraisalPricePerSqWah: 9500,
@@ -166,27 +172,35 @@ test('POST returns transparent manual calculation and rejects invalid JSON and m
   assert.equal((await route.POST(new Request('https://example.com/api/landsmaps', { method: 'POST', body: '{' }))).status, 400);
 });
 
-function store({ backend = 'firebase', user = { uid: 'staff-uid' }, saved = null, deny = false, ready = async () => {} } = {}) {
+function store({ backend = 'firebase', user = { uid: 'staff-uid' }, saved = null, savedBoundaries = null, savedBoundaryJson, deny = false, ready = async () => {} } = {}) {
   const calls = [];
   const local = new Map();
+  const storageAccess = [];
   const authModel = { currentUser: user, authStateReady: async () => ready(authModel) };
   const module = load('src/lib/store/land-valuation-store.ts', {
-    '@/lib/landsmaps': core, '@/lib/backend': { dataBackend: backend },
+    '@/lib/landsmaps': core, '@/lib/parcel-boundaries': boundariesCore, '@/lib/backend': { dataBackend: backend },
     '@/lib/firebase/client': { db: {}, auth: authModel },
     'firebase/firestore': {
       doc: (_database, collection, id) => ({ collection, id }),
       getDocFromServer: async reference => {
         calls.push({ operation: 'read', reference });
         if (deny) throw Error('permission-denied');
-        return { exists: () => saved !== null, data: () => ({ input: saved }) };
+        const serialized = savedBoundaryJson === undefined ? JSON.stringify(savedBoundaries) : savedBoundaryJson;
+        const exists = reference.id.startsWith('land_boundaries_')
+          ? savedBoundaries !== null || savedBoundaryJson !== undefined
+          : saved !== null;
+        return { exists: () => exists, data: () => ({ input: saved, collection_json: serialized }) };
       },
       setDoc: async (reference, value) => {
         calls.push({ operation: 'write', reference, value });
         if (deny) throw Error('permission-denied');
       },
     },
-  }, { window: { localStorage: { getItem: key => local.get(key) ?? null, setItem: (key, value) => local.set(key, value) } } });
-  return { ...module, calls, local };
+  }, { window: { localStorage: {
+    getItem: key => { storageAccess.push('read'); return local.get(key) ?? null; },
+    setItem: (key, value) => { storageAccess.push('write'); local.set(key, value); },
+  } } });
+  return { ...module, calls, local, storageAccess };
 }
 
 test('private appraisal persistence uses staff-only settings and keeps source provenance', async () => {
@@ -238,10 +252,117 @@ test('a restoring Firebase session loads the existing record before permitting a
   assert.equal(persistence.calls[1].value.updated_by, 'restored-staff');
 });
 
-test('local backend persists explicitly in this browser and handles absent records', async () => {
+test('local appraisal records are copied in temporary memory and disappear with a new module', async () => {
   const local = store({ backend: 'local', user: null });
   assert.equal(await local.loadLandValuation('manual'), null);
-  await local.saveLandValuation('manual', officialRate());
+  const original = officialRate();
+  await local.saveLandValuation('manual', original);
+  original.appraisalPricePerSqWah = 1;
+  const loaded = await local.loadLandValuation('manual');
+  assert.equal(loaded.appraisalPricePerSqWah, 9500);
+  loaded.appraisalPricePerSqWah = 2;
   assert.equal((await local.loadLandValuation('manual')).appraisalPricePerSqWah, 9500);
+  assert.equal(await store({ backend: 'local' }).loadLandValuation('manual'), null);
+  assert.equal(local.storageAccess.length, 0);
+  assert.equal(local.local.size, 0);
   assert.equal(local.calls.length, 0);
+});
+
+test('private boundary persistence awaits auth restoration and uses staff-only settings with provenance', async () => {
+  let finishRestoring;
+  const restoring = new Promise(resolve => { finishRestoring = resolve; });
+  const savedBoundaries = boundary();
+  const persistence = store({ user: null, savedBoundaries, ready: async authModel => {
+    await restoring;
+    authModel.currentUser = { uid: 'boundary-staff' };
+  } });
+  const pendingLoad = persistence.loadLandBoundaries('property-123');
+  assert.equal(persistence.calls.length, 0);
+  finishRestoring();
+  const loaded = await pendingLoad;
+  assert.equal(loaded.features[0].properties.label, 'แปลงของฉัน');
+  loaded.features[0].geometry.coordinates[0][0][0] = 1;
+  assert.equal(savedBoundaries.features[0].geometry.coordinates[0][0][0], 100.6);
+  await persistence.saveLandBoundaries('property-123', savedBoundaries);
+  for (const call of persistence.calls) {
+    assert.equal(call.reference.collection, 'settings');
+    assert.equal(call.reference.id, 'land_boundaries_property-123');
+  }
+  const written = persistence.calls[1].value;
+  assert.equal(typeof written.collection_json, 'string');
+  assert.equal(written.collection_json, JSON.stringify(savedBoundaries));
+  assert.equal(JSON.parse(written.collection_json).features[0].geometry.coordinates[0][0][0], 100.6);
+  assert.equal('collection' in written, false);
+  assert.ok(Object.values(written).every(value => value === null || typeof value !== 'object'));
+  assert.ok(new TextEncoder().encode(written.collection_json).byteLength <= 512 * 1024);
+  assert.equal(written.source, 'user_supplied_boundary');
+  assert.equal(written.officialDataFetched, false);
+  assert.equal(written.updated_by, 'boundary-staff');
+  assert.ok(Number.isFinite(Date.parse(written.updated_at)));
+  assert.equal(persistence.storageAccess.length, 0);
+});
+
+test('anonymous and denied boundary access cannot fall back, and unsupported backends reject access', async () => {
+  const anonymous = store({ user: null });
+  await assert.rejects(anonymous.loadLandBoundaries('manual'));
+  await assert.rejects(anonymous.saveLandBoundaries('manual', boundary()));
+  assert.equal(anonymous.calls.length, 0);
+  const denied = store({ deny: true });
+  await assert.rejects(denied.loadLandBoundaries('manual'), /permission-denied/);
+  await assert.rejects(denied.saveLandBoundaries('manual', boundary()), /permission-denied/);
+  for (const persistence of [anonymous, denied]) {
+    assert.equal(persistence.storageAccess.length, 0);
+    assert.equal(persistence.local.size, 0);
+  }
+  const unsupported = store({ backend: 'supabase' });
+  await assert.rejects(unsupported.loadLandBoundaries('manual'), /Supabase/);
+  await assert.rejects(unsupported.saveLandBoundaries('manual', boundary()), /Supabase/);
+  assert.equal(unsupported.calls.length, 0);
+  assert.equal(unsupported.storageAccess.length, 0);
+});
+
+test('local boundaries are copied in temporary memory without touching browser storage', async () => {
+  const local = store({ backend: 'local', user: null });
+  assert.equal(await local.loadLandBoundaries('manual'), null);
+  const original = boundary();
+  await local.saveLandBoundaries('manual', original);
+  original.features[0].properties.label = 'changed';
+  original.features[0].geometry.coordinates[0][0][0] = 1;
+  const loaded = await local.loadLandBoundaries('manual');
+  assert.equal(loaded.features[0].properties.label, 'แปลงของฉัน');
+  assert.equal(loaded.features[0].geometry.coordinates[0][0][0], 100.6);
+  loaded.features[0].properties.label = 'changed again';
+  loaded.features[0].geometry.coordinates[0][0][0] = 2;
+  assert.equal((await local.loadLandBoundaries('manual')).features[0].geometry.coordinates[0][0][0], 100.6);
+  assert.equal((await local.loadLandBoundaries('manual')).features[0].properties.label, 'แปลงของฉัน');
+  assert.equal(await store({ backend: 'local' }).loadLandBoundaries('manual'), null);
+  assert.equal(local.storageAccess.length, 0);
+  assert.equal(local.local.size, 0);
+  assert.equal(local.calls.length, 0);
+  await local.saveLandBoundaries('manual', boundariesCore.EMPTY_PARCEL_BOUNDARIES);
+  assert.equal((await local.loadLandBoundaries('manual')).features.length, 0);
+});
+
+test('boundary IDs, invalid server geometry and oversized writes are rejected before persistence', async () => {
+  const persistence = store();
+  for (const id of ['../properties', '', 'a'.repeat(121), 'space id']) {
+    await assert.rejects(persistence.loadLandBoundaries(id));
+    await assert.rejects(persistence.saveLandBoundaries(id, boundary()));
+  }
+  const invalid = boundary();
+  invalid.features[0].geometry.coordinates[0][0][0] = 181;
+  await assert.rejects(persistence.saveLandBoundaries('manual', invalid), boundariesCore.ParcelBoundaryValidationError);
+  const oversized = { ...boundary(), unrelated: 'x'.repeat(512 * 1024) };
+  await assert.rejects(persistence.saveLandBoundaries('manual', oversized), /512 KB/);
+  assert.equal(persistence.calls.length, 0);
+  const corrupt = store({ savedBoundaries: invalid });
+  await assert.rejects(corrupt.loadLandBoundaries('manual'), boundariesCore.ParcelBoundaryValidationError);
+  assert.equal(corrupt.calls.length, 1);
+  assert.equal(corrupt.storageAccess.length, 0);
+  for (const savedBoundaryJson of ['{', null, boundary(), ' '.repeat(512 * 1024) + '{}']) {
+    const malformed = store({ savedBoundaryJson });
+    await assert.rejects(malformed.loadLandBoundaries('manual'));
+    assert.equal(malformed.calls.length, 1);
+    assert.equal(malformed.storageAccess.length, 0);
+  }
 });

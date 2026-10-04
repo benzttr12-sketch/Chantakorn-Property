@@ -2,8 +2,12 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { LayerGroup, Map as LeafletMap, Marker, TileLayer } from 'leaflet';
-import { LocateFixed, MapPin, Maximize2, Minimize2, Navigation, RefreshCw } from 'lucide-react';
+import { Check, Layers, LocateFixed, MapPin, Maximize2, Minimize2, Navigation, Pencil, RefreshCw, Undo2, X } from 'lucide-react';
 import type { Property } from '@/lib/types';
+import {
+  createSketchBoundary, EMPTY_PARCEL_BOUNDARIES, getParcelBoundaryBounds,
+  validateParcelBoundaries, type ParcelBoundaryCollection,
+} from '@/lib/parcel-boundaries';
 
 interface ParcelLocationMapProps {
   latitude: number | null;
@@ -13,6 +17,9 @@ interface ParcelLocationMapProps {
   onPropertySelect?: (property: Property) => void;
   selectedPropertyId?: string;
   height?: string;
+  boundaryCollection?: ParcelBoundaryCollection;
+  onBoundaryChange?: (collection: ParcelBoundaryCollection) => void;
+  boundaryAttribution?: string;
 }
 
 type BaseLayer = 'street' | 'satellite';
@@ -45,7 +52,7 @@ function pinIcon(leaflet: LeafletModule, selected = false) {
 /** Displays stored or manually selected coordinates; never synthesizes parcel boundaries. */
 export default function ParcelLocationMap({
   latitude, longitude, onLocationChange, properties = [], onPropertySelect,
-  selectedPropertyId, height = '480px',
+  selectedPropertyId, height = '480px', boundaryCollection, onBoundaryChange, boundaryAttribution,
 }: ParcelLocationMapProps) {
   const shellRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -54,10 +61,13 @@ export default function ParcelLocationMap({
   const leafletRef = useRef<LeafletModule | null>(null);
   const markerRef = useRef<Marker | null>(null);
   const propertiesLayerRef = useRef<LayerGroup | null>(null);
+  const boundariesLayerRef = useRef<LayerGroup | null>(null);
+  const draftLayerRef = useRef<LayerGroup | null>(null);
+  const drawingRef = useRef(false);
   const tilesRef = useRef<Record<BaseLayer, TileLayer> | null>(null);
   const activeRef = useRef(false);
   const locationRequestGenerationRef = useRef(0);
-  const latestRef = useRef({ latitude, longitude, onLocationChange, onPropertySelect });
+  const latestRef = useRef({ latitude, longitude, onLocationChange, onPropertySelect, boundaryCollection, onBoundaryChange });
   const [ready, setReady] = useState(false);
   const [reload, setReload] = useState(0);
   const [baseLayer, setBaseLayer] = useState<BaseLayer>('satellite');
@@ -67,12 +77,28 @@ export default function ParcelLocationMap({
   const [locating, setLocating] = useState(false);
   const [fullscreen, setFullscreen] = useState(false);
   const [cssFullscreen, setCssFullscreen] = useState(false);
+  const [showBoundaries, setShowBoundaries] = useState(true);
+  const [drawing, setDrawing] = useState(false);
+  const [draftPoints, setDraftPoints] = useState<Array<[number, number]>>([]);
+  const [boundaryError, setBoundaryError] = useState('');
   const isFullscreen = fullscreen || cssFullscreen;
   const editable = Boolean(onLocationChange);
+  const canDraw = Boolean(onBoundaryChange);
+  const hasBoundaryControls = boundaryCollection !== undefined || canDraw;
   const invalidateLocationRequest = useCallback(() => {
     locationRequestGenerationRef.current += 1;
     setLocating(false);
   }, []);
+  const resetDrawing = useCallback(() => {
+    drawingRef.current = false;
+    setDrawing(false);
+    setDraftPoints([]);
+  }, []);
+
+  useEffect(() => {
+    resetDrawing();
+    setBoundaryError('');
+  }, [selectedPropertyId, canDraw, boundaryCollection, resetDrawing]);
 
   useEffect(() => {
     invalidateLocationRequest();
@@ -80,14 +106,15 @@ export default function ParcelLocationMap({
   }, [latitude, longitude, selectedPropertyId, editable, invalidateLocationRequest]);
 
   useEffect(() => {
-    latestRef.current = { latitude, longitude, onLocationChange, onPropertySelect };
-  }, [latitude, longitude, onLocationChange, onPropertySelect]);
+    latestRef.current = { latitude, longitude, onLocationChange, onPropertySelect, boundaryCollection, onBoundaryChange };
+  }, [latitude, longitude, onLocationChange, onPropertySelect, boundaryCollection, onBoundaryChange]);
 
   useEffect(() => {
     let cancelled = false;
     let resizeObserver: ResizeObserver | undefined;
     activeRef.current = true;
     invalidateLocationRequest();
+    resetDrawing();
     setReady(false);
     setInitError('');
     setTileError('');
@@ -118,7 +145,15 @@ export default function ParcelLocationMap({
         }).on('tileerror', reportTileError);
         tilesRef.current = { street, satellite };
         propertiesLayerRef.current = leaflet.layerGroup().addTo(map);
+        boundariesLayerRef.current = leaflet.layerGroup().addTo(map);
+        draftLayerRef.current = leaflet.layerGroup().addTo(map);
         map.on('click', (event) => {
+          if (drawingRef.current) {
+            if (latestRef.current.onBoundaryChange) {
+              setDraftPoints((points) => [...points, [event.latlng.lng, event.latlng.lat]]);
+            }
+            return;
+          }
           const callback = latestRef.current.onLocationChange;
           if (callback) {
             invalidateLocationRequest();
@@ -139,15 +174,18 @@ export default function ParcelLocationMap({
       cancelled = true;
       activeRef.current = false;
       locationRequestGenerationRef.current += 1;
+      drawingRef.current = false;
       resizeObserver?.disconnect();
       mapRef.current?.remove();
       mapRef.current = null;
       markerRef.current = null;
       propertiesLayerRef.current = null;
+      boundariesLayerRef.current = null;
+      draftLayerRef.current = null;
       tilesRef.current = null;
       leafletRef.current = null;
     };
-  }, [reload, invalidateLocationRequest]);
+  }, [reload, invalidateLocationRequest, resetDrawing]);
 
   useEffect(() => {
     const map = mapRef.current;
@@ -169,14 +207,17 @@ export default function ParcelLocationMap({
       return;
     }
     const coordinates: [number, number] = [latitude as number, longitude as number];
+    const previousPosition = markerRef.current?.getLatLng();
+    const moved = !previousPosition || previousPosition.lat !== coordinates[0] || previousPosition.lng !== coordinates[1];
     if (!markerRef.current) {
-      const marker = leaflet.marker(coordinates, { icon: pinIcon(leaflet, true), draggable: editable });
+      const marker = leaflet.marker(coordinates, { icon: pinIcon(leaflet, true), draggable: editable && !drawing });
       const label = document.createElement('div');
       label.style.cssText = 'padding:12px;max-width:230px;';
       label.textContent = 'ตำแหน่งหมุดที่เลือก ไม่ใช่แนวเขตโฉนด';
       marker.bindPopup(label).addTo(map);
       marker.on('dragstart', invalidateLocationRequest);
       marker.on('dragend', () => {
+        if (drawingRef.current) return;
         invalidateLocationRequest();
         const point = marker.getLatLng();
         latestRef.current.onLocationChange?.(point.lat, point.lng);
@@ -184,11 +225,13 @@ export default function ParcelLocationMap({
       markerRef.current = marker;
     } else {
       markerRef.current.setLatLng(coordinates);
-      if (editable) markerRef.current.dragging?.enable();
+      if (editable && !drawing) markerRef.current.dragging?.enable();
       else markerRef.current.dragging?.disable();
     }
-    map.setView(coordinates, Math.max(map.getZoom(), 16));
-  }, [latitude, longitude, editable, ready, invalidateLocationRequest]);
+    const element = markerRef.current.getElement();
+    if (element) element.style.pointerEvents = drawing ? 'none' : '';
+    if (moved) map.setView(coordinates, Math.max(map.getZoom(), 16));
+  }, [latitude, longitude, editable, drawing, ready, invalidateLocationRequest]);
 
   useEffect(() => {
     const leaflet = leafletRef.current;
@@ -199,7 +242,7 @@ export default function ParcelLocationMap({
       if (!hasPropertyCoordinates(property)) continue;
       if (property.id === selectedPropertyId && validCoordinates(latitude, longitude)) continue;
       const marker = leaflet.marker([property.latitude, property.longitude], {
-        icon: pinIcon(leaflet), bubblingMouseEvents: false,
+        icon: pinIcon(leaflet), bubblingMouseEvents: false, interactive: !drawing,
       });
       const popup = document.createElement('div');
       popup.style.cssText = 'padding:12px;max-width:240px;';
@@ -211,12 +254,13 @@ export default function ParcelLocationMap({
       area.textContent = [property.subdistrict, property.district, property.province].filter(Boolean).join(' ');
       area.style.cssText = 'font-size:12px;margin:0;';
       popup.appendChild(area);
-      if (latestRef.current.onPropertySelect) {
+      if (latestRef.current.onPropertySelect && !drawing) {
         const select = document.createElement('button');
         select.type = 'button';
         select.textContent = 'เลือกทรัพย์นี้';
         select.style.cssText = 'margin-top:10px;padding:6px 10px;background:#fff3e8;color:#9a3412;border:1px solid #fdba74;border-radius:8px;cursor:pointer;';
         select.addEventListener('click', () => {
+          if (drawingRef.current) return;
           invalidateLocationRequest();
           latestRef.current.onPropertySelect?.(property);
         });
@@ -224,11 +268,88 @@ export default function ParcelLocationMap({
       }
       marker.bindPopup(popup).addTo(layer);
       marker.on('click', () => {
+        if (drawingRef.current) return;
         invalidateLocationRequest();
         latestRef.current.onPropertySelect?.(property);
       });
     }
-  }, [properties, selectedPropertyId, latitude, longitude, onPropertySelect, ready, invalidateLocationRequest]);
+  }, [properties, selectedPropertyId, latitude, longitude, onPropertySelect, drawing, ready, invalidateLocationRequest]);
+
+  useEffect(() => {
+    const leaflet = leafletRef.current;
+    const layer = boundariesLayerRef.current;
+    if (!ready || !leaflet || !layer) return;
+    layer.clearLayers();
+    setBoundaryError('');
+    if (!showBoundaries || !boundaryCollection) return;
+    try {
+      const collection = validateParcelBoundaries(boundaryCollection);
+      leaflet.geoJSON(collection, {
+        interactive: !drawing,
+        style: { color: '#dc2626', weight: 2.5, fillColor: '#dc2626', fillOpacity: 0.05 },
+        onEachFeature: (feature, featureLayer) => {
+          const popup = document.createElement('div');
+          popup.style.cssText = 'padding:12px;max-width:260px;';
+          const title = document.createElement('p');
+          title.textContent = feature.properties.label;
+          title.style.cssText = 'font-weight:600;margin:0 0 6px;';
+          popup.appendChild(title);
+          const source = document.createElement('p');
+          source.textContent = feature.properties.origin === 'sketch'
+            ? 'แนวเขตที่ผู้ใช้วาด เป็นร่างจากแผนที่ ต้องตรวจโฉนด'
+            : 'แนวเขตจากไฟล์ที่นำเข้า กรุณาตรวจสอบแหล่งที่มาและโฉนด';
+          source.style.cssText = 'font-size:12px;margin:0;';
+          popup.appendChild(source);
+          featureLayer.bindPopup(popup);
+          const label = document.createElement('span');
+          label.textContent = feature.properties.label;
+          featureLayer.bindTooltip(label, { sticky: true });
+        },
+      }).addTo(layer);
+    } catch {
+      setBoundaryError('ข้อมูลแนวเขตไม่ถูกต้อง กรุณาตรวจสอบไฟล์และพิกัดก่อนแสดงบนแผนที่');
+    }
+  }, [boundaryCollection, showBoundaries, drawing, ready]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!ready || !map || !boundaryCollection) return;
+    try {
+      const bounds = getParcelBoundaryBounds(validateParcelBoundaries(boundaryCollection));
+      if (bounds) map.fitBounds(bounds, { padding: [25, 25], maxZoom: 18 });
+    } catch {
+      setBoundaryError('ข้อมูลแนวเขตไม่ถูกต้อง กรุณาตรวจสอบไฟล์และพิกัด');
+    }
+  }, [boundaryCollection, ready]);
+
+  useEffect(() => {
+    const leaflet = leafletRef.current;
+    const layer = draftLayerRef.current;
+    if (!ready || !leaflet || !layer) return;
+    layer.clearLayers();
+    if (!drawing) return;
+    const points: [number, number][] = draftPoints.map(([lng, lat]) => [lat, lng]);
+    if (points.length > 1) leaflet.polyline(points, {
+      color: '#dc2626', weight: 2.5, dashArray: '6,5', interactive: false,
+    }).addTo(layer);
+    for (const point of points) leaflet.circleMarker(point, {
+      radius: 4, color: '#dc2626', fillColor: '#fff', fillOpacity: 1, weight: 2, interactive: false,
+    }).addTo(layer);
+  }, [draftPoints, drawing, ready]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    const container = containerRef.current;
+    if (!ready || !map || !container || !drawing) return;
+    const doubleClickWasEnabled = map.doubleClickZoom.enabled();
+    const previousCursor = container.style.cursor;
+    map.doubleClickZoom.disable();
+    container.style.cursor = 'crosshair';
+    return () => {
+      if (doubleClickWasEnabled && mapRef.current === map) map.doubleClickZoom.enable();
+      container.style.cursor = previousCursor;
+    };
+  }, [drawing, ready]);
 
   useEffect(() => {
     const update = () => {
@@ -306,7 +427,43 @@ export default function ParcelLocationMap({
     if (points.length) map.fitBounds(leaflet.latLngBounds(points), { padding: [35, 35], maxZoom: 17 });
   };
 
+  const fitBoundaries = () => {
+    try {
+      const collection = validateParcelBoundaries(latestRef.current.boundaryCollection || EMPTY_PARCEL_BOUNDARIES);
+      const bounds = getParcelBoundaryBounds(collection);
+      if (bounds) mapRef.current?.fitBounds(bounds, { padding: [25, 25], maxZoom: 18 });
+    } catch {
+      setBoundaryError('ข้อมูลแนวเขตไม่ถูกต้อง กรุณาตรวจสอบไฟล์และพิกัด');
+    }
+  };
+
+  const startDrawing = () => {
+    if (!ready || !latestRef.current.onBoundaryChange) return;
+    invalidateLocationRequest();
+    setBoundaryError('');
+    setShowBoundaries(true);
+    setDraftPoints([]);
+    drawingRef.current = true;
+    setDrawing(true);
+    mapRef.current?.closePopup();
+  };
+
+  const finishDrawing = () => {
+    if (!drawingRef.current || draftPoints.length < 3 || !latestRef.current.onBoundaryChange) return;
+    try {
+      const collection = validateParcelBoundaries(latestRef.current.boundaryCollection || EMPTY_PARCEL_BOUNDARIES);
+      const sketch = createSketchBoundary(draftPoints, `แนวเขตที่วาด ${collection.features.length + 1}`);
+      const next = validateParcelBoundaries({ type: 'FeatureCollection', features: [...collection.features, ...sketch.features] });
+      latestRef.current.onBoundaryChange(next);
+      setBoundaryError('');
+      resetDrawing();
+    } catch {
+      setBoundaryError('ปิดแนวเขตไม่ได้ ต้องมีมุมที่ไม่ซ้ำอย่างน้อย 3 จุดและล้อมพื้นที่จริง โปรดตรวจสอบจุดที่วาด');
+    }
+  };
+
   const locate = () => {
+    if (drawingRef.current) return;
     if (!navigator.geolocation) {
       setLocationError('เบราว์เซอร์นี้ไม่รองรับการค้นหาตำแหน่ง');
       return;
@@ -357,6 +514,7 @@ export default function ParcelLocationMap({
 
   return (
     <div ref={shellRef} data-map-fullscreen={isFullscreen ? 'true' : 'false'}
+      data-parcel-boundary-count={boundaryCollection?.features.length || 0} data-boundary-drawing={drawing ? 'true' : 'false'}
       role={isFullscreen ? 'dialog' : undefined} aria-modal={isFullscreen || undefined}
       aria-label={isFullscreen ? 'แผนที่เต็มหน้าจอ' : undefined}
       className={`relative isolate overflow-hidden border border-slate-200 bg-white ${isFullscreen ? 'flex flex-col rounded-none' : 'rounded-2xl'}`}
@@ -370,7 +528,17 @@ export default function ParcelLocationMap({
         </div>
         <button type="button" className={buttonClass} onClick={goToPin} disabled={!ready || !hasPin}><MapPin size={14} />ไปยังหมุด</button>
         <button type="button" className={buttonClass} onClick={fitProperties} disabled={!ready || (!hasPin && !properties.some(hasPropertyCoordinates))}><LocateFixed size={14} />ดูทุกทรัพย์</button>
-        {onLocationChange && <button type="button" className={buttonClass} onClick={locate} disabled={!ready || locating}><Navigation size={14} />{locating ? 'กำลังหาตำแหน่ง…' : 'ใช้ตำแหน่งของฉัน'}</button>}
+        {hasBoundaryControls && <>
+          <button type="button" className={buttonClass} aria-pressed={showBoundaries} onClick={() => setShowBoundaries((value) => !value)} disabled={!ready || drawing}><Layers size={14} />แนวเขตสีแดง</button>
+          <button type="button" className={buttonClass} onClick={fitBoundaries} disabled={!ready || !boundaryCollection?.features.length}><LocateFixed size={14} />ดูแนวเขตทั้งหมด</button>
+        </>}
+        {canDraw && !drawing && <button type="button" className={buttonClass} onClick={startDrawing} disabled={!ready}><Pencil size={14} />วาดแนวเขต</button>}
+        {drawing && <>
+          <button type="button" className={buttonClass} onClick={finishDrawing} disabled={draftPoints.length < 3}><Check size={14} />จบการวาด</button>
+          <button type="button" className={buttonClass} onClick={() => setDraftPoints((points) => points.slice(0, -1))} disabled={!draftPoints.length}><Undo2 size={14} />ลบจุดล่าสุด</button>
+          <button type="button" className={buttonClass} onClick={() => { resetDrawing(); setBoundaryError(''); }}><X size={14} />ยกเลิกการวาด</button>
+        </>}
+        {onLocationChange && <button type="button" className={buttonClass} onClick={locate} disabled={!ready || locating || drawing}><Navigation size={14} />{locating ? 'กำลังหาตำแหน่ง…' : 'ใช้ตำแหน่งของฉัน'}</button>}
         <button ref={fullscreenButtonRef} type="button" className={`${buttonClass} ml-auto`} onClick={() => void toggleFullscreen()} aria-label={isFullscreen ? 'ออกจากแผนที่เต็มหน้าจอ' : 'เปิดแผนที่เต็มหน้าจอ'}>{isFullscreen ? <><Minimize2 size={14} /><span>ออกจากเต็มหน้าจอ</span></> : <Maximize2 size={14} />}</button>
       </div>
       <div className={`relative ${isFullscreen ? 'min-h-0 flex-1' : ''}`} style={{ height: isFullscreen ? undefined : height, minHeight: isFullscreen ? '0' : '240px' }}>
@@ -382,7 +550,12 @@ export default function ParcelLocationMap({
       </div>
       <div className={`shrink-0 space-y-1 border-t border-slate-200 p-3 text-xs text-slate-600 ${isFullscreen ? 'max-h-[35vh] overflow-y-auto' : ''}`}>
         <p><span className="mr-1 inline-block h-2.5 w-2.5 rounded-full bg-orange-500" />หมุดตามพิกัดที่บันทึก ไม่ใช่แนวเขตโฉนด{properties.length > 0 && <span className="ml-3"><span className="mr-1 inline-block h-2.5 w-2.5 rounded-full bg-blue-600" />ทรัพย์ในฐานข้อมูล</span>}</p>
-        <p>{onLocationChange ? 'คลิกแผนที่หรือลากหมุดเพื่อเลือกพิกัด • ' : ''}{baseLayer === 'satellite' ? 'ภาพดาวเทียม Esri World Imagery' : 'แผนที่ถนน OpenStreetMap'}{!hasPin ? ' • ยังไม่ได้เลือกหมุด' : ''}</p>
+        {hasBoundaryControls && <p><span className="mr-1 inline-block h-0.5 w-4 bg-red-600 align-middle" />แนวเขตจากไฟล์ที่นำเข้าหรือจุดที่ผู้ใช้วาด {boundaryCollection?.features.length || 0} รายการ{!showBoundaries ? ' (ซ่อนอยู่)' : ''}</p>}
+        {boundaryAttribution && <p>{boundaryAttribution}</p>}
+        {canDraw && <p className="text-red-800">แนวเขตที่ผู้ใช้วาด เป็นร่างจากแผนที่ ต้องตรวจโฉนด</p>}
+        {drawing && <p className="font-medium text-red-800" role="status">คลิกมุมแปลงทีละจุด ({draftPoints.length} จุด) แล้วกดจบการวาด • ระหว่างวาดจะไม่ย้ายหมุดหรือเลือกทรัพย์</p>}
+        <p>{onLocationChange && !drawing ? 'คลิกแผนที่หรือลากหมุดเพื่อเลือกพิกัด • ' : ''}{baseLayer === 'satellite' ? 'ภาพดาวเทียม Esri World Imagery' : 'แผนที่ถนน OpenStreetMap'}{!hasPin ? ' • ยังไม่ได้เลือกหมุด' : ''}</p>
+        {boundaryError && <p className="text-red-800" role="alert">{boundaryError}</p>}
         {(tileError || locationError) && <div className="flex flex-wrap items-center gap-2 text-amber-800" role="status"><p>{locationError || tileError}</p>{tileError && <button type="button" className={buttonClass} onClick={() => setReload((value) => value + 1)}><RefreshCw size={12} />โหลดใหม่</button>}</div>}
       </div>
     </div>

@@ -13,6 +13,8 @@ import {
   raiNganWahToSqWah, buildGoogleMapsUrl,
 } from '@/lib/landsmaps';
 import ParcelLocationMap from './ParcelLocationMap';
+import ParcelBoundaryControls from './ParcelBoundaryControls';
+import { EMPTY_PARCEL_BOUNDARIES, ParcelBoundaryCollection } from '@/lib/parcel-boundaries';
 
 interface Props {
   initialProperty?: Property | null;
@@ -61,6 +63,10 @@ export default function AutoPinLandsMapsValuation({ initialProperty = null, prop
   const [error, setError] = useState('');
   const [catalogError, setCatalogError] = useState('');
   const [dirty, setDirty] = useState(false);
+  const [boundaries, setBoundaries] = useState<ParcelBoundaryCollection>(EMPTY_PARCEL_BOUNDARIES);
+  const [boundariesDirty, setBoundariesDirty] = useState(false);
+  const [boundaryEditingAvailable, setBoundaryEditingAvailable] = useState(false);
+  const [boundaryPreview, setBoundaryPreview] = useState<ParcelBoundaryCollection | null>(null);
   const revision = useRef(0);
   const key = selectedProperty?.id || 'workspace';
 
@@ -96,12 +102,14 @@ export default function AutoPinLandsMapsValuation({ initialProperty = null, prop
   }
 
   function selectProperty(property: Property | null) {
-    if (dirty && !window.confirm('มีข้อมูลที่ยังไม่ได้บันทึก ต้องการเปลี่ยนทรัพย์และเริ่มข้อมูลใหม่หรือไม่?')) return;
+    if ((property?.id || 'workspace') === key) return;
+    if ((dirty || boundariesDirty) && !window.confirm('มีข้อมูลที่ยังไม่ได้บันทึก ต้องการเปลี่ยนทรัพย์และเริ่มข้อมูลใหม่หรือไม่?')) return;
+    setBoundaries(EMPTY_PARCEL_BOUNDARIES); setBoundariesDirty(false); setBoundaryPreview(null); setBoundaryEditingAvailable(false);
     setSelectedProperty(property); setCoordinates(''); setCoordinateError('');
   }
 
   function setLocation(latitude: number, longitude: number) {
-    if (loading || saving || readFailed) return;
+    if (loading || saving || readFailed || boundaryPreview) return;
     revision.current += 1;
     setDraft(previous => ({ ...previous, latitude, longitude }));
     setDirty(true); setNotice(''); setError(''); setCoordinateError('');
@@ -154,7 +162,7 @@ export default function AutoPinLandsMapsValuation({ initialProperty = null, prop
     try {
       await saveLandValuation(key, validated);
       if (savedRevision === revision.current) setDirty(false);
-      setNotice(dataBackend === 'local' ? 'บันทึกในเบราว์เซอร์เครื่องนี้แล้ว' : 'บันทึกข้อมูลประเมินสำหรับพนักงานแล้ว');
+      setNotice(dataBackend === 'local' ? 'เก็บข้อมูลประเมินชั่วคราวระหว่างเปิดเว็บนี้แล้ว ข้อมูลจะหายเมื่อรีเฟรช' : 'บันทึกข้อมูลประเมินสำหรับพนักงานแล้ว');
       onSaved?.();
     } catch { setError('บันทึกไม่สำเร็จ กรุณาตรวจการเข้าสู่ระบบและสิทธิ์ฐานข้อมูล ข้อมูลยังอยู่ในแบบฟอร์ม'); }
     finally { setSaving(false); }
@@ -189,14 +197,15 @@ export default function AutoPinLandsMapsValuation({ initialProperty = null, prop
     </div>
     <div className="grid gap-5 xl:grid-cols-[minmax(0,1.55fr)_minmax(320px,1fr)]">
       <div className="min-w-0 space-y-3">
-        <ParcelLocationMap latitude={draft.latitude} longitude={draft.longitude} properties={catalog} selectedPropertyId={selectedProperty?.id} onPropertySelect={property => { if (!loading && !saving) selectProperty(property); }} onLocationChange={!loading && !saving && !readFailed ? setLocation : undefined} />
+        <ParcelLocationMap latitude={draft.latitude} longitude={draft.longitude} properties={catalog} selectedPropertyId={selectedProperty?.id} onPropertySelect={property => { if (!loading && !saving) selectProperty(property); }} onLocationChange={!loading && !saving && !readFailed && !boundaryPreview ? setLocation : undefined} boundaryCollection={boundaryPreview || boundaries} boundaryAttribution={boundaryPreview ? 'กรมที่ดิน · ข้อมูลเปิด ต.น้ำร้อน จ.เพชรบูรณ์ · เผยแพร่ พ.ศ. 2564 · แปลงพิกัดเป็น WGS84 (ความแม่นยำการแปลงประมาณ 3 ม.)' : undefined} onBoundaryChange={boundaryEditingAvailable && !boundaryPreview ? collection => { setBoundaries(collection); setBoundariesDirty(true); } : undefined} />
         <div className="flex flex-col gap-2 sm:flex-row">
           <label className="flex-1"><span className="sr-only">พิกัดละติจูดและลองจิจูด</span><input className={inputClass} value={coordinates} onChange={event => { setCoordinates(event.target.value); setCoordinateError(''); }} placeholder="วางพิกัด เช่น 7.1982, 100.5951" /></label>
-          <button type="button" onClick={pinCoordinates} disabled={loading || saving || readFailed} className="inline-flex justify-center items-center gap-2 rounded-xl bg-navy-950 px-4 py-2.5 text-sm font-bold text-white disabled:opacity-40"><MapPin size={16} />ปักหมุดพิกัด</button>
+          <button type="button" onClick={pinCoordinates} disabled={loading || saving || readFailed || Boolean(boundaryPreview)} className="inline-flex justify-center items-center gap-2 rounded-xl bg-navy-950 px-4 py-2.5 text-sm font-bold text-white disabled:opacity-40"><MapPin size={16} />ปักหมุดพิกัด</button>
         </div>
         {coordinateError && <p role="alert" className="text-xs text-red-600">{coordinateError}</p>}
         <p className="text-xs text-gray-500">{draft.latitude !== null && draft.longitude !== null ? `หมุดปัจจุบัน: ${draft.latitude.toFixed(6)}, ${draft.longitude.toFixed(6)}` : 'ยังไม่มีหมุดที่ดิน — ตำแหน่งเริ่มต้นแผนที่เป็นเพียงพื้นที่ดูแผนที่'}</p>
         {draft.latitude !== null && draft.longitude !== null && <a href={buildGoogleMapsUrl(draft.latitude, draft.longitude) || undefined} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-xs text-blue-700 underline">เปิดพิกัดใน Google Maps <ExternalLink size={12} /></a>}
+        <ParcelBoundaryControls key={key} recordId={key} collection={boundaries} dirty={boundariesDirty} previewActive={Boolean(boundaryPreview)} onChange={collection => { setBoundaries(collection); setBoundariesDirty(true); }} onLoaded={collection => { setBoundaries(collection); setBoundariesDirty(false); }} onPreviewChange={setBoundaryPreview} onEditingAvailabilityChange={setBoundaryEditingAvailable} />
         <div className="rounded-2xl border border-blue-100 bg-blue-50 p-4 space-y-3">
           <h3 className="font-bold text-sm text-navy-950">ดูรูปแปลงโฉนดจริงและค้นราคาประเมิน</h3>
           <p className="text-xs leading-relaxed text-gray-600">คัดลอกข้อมูลด้านขวา แล้วค้นจังหวัด อำเภอ และเลขโฉนดในเว็บกรมที่ดิน เปิดเว็บธนารักษ์เพื่อดูราคาประเมินของแปลงเดียวกัน จากนั้นนำอัตราและแหล่งอ้างอิงกลับมาบันทึกด้านล่าง</p>
@@ -247,7 +256,7 @@ export default function AutoPinLandsMapsValuation({ initialProperty = null, prop
           <button type="button" disabled={!validated || loading || saving || readFailed} onClick={save} className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-gold-500 px-3 py-3 text-sm font-bold text-navy-950 disabled:opacity-40"><Save size={16} />{saving ? 'กำลังบันทึก…' : 'บันทึกข้อมูลประเมิน'}</button>
           <button type="button" disabled={!result || loading || readFailed} onClick={report} className="inline-flex items-center gap-2 rounded-xl border border-gray-300 px-3 text-xs disabled:opacity-40"><Copy size={14} />รายงาน</button>
         </div>
-        <p className="text-xs text-gray-500">{dataBackend === 'local' ? 'ข้อมูลบันทึกเฉพาะเบราว์เซอร์เครื่องนี้' : 'ข้อมูลโฉนดและผลประเมินบันทึกสำหรับพนักงาน ไม่แสดงในหน้าประกาศสาธารณะ'}</p>
+        <p className="text-xs text-gray-500">{dataBackend === 'local' ? 'โหมดทดสอบเก็บข้อมูลชั่วคราวในหน่วยความจำ ข้อมูลจะหายเมื่อรีเฟรช' : 'ข้อมูลโฉนดและผลประเมินบันทึกสำหรับพนักงาน ไม่แสดงในหน้าประกาศสาธารณะ'}</p>
       </div>
     </div>
     {readFailed && <button type="button" onClick={() => setLoadAttempt(value => value + 1)} className="rounded-xl border border-gray-300 px-4 py-2 text-sm font-semibold">ลองอ่านข้อมูลที่บันทึกไว้อีกครั้ง</button>}

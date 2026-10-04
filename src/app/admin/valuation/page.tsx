@@ -21,7 +21,7 @@ export default function AdminValuationPage() {
               แผนที่ที่ดิน & ประเมินราคา (หลังบ้าน)
             </h1>
             <p className="text-xs sm:text-sm text-gray-500 max-w-2xl">
-              เลือกทรัพย์เพื่อดูตำแหน่งจริง ปักหมุดบนแผนที่ และค้นรูปแปลงใน LandsMaps จากนั้นกรอกราคาประเมินที่ตรวจสอบจากกรมธนารักษ์เพื่อคำนวณมูลค่าที่ดิน พร้อมบันทึกแหล่งข้อมูลและวันที่ตรวจสอบ
+              เลือกทรัพย์เพื่อดูตำแหน่งจริงและปักหมุด ดูเส้นแดงจากข้อมูลเปิดกรมที่ดินในพื้นที่ที่มีข้อมูล หรือวาดและนำเข้าแนวเขตของทรัพย์ จากนั้นกรอกราคาประเมินที่ตรวจสอบจากกรมธนารักษ์เพื่อคำนวณมูลค่าที่ดิน พร้อมบันทึกแหล่งข้อมูลและวันที่ตรวจสอบ
             </p>
             <div className="flex flex-wrap gap-4 pt-2 text-xs font-semibold text-blue-700">
               <a href={LANDSMAPS_URL} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 hover:underline">เว็บไซต์กรมที่ดิน LandsMaps <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" /></a>
