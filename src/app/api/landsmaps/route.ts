@@ -1,87 +1,40 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { generateLandsMapsParcelInfo, estimateTreasuryAppraisalRate, calculateLandTransferFees } from '@/lib/landsmaps';
+import {
+  LANDSMAPS_URL, TREASURY_APPRAISAL_URL, LandValuationValidationError,
+  buildGoogleMapsUrl, calculateLandValuation, validateLandValuation,
+} from '@/lib/landsmaps';
 
-export async function POST(req: NextRequest) {
-  try {
-    const body = await req.json();
-    const {
-      propertyId = 'api_req',
-      chanoteNo = '',
-      district = 'หาดใหญ่',
-      province = 'สงขลา',
-      subdistrict = 'คอหงส์',
-      landSizeSqWah = 80,
-      price = 3500000,
-      latitude = 7.008,
-      longitude = 100.474,
-      isOwnedOver5Years = true,
-    } = body;
+const source = 'manual_official_lookup';
+const links = { landsmaps: LANDSMAPS_URL, treasury: TREASURY_APPRAISAL_URL };
 
-    const parcelInfo = generateLandsMapsParcelInfo(
-      propertyId,
-      district,
-      province,
-      subdistrict,
-      Number(landSizeSqWah) || 50,
-      Number(price) || 3000000,
-      Number(latitude) || 7.008,
-      Number(longitude) || 100.474,
-      chanoteNo || undefined
-    );
-
-    const customFees = calculateLandTransferFees(
-      Number(price) || 3000000,
-      parcelInfo.totalAppraisalValue,
-      Boolean(isOwnedOver5Years)
-    );
-
-    return NextResponse.json({
-      success: true,
-      timestamp: new Date().toISOString(),
-      source: 'https://landsmaps.dol.go.th/',
-      data: {
-        ...parcelInfo,
-        transferFees: customFees,
-      },
-    });
-  } catch (error: any) {
-    return NextResponse.json(
-      {
-        success: false,
-        error: error?.message || 'Failed to parse parcel data from DOL LandsMaps',
-      },
-      { status: 500 }
-    );
-  }
+/** Capability information only. No generated deeds, boundaries or government prices. */
+export async function GET() {
+  return NextResponse.json({
+    success: true, source, officialDataFetched: false, links,
+    capabilities: { officialLookup: 'external_website', manualValuation: true, parcelApi: false },
+  });
 }
 
-export async function GET(req: NextRequest) {
-  const { searchParams } = new URL(req.url);
-  const chanoteNo = searchParams.get('chanoteNo') || '12345';
-  const district = searchParams.get('district') || 'หาดใหญ่';
-  const province = searchParams.get('province') || 'สงขลา';
-  const subdistrict = searchParams.get('subdistrict') || 'คอหงส์';
-  const landSizeSqWah = Number(searchParams.get('landSize')) || 80;
-  const price = Number(searchParams.get('price')) || 3500000;
-  const latitude = Number(searchParams.get('lat')) || 7.008;
-  const longitude = Number(searchParams.get('lng')) || 100.474;
-
-  const parcelInfo = generateLandsMapsParcelInfo(
-    `get_${chanoteNo}`,
-    district,
-    province,
-    subdistrict,
-    landSizeSqWah,
-    price,
-    latitude,
-    longitude,
-    chanoteNo
-  );
-
-  return NextResponse.json({
-    success: true,
-    timestamp: new Date().toISOString(),
-    source: 'https://landsmaps.dol.go.th/',
-    data: parcelInfo,
-  });
+/** Pure calculation of explicitly supplied data; does not fetch or persist private records. */
+export async function POST(req: NextRequest) {
+  let body: unknown;
+  try {
+    body = await req.json();
+  } catch {
+    return NextResponse.json({ success: false, error: 'รูปแบบ JSON ไม่ถูกต้อง' }, { status: 400 });
+  }
+  try {
+    const input = validateLandValuation(body);
+    return NextResponse.json({
+      success: true, source, officialDataFetched: false,
+      links: { ...links, googleMaps: buildGoogleMapsUrl(input.latitude, input.longitude) },
+      input, data: calculateLandValuation(input),
+      transferFeeNote: 'ค่าธรรมเนียมโอนอัตราทั่วไป 2% เป็นเพียงประมาณการ ไม่รวมภาษีหรือมาตรการลดค่าธรรมเนียม',
+    });
+  } catch (error: unknown) {
+    return NextResponse.json({
+      success: false,
+      error: error instanceof LandValuationValidationError ? error.message : 'ไม่สามารถคำนวณข้อมูลที่ดินได้',
+    }, { status: error instanceof LandValuationValidationError ? 400 : 500 });
+  }
 }

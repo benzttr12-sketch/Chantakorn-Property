@@ -100,8 +100,8 @@ function rowToProperty(row: PropertyRow): Property {
   const { agents, property_images, ...property } = row;
   const parsedLat = Number(property.latitude);
   const parsedLng = Number(property.longitude);
-  const validLat = Number.isFinite(parsedLat) && Math.abs(parsedLat) <= 90;
-  const validLng = Number.isFinite(parsedLng) && Math.abs(parsedLng) <= 180;
+  const validLat = property.latitude != null && String(property.latitude).trim() !== '' && Number.isFinite(parsedLat) && Math.abs(parsedLat) <= 90;
+  const validLng = property.longitude != null && String(property.longitude).trim() !== '' && Number.isFinite(parsedLng) && Math.abs(parsedLng) <= 180;
 
   let resolvedAgent = agents || property.agent || undefined;
   if (typeof window !== 'undefined') {
@@ -135,6 +135,7 @@ function rowToProperty(row: PropertyRow): Property {
 
   return {
     ...property,
+    coordinates_available: property.coordinates_available !== false && validLat && validLng && (parsedLat !== 0 || parsedLng !== 0),
     price: Number(property.price) || 0,
     latitude: validLat && validLng ? parsedLat : 7.0084, // Fallback to Hat Yai center if invalid/NaN
     longitude: validLat && validLng ? parsedLng : 100.4705,
@@ -358,6 +359,11 @@ export async function updateProperty(id: string, updates: Partial<Property>): Pr
     const updated = {
       ...current,
       ...changes,
+      ...(current.coordinates_available === false &&
+        typeof updates.latitude === 'number' && Number.isFinite(updates.latitude) && Math.abs(updates.latitude) <= 90 &&
+        typeof updates.longitude === 'number' && Number.isFinite(updates.longitude) && Math.abs(updates.longitude) <= 180 &&
+        (updates.latitude !== current.latitude || updates.longitude !== current.longitude)
+        ? { coordinates_available: true } : {}),
       ...(images ? { images } : {}),
       ...(agent ? { agent } : {})
     };

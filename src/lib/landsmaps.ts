@@ -1,221 +1,195 @@
-// src/lib/landsmaps.ts
-// Department of Lands (DOL LandsMaps - กรมที่ดิน) Integration Engine
+import type { Property } from '@/lib/types';
 
-export interface LandsMapsParcelInfo {
-  chanoteNo: string; // เลขที่โฉนดที่ดิน
-  landNo: string; // เลขที่ดิน
-  surveyPage: string; // หน้าสำรวจ
-  mapSheet: string; // ระวาง
-  province: string; // จังหวัด
-  district: string; // อำเภอ
-  subdistrict: string; // ตำบล
-  rai: number;
-  ngan: number;
-  sqWah: number;
-  totalSqWah: number;
-  totalSqMeters: number;
-  appraisalPricePerSqWah: number; // ราคาประเมินกรมธนารักษ์ ต่อ ตร.ว.
-  totalAppraisalValue: number; // รวมราคาประเมินทุนทรัพย์ราชการ
-  marketPrice: number; // ราคาเสนอขาย
-  diffPercentage: number; // ส่วนต่างราคาประเมินกับราคาขาย (%)
-  latitude: number;
-  longitude: number;
-  landsmapsUrl: string; // Direct deep-link to landsmaps.dol.go.th
-  googleMapsUrl: string;
-  transferFees: {
-    transferFee: number; // ค่าธรรมเนียมการโอน 2% ของราคาประเมิน
-    withholdingTax: number; // ภาษีเงินได้หัก ณ ที่จ่ายประเมิน
-    stampDutyOrBusinessTax: number; // อากรแสตมป์ 0.5% หรือ ภาษีธุรกิจเฉพาะ 3.3%
-    totalDepartmentOfLandsFees: number; // รวมค่าใช้จ่าย ณ สำนักงานที่ดิน
-  };
+// Official lookup services. They are not a public data API for this application.
+export const LANDSMAPS_URL = 'https://landsmaps.dol.go.th/';
+export const TREASURY_APPRAISAL_URL = 'https://assessprice.treasury.go.th/';
+
+export interface LandValuationInput {
+  chanoteNo: string;
+  landNo: string;
+  surveyPage: string;
+  mapSheet: string;
+  province: string;
+  district: string;
+  subdistrict: string;
+  landSizeSqWah: number;
+  latitude: number | null;
+  longitude: number | null;
+  appraisalPricePerSqWah: number | null;
+  appraisalReference: string;
+  appraisalCheckedAt: string;
+  appraisalPeriod: string;
+  askingPrice: number | null;
 }
 
-// Hat Yai and Songkhla zone Treasury appraisal benchmarks (THB per sq. wah)
-const ZONE_TREASURY_APPRAISAL_RATES: Record<string, number> = {
-  'หาดใหญ่_ศูนย์กลางเมือง': 75000,
-  'หาดใหญ่_คอหงส์_ม.อ.': 45000,
-  'หาดใหญ่_คลองแห': 25000,
-  'หาดใหญ่_ควนลัง': 18000,
-  'หาดใหญ่_บ้านพรุ': 20000,
-  'หาดใหญ่_คลองอู่ตะเภา': 12000,
-  'เมืองสงขลา_บ่อยาง': 50000,
-  'เมืองสงขลา_เขารูปช้าง': 28000,
-  'เมืองสงขลา_พะวง': 18000,
-  'สะเดา_ด่านนอก': 22000,
-  'สะเดา_เมือง': 12000,
-  'บางกล่ำ': 8500,
-  'ควนเนียง': 6000,
-  'สิงหนคร': 9500,
-  'จะนะ': 7000,
-  ' default': 15000,
+export const EMPTY_LAND_VALUATION: LandValuationInput = {
+  chanoteNo: '', landNo: '', surveyPage: '', mapSheet: '',
+  province: '', district: '', subdistrict: '', landSizeSqWah: 0,
+  latitude: null, longitude: null, appraisalPricePerSqWah: null,
+  appraisalReference: '', appraisalCheckedAt: '', appraisalPeriod: '', askingPrice: null,
 };
 
-/**
- * Estimate Treasury Appraisal Rate (ราคาประเมินกรมธนารักษ์) per sq. wah in Songkhla / Hat Yai
- */
-export function estimateTreasuryAppraisalRate(district: string, subdistrict?: string): number {
-  const cleanDistrict = (district || '').trim();
-  const cleanSubdistrict = (subdistrict || '').trim();
-
-  if (cleanDistrict.includes('หาดใหญ่')) {
-    if (cleanSubdistrict.includes('คอหงส์')) return ZONE_TREASURY_APPRAISAL_RATES['หาดใหญ่_คอหงส์_ม.อ.'];
-    if (cleanSubdistrict.includes('คลองแห')) return ZONE_TREASURY_APPRAISAL_RATES['หาดใหญ่_คลองแห'];
-    if (cleanSubdistrict.includes('ควนลัง')) return ZONE_TREASURY_APPRAISAL_RATES['หาดใหญ่_ควนลัง'];
-    if (cleanSubdistrict.includes('บ้านพรุ')) return ZONE_TREASURY_APPRAISAL_RATES['หาดใหญ่_บ้านพรุ'];
-    return ZONE_TREASURY_APPRAISAL_RATES['หาดใหญ่_ศูนย์กลางเมือง'];
+export class LandValuationValidationError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'LandValuationValidationError';
   }
-
-  if (cleanDistrict.includes('เมืองสงขลา')) {
-    if (cleanSubdistrict.includes('เขารูปช้าง')) return ZONE_TREASURY_APPRAISAL_RATES['เมืองสงขลา_เขารูปช้าง'];
-    if (cleanSubdistrict.includes('พะวง')) return ZONE_TREASURY_APPRAISAL_RATES['เมืองสงขลา_พะวง'];
-    return ZONE_TREASURY_APPRAISAL_RATES['เมืองสงขลา_บ่อยาง'];
-  }
-
-  if (cleanDistrict.includes('สะเดา')) return ZONE_TREASURY_APPRAISAL_RATES['สะเดา_ด่านนอก'];
-  if (cleanDistrict.includes('บางกล่ำ')) return ZONE_TREASURY_APPRAISAL_RATES['บางกล่ำ'];
-  if (cleanDistrict.includes('ควนเนียง')) return ZONE_TREASURY_APPRAISAL_RATES['ควนเนียง'];
-  if (cleanDistrict.includes('สิงหนคร')) return ZONE_TREASURY_APPRAISAL_RATES['สิงหนคร'];
-  if (cleanDistrict.includes('จะนะ')) return ZONE_TREASURY_APPRAISAL_RATES['จะนะ'];
-
-  return ZONE_TREASURY_APPRAISAL_RATES[' default'];
 }
 
-/**
- * Convert total square wah into Rai-Ngan-Wah breakdown
- */
-export function sqWahToRaiNganWah(totalSqWah: number): { rai: number; ngan: number; sqWah: number; totalSqMeters: number } {
-  const cleanSqWah = Math.max(0, totalSqWah || 0);
-  const rai = Math.floor(cleanSqWah / 400);
-  const remainderAfterRai = cleanSqWah % 400;
-  const ngan = Math.floor(remainderAfterRai / 100);
-  const sqWah = Math.round((remainderAfterRai % 100) * 10) / 10;
-  const totalSqMeters = Math.round(cleanSqWah * 4);
+const MAX_AREA = 1_000_000_000;
+const MAX_MONEY = Number.MAX_SAFE_INTEGER / 100;
+const FIELD_LABELS: Record<string, string> = {
+  chanoteNo: 'เลขโฉนด', landNo: 'เลขที่ดิน', surveyPage: 'หน้าสำรวจ', mapSheet: 'ระวาง',
+  province: 'จังหวัด', district: 'อำเภอ', subdistrict: 'ตำบล', landSizeSqWah: 'เนื้อที่',
+  latitude: 'ละติจูด', longitude: 'ลองจิจูด', appraisalPricePerSqWah: 'ราคาประเมินต่อ ตร.ว.',
+  appraisalReference: 'แหล่งอ้างอิง', appraisalCheckedAt: 'วันที่ตรวจข้อมูล',
+  appraisalPeriod: 'รอบราคาประเมิน', askingPrice: 'ราคาเสนอขาย',
+};
 
-  return { rai, ngan, sqWah, totalSqMeters };
-}
-
-/**
- * Convert Rai-Ngan-Wah into Total Square Wah
- */
-export function raiNganWahToSqWah(rai: number, ngan: number, sqWah: number): number {
-  return (rai || 0) * 400 + (ngan || 0) * 100 + (sqWah || 0);
-}
-
-/**
- * Generate official Department of Lands (DOL LandsMaps) Deep-Link URL
- */
-export function buildLandsMapsUrl(params: {
-  province?: string;
-  district?: string;
-  chanoteNo?: string;
-  latitude?: number;
-  longitude?: number;
-}): string {
-  const baseUrl = 'https://landsmaps.dol.go.th/';
-  const prov = encodeURIComponent(params.province || 'สงขลา');
-  const dist = encodeURIComponent(params.district || 'หาดใหญ่');
-
-  if (params.chanoteNo) {
-    return `${baseUrl}?prov=${prov}&dist=${dist}&chanote=${encodeURIComponent(params.chanoteNo)}`;
+function textField(input: Record<string, unknown>, name: string, maxLength: number): string {
+  const value = input[name];
+  if (value === undefined || value === null) return '';
+  if (typeof value !== 'string' || value.length > maxLength || /[\u0000-\u001f\u007f]/.test(value)) {
+    throw new LandValuationValidationError(`ข้อมูล${FIELD_LABELS[name] || 'ที่กรอก'}ไม่ถูกต้อง`);
   }
-
-  if (params.latitude && params.longitude) {
-    return `${baseUrl}?lat=${params.latitude}&lng=${params.longitude}`;
-  }
-
-  return baseUrl;
+  return value.trim();
 }
 
-/**
- * Calculate Department of Lands official transfer fees and taxes
- */
-export function calculateLandTransferFees(price: number, appraisalValue: number, isOwnedOver5Years = true) {
-  const salePrice = Math.max(0, price || 0);
-  const appraisal = Math.max(0, appraisalValue || salePrice * 0.7);
+function nullableNumber(input: Record<string, unknown>, name: string): number | null {
+  const value = input[name];
+  if (value === null || value === undefined) return null;
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    throw new LandValuationValidationError(`ข้อมูล${FIELD_LABELS[name] || 'ที่กรอก'}ต้องเป็นตัวเลขที่ถูกต้อง`);
+  }
+  return value;
+}
 
-  // 1. Transfer Fee (ค่าธรรมเนียมการโอน): 2% of Appraisal Value (or reduced rate depending on policy)
-  const transferFee = Math.round(appraisal * 0.02);
+export function isValidCoordinates(latitude: unknown, longitude: unknown): boolean {
+  return typeof latitude === 'number' && Number.isFinite(latitude) && Math.abs(latitude) <= 90 &&
+    typeof longitude === 'number' && Number.isFinite(longitude) && Math.abs(longitude) <= 180;
+}
 
-  // 2. Withholding Tax (ภาษีหัก ณ ที่จ่าย): estimated at ~2.5% - 3% of Appraisal Value for individuals
-  const withholdingTax = Math.round(appraisal * 0.025);
-
-  // 3. Stamp Duty (0.5%) vs Specific Business Tax (3.3%)
-  // If owned > 5 years or listed on house registration > 1 year -> Stamp Duty 0.5% of max(salePrice, appraisal)
-  // Else -> Specific Business Tax 3.3%
-  const higherBase = Math.max(salePrice, appraisal);
-  const stampDutyOrBusinessTax = isOwnedOver5Years
-    ? Math.round(higherBase * 0.005)
-    : Math.round(higherBase * 0.033);
-
-  const totalDepartmentOfLandsFees = transferFee + withholdingTax + stampDutyOrBusinessTax;
-
+/** Validate entered evidence. Never invent a parcel identifier, coordinate or official rate. */
+export function validateLandValuation(input: unknown): LandValuationInput {
+  if (!input || typeof input !== 'object' || Array.isArray(input)) {
+    throw new LandValuationValidationError('กรุณาระบุข้อมูลที่ดิน');
+  }
+  const body = input as Record<string, unknown>;
+  const landSizeSqWah = nullableNumber(body, 'landSizeSqWah');
+  if (landSizeSqWah === null || landSizeSqWah <= 0 || landSizeSqWah > MAX_AREA) {
+    throw new LandValuationValidationError('เนื้อที่ต้องมากกว่า 0 และไม่เกิน 1,000,000,000 ตร.ว.');
+  }
+  const latitude = nullableNumber(body, 'latitude');
+  const longitude = nullableNumber(body, 'longitude');
+  if ((latitude === null) !== (longitude === null) ||
+    (latitude !== null && !isValidCoordinates(latitude, longitude))) {
+    throw new LandValuationValidationError('กรุณาระบุละติจูดและลองจิจูดที่ถูกต้องทั้งคู่');
+  }
+  const appraisalPricePerSqWah = nullableNumber(body, 'appraisalPricePerSqWah');
+  if (appraisalPricePerSqWah !== null &&
+    (appraisalPricePerSqWah <= 0 || appraisalPricePerSqWah > 1_000_000_000 ||
+      appraisalPricePerSqWah * landSizeSqWah > MAX_MONEY)) {
+    throw new LandValuationValidationError('ราคาประเมินต่อ ตร.ว. ต้องมากกว่า 0 และอยู่ในช่วงที่คำนวณได้');
+  }
+  const askingPrice = nullableNumber(body, 'askingPrice');
+  if (askingPrice !== null && (askingPrice < 0 || askingPrice > MAX_MONEY)) {
+    throw new LandValuationValidationError('ราคาเสนอขายต้องไม่ติดลบและอยู่ในช่วงที่คำนวณได้');
+  }
+  const appraisalReference = textField(body, 'appraisalReference', 2000);
+  const appraisalCheckedAt = textField(body, 'appraisalCheckedAt', 10);
+  const appraisalPeriod = textField(body, 'appraisalPeriod', 100);
+  if (appraisalCheckedAt) {
+    const parsed = new Date(`${appraisalCheckedAt}T00:00:00.000Z`);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(appraisalCheckedAt) || !Number.isFinite(parsed.getTime()) ||
+      parsed.toISOString().slice(0, 10) !== appraisalCheckedAt ||
+      appraisalCheckedAt < '2000-01-01' || appraisalCheckedAt > new Date().toISOString().slice(0, 10)) {
+      throw new LandValuationValidationError('วันที่ตรวจสอบต้องเป็นวันที่จริงตั้งแต่ปี 2000 และไม่อยู่ในอนาคต');
+    }
+  }
+  if (appraisalPricePerSqWah !== null && (!appraisalReference || !appraisalCheckedAt || !appraisalPeriod)) {
+    throw new LandValuationValidationError('กรุณาระบุแหล่งอ้างอิง วันที่ตรวจสอบ และรอบราคาประเมินจากเว็บไซต์ทางการ');
+  }
   return {
-    transferFee,
-    withholdingTax,
-    stampDutyOrBusinessTax,
-    totalDepartmentOfLandsFees,
-    isSpecificBusinessTax: !isOwnedOver5Years,
+    chanoteNo: textField(body, 'chanoteNo', 100), landNo: textField(body, 'landNo', 100),
+    surveyPage: textField(body, 'surveyPage', 100), mapSheet: textField(body, 'mapSheet', 100),
+    province: textField(body, 'province', 100), district: textField(body, 'district', 100),
+    subdistrict: textField(body, 'subdistrict', 100), landSizeSqWah, latitude, longitude,
+    appraisalPricePerSqWah, appraisalReference, appraisalCheckedAt, appraisalPeriod, askingPrice,
   };
 }
 
-/**
- * Generate complete LandsMaps Parcel Info object for a property or title deed search
- */
-export function generateLandsMapsParcelInfo(
-  propertyId: string,
-  district: string,
-  province = 'สงขลา',
-  subdistrict = 'คอหงส์',
-  landSizeSqWah = 100,
-  marketPrice = 3500000,
-  lat = 7.008,
-  lng = 100.474,
-  customChanoteNo?: string
-): LandsMapsParcelInfo {
-  // Deterministic Chanote number from property ID if not custom
-  let seedNum = 0;
-  for (let i = 0; i < propertyId.length; i++) {
-    seedNum += propertyId.charCodeAt(i);
-  }
-  
-  const chanoteNo = customChanoteNo || String(10000 + (seedNum * 37) % 89999);
-  const landNo = String(100 + (seedNum * 13) % 899);
-  const surveyPage = String(1000 + (seedNum * 19) % 8999);
-  const mapSheet = `4922 I ${(seedNum % 90) + 10}-00`;
+function money(value: number): number | null {
+  // Tiny entered areas can produce an unrepresentable unit price or percentage.
+  // Keep unavailable results null instead of emitting Infinity or unsafe rounded values.
+  if (!Number.isFinite(value) || Math.abs(value) > MAX_MONEY) return null;
+  return Math.round(value * 100) / 100;
+}
 
-  const { rai, ngan, sqWah, totalSqMeters } = sqWahToRaiNganWah(landSizeSqWah);
-  const rate = estimateTreasuryAppraisalRate(district, subdistrict);
-  const totalAppraisalValue = Math.round(landSizeSqWah * rate);
-
-  const diffPercentage = totalAppraisalValue > 0
-    ? Math.round(((marketPrice - totalAppraisalValue) / totalAppraisalValue) * 100)
-    : 0;
-
-  const transferFees = calculateLandTransferFees(marketPrice, totalAppraisalValue);
-  const landsmapsUrl = buildLandsMapsUrl({ province, district, chanoteNo, latitude: lat, longitude: lng });
-  const googleMapsUrl = `https://www.google.com/maps/search/?api=1&query=${lat},${lng}`;
-
+export function calculateLandValuation(input: LandValuationInput) {
+  const value = validateLandValuation(input);
+  const totalAppraisalValue = value.appraisalPricePerSqWah === null
+    ? null : money(value.landSizeSqWah * value.appraisalPricePerSqWah);
+  const askingPricePerSqWah = value.askingPrice === null ? null : money(value.askingPrice / value.landSizeSqWah);
   return {
-    chanoteNo,
-    landNo,
-    surveyPage,
-    mapSheet,
-    province,
-    district,
-    subdistrict,
-    rai,
-    ngan,
-    sqWah,
-    totalSqWah: landSizeSqWah,
-    totalSqMeters,
-    appraisalPricePerSqWah: rate,
+    totalSqWah: value.landSizeSqWah,
+    totalSqMeters: value.landSizeSqWah * 4,
     totalAppraisalValue,
-    marketPrice,
-    diffPercentage,
-    latitude: lat,
-    longitude: lng,
-    landsmapsUrl,
-    googleMapsUrl,
-    transferFees,
+    askingPricePerSqWah,
+    differencePercentage: totalAppraisalValue === null || totalAppraisalValue === 0 || value.askingPrice === null
+      ? null : money(((value.askingPrice - totalAppraisalValue) / totalAppraisalValue) * 100),
+    // Illustrative standard 2% transfer fee only; tax and temporary reductions are not included.
+    standardTransferFee: totalAppraisalValue === null ? null : money(totalAppraisalValue * 0.02),
   };
+}
+
+export function sqWahToRaiNganWah(totalSqWah: number) {
+  if (!Number.isFinite(totalSqWah) || totalSqWah < 0 || totalSqWah > MAX_AREA) {
+    throw new LandValuationValidationError('เนื้อที่ไม่ถูกต้อง');
+  }
+  const rai = Math.floor(totalSqWah / 400);
+  const afterRai = totalSqWah - rai * 400;
+  const ngan = Math.floor(afterRai / 100);
+  return { rai, ngan, sqWah: afterRai - ngan * 100, totalSqMeters: totalSqWah * 4 };
+}
+
+export function raiNganWahToSqWah(rai: number, ngan: number, sqWah: number): number {
+  if (![rai, ngan, sqWah].every(value => Number.isFinite(value) && value >= 0) ||
+    !Number.isInteger(rai) || !Number.isInteger(ngan) || ngan > 3 || sqWah >= 100) {
+    throw new LandValuationValidationError('กรุณาระบุไร่เป็นจำนวนเต็ม งาน 0–3 และ ตร.ว. น้อยกว่า 100');
+  }
+  const total = rai * 400 + ngan * 100 + sqWah;
+  if (total > MAX_AREA) throw new LandValuationValidationError('เนื้อที่มากเกินช่วงที่รองรับ');
+  return total;
+}
+
+/** No supported public parcel deep-link contract has been established. */
+export function buildLandsMapsUrl(): string {
+  return LANDSMAPS_URL;
+}
+
+export function buildGoogleMapsUrl(latitude: number | null, longitude: number | null): string | null {
+  return isValidCoordinates(latitude, longitude)
+    ? `https://www.google.com/maps/search/?api=1&query=${latitude},${longitude}` : null;
+}
+
+/** Existing asking prices are comparisons, not completed sale prices or a Treasury valuation. */
+export function getAskingPriceComparables(properties: Property[], input: LandValuationInput) {
+  const province = input.province.trim();
+  const district = input.district.trim();
+  const rates = !province || !district ? [] : properties
+    .filter(property => property && property.property_type === 'land' && property.status === 'sale' &&
+      typeof property.province === 'string' && typeof property.district === 'string' &&
+      property.province.trim() === province && property.district.trim() === district &&
+      Number.isFinite(property.land_size) && property.land_size > 0 && property.land_size <= MAX_AREA &&
+      Number.isFinite(property.price) && property.price > 0 && property.price <= MAX_MONEY)
+    .map(property => property.price / property.land_size)
+    .filter(rate => Number.isFinite(rate) && rate <= MAX_MONEY)
+    .sort((a, b) => a - b);
+  const middle = Math.floor(rates.length / 2);
+  const medianPricePerSqWah = rates.length === 0 ? null
+    : rates.length % 2 ? rates[middle] : (rates[middle - 1] + rates[middle]) / 2;
+  const estimatedTotal = medianPricePerSqWah === null || !Number.isFinite(input.landSizeSqWah) ||
+    input.landSizeSqWah <= 0 || medianPricePerSqWah * input.landSizeSqWah > MAX_MONEY
+    ? null : money(medianPricePerSqWah * input.landSizeSqWah);
+  return { count: rates.length, medianPricePerSqWah: medianPricePerSqWah === null ? null : money(medianPricePerSqWah), estimatedTotal };
 }

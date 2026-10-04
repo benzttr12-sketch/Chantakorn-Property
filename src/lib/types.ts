@@ -67,6 +67,8 @@ export interface Property {
   address?: string;
   latitude: number;
   longitude: number;
+  /** Whether coordinates came from the record rather than a map viewport fallback. */
+  coordinates_available?: boolean;
   facing_direction?: FacingDirection | string;
   feng_shui?: FengShuiAnalysis;
   bedrooms: number;
