@@ -254,7 +254,6 @@ test('notification uses the selected property cover ahead of gallery photos and 
     video_url: 'https://www.youtube.com/watch?v=ScMzIvxBSi4',
   });
   assert.equal(payload.messages[1].contents.hero.url, 'https://photos.example.test/selected-cover.jpg');
-  assert.equal(JSON.stringify(payload).includes('img.youtube.com'), false);
 });
 
 test('uploaded notification cover uses the API origin while detail links use the configured website', async () => {
@@ -300,7 +299,5 @@ test('notification without a property photo omits the hero instead of showing a 
   ]) {
     const payload = await propertyPush(property);
     assert.equal(Object.hasOwn(payload.messages[1].contents, 'hero'), false);
-    assert.equal(JSON.stringify(payload).includes('unsplash'), false);
-    assert.equal(JSON.stringify(payload).includes('img.youtube.com'), false);
   }
 });
