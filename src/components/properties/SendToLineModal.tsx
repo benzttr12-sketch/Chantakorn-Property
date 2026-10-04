@@ -88,6 +88,7 @@ export default function SendToLineModal({ isOpen, onClose, property, autoSend = 
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          manualSend: true,
           title: property.title,
           price: property.price,
           status: property.status || 'sale',
@@ -105,17 +106,14 @@ export default function SendToLineModal({ isOpen, onClose, property, autoSend = 
       });
 
       const data = await res.json();
-      if (data.success && data.isRealSent) {
+      if (res.ok && data.success && data.isRealSent) {
         setPushSuccess(true);
         setPushMessage('LINE รับคำขอส่งการ์ดถึงเจ้าหน้าที่ที่ตั้งค่าไว้แล้ว กรุณาตรวจการได้รับข้อความใน LINE');
-      } else if (data.success) {
-        setPushSuccess(true);
-        setPushMessage('✨ จัดเตรียมข้อความสำเร็จ พร้อมส่งต่อเข้า LINE OA');
       } else {
-        setPushMessage(data.error || 'ระบบไม่สามารถส่งแจ้งเตือนได้ กรุณาใช้ปุ่มเปิดแชท LINE OA');
+        setPushMessage(data.error || data.message || 'ยังไม่ได้ส่งแจ้งเตือน กรุณาลองใหม่หรือเปิดแชท LINE OA');
       }
     } catch (err) {
-      setPushMessage('เกิดข้อผิดพลาดในการเชื่อมต่อ กรุณากดปุ่มเปิดแชท LINE OA โดยตรง');
+      setPushMessage(err instanceof Error ? err.message : 'เกิดข้อผิดพลาดในการเชื่อมต่อ กรุณากดปุ่มเปิดแชท LINE OA โดยตรง');
     } finally {
       setPushing(false);
     }
@@ -198,12 +196,11 @@ export default function SendToLineModal({ isOpen, onClose, property, autoSend = 
               rel="noopener noreferrer"
               onClick={() => {
                 handleCopyText();
-                if (!pushSuccess) handleDirectPushNotify();
               }}
               className="w-full py-4 px-4 bg-gradient-to-r from-emerald-600 via-[#06C755] to-emerald-500 hover:from-emerald-500 hover:to-[#05b34c] active:scale-[0.99] text-white rounded-2xl font-black text-sm sm:text-base shadow-lg hover:shadow-xl flex items-center justify-center space-x-2 transition-all cursor-pointer group"
             >
               <MessageCircle className="w-5 h-5 fill-current group-hover:scale-110 transition-transform" />
-              <span>🚀 กดส่งข้อมูลทรัพย์เข้าห้องแชท LINE OA ทันที</span>
+              <span>เปิด LINE พร้อมข้อความ แล้วกดส่งในแชท</span>
               <ExternalLink className="w-4 h-4 ml-1 opacity-90" />
             </a>
 

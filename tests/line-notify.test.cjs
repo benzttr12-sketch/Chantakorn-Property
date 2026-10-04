@@ -125,6 +125,61 @@ test('disabled listing notifications remain disabled without calling LINE', asyn
   assert.equal(result.isRealSent, false);
 });
 
+test('staff manual sends and tests still reach LINE when automatic notifications are disabled', async () => {
+  const sends = [];
+  const api = load({ staff: true,
+    env: { LINE_CHANNEL_ACCESS_TOKEN: 'runtime-token', LINE_TARGET_USER_ID: owner },
+    firestore: { getFirestoreDocument: async () => Response.json({ fields: { auto_notify_new_property: { booleanValue: false } } }) },
+    fetch: async (_url, init) => { sends.push(JSON.parse(init.body)); return Response.json({}); },
+  });
+  for (const intent of [{ manualSend: true }, { isTest: true }]) {
+    const result = await (await api.POST(request({ title: 'Home', ...intent }))).json();
+    assert.equal(result.isRealSent, true);
+    assert.equal(result.simulated, false);
+  }
+  assert.equal(sends.length, 2);
+  assert.equal(sends.every(item => item.to === owner), true);
+});
+
+test('public callers cannot use manual or test flags to bypass disabled inquiry notifications', async () => {
+  const api = load({ firestore: { getFirestoreDocument: async () => Response.json({ fields: { auto_notify_consignment: { booleanValue: false } } }) } });
+  for (const intent of [{ manualSend: true }, { isTest: true }]) {
+    const result = await (await api.POST(request({ inquiry_type: 'inquiry', ...intent }))).json();
+    assert.equal(result.isRealSent, false);
+    assert.equal(result.simulated, true);
+  }
+  assert.equal((await api.POST(request({ title: 'Home', manualSend: true }))).status, 401);
+});
+
+test('missing token, missing recipient and invalid recipient have distinct safe errors', async () => {
+  const configurations = [
+    [{ LINE_TARGET_USER_ID: owner }, 'LINE_TOKEN_MISSING'],
+    [{ LINE_CHANNEL_ACCESS_TOKEN: 'private-token' }, 'LINE_RECIPIENT_MISSING'],
+    [{ LINE_CHANNEL_ACCESS_TOKEN: 'private-token', LINE_TARGET_USER_ID: '@not-a-user-id' }, 'LINE_RECIPIENT_INVALID'],
+  ];
+  for (const [env, code] of configurations) {
+    const api = load({ staff: true, env });
+    const response = await api.POST(request({ title: 'Home', manualSend: true }));
+    const result = await response.json();
+    assert.equal(response.status, 503);
+    assert.equal(result.code, code);
+    assert.equal(result.isRealSent, false);
+    assert.equal(JSON.stringify(result).includes('private-token'), false);
+    assert.equal(JSON.stringify(result).includes('@not-a-user-id'), false);
+  }
+});
+
+test('staff readiness reflects all recipients without exposing their IDs', async () => {
+  for (const [recipients, configured, count] of [[`${owner}, ${owner}, ${second}`, true, 2], ['', false, 0], [`${owner}, invalid`, false, 1]]) {
+    const api = load({ staff: true, env: { LINE_CHANNEL_ACCESS_TOKEN: 'private-token', LINE_ADMIN_USER_IDS: recipients } });
+    const result = await (await api.GET(new Request('https://example.com/api/line/notify'))).json();
+    assert.equal(result.isRecipientConfigured, configured);
+    assert.equal(result.recipientCount, count);
+    assert.equal(JSON.stringify(result).includes(owner), false);
+    assert.equal(JSON.stringify(result).includes(second), false);
+  }
+});
+
 test('anonymous inquiries preserve readable consignment preferences and do not poison staff settings', async () => {
   let reads = 0;
   const api = load({ staff: true, firestore: {
