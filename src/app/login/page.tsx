@@ -71,12 +71,6 @@ function LoginForm() {
     }
   };
 
-  const handleQuickFill = (targetEmail: string, defaultPass: string = '123456') => {
-    setEmail(targetEmail);
-    setPassword(defaultPass);
-    setError('');
-  };
-
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
@@ -201,24 +195,8 @@ function LoginForm() {
 
           <div className="pt-2 border-t border-amber-200/80 space-y-1.5">
             <span className="font-bold text-[11px] text-amber-900 block">
-              ⚡ หรือเลือกเข้าสู่ระบบด่วนด้วยอีเมลและรหัสผ่านด้านล่างนี้:
+              กรุณาเข้าสู่ระบบด้วยอีเมลและรหัสผ่านของเจ้าหน้าที่ด้านล่าง หรือติดต่อผู้ดูแลระบบหากยังไม่มีสิทธิ์
             </span>
-            <div className="grid grid-cols-2 gap-2">
-              <button
-                type="button"
-                onClick={() => handleQuickFill('benzttr12@gmail.com', '123456')}
-                className="p-2 rounded-xl bg-navy-950 text-gold-400 font-bold text-[11px] hover:bg-navy-900 transition-colors text-center"
-              >
-                👑 ผู้ดูแลระบบ (Admin)
-              </button>
-              <button
-                type="button"
-                onClick={() => handleQuickFill('agent@chantakornproperty.com', '123456')}
-                className="p-2 rounded-xl bg-white border border-gray-300 text-navy-950 font-bold text-[11px] hover:bg-gray-50 transition-colors text-center"
-              >
-                💼 นายหน้า (Agent)
-              </button>
-            </div>
           </div>
         </div>
       )}
