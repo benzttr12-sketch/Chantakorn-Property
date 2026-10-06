@@ -159,7 +159,7 @@ export async function recordPropertyHistory(
     new_value: log.new_value !== undefined ? log.new_value : null,
     diff_summary: log.diff_summary,
     actor_name: log.actor_name || currentUser?.full_name || 'คุณฉันทากร (ผู้ดูแลระบบ)',
-    actor_email: log.actor_email || currentUser?.email || 'benzttr12@gmail.com',
+    actor_email: log.actor_email || currentUser?.email || 'system@chantakornproperty.com',
     actor_role: log.actor_role || currentUser?.role || 'ADMIN',
     timestamp,
     notes: log.notes || '',
@@ -192,7 +192,7 @@ export async function logPropertyChanges(
 ) {
   const currentUser = getStoredUser();
   const actorName = customActor?.name || currentUser?.full_name || 'คุณฉันทากร (ผู้ดูแลระบบ)';
-  const actorEmail = customActor?.email || currentUser?.email || 'benzttr12@gmail.com';
+  const actorEmail = customActor?.email || currentUser?.email || 'system@chantakornproperty.com';
   const actorRole = customActor?.role || currentUser?.role || 'ADMIN';
 
   // 1. Price Change
