@@ -133,9 +133,6 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       // 3. Firebase Auth check
       if (dataBackend === 'firebase' && auth && db) {
         if (auth.currentUser) {
-          const userEmail = auth.currentUser.email?.toLowerCase() || '';
-          const isRoot = userEmail === 'benzttr12@gmail.com' || userEmail === 'agent@chantakornproperty.com';
-
           try {
             let snap;
             try {
@@ -145,7 +142,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             }
 
             const docRole = snap.exists() ? snap.data()?.role : null;
-            const effectiveRole = isRoot ? 'ADMIN' : (docRole || 'USER');
+            const effectiveRole = docRole || 'USER';
 
             if (['ADMIN', 'AGENT'].includes(effectiveRole)) {
               const profile = snap.exists() ? snap.data() : {};
@@ -155,7 +152,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
               }
               setCurrentUser({
                 id: auth.currentUser.uid,
-                full_name: profile.full_name || auth.currentUser.displayName || (isRoot ? 'คุณฉันทากร (ผู้ดูแลระบบ)' : 'เจ้าหน้าที่'),
+                full_name: profile.full_name || auth.currentUser.displayName || 'เจ้าหน้าที่',
                 email: auth.currentUser.email,
                 role: effectiveRole,
                 avatar_url: profile.avatar_url || auth.currentUser.photoURL || '',
@@ -188,11 +185,9 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       const firestore = db;
       unsubscribeFirebase = onAuthStateChanged(auth, async (firebaseUser) => {
         if (firebaseUser) {
-          const userEmail = firebaseUser.email?.toLowerCase() || '';
-          const isRoot = userEmail === 'benzttr12@gmail.com' || userEmail === 'agent@chantakornproperty.com';
-          let role = isRoot ? 'ADMIN' : 'USER';
+          let role = 'USER';
           let avatar = firebaseUser.photoURL || '';
-          let name = firebaseUser.displayName || (isRoot ? 'คุณฉันทากร (ผู้ดูแลระบบ)' : firebaseUser.email?.split('@')[0]) || 'ผู้ดูแลระบบ';
+          let name = firebaseUser.displayName || firebaseUser.email?.split('@')[0] || 'ผู้ดูแลระบบ';
           try {
             let snap;
             try {
@@ -203,7 +198,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
             if (snap.exists()) {
               const data = snap.data();
-              if (data.role && !isRoot) role = data.role;
+              if (data.role) role = data.role;
               if (data.avatar_url) avatar = data.avatar_url;
               if (data.full_name) name = data.full_name;
             }
