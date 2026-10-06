@@ -113,19 +113,19 @@ export default function Header() {
       {/* Top Notification / Trust Bar */}
       <div className="bg-navy-950 text-white text-xs py-2 px-4 hidden md:block border-b border-navy-800 shadow-inner">
         <div className="max-w-7xl mx-auto flex justify-between items-center">
-          <div className="flex items-center space-x-3">
-            <span className="inline-flex items-center text-gold-300 font-bold tracking-wide">
+          <div className="flex items-center space-x-3 min-w-0">
+            <span className="inline-flex items-center text-gold-300 font-bold tracking-wide whitespace-nowrap">
               <ShieldCheck className="w-4 h-4 mr-1.5 text-gold-400 flex-shrink-0" />
               นายหน้าอสังหาริมทรัพย์มืออาชีพ หาดใหญ่ – สงขลา
             </span>
             <span className="text-navy-600">|</span>
-            <span className="text-gray-200 font-normal">บริการซื้อ ขาย เช่า ฝากขาย ให้คำปรึกษาฟรี</span>
+            <span className="text-gray-200 font-normal whitespace-nowrap hidden xl:inline">บริการซื้อ ขาย เช่า ฝากขาย ให้คำปรึกษาฟรี</span>
           </div>
 
           <div className="flex items-center space-x-4 text-xs">
             <a 
               href="tel:0816040097" 
-              className="hover:text-gold-300 text-white transition-colors flex items-center group font-medium"
+              className="hover:text-gold-300 text-white transition-colors flex items-center group font-medium whitespace-nowrap"
             >
               <Phone className="w-3.5 h-3.5 mr-1.5 text-gold-400 group-hover:scale-110 transition-transform" />
               <span className="font-semibold">081-604-0097</span>
@@ -137,11 +137,11 @@ export default function Header() {
               href="https://www.facebook.com/people/Chantakorn-Property-%E0%B8%99%E0%B8%B2%E0%B8%A2%E0%B8%AB%E0%B8%99%E0%B9%89%E0%B8%B2-%E0%B8%9A%E0%B9%89%E0%B8%B2%E0%B8%99-%E0%B8%97%E0%B8%B5%E0%B9%88%E0%B8%94%E0%B8%B4%E0%B8%99-%E0%B8%84%E0%B8%AD%E0%B8%99%E0%B9%82%E0%B8%94-%E0%B8%AB%E0%B8%B2%E0%B8%94%E0%B9%83%E0%B8%AB%E0%B8%8D%E0%B9%88-%E0%B8%AA%E0%B8%87%E0%B8%82%E0%B8%A5%E0%B8%B2/61593092347613/"
               target="_blank"
               rel="noreferrer"
-              className="hover:text-gold-300 text-white transition-colors flex items-center font-medium"
+              className="hover:text-gold-300 text-white transition-colors flex items-center font-medium whitespace-nowrap"
               title="Facebook Page: Chantakorn Property"
             >
               <Facebook className="w-3.5 h-3.5 mr-1.5 text-[#3b82f6]" />
-              Facebook
+              <span className="hidden lg:inline">Facebook</span>
             </a>
 
             <span className="text-navy-600">•</span>
@@ -150,11 +150,11 @@ export default function Header() {
               href="https://lin.ee/NMSe28T3"
               target="_blank"
               rel="noreferrer"
-              className="hover:text-gold-300 text-white transition-colors flex items-center group font-medium"
+              className="hover:text-gold-300 text-white transition-colors flex items-center group font-medium whitespace-nowrap"
               title="LINE Official Account: Chantakorn Property (คลิกเพื่อแอดไลน์)"
             >
               <MessageCircle className="w-3.5 h-3.5 mr-1.5 text-[#06C755] fill-current group-hover:scale-110 transition-transform" />
-              <span>LINE: <span className="text-gold-300 font-bold">Official Account</span></span>
+              <span className="hidden lg:inline">LINE: <span className="text-gold-300 font-bold">Official Account</span></span>
             </a>
 
             <span className="text-navy-600">•</span>
