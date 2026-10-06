@@ -1,7 +1,6 @@
 import { jsonResponse } from '@/lib/api-response';
 import appletConfig from '../../firebase-applet-config.json';
 
-const ROOT_ADMIN_EMAIL = 'benzttr12@gmail.com';
 
 type FirebaseLookupResponse = {
   users?: Array<{
@@ -50,8 +49,6 @@ export async function requireStaff(req: Request): Promise<Response | null> {
     if (!user?.localId || !user.emailVerified || user.disabled) {
       return jsonResponse({ error: 'บัญชีนี้ไม่มีสิทธิ์เข้าถึง API' }, { status: 403 });
     }
-
-    if (user.email?.toLowerCase() === ROOT_ADMIN_EMAIL) return null;
 
     const databaseId = appletConfig.firestoreDatabaseId || '(default)';
     const profileResponse = await fetch(

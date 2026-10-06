@@ -4,6 +4,8 @@ import {
   signOut as firebaseSignOut,
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
+  sendPasswordResetEmail,
+  sendEmailVerification,
   updateProfile,
   User,
 } from 'firebase/auth';
@@ -14,17 +16,20 @@ import { UserProfile } from '@/lib/types';
 
 const VALID_ROLES: UserProfile['role'][] = ['ADMIN', 'AGENT', 'USER'];
 const PROFILE_FIELDS = ['full_name', 'phone', 'avatar_url', 'line_id', 'facebook', 'bio'] as const;
-
 type ProfileUpdates = Partial<Pick<UserProfile, (typeof PROFILE_FIELDS)[number]>>;
+let verifiedProfile: UserProfile | null = null;
 
 function validRole(value: unknown): value is UserProfile['role'] {
   return typeof value === 'string' && VALID_ROLES.includes(value as UserProfile['role']);
 }
 
-function demoCacheProfile(profile: UserProfile | null) {
+function cacheProfile(profile: UserProfile | null) {
+  verifiedProfile = profile;
   if (typeof window === 'undefined') return;
-  if (profile) localStorage.setItem('chantakorn_auth_user', JSON.stringify(profile));
-  else localStorage.removeItem('chantakorn_auth_user');
+  try {
+    if (isDemoAuthEnabled && profile) window.localStorage.setItem('chantakorn_auth_user', JSON.stringify(profile));
+    else window.localStorage.removeItem('chantakorn_auth_user');
+  } catch {}
 }
 
 export function notifyAuthChange(profile: UserProfile | null) {
@@ -33,262 +38,141 @@ export function notifyAuthChange(profile: UserProfile | null) {
   }
 }
 
-export async function syncFirebaseUserProfile(
-  user: User,
-  customFullName?: string,
-  customPhone?: string,
-): Promise<UserProfile> {
-  if (dataBackend !== 'firebase' || !db) {
-    throw new Error('Firebase profile storage is not configured');
-  }
-
+export async function syncFirebaseUserProfile(user: User, customFullName?: string, customPhone?: string): Promise<UserProfile> {
+  if (dataBackend !== 'firebase' || !db) throw new Error('Firebase profile storage is not configured');
   const email = user.email || '';
-  const isDefaultAdmin = email.toLowerCase() === 'benzttr12@gmail.com';
   const userDocRef = doc(db, 'profiles', user.uid);
-  let snap;
-  try {
-    snap = await getDocFromServer(userDocRef);
-  } catch {
-    const { getDoc } = await import('firebase/firestore');
-    snap = await getDoc(userDocRef);
-  }
-
-  let data: Partial<UserProfile> = {};
-
-  if (snap && snap.exists()) {
-    data = snap.data() as Partial<UserProfile>;
-    if (isDefaultAdmin && data.role !== 'ADMIN') {
-      data.role = 'ADMIN';
-      await setDoc(userDocRef, { role: 'ADMIN' }, { merge: true });
-    }
+  const snapshot = await getDocFromServer(userDocRef);
+  let data: Partial<UserProfile>;
+  if (snapshot.exists()) {
+    data = snapshot.data() as Partial<UserProfile>;
   } else {
     data = {
       id: user.uid,
-      full_name: customFullName || user.displayName || (isDefaultAdmin ? 'คุณฉันทากร (ผู้ดูแลระบบ)' : email.split('@')[0]) || 'ผู้ใช้งาน',
+      full_name: customFullName || user.displayName || email.split('@')[0] || 'ผู้ใช้งาน',
       email,
-      role: isDefaultAdmin ? 'ADMIN' : 'USER',
-      phone: customPhone || user.phoneNumber || (isDefaultAdmin ? '081-604-0097' : ''),
+      role: 'USER',
+      phone: customPhone || user.phoneNumber || '',
       avatar_url: user.photoURL || '',
-      line_id: isDefaultAdmin ? '@chantakorn' : '',
-      facebook: isDefaultAdmin ? 'https://www.facebook.com/chantakornproperty' : '',
       created_at: new Date().toISOString(),
     };
-    await setDoc(userDocRef, data, { merge: true });
+    await setDoc(userDocRef, data);
   }
-
   const profile: UserProfile = {
+    ...data,
     id: user.uid,
-    full_name: data.full_name || customFullName || user.displayName || email.split('@')[0] || 'ผู้ใช้งาน',
     email,
-    role: isDefaultAdmin ? 'ADMIN' : (validRole(data.role) ? data.role : 'USER'),
-    phone: data.phone || customPhone || user.phoneNumber || '',
+    full_name: data.full_name || user.displayName || 'ผู้ใช้งาน',
+    role: user.emailVerified && validRole(data.role) ? data.role : 'USER',
     avatar_url: data.avatar_url || user.photoURL || '',
-    line_id: data.line_id || '',
-    facebook: data.facebook || '',
-    bio: data.bio || '',
-    created_at: data.created_at,
-    updated_at: data.updated_at,
   };
-
-  demoCacheProfile(profile);
+  cacheProfile(profile);
   notifyAuthChange(profile);
   return profile;
 }
 
-export async function updateCurrentUserProfile(updates: ProfileUpdates): Promise<UserProfile> {
-  let updatedProfile: UserProfile;
-
-  if (dataBackend === 'firebase') {
-    if (!auth?.currentUser || !db) throw new Error('กรุณาเข้าสู่ระบบอีกครั้ง');
-
-    const current = await syncFirebaseUserProfile(auth.currentUser);
-
-    // Safely update Firebase Auth displayName & photoURL
-    // Note: Firebase Auth enforces a max 2,048 character limit and valid URL scheme on photoURL.
-    // Base64 data URIs (data:image/...) or long URLs must NOT be sent to Auth photoURL,
-    // but are fully supported in Firestore profiles/{uid} document!
-    try {
-      const authUpdates: { displayName?: string; photoURL?: string | null } = {};
-      if (updates.full_name !== undefined && updates.full_name.trim()) {
-        authUpdates.displayName = updates.full_name.trim().slice(0, 100);
-      }
-      if (updates.avatar_url !== undefined) {
-        const rawAvatar = updates.avatar_url?.trim() || '';
-        if (
-          rawAvatar &&
-          !rawAvatar.startsWith('data:') &&
-          rawAvatar.length <= 1500 &&
-          (rawAvatar.startsWith('http://') || rawAvatar.startsWith('https://'))
-        ) {
-          authUpdates.photoURL = rawAvatar;
-        } else if (rawAvatar === '') {
-          authUpdates.photoURL = null;
-        }
-        // If it's a data URL or > 1500 chars, do NOT update auth.currentUser.photoURL; it will be saved in Firestore!
-      }
-
-      if (Object.keys(authUpdates).length > 0) {
-        await updateProfile(auth.currentUser, authUpdates).catch((err) => {
-          console.warn('Firebase Auth updateProfile non-critical warning:', err);
-        });
-      }
-    } catch (authError) {
-      console.warn('Firebase Auth updateProfile caught:', authError);
-    }
-
-    const safeUpdates = Object.fromEntries(
-      PROFILE_FIELDS
-        .filter((key) => updates[key] !== undefined)
-        .map((key) => [key, updates[key]]),
-    ) as ProfileUpdates;
-    const updatedAt = new Date().toISOString();
-    await setDoc(
-      doc(db, 'profiles', auth.currentUser.uid),
-      { ...safeUpdates, updated_at: updatedAt },
-      { merge: true },
-    );
-    updatedProfile = { ...current, ...safeUpdates, updated_at: updatedAt };
-    demoCacheProfile(updatedProfile);
-    notifyAuthChange(updatedProfile);
+export async function getCurrentUserProfile(): Promise<UserProfile | null> {
+  if (dataBackend === 'firebase' && auth) {
+    await auth.authStateReady();
+    if (auth.currentUser) return syncFirebaseUserProfile(auth.currentUser);
   } else if (dataBackend === 'supabase' && supabase) {
-    const { data: authData, error: authError } = await supabase.auth.getUser();
-    if (authError || !authData.user) throw authError || new Error('กรุณาเข้าสู่ระบบอีกครั้ง');
-
-    const { data, error } = await supabase
-      .from('profiles')
-      .update({ ...updates, updated_at: new Date().toISOString() })
-      .eq('id', authData.user.id)
-      .select('*')
-      .single();
-    if (error || !data || !validRole(data.role)) throw error || new Error('ไม่พบข้อมูลสมาชิก');
-    updatedProfile = { ...data, email: authData.user.email } as UserProfile;
+    const { data: { user }, error } = await supabase.auth.getUser();
+    if (error || !user) return null;
+    const { data, error: profileError } = await supabase.from('profiles').select('*').eq('id', user.id).single();
+    if (profileError) throw profileError;
+    if (!data || !validRole(data.role)) return null;
+    const profile = { ...data, id: user.id, email: user.email } as UserProfile;
+    cacheProfile(profile);
+    return profile;
   } else if (isDemoAuthEnabled) {
-    const current = getStoredUser();
-    if (!current) throw new Error('กรุณาเข้าสู่ระบบทดลองอีกครั้ง');
-    updatedProfile = { ...current, ...updates, updated_at: new Date().toISOString() };
-    demoCacheProfile(updatedProfile);
+    return getStoredUser();
+  }
+  cacheProfile(null);
+  return null;
+}
+
+export async function updateCurrentUserProfile(updates: ProfileUpdates): Promise<UserProfile> {
+  const safeUpdates = Object.fromEntries(PROFILE_FIELDS.filter(key => updates[key] !== undefined).map(key => [key, updates[key]])) as ProfileUpdates;
+  const current = await getCurrentUserProfile();
+  if (!current) throw new Error('กรุณาเข้าสู่ระบบอีกครั้ง');
+  const updatedAt = new Date().toISOString();
+  let updatedProfile: UserProfile;
+  if (dataBackend === 'firebase' && auth?.currentUser && db) {
+    await setDoc(doc(db, 'profiles', auth.currentUser.uid), { ...safeUpdates, updated_at: updatedAt }, { merge: true });
+    const authUpdates: { displayName?: string; photoURL?: string | null } = {};
+    if (safeUpdates.full_name?.trim()) authUpdates.displayName = safeUpdates.full_name.trim().slice(0, 100);
+    if (safeUpdates.avatar_url !== undefined) {
+      const avatar = safeUpdates.avatar_url.trim();
+      if (!avatar) authUpdates.photoURL = null;
+      else if (/^https?:\/\//.test(avatar) && avatar.length <= 1500) authUpdates.photoURL = avatar;
+    }
+    if (Object.keys(authUpdates).length) await updateProfile(auth.currentUser, authUpdates).catch(() => undefined);
+    updatedProfile = { ...current, ...safeUpdates, updated_at: updatedAt };
+  } else if (dataBackend === 'supabase' && supabase) {
+    const { data, error } = await supabase.from('profiles').update({ ...safeUpdates, updated_at: updatedAt }).eq('id', current.id).select('*').single();
+    if (error || !data) throw error || new Error('ไม่พบข้อมูลสมาชิก');
+    updatedProfile = { ...data, email: current.email } as UserProfile;
+  } else if (isDemoAuthEnabled) {
+    updatedProfile = { ...current, ...safeUpdates, updated_at: updatedAt };
   } else {
     throw new Error('ระบบสมาชิกยังไม่ได้ตั้งค่า');
   }
-
+  cacheProfile(updatedProfile);
   notifyAuthChange(updatedProfile);
   return updatedProfile;
 }
 
 export async function signInWithGoogle(): Promise<UserProfile> {
-  if (dataBackend !== 'firebase' || !auth) {
-    throw new Error('Firebase Auth is not configured for this backend');
-  }
-  try {
-    const result = await signInWithPopup(auth, googleProvider);
-    return syncFirebaseUserProfile(result.user);
-  } catch (err: any) {
-    if (err?.code === 'auth/unauthorized-domain' || err?.message?.includes('unauthorized-domain')) {
-      // In development / preview run.app environments where Firebase domain is not yet whitelisted,
-      // fallback to authenticating the admin account (benzttr12@gmail.com) so the user is never stuck!
-      const isDevEnv = typeof window !== 'undefined' && (
-        window.location.hostname.includes('run.app') || 
-        window.location.hostname === 'localhost' || 
-        window.location.hostname.includes('127.0.0.1')
-      );
-
-      if (isDevEnv) {
-        const adminEmail = 'benzttr12@gmail.com';
-        const fallbackProfile: UserProfile = {
-          id: 'admin_root',
-          full_name: 'คุณฉันทากร (ผู้ดูแลระบบ)',
-          email: adminEmail,
-          role: 'ADMIN',
-          phone: '081-604-0097',
-          avatar_url: '',
-          line_id: '@chantakorn',
-          facebook: 'https://www.facebook.com/chantakornproperty',
-          created_at: new Date().toISOString(),
-        };
-        demoCacheProfile(fallbackProfile);
-        notifyAuthChange(fallbackProfile);
-        return fallbackProfile;
-      }
-
-      const hostname = typeof window !== 'undefined' ? window.location.hostname : 'domain';
-      const customError: any = new Error(
-        `โดเมนนี้ยังไม่ได้รับอนุญาตใน Firebase Console (auth/unauthorized-domain: ${hostname}). กรุณาเข้าสู่ระบบด้วยอีเมลและรหัสผ่าน หรือเพิ่มโดเมน ${hostname} ใน Firebase Console > Authentication > Settings > Authorized domains`
-      );
-      customError.code = 'auth/unauthorized-domain';
-      customError.hostname = hostname;
-      throw customError;
-    }
-    throw err;
-  }
+  if (dataBackend !== 'firebase' || !auth) throw new Error('ระบบ Google Sign-In ยังไม่ได้ตั้งค่า');
+  const result = await signInWithPopup(auth, googleProvider);
+  return syncFirebaseUserProfile(result.user);
 }
 
-export async function loginWithEmail(email: string, pass: string): Promise<UserProfile> {
-  if (dataBackend !== 'firebase' || !auth) {
-    throw new Error('ระบบตรวจสอบสิทธิ์ Firebase ยังไม่พร้อมใช้งาน');
-  }
-  try {
-    const result = await signInWithEmailAndPassword(auth, email, pass);
-    return syncFirebaseUserProfile(result.user);
-  } catch (err: any) {
-    // If account doesn't exist yet for admin/agent, auto-register
-    if (
-      err?.code === 'auth/user-not-found' || 
-      err?.code === 'auth/invalid-credential' ||
-      err?.code === 'auth/invalid-email'
-    ) {
-      const isDefaultAdmin = email.toLowerCase() === 'benzttr12@gmail.com';
-      const isDefaultAgent = email.toLowerCase() === 'agent@chantakornproperty.com';
-      if ((isDefaultAdmin || isDefaultAgent) && pass.length >= 6) {
-        try {
-          const newResult = await createUserWithEmailAndPassword(auth, email, pass);
-          return syncFirebaseUserProfile(
-            newResult.user,
-            isDefaultAdmin ? 'คุณฉันทากร (ผู้ดูแลระบบ)' : 'เจ้าหน้าที่นายหน้า',
-            isDefaultAdmin ? '081-604-0097' : '082-436-4499'
-          );
-        } catch {
-          // If creation fails because user already exists or other reasons, continue to throw
-        }
-      }
-    }
-    throw err;
-  }
+export async function loginWithEmail(email: string, password: string): Promise<UserProfile> {
+  if (dataBackend !== 'firebase' || !auth) throw new Error('ระบบตรวจสอบสิทธิ์ Firebase ยังไม่พร้อมใช้งาน');
+  const result = await signInWithEmailAndPassword(auth, email.trim(), password);
+  return syncFirebaseUserProfile(result.user);
 }
 
-export async function registerWithEmail(
-  email: string,
-  pass: string,
-  fullName: string,
-  phone: string,
-): Promise<UserProfile> {
-  if (dataBackend !== 'firebase' || !auth) {
-    throw new Error('ระบบตรวจสอบสิทธิ์ Firebase ยังไม่พร้อมใช้งาน');
+export async function registerWithEmail(email: string, password: string, fullName: string, phone: string): Promise<UserProfile> {
+  if (dataBackend !== 'firebase' || !auth) throw new Error('ระบบตรวจสอบสิทธิ์ Firebase ยังไม่พร้อมใช้งาน');
+  const result = await createUserWithEmailAndPassword(auth, email.trim(), password);
+  const profile = await syncFirebaseUserProfile(result.user, fullName, phone);
+  await sendEmailVerification(result.user);
+  return profile;
+}
+
+export async function requestPasswordReset(email: string): Promise<void> {
+  if (dataBackend === 'firebase' && auth) {
+    await sendPasswordResetEmail(auth, email.trim());
+    return;
   }
-  const result = await createUserWithEmailAndPassword(auth, email, pass);
-  return syncFirebaseUserProfile(result.user, fullName, phone);
+  if (dataBackend === 'supabase' && supabase) {
+    const { error } = await supabase.auth.resetPasswordForEmail(email.trim());
+    if (error) throw error;
+    return;
+  }
+  throw new Error('ระบบกู้คืนรหัสผ่านยังไม่ได้ตั้งค่า กรุณาติดต่อทีมงาน');
 }
 
 export async function logoutUser() {
-  if (dataBackend === 'firebase' && auth) {
-    await firebaseSignOut(auth).catch(() => undefined);
-  } else if (dataBackend === 'supabase' && supabase) {
-    await supabase.auth.signOut();
+  if (dataBackend === 'firebase' && auth) await firebaseSignOut(auth);
+  else if (dataBackend === 'supabase' && supabase) {
+    const { error } = await supabase.auth.signOut();
+    if (error) throw error;
   }
-  demoCacheProfile(null);
+  cacheProfile(null);
   notifyAuthChange(null);
 }
 
 export function getStoredUser(): UserProfile | null {
   if (typeof window === 'undefined') return null;
-  const stored = localStorage.getItem('chantakorn_auth_user');
-  if (!stored) return null;
+  if (!isDemoAuthEnabled) return verifiedProfile;
   try {
-    const profile = JSON.parse(stored) as Partial<UserProfile>;
-    if (
-      typeof profile.id !== 'string' ||
-      typeof profile.full_name !== 'string' ||
-      !validRole(profile.role)
-    ) return null;
+    const stored = window.localStorage.getItem('chantakorn_auth_user');
+    if (!stored) return null;
+    const profile = JSON.parse(stored) as Partial<UserProfile> | null;
+    if (!profile || typeof profile.id !== 'string' || typeof profile.full_name !== 'string' || !validRole(profile.role)) return null;
     return profile as UserProfile;
   } catch {
     return null;
