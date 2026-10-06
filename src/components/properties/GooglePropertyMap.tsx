@@ -108,6 +108,15 @@ export default function GooglePropertyMap({
 
   // Fallback state if Google Maps Web JS is slow or blocked in preview
   const [hasGoogleMapsError, setHasGoogleMapsError] = useState(false);
+  const mapsApiKey = GOOGLE_MAPS_API_KEY || '';
+
+  // Google Maps JS calls this global hook when the key is missing permissions/invalid.
+  useEffect(() => {
+    (window as unknown as { gm_authFailure?: () => void }).gm_authFailure = () => setHasGoogleMapsError(true);
+    return () => {
+      delete (window as unknown as { gm_authFailure?: () => void }).gm_authFailure;
+    };
+  }, []);
 
   // Sync active popup with selectedProperty from parent
   useEffect(() => {
@@ -287,8 +296,8 @@ export default function GooglePropertyMap({
         </div>
       )}
 
-      {/* Main Google Maps Engine */}
-      {!hasGoogleMapsError ? (
+      {/* Main Google Maps Engine (skip entirely when no API key is configured) */}
+      {!hasGoogleMapsError && mapsApiKey ? (
         <APIProvider 
           apiKey={GOOGLE_MAPS_API_KEY}
           onError={() => setHasGoogleMapsError(true)}
