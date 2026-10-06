@@ -175,6 +175,7 @@ function filterProperties(properties: Property[], filters?: PropertyFilters): Pr
     ].some(value => contains(value, filters.searchQuery!))) return false;
     if (filters?.features?.length && !filters.features.every(feature => property.features.some(value => contains(value, feature)))) return false;
     if (filters?.hasVideo && !property.video_url) return false;
+    if (filters?.featured !== undefined && Boolean(property.featured) !== filters.featured) return false;
     return true;
   });
   return results.sort((a, b) => {
