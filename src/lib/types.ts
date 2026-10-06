@@ -1,110 +1,165 @@
-// Shared TypeScript type definitions for Chantakorn Property
-// Mirrors the Supabase schema: profiles, properties, inquiries, favorite_properties
-
-export type PropertyStatus = 'sale' | 'rent' | 'sold';
-
-export type UserRole = 'ADMIN' | 'AGENT' | 'USER';
-
-export interface UserProfile {
-  id: string;
-  full_name: string;
-  email: string;
-  phone?: string;
-  role: UserRole;
-  avatar_url?: string;
-  line_id?: string;
-  facebook?: string;
-  bio?: string;
-  created_at: string;
-  updated_at?: string;
-}
-
-export interface Agent extends UserProfile {
-  agency_name?: string;
-  license_number?: string;
-  rating?: number;
-  review_count?: number;
-  properties_count?: number;
-  is_verified?: boolean;
-  experience_years?: number;
-  specialties?: string[];
-  languages?: string[];
-  description?: string;
-}
+export type PropertyType = 'house' | 'land' | 'condo' | 'commercial' | 'investment' | 'consignment';
+export type PropertyStatus = 'sale' | 'rent';
 
 export interface PropertyImage {
   id: string;
-  url: string;
-  is_primary?: boolean;
-  caption?: string;
+  property_id: string;
+  image_url: string;
+  sort_order: number;
+}
+
+export type AgentRank = 'แอดมิน' | 'นายหน้า';
+
+export interface Agent {
+  id: string;
+  name: string;
+  rank?: AgentRank;
+  title: AgentRank | string;
+  phone: string;
+  line_id: string;
+  facebook?: string;
+  email: string;
+  photo_url: string;
+  bio: string;
+  user_id?: string;
+}
+
+export type FacingDirection =
+  | 'ทิศเหนือ'
+  | 'ทิศใต้'
+  | 'ทิศตะวันออก'
+  | 'ทิศตะวันตก'
+  | 'ทิศตะวันออกเฉียงเหนือ'
+  | 'ทิศตะวันออกเฉียงใต้'
+  | 'ทิศตะวันตกเฉียงเหนือ'
+  | 'ทิศตะวันตกเฉียงใต้';
+
+export interface FengShuiAnalysis {
+  direction: string;
+  degrees: number;
+  element: string;
+  elementColor: string;
+  score: number;
+  grade: string;
+  meaning: string;
+  summary: string;
+  highlights: string[];
+  windEnergy: string;
+  sunEnergy: string;
+  suitableFor: string[];
+  luckyColors: string[];
+  auspiciousDecorTips: string[];
+  auspiciousNumbers: string;
+  qiFlow: string;
 }
 
 export interface Property {
   id: string;
-  slug: string;
   title: string;
+  slug: string;
   description: string;
-  internal_notes?: string;
-
-  property_type: 'house' | 'land' | 'condo' | 'commercial' | 'townhome';
+  property_type: PropertyType;
   status: PropertyStatus;
   price: number;
-
-  address?: string;
-  district: string;
   province: string;
-  postcode?: string;
+  district: string;
+  subdistrict?: string;
+  address?: string;
   latitude: number;
   longitude: number;
-  location_display_name?: string;
-
+  /** Whether coordinates came from the record rather than a map viewport fallback. */
+  coordinates_available?: boolean;
+  facing_direction?: FacingDirection | string;
+  feng_shui?: FengShuiAnalysis;
   bedrooms: number;
   bathrooms: number;
-  parking?: number;
-  land_size: number;
-  land_size_rai?: number;
-  land_size_ngan?: number;
-  land_size_square_wa?: number;
-  usable_area?: number;
-  facing_direction?: 'north' | 'south' | 'east' | 'west' | 'northeast' | 'northwest' | 'southeast' | 'southwest';
-
-  image_urls?: string[];
+  parking: number;
+  land_size: number; // ตร.ว.
+  usable_area: number; // ตร.ม.
+  year_built?: number;
+  furniture: string;
+  features: string[];
   cover_image: string;
   images: string[];
-  video_url?: string | null;
-  video_type?: 'youtube' | 'facebook' | 'tiktok' | 'file' | null;
-
-  features?: string[];
-
-  year_built?: number;
-  furniture?: 'none' | 'partial' | 'full';
-  house_condition?: 'new' | 'excellent' | 'good' | 'fair' | 'needs_renovation';
-
-  land_title_deed_type?: 'chanote' | 'nor_sor_3_kor' | 'nor_sor_3_hor' | 'sor_kor_1' | 'por_bor_tor_5' | 'other';
-  land_zoning?: 'orange' | 'yellow' | 'green' | 'purple' | 'red' | 'blue' | 'brown' | 'none';
-  land_width_meters?: number;
-  public_utility_access?: string[];
-  canal_access?: boolean;
-  road_access?: boolean;
-  corner_plot?: boolean;
-
-  created_at: string;
-  updated_at: string;
-  published?: boolean;
-  featured?: boolean;
-
+  video_url?: string;
+  videos?: string[];
+  featured: boolean;
+  published: boolean;
+  internal_notes?: string;
+  agent_id?: string;
   agent?: Agent;
-  views_count?: number;
+  created_at: string;
+  updated_at?: string;
+}
+
+export interface PropertyCardProps {
+  id: string;
+  title: string;
+  type: PropertyType;
+  status: PropertyStatus;
+  price: number;
+  location: string;
+  district: string;
+  province: string;
+  coverImage: string;
+  images?: string[];
+  bedrooms: number;
+  bathrooms: number;
+  landSize: number;
+  usableArea: number;
+  featured?: boolean;
+  video_url?: string;
+  slug: string;
+  createdAt?: string;
+  facingDirection?: string;
+}
+
+export interface Inquiry {
+  id: string;
+  property_id?: string;
+  property_title?: string;
+  name: string;
+  phone: string;
+  line_id?: string;
+  message: string;
+  inquiry_type: 'inquiry' | 'viewing' | 'consignment_sell';
+  status: 'new' | 'contacted' | 'scheduled' | 'closed';
+  consignment_details?: {
+    property_type: string;
+    province: string;
+    district: string;
+    subdistrict?: string;
+    expected_price: number;
+    land_size?: number;
+    usable_area?: number;
+    photos_count?: number;
+    photos?: string[];
+  };
+  created_at: string;
+}
+
+export interface UserProfile {
+  id: string;
+  full_name: string;
+  phone?: string;
+  role: 'ADMIN' | 'AGENT' | 'USER';
+  avatar_url?: string;
+  email?: string;
+  line_id?: string;
+  facebook?: string;
+  bio?: string;
+  created_at?: string;
+  updated_at?: string;
 }
 
 export interface PropertyFilters {
+  type?: PropertyType | 'all';
   status?: PropertyStatus | 'all';
-  property_type?: Property['property_type'] | 'all';
+  province?: string;
   district?: string;
+  subdistrict?: string;
   minPrice?: number;
   maxPrice?: number;
-  minLandSize?: number;
-  maxLandSize?: number;
   bedrooms?: number | 'any';
   bathrooms?: number | 'any';
   features?: string[];
@@ -117,82 +172,77 @@ export interface PropertyFilters {
 export type PropertyHistoryChangeType =
   | 'price_change'
   | 'status_change'
-  | 'description_update'
-  | 'images_update'
-  | 'features_update'
-  | 'other';
+  | 'agent_change'
+  | 'published_change'
+  | 'featured_change'
+  | 'info_update'
+  | 'created'
+  | 'manual_note';
 
-export interface PropertyHistoryEntry {
+export interface PropertyHistoryLog {
   id: string;
   property_id: string;
-  changed_at: string;
-  change_type: PropertyHistoryChangeType;
-  field_name?: string;
-  old_value?: string | number | boolean | null;
-  new_value?: string | number | boolean | null;
-  note?: string;
-  changed_by?: string;
-}
-
-export interface Inquiry {
-  id: string;
-  property_id?: string | null;
   property_title?: string;
-  full_name: string;
-  email: string;
-  phone: string;
-  message?: string;
-  inquiry_type: 'general' | 'viewing' | 'price_negotiation' | 'sell_with_us';
-  status: 'new' | 'in_progress' | 'contacted' | 'closed';
-  created_at: string;
-  updated_at?: string;
-  admin_notes?: string;
+  change_type: PropertyHistoryChangeType;
+  previous_value?: string | number | boolean | null;
+  new_value?: string | number | boolean | null;
+  diff_summary: string;
+  actor_name: string;
+  actor_email?: string;
+  actor_role?: string;
+  timestamp: string;
+  notes?: string;
 }
 
-export interface Review {
+export type SystemActivityCategory = 'property' | 'inquiry' | 'user_role' | 'system' | 'work_phase';
+
+export interface SystemActivity {
   id: string;
-  property_id?: string | null;
-  user_id?: string | null;
-  user_name: string;
-  user_avatar_url?: string | null;
-  rating: number;
-  comment: string;
-  is_featured: boolean;
-  status: 'pending' | 'approved' | 'rejected';
-  created_at: string;
-}
-
-export interface SystemSettings {
-  id: string;
-  contact_phone: string;
-  contact_email: string;
-  contact_line_id: string;
-  contact_facebook_url: string;
-  office_address: string;
-  office_hours: string;
-  is_maintenance_mode?: boolean;
-}
-
-export interface NearbyLandmark {
+  category: SystemActivityCategory;
+  action: string;
   title: string;
-  category: 'hospital' | 'education' | 'shopping' | 'transport' | 'market' | 'tourism' | 'government' | 'other';
-  latitude: number;
-  longitude: number;
-}
-
-export interface MapDisplayProperty extends Property {
-  display_price_label: string;
-  status_color: string;
-}
-
-export type NotificationType = 'inquiry_new' | 'inquiry_updated' | 'review_new' | 'review_updated' | 'system_alert';
-
-export interface AppNotification {
-  id: string;
-  type: NotificationType;
-  title: string;
-  message: string;
-  link?: string;
-  is_read: boolean;
+  description: string;
+  target_id?: string;
+  target_name?: string;
+  actor_name: string;
+  actor_email?: string;
+  actor_role?: string;
+  metadata?: Record<string, any>;
   created_at: string;
+}
+
+export type WorkPhaseStatus = 'pending' | 'in_progress' | 'completed' | 'skipped';
+
+export interface WorkPhase {
+  phase_number: number;
+  phase_title: string;
+  description?: string;
+  status: WorkPhaseStatus;
+  started_at?: string;
+  completed_at?: string;
+  completed_by?: string;
+  notes?: string;
+  proof_photos?: string[];
+  target_completion_date?: string;
+  assigned_agent_name?: string;
+}
+
+export type WorkJobStatus = 'active' | 'completed' | 'on_hold';
+
+export interface WorkJob {
+  id: string;
+  job_code: string;
+  title: string;
+  property_id?: string;
+  property_title?: string;
+  inquiry_id?: string;
+  customer_name?: string;
+  customer_phone?: string;
+  assigned_agent?: string;
+  current_phase_number: number;
+  total_phases: number;
+  status: WorkJobStatus;
+  phases: WorkPhase[];
+  created_at: string;
+  updated_at: string;
 }
