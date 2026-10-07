@@ -260,15 +260,18 @@ async function triggerLineNotification(property: Property) {
     const res = await fetchStaffApi('/api/line/notify', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(property),
+      body: JSON.stringify({ ...property, notifyCustomers: true }),
     });
     const data = await res.json();
     if (data.success) {
+      const customerNotice = typeof data.customerRecipients === 'number' && data.customerRecipients > 0
+        ? ` (แจ้งเตือนลูกค้าผู้ติดตาม OA แล้ว ${data.customerDelivered}/${data.customerRecipients} คน)`
+        : '';
       logSystemActivity({
         category: 'system',
         action: 'system_notification',
         title: 'แจ้งเตือน LINE OA อัตโนมัติ',
-        description: `ระบบได้ส่งข้อมูลประกาศอสังหาฯ ใหม่ "${property.title}" เข้าไลน์ออฟฟิเชียลแอคเคานต์ https://lin.ee/NMSe28T3 ${data.simulated ? '(โหมดทดสอบจำลอง)' : '(ส่งแจ้งเตือนจริง)'} เรียบร้อยแล้ว`,
+        description: `ระบบได้ส่งข้อมูลประกาศอสังหาฯ ใหม่ "${property.title}" เข้าไลน์ออฟฟิเชียลแอคเคานต์ https://lin.ee/NMSe28T3${customerNotice} ${data.simulated ? '(โหมดทดสอบจำลอง)' : '(ส่งแจ้งเตือนจริง)'} เรียบร้อยแล้ว`,
         target_id: property.id,
         target_name: property.title,
         actor_name: 'ระบบอัตโนมัติ',
