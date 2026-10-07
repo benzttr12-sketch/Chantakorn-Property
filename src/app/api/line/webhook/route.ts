@@ -3,6 +3,7 @@ import { Property } from '@/lib/types';
 import { requireStaff } from '@/lib/server-auth';
 import { createFirestoreDocument, listFirestoreDocuments, patchFirestoreDocument } from '@/lib/firestore-rest';
 import { getLinePropertyImageUrl } from '@/lib/line-property-image';
+import { formatPropertyCode } from '@/lib/format-code';
 
 const OFFICIAL_LINE_OA_URL = 'https://lin.ee/NMSe28T3';
 const DEFAULT_PHONE = '081-604-0097';
@@ -176,7 +177,8 @@ function buildPropertyCarouselFlex(properties: Property[], hostOrigin: string, q
       ? new Intl.NumberFormat('th-TH', { style: 'currency', currency: 'THB', maximumFractionDigits: 0 }).format(p.price)
       : 'ราคาพิเศษ';
     const actionText = p.status === 'rent' ? 'ปล่อยเช่า' : 'เสนอขาย';
-    const detailUrl = p.slug ? `${hostOrigin}/properties/detail/?slug=${encodeURIComponent(p.slug)}` : `${hostOrigin}/properties/`;
+    const propertyKey = (p.id ? formatPropertyCode(p.id) : '') || p.slug;
+    const detailUrl = propertyKey ? `${hostOrigin}/properties/${encodeURIComponent(propertyKey)}` : `${hostOrigin}/properties/`;
     const coverImg = getLinePropertyImageUrl(p, imageOrigin);
 
     return {

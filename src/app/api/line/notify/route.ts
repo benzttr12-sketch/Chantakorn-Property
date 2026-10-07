@@ -2,6 +2,7 @@ import { jsonResponse } from '@/lib/api-response';
 import { requireStaff } from '@/lib/server-auth';
 import { getFirestoreDocument, patchFirestoreDocument, listFirestoreDocuments } from '@/lib/firestore-rest';
 import { getLinePropertyImageUrl } from '@/lib/line-property-image';
+import { formatPropertyCode } from '@/lib/format-code';
 
 const OFFICIAL_LINE_OA_URL = 'https://lin.ee/NMSe28T3';
 const DEFAULT_PHONE = '081-604-0097';
@@ -263,9 +264,10 @@ LINE Official Account: ${OFFICIAL_LINE_OA_URL}`;
 
     } else {
       // 2. Standard Property Listing Notification
-      const { title, price, status, district, subdistrict, slug, agent } = body;
-      
-      propertyUrl = slug ? `${hostOrigin}/properties/detail/?slug=${encodeURIComponent(slug)}` : `${hostOrigin}/properties/`;
+      const { title, price, status, district, subdistrict, slug, id, agent } = body;
+
+      const propertyKey = (id ? formatPropertyCode(id) : '') || slug;
+      propertyUrl = propertyKey ? `${hostOrigin}/properties/${encodeURIComponent(propertyKey)}` : `${hostOrigin}/properties/`;
       const priceFormatted = price 
         ? new Intl.NumberFormat('th-TH', { style: 'currency', currency: 'THB', maximumFractionDigits: 0 }).format(price)
         : 'ราคาพิเศษ';

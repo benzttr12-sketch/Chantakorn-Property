@@ -223,6 +223,15 @@ export async function fetchAdminProperties(filters?: PropertyFilters): Promise<P
   return filterProperties(await loadProperties(true), filters);
 }
 
+function matchesPropertyKey(property: Property, key: string): boolean {
+  const normalized = key.trim().toLowerCase();
+  if (!normalized) return false;
+  if (property.slug && property.slug.toLowerCase() === normalized) return true;
+  if (property.id && property.id.toLowerCase() === normalized) return true;
+  const code = formatPropertyCode(property.id);
+  return code !== '-' && code.toLowerCase() === normalized;
+}
+
 export async function fetchPropertyBySlug(slug: string): Promise<Property | null> {
   requireConnection();
   if (dataBackend === 'supabase') {
@@ -230,7 +239,9 @@ export async function fetchPropertyBySlug(slug: string): Promise<Property | null
       const { data, error } = await supabase.from('properties').select(PROPERTY_SELECT)
         .eq('slug', slug).eq('published', true).maybeSingle();
       if (error) throw error;
-      return data ? rowToProperty(data as PropertyRow) : null;
+      if (data) return rowToProperty(data as PropertyRow);
+      const all = await loadProperties(false);
+      return all.find(property => matchesPropertyKey(property, slug)) || null;
     }
     return null;
   }
@@ -238,11 +249,11 @@ export async function fetchPropertyBySlug(slug: string): Promise<Property | null
   if (dataBackend === 'firebase') {
     if (firestore) {
       const all = await loadProperties(false);
-      return all.find(property => property.slug === slug) || null;
+      return all.find(property => matchesPropertyKey(property, slug)) || null;
     }
     return null;
   }
-  return (await loadProperties(false)).find(property => property.slug === slug) || null;
+  return (await loadProperties(false)).find(property => matchesPropertyKey(property, slug)) || null;
 }
 
 function generateShortPropertyId(): string {
