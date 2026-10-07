@@ -24,6 +24,21 @@ export async function requireStaff(req: Request): Promise<Response | null> {
     return jsonResponse({ error: 'กรุณาเข้าสู่ระบบพนักงาน' }, { status: 401 });
   }
 
+  // โหมด local/demo: ยอมรับเซสชันทดลองจาก localStorage (เปิดเฉพาะเมื่อ demo auth ถูกเปิดใช้)
+  if (
+    process.env.NEXT_PUBLIC_DATA_BACKEND === 'local' &&
+    process.env.NEXT_PUBLIC_ENABLE_DEMO_AUTH === 'true' &&
+    token.startsWith('demo ')
+  ) {
+    try {
+      const [encodedEmail, role] = Buffer.from(token.slice(5), 'base64').toString('utf8').split('|');
+      if (encodedEmail && (role === 'ADMIN' || role === 'AGENT')) {
+        return null;
+      }
+    } catch {}
+    return jsonResponse({ error: 'เซสชันทดลองไม่ถูกต้อง กรุณาเข้าสู่ระบบใหม่' }, { status: 401 });
+  }
+
   const apiKey = process.env.NEXT_PUBLIC_FIREBASE_API_KEY || appletConfig.apiKey;
   const projectId = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || appletConfig.projectId;
   if (!apiKey || !projectId) {

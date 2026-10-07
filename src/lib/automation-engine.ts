@@ -1,4 +1,4 @@
-import { Property, Inquiry } from '@/lib/types';
+﻿import { Property, Inquiry } from '@/lib/types';
 import { 
   formatPrice, 
   numberToThaiBahtWords, 
@@ -6,6 +6,7 @@ import {
   formatLineUrl,
   DEFAULT_OFFICIAL_FACEBOOK
 } from '@/lib/utils';
+import { formatPropertyCode } from '@/lib/format-code';
 
 export type MarketingChannel = 'facebook' | 'tiktok' | 'line' | 'instagram' | 'english' | 'chinese';
 export type MarketingTone = 'luxury' | 'hot_deal' | 'friendly' | 'investor';
@@ -35,10 +36,11 @@ export function generateLocalSocialPost(
   const sizeText = property.land_size ? `${property.land_size} ตร.ว.` : property.usable_area ? `${property.usable_area} ตร.ม.` : '';
   const agentName = property.agent?.name || 'ทีมงาน ฉันทากร พร็อพเพอร์ตี้';
   const agentPhone = property.agent?.phone || '082-436-4499';
-  const lineLink = formatLineUrl(property.agent?.line_id || '@chantakorn');
+  const lineLink = formatLineUrl(property.agent?.line_id || '@930xzcyi');
 
   const origin = typeof window !== 'undefined' ? window.location.origin : 'https://chantakornproperty.com';
-  const propertyUrl = `${origin}/properties/${property.slug}`;
+  const propertyCode = formatPropertyCode(property.id);
+  const propertyUrl = `${origin}/properties/${encodeURIComponent(propertyCode)}`;
 
   if (channel === 'tiktok') {
     const fullPost = `🎬 [SCRIPT วิดีโอ TIKTOK / REELS สั้น 45-60 วินาที]
@@ -67,7 +69,7 @@ export function generateLocalSocialPost(
 [ฉากที่ 4: วินาทีที่ 31-45 (สรุปราคา & ค่างวด & CALL TO ACTION)]
 🎥 ภาพ: นายหน้ายืนยิ้มหน้าบ้าน หรือภาพมุมสูงสวยๆ
 🎙️ เสียงบรรยาย: "ราคาเพียง ${priceFormatted}${priceUnit} เท่านั้น กู้ได้เต็ม มีบริการเช็กวงเงินฟรี ยื่นกู้ให้ทุกธนาคาร รีบคอมเมนต์หรือทักลิงก์ที่หน้าโปรไฟล์ก่อนหลุดนะครับ!"
-💬 ตัวหนังสือบนจอ: "📞 นัดชม: ${agentPhone} | LINE: ${property.agent?.line_id || '@chantakorn'}"
+💬 ตัวหนังสือบนจอ: "📞 นัดชม: ${agentPhone} | LINE: ${property.agent?.line_id || '@930xzcyi'}"
 
 #บ้านหาดใหญ่ #บ้านสงขลา #อสังหาหาดใหญ่ #บ้านมือสองหาดใหญ่ #ฉันทากรพร็อพเพอร์ตี้ #บ้านสวยพร้อมอยู่`;
 
@@ -133,7 +135,7 @@ ${property.facing_direction ? `▫️ Direction: ${property.facing_direction}` :
 ความสุขที่เริ่มต้นได้จากบ้านหลังนี้ สัมผัสบรรยากาศจริงได้แล้ววันนี้ นัดหมายเข้าชมแบบ Exclusive ได้เลยค่ะ
 
 📞 Private Viewing: ${agentPhone}
-📲 LINE: ${property.agent?.line_id || '@chantakorn'}
+📲 LINE: ${property.agent?.line_id || '@930xzcyi'}
 🌐 Website Link in Bio: ${propertyUrl}
 
 .
@@ -172,7 +174,7 @@ Free consultation for foreigners, expats, and investors regarding leaseholds, co
 
 📞 For private inspection:
 Phone / WhatsApp: ${agentPhone}
-LINE ID: ${property.agent?.line_id || '@chantakorn'}
+LINE ID: ${property.agent?.line_id || '@930xzcyi'}
 Explore full gallery: ${propertyUrl}`;
 
     return {
@@ -204,7 +206,7 @@ Explore full gallery: ${propertyUrl}`;
 
 如需预约实地看房或获取中文房产投资资料，欢迎随时与我们联系：
 📞 咨询热线: ${agentPhone}
-📲 微信/LINE: ${property.agent?.line_id || '@chantakorn'}
+📲 微信/LINE: ${property.agent?.line_id || '@930xzcyi'}
 🌐 房源详情网址: ${propertyUrl}`;
 
     return {
@@ -242,7 +244,7 @@ ${property.features && property.features.length > 0 ? property.features.map(f =>
 ━━━━━━━━━━━━━━━━━━━━
 สนใจสอบถามข้อมูลเพิ่มเติม / นัดเข้าชมบ้านจริง:
 📞 โทร: ${agentPhone} (${agentName})
-💬 ทักไลน์: ${lineLink} หรือค้นหาไอดี "${property.agent?.line_id || '@chantakorn'}"
+💬 ทักไลน์: ${lineLink} หรือค้นหาไอดี "${property.agent?.line_id || '@930xzcyi'}"
 🌐 Facebook: ${DEFAULT_OFFICIAL_FACEBOOK}
 ━━━━━━━━━━━━━━━━━━━━
 
@@ -364,7 +366,7 @@ export function matchLeadToProperties(
 
     // Construct tailored LINE message
     const origin = typeof window !== 'undefined' ? window.location.origin : 'https://chantakornproperty.com';
-    const propertyUrl = `${origin}/properties/${prop.slug}`;
+    const propertyUrl = `${origin}/properties/${encodeURIComponent(formatPropertyCode(prop.id))}`;
     const monthlyMortgage = Math.round((prop.price * 0.9 * 0.05) / 12);
 
     const recommendedLinePitch = `สวัสดีครับคุณ ${inquiry.name} 🙏

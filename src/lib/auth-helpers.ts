@@ -129,17 +129,112 @@ export async function signInWithGoogle(): Promise<UserProfile> {
 }
 
 export async function loginWithEmail(email: string, password: string): Promise<UserProfile> {
+  if (dataBackend === 'local') return demoLoginWithEmail(email, password);
   if (dataBackend !== 'firebase' || !auth) throw new Error('ระบบตรวจสอบสิทธิ์ Firebase ยังไม่พร้อมใช้งาน');
   const result = await signInWithEmailAndPassword(auth, email.trim(), password);
   return syncFirebaseUserProfile(result.user);
 }
 
 export async function registerWithEmail(email: string, password: string, fullName: string, phone: string): Promise<UserProfile> {
+  if (dataBackend === 'local') return demoRegisterWithEmail(email, password, fullName, phone);
   if (dataBackend !== 'firebase' || !auth) throw new Error('ระบบตรวจสอบสิทธิ์ Firebase ยังไม่พร้อมใช้งาน');
   const result = await createUserWithEmailAndPassword(auth, email.trim(), password);
   const profile = await syncFirebaseUserProfile(result.user, fullName, phone);
   await sendEmailVerification(result.user);
   return profile;
+}
+
+/* ---------------------------------------------------------------------------
+ * Local demo auth — ใช้เฉพาะเมื่อ NEXT_PUBLIC_DATA_BACKEND=local และ
+ * NEXT_PUBLIC_ENABLE_DEMO_AUTH=true เท่านั้น (ข้อมูลเก็บใน localStorage ของเบราว์เซอร์)
+ * บัญชีแรกที่สมัครจะได้รับบทบาท ADMIN เพื่อให้เข้าระบบหลังบ้านได้ทันที
+ * ------------------------------------------------------------------------- */
+const DEMO_USERS_KEY = 'chantakorn_demo_users';
+
+interface DemoUserRecord {
+  email: string;
+  password: string;
+  profile: UserProfile;
+}
+
+function readDemoUsers(): DemoUserRecord[] {
+  if (typeof window === 'undefined') return [];
+  try {
+    const raw = window.localStorage.getItem(DEMO_USERS_KEY);
+    const parsed = raw ? (JSON.parse(raw) as unknown) : [];
+    return Array.isArray(parsed) ? (parsed as DemoUserRecord[]) : [];
+  } catch {
+    return [];
+  }
+}
+
+function writeDemoUsers(users: DemoUserRecord[]) {
+  if (typeof window === 'undefined') return;
+  try {
+    window.localStorage.setItem(DEMO_USERS_KEY, JSON.stringify(users));
+  } catch {}
+}
+
+export async function demoRegisterWithEmail(email: string, password: string, fullName: string, phone: string): Promise<UserProfile> {
+  if (dataBackend !== 'local' || !isDemoAuthEnabled) {
+    throw new Error('โหมดสมัครสมาชิกทดลองยังไม่เปิดใช้งาน');
+  }
+  const normalized = email.trim().toLowerCase();
+  if (!normalized || !password || password.length < 6) {
+    throw new Error('กรุณากรอกอีเมลและรหัสผ่านอย่างน้อย 6 ตัวอักษร');
+  }
+  const users = readDemoUsers();
+  if (users.some((u) => u.email === normalized)) {
+    throw new Error('อีเมลนี้ถูกใช้สมัครแล้ว กรุณาเข้าสู่ระบบหรือใช้อีเมลอื่น');
+  }
+  const profile: UserProfile = {
+    id: `demo-${Date.now().toString(36)}`,
+    full_name: fullName.trim() || normalized.split('@')[0] || 'ผู้ใช้งาน',
+    email: normalized,
+    role: users.length === 0 ? 'ADMIN' : 'USER',
+    phone: phone.trim() || '',
+    avatar_url: '',
+    created_at: new Date().toISOString(),
+  };
+  users.push({ email: normalized, password, profile });
+  writeDemoUsers(users);
+  cacheProfile(profile);
+  notifyAuthChange(profile);
+  return profile;
+}
+
+export async function demoLoginWithEmail(email: string, password: string): Promise<UserProfile> {
+  if (dataBackend !== 'local' || !isDemoAuthEnabled) {
+    throw new Error('โหมดเข้าสู่ระบบทดลองยังไม่เปิดใช้งาน');
+  }
+  const normalized = email.trim().toLowerCase();
+  const record = readDemoUsers().find((u) => u.email === normalized);
+  if (!record) {
+    throw new Error('ไม่พบบัญชีนี้ในระบบ กรุณาสมัครสมาชิกก่อนใช้งาน');
+  }
+  if (record.password !== password) {
+    throw new Error('อีเมลหรือรหัสผ่านไม่ถูกต้อง');
+  }
+  cacheProfile(record.profile);
+  notifyAuthChange(record.profile);
+  return record.profile;
+}
+
+export async function demoResetPassword(email: string, newPassword: string): Promise<void> {
+  if (dataBackend !== 'local' || !isDemoAuthEnabled) {
+    throw new Error('โหมดรีเซ็ตรหัสผ่านทดลองยังไม่เปิดใช้งาน');
+  }
+  const normalized = email.trim().toLowerCase();
+  if (!newPassword || newPassword.length < 6) {
+    throw new Error('รหัสผ่านใหม่ต้องมีอย่างน้อย 6 ตัวอักษร');
+  }
+  const users = readDemoUsers();
+  const record = users.find((u) => u.email === normalized);
+  if (!record) {
+    throw new Error('ไม่พบบัญชีนี้ในระบบ กรุณาสมัครสมาชิกก่อนใช้งาน');
+  }
+  record.password = newPassword;
+  writeDemoUsers(users);
 }
 
 export async function requestPasswordReset(email: string): Promise<void> {

@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Smart Property Text Parser & Auto-Extractor
  * แปลงข้อความดิบจาก LINE, Facebook, หรือโน้ตของนายหน้าเป็นข้อมูลทรัพย์สินอัตโนมัติ
  * Chantakorn Property - หาดใหญ่ สงขลา
@@ -277,7 +277,7 @@ export function generateProfessionalDescription(params: {
     ``,
     `📞 นัดชมทรัพย์และสอบถามข้อมูลเพิ่มเติม:`,
     `• โทร: 081-604-0097 (คุณฉันทากร / เบนซ์)`,
-    `• LINE Official: @chantakorn`,
+    `• LINE Official: @930xzcyi`,
     `• Facebook: Chantakorn Property รับฝากขายบ้าน ที่ดิน คอนโด หาดใหญ่ สงขลา`
   ];
 

@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { ExtendedAgent, AGENTS as DEFAULT_AGENTS } from '@/data/agents';
 import { UserProfile } from '@/lib/types';
@@ -143,7 +143,7 @@ export function syncAgentsFromUsers(users: UserProfile[]): ExtendedAgent[] {
         rank: user.role === 'ADMIN' ? 'แอดมิน' : 'นายหน้า',
         title: user.role === 'ADMIN' ? 'ผู้บริหาร & ที่ปรึกษาอสังหาริมทรัพย์' : 'ที่ปรึกษาอสังหาริมทรัพย์มืออาชีพ',
         phone: user.phone || '081-604-0097',
-        line_id: user.line_id || '@chantakorn',
+        line_id: user.line_id || '@930xzcyi',
         facebook: user.facebook || '',
         email: user.email || 'contact@chantakornproperty.com',
         photo_url: user.avatar_url || 'https://images.unsplash.com/photo-1560250097-0b93528c311a?auto=format&fit=crop&w=600&q=80',
@@ -181,7 +181,7 @@ export function updateAgent(agentId: string, updatedFields: Partial<ExtendedAgen
       rank: updatedFields.rank || 'นายหน้า',
       title: updatedFields.title || 'ที่ปรึกษาอสังหาริมทรัพย์มืออาชีพ',
       phone: updatedFields.phone || '081-604-0097',
-      line_id: updatedFields.line_id || '@chantakorn',
+      line_id: updatedFields.line_id || '@930xzcyi',
       facebook: updatedFields.facebook || '',
       email: updatedFields.email || 'contact@chantakornproperty.com',
       photo_url: updatedFields.photo_url || 'https://images.unsplash.com/photo-1560250097-0b93528c311a?auto=format&fit=crop&w=600&q=80',

@@ -112,7 +112,7 @@ function LoginForm() {
       }
     }
 
-    if (dataBackend === 'firebase' && auth) {
+    if (dataBackend === 'local' || (dataBackend === 'firebase' && auth)) {
       try {
         const profile = await loginWithEmail(email, password);
         handleSuccessfulAuth(profile.role);

@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
@@ -91,6 +91,14 @@ export default function Header() {
   useEffect(() => {
     setMobileMenuOpen(false);
   }, [pathname]);
+
+  // Lock body scroll while the mobile menu is open
+  useEffect(() => {
+    document.body.style.overflow = mobileMenuOpen ? 'hidden' : '';
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [mobileMenuOpen]);
 
   const handleLogout = async () => {
     await logoutUser();
@@ -212,7 +220,7 @@ export default function Header() {
           </Link>
 
           {/* Center Navigation Links (Desktop) */}
-          <nav className="hidden lg:flex items-center space-x-1 xl:space-x-1.5">
+          <nav className="hidden lg:flex items-center space-x-0.5 xl:space-x-1">
             {navLinks.map((link) => {
               const isActive = pathname === link.href;
               return (
@@ -220,10 +228,10 @@ export default function Header() {
                   key={link.name}
                   href={link.href}
                   onClick={() => setMobileMenuOpen(false)}
-                  className={`px-3 py-1.5 rounded-xl text-sm transition-all ${
+                  className={`relative px-3 py-2 text-sm tracking-wide transition-colors after:absolute after:left-3 after:right-3 after:bottom-0.5 after:h-[2px] after:rounded-full after:bg-gradient-to-r after:from-gold-300 after:to-gold-500 after:transition-opacity after:duration-300 ${
                     isActive
-                      ? 'text-gold-300 bg-navy-900 border border-gold-400/50 font-bold shadow-sm'
-                      : 'text-white hover:text-gold-300 hover:bg-navy-900/80 font-medium'
+                      ? 'text-gold-300 font-bold after:opacity-100'
+                      : 'text-slate-200 font-medium hover:text-gold-200 after:opacity-0'
                   }`}
                 >
                   {link.name}
@@ -461,7 +469,7 @@ export default function Header() {
                   className="text-[#06C755] hover:underline font-bold inline-flex items-center space-x-1"
                 >
                   <MessageCircle className="w-3.5 h-3.5 fill-current inline mr-1" />
-                  <span>LINE Official: @chantakorn (คลิกเพื่อแอดไลน์)</span>
+                  <span>LINE Official: @930xzcyi (คลิกเพื่อแอดไลน์)</span>
                 </a>
               </div>
               <div>

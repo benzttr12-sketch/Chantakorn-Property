@@ -305,18 +305,19 @@ export async function compressImageFile(
 }
 
 /**
- * Batch compress images with progress updates
+ * Batch compress images with progress updates (พร้อมตั้งค่าลายน้ำได้)
  */
 export async function compressMultipleImages(
   files: File[],
-  onProgress?: (current: number, total: number, currentItem: CompressedImageResult) => void
+  onProgress?: (current: number, total: number, currentItem: CompressedImageResult) => void,
+  options: CompressionOptions = {}
 ): Promise<CompressedImageResult[]> {
   const results: CompressedImageResult[] = [];
   const total = files.length;
 
   for (let i = 0; i < total; i++) {
     const file = files[i];
-    const result = await compressImageFile(file);
+    const result = await compressImageFile(file, options);
     results.push(result);
     if (onProgress) {
       onProgress(i + 1, total, result);
@@ -324,6 +325,35 @@ export async function compressMultipleImages(
   }
 
   return results;
+}
+
+/**
+ * ดาวน์โหลดรูปจาก URL แล้วบีบอัด + ใส่ลายน้ำ (ใช้กับ "เพิ่มรูปจากลิงก์")
+ * คืนค่า dataUrl ที่ผ่านการประมวลผล หรือ URL เดิมหากดึงไม่ได้ (เช่น CORS)
+ */
+export async function compressImageFromUrl(
+  imageUrl: string,
+  options: CompressionOptions = {}
+): Promise<{ dataUrl: string; processed: boolean; originalSize?: number; compressedSize?: number; percentSaved?: number }> {
+  if (typeof window === 'undefined') return { dataUrl: imageUrl, processed: false };
+  try {
+    const response = await fetch(imageUrl, { mode: 'cors' });
+    if (!response.ok) return { dataUrl: imageUrl, processed: false };
+    const blob = await response.blob();
+    if (!blob.type.startsWith('image/')) return { dataUrl: imageUrl, processed: false };
+    const file = new File([blob], imageUrl.split('/').pop() || 'image', { type: blob.type });
+    const result = await compressImageFile(file, options);
+    return {
+      dataUrl: result.dataUrl,
+      processed: true,
+      originalSize: result.originalSize,
+      compressedSize: result.compressedSize,
+      percentSaved: result.percentSaved,
+    };
+  } catch {
+    // CORS หรือเครือข่ายล้มเหลว — ใช้ URL เดิมโดยไม่บีบอัด
+    return { dataUrl: imageUrl, processed: false };
+  }
 }
 
 export interface ParsedVideoInfo {

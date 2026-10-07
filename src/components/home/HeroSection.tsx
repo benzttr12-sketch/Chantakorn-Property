@@ -38,11 +38,12 @@ export default function HeroSection() {
           </div>
 
           {/* Main Headline */}
-          <h1 className="text-4xl sm:text-5xl lg:text-6xl font-black text-white tracking-tight leading-[1.12] mb-6 text-balance">
-            ซื้อ ขาย เช่า ฝากขาย <br className="hidden sm:inline" />
+          <h1 className="text-4xl sm:text-5xl lg:text-[3.4rem] font-black text-white tracking-tight leading-[1.14] mb-6 text-balance">
+            ซื้อ ขาย เช่า <span className="whitespace-nowrap">ฝากขาย</span>{' '}
             <span className="bg-gradient-to-r from-[#F4E3BA] via-[#D4AF37] to-[#AA771C] bg-clip-text text-transparent">
               บ้าน ที่ดิน คอนโด
             </span>
+            <br className="hidden sm:inline" />
             <span className="text-white"> ในหาดใหญ่–สงขลา</span>
           </h1>
 
@@ -78,11 +79,11 @@ export default function HeroSection() {
               <div className="text-2xl sm:text-3xl font-black text-gold-300 tabular-nums">500+</div>
               <span className="text-[11px] text-slate-300 font-medium">ทรัพย์คุณภาพคัดสรร</span>
             </div>
-            <div className="space-y-0.5">
+            <div className="space-y-0.5 sm:border-l sm:border-white/15 sm:pl-6">
               <div className="text-2xl sm:text-3xl font-black text-gold-300 tabular-nums">99%</div>
               <span className="text-[11px] text-slate-300 font-medium">อัตราอนุมัติสินเชื่อ</span>
             </div>
-            <div className="space-y-0.5">
+            <div className="space-y-0.5 sm:border-l sm:border-white/15 sm:pl-6">
               <div className="text-2xl sm:text-3xl font-black text-gold-300 tabular-nums">100%</div>
               <span className="text-[11px] text-slate-300 font-medium">ตรวจสอบเอกสารสิทธิ์</span>
             </div>

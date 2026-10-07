@@ -76,7 +76,7 @@ export default function RegisterPage() {
       }
     }
 
-    if (dataBackend === 'firebase' && auth) {
+    if (dataBackend === 'local' || (dataBackend === 'firebase' && auth)) {
       try {
         const profile = await registerWithEmail(email, password, fullName, phone);
         setRegistered(true);

@@ -20,6 +20,7 @@ function load(file, { env = {}, fetch = async () => { throw Error('Unexpected re
       if (name === '@/lib/api-response') return { jsonResponse: (body, init) => Response.json(body, init) };
       if (name === '@/lib/server-auth') return { requireStaff };
       if (name === '@/lib/line-property-image') return load('lib/line-property-image.ts');
+      if (name === '@/lib/format-code') return load('lib/format-code.ts');
       if (name === '@/app/api/line/property-image/route') return load('app/api/line/property-image/route.ts', { env, fetch, firestore, requireStaff });
       if (name === 'sharp') return { default: sharp };
       if (name === 'node:buffer') return require(name);
@@ -177,7 +178,7 @@ test('LINE property carousel contains only published homes with static-site link
     firestore: { listFirestoreDocuments: async (_collection, _limit, options) => {
       queryOptions = options;
       return [
-        { title: 'Public home', published: true, slug: 'home one', status: 'sale', price: 1000000 },
+        { id: 'home one', title: 'Public home', published: true, slug: 'home one', status: 'sale', price: 1000000 },
         { title: 'Private draft', published: false, slug: 'draft', status: 'sale', price: 2000000 },
       ];
     } },
@@ -195,7 +196,7 @@ test('LINE property carousel contains only published homes with static-site link
   const bubbles = sent.body.messages[0].contents.contents;
   assert.equal(bubbles.length, 1);
   assert.equal(bubbles[0].body.contents[1].text, 'Public home');
-  assert.equal(bubbles[0].footer.contents[0].action.uri, 'https://example.com/site/properties/detail/?slug=home%20one');
+  assert.equal(bubbles[0].footer.contents[0].action.uri, 'https://example.com/site/properties/CK-HOME%20ONE');
 });
 
 test('LINE property carousel preserves the selected HTTPS cover instead of another gallery photo', async () => {
@@ -217,7 +218,7 @@ test('uploaded cover uses the webhook host image endpoint while details use the 
   const bubble = sent.messages[0].contents.contents[0];
   const imageVersion = createHash('sha256').update(uploadedCover).digest('hex').slice(0, 16);
   assert.equal(bubble.hero.url, `https://api.example.com/api/line/property-image?id=home%20one&v=${imageVersion}`);
-  assert.equal(bubble.footer.contents[0].action.uri, 'https://site.example.com/property-site/properties/detail/?slug=home%20one');
+  assert.equal(bubble.footer.contents[0].action.uri, 'https://site.example.com/property-site/properties/CK-HOME%20ONE');
   assert.equal(JSON.stringify(sent).includes(uploadedCover), false);
   assert.equal(JSON.stringify(sent).includes('data:image'), false);
 });
@@ -266,7 +267,7 @@ test('property cards without a usable photo omit the hero instead of substitutin
   const bubble = sent.messages[0].contents.contents[0];
   assert.equal(Object.hasOwn(bubble, 'hero'), false);
   assert.equal(JSON.stringify(bubble).includes('unsplash'), false);
-  assert.equal(bubble.footer.contents[0].action.uri, 'https://site.example.com/property-site/properties/detail/?slug=no-photo');
+  assert.equal(bubble.footer.contents[0].action.uri, 'https://site.example.com/property-site/properties/CK-NO-PHOTO');
 });
 
 test('public property image endpoint converts the selected uploaded WebP to bounded JPEG', async () => {

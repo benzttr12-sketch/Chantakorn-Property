@@ -47,6 +47,7 @@ import {
 import { fetchAdminProperties, fetchInquiries } from '@/lib/store/properties-store';
 import { Property, Inquiry } from '@/lib/types';
 import { formatPrice, getPropertyTypeName, formatLineUrl } from '@/lib/utils';
+import { propertyHref } from '@/components/properties/property-link';
 import { 
   generateLocalSocialPost, 
   MarketingChannel, 
@@ -351,7 +352,7 @@ function AutomationContent() {
 
           {selectedProperty && (
             <Link
-              href={`/properties/${selectedProperty.slug}`}
+              href={propertyHref(selectedProperty)}
               target="_blank"
               className="inline-flex items-center justify-center space-x-1.5 px-3 py-2 bg-navy-800 hover:bg-navy-700 text-gold-300 text-xs font-semibold rounded-xl border border-navy-700 transition-colors whitespace-nowrap"
             >

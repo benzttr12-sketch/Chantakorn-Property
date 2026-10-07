@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server';
+﻿import { NextRequest, NextResponse } from 'next/server';
 import { GoogleGenAI, Type } from '@google/genai';
 import { PropertyType, PropertyStatus } from '@/lib/types';
 
@@ -50,7 +50,7 @@ export async function POST(req: NextRequest) {
       landmarks = [],
       agentName = 'คุณฉันทากร (เบนซ์)',
       agentPhone = '081-604-0097',
-      agentLine = '@chantakorn',
+      agentLine = '@930xzcyi',
       agentFacebook = 'Chantakorn Property รับฝากขายบ้าน ที่ดิน คอนโด หาดใหญ่ สงขลา',
       tone = 'high_converting',
       customHighlights = '',

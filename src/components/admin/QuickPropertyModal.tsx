@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import React, { useState } from 'react';
 import Image from 'next/image';
@@ -113,7 +113,7 @@ export default function QuickPropertyModal({ isOpen, onClose, onSuccess }: Quick
           features,
           agentName: currentUser?.full_name || 'คุณฉันทากร (เบนซ์)',
           agentPhone: currentUser?.phone || '081-604-0097',
-          agentLine: currentUser?.line_id || '@chantakorn',
+          agentLine: currentUser?.line_id || '@930xzcyi',
           tone: 'high_converting',
         }),
       });
@@ -291,7 +291,7 @@ export default function QuickPropertyModal({ isOpen, onClose, onSuccess }: Quick
           rank: (currentUser?.role === 'ADMIN' ? 'แอดมิน' : 'นายหน้า'),
           title: (currentUser?.role === 'ADMIN' ? 'แอดมิน' : 'นายหน้า'),
           phone: currentUser?.phone || '081-604-0097',
-          line_id: currentUser?.line_id || '@chantakorn',
+          line_id: currentUser?.line_id || '@930xzcyi',
           email: currentUser?.email || 'contact@chantakorn.com',
           photo_url: currentUser?.avatar_url || 'https://images.unsplash.com/photo-1560250097-0b93528c311a?auto=format&fit=crop&w=400&q=80',
           bio: currentUser?.bio || 'ผู้เชี่ยวชาญอสังหาริมทรัพย์หาดใหญ่-สงขลา',

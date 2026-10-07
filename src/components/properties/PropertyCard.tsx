@@ -240,10 +240,10 @@ export default function PropertyCard({
           <div className="mt-4 pt-1 grid grid-cols-2 gap-2">
             <Link
               href={propertyHref(slug)}
-              className="py-2.5 px-3 bg-slate-50 hover:bg-navy-950 text-navy-950 hover:text-gold-400 rounded-xl text-xs font-bold flex items-center justify-center space-x-1.5 transition-all duration-200 group/btn border border-slate-200/80 hover:border-navy-950"
+              className="py-2.5 px-3 bg-navy-950 hover:bg-navy-800 text-gold-400 rounded-xl text-xs font-bold flex items-center justify-center space-x-1.5 transition-all duration-200 group/btn border border-navy-950 hover:border-navy-800"
             >
               <span>ดูรายละเอียด</span>
-              <ArrowRight className="w-3.5 h-3.5 transform group-hover/btn:translate-x-1 transition-transform text-gold-500" />
+              <ArrowRight className="w-3.5 h-3.5 transform group-hover/btn:translate-x-1 transition-transform text-gold-400" />
             </Link>
 
             <SendToLineButton

@@ -48,7 +48,10 @@ export default function Footer() {
     };
   }, []);
   return (
-    <footer className="bg-navy-950 text-gray-300 pt-16 pb-24 md:pb-12 border-t border-navy-800">
+    <footer className="bg-navy-950 text-gray-300 border-t border-navy-800">
+      {/* Gold accent line */}
+      <div className="h-px w-full bg-gradient-to-r from-transparent via-gold-500/60 to-transparent" />
+      <div className="pt-16 pb-24 md:pb-12">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-10 pb-12 border-b border-navy-800/80">
           {/* Col 1: Brand & Bio */}
@@ -257,6 +260,7 @@ export default function Footer() {
             </Link>
           </div>
         </div>
+      </div>
       </div>
     </footer>
   );

@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import React, { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -55,7 +55,16 @@ import {
   fetchUsers 
 } from '@/lib/store/properties-store';
 import { getAgents } from '@/lib/store/agents-store';
+import { getLineOaChatUrl } from '@/lib/line-inquiry';
+import { propertyHref } from '@/components/properties/property-link';
 import { PropertyType, PropertyStatus, UserProfile, Agent, AgentRank, FacingDirection } from '@/lib/types';
+
+function buildAnnouncementMessage(data: { id?: string; title?: string; price?: number; slug?: string }): string {
+  const origin = typeof window !== 'undefined' ? window.location.origin : '';
+  const shortCode = data.id ? formatPropertyCode(data.id) : '';
+  const link = shortCode && shortCode !== '-' ? `/properties/${encodeURIComponent(shortCode)}` : `/properties/${encodeURIComponent(data.slug || '')}`;
+  return `📢 ลงประกาศอสังหาริมทรัพย์ใหม่บนเว็บไซต์ Chantakorn Property!\n🏡 ${data.title}\n💰 ราคา: ฿${data.price?.toLocaleString() || 0} บาท\n🔗 ดูรายละเอียด:\n👉 ${origin}${link}`;
+}
 import { 
   slugify, 
   formatPrice, 
@@ -67,6 +76,7 @@ import {
   formatLineUrl,
   formatFacebookUrl
 } from '@/lib/utils';
+import { formatPropertyCode } from '@/lib/format-code';
 import { 
   DISTRICTS_LIST, 
   getSongkhlaSubdistricts, 
@@ -75,10 +85,11 @@ import {
 import { getStoredUser } from '@/lib/auth-helpers';
 import { 
   compressMultipleImages, 
+  compressImageFromUrl,
   parseVideoUrl, 
   formatBytes,
   MAX_UPLOAD_IMAGE_SIZE_BYTES,
-  MAX_UPLOAD_VIDEO_SIZE_BYTES
+  WatermarkOptions
 } from '@/lib/image-compressor';
 import { calculateNearbyLandmarks } from '@/lib/nearby-landmarks';
 import { calculateFengShui, formatFengShuiText, ALL_FACING_DIRECTIONS, FENG_SHUI_DIRECTIONS } from '@/lib/feng-shui';
@@ -141,6 +152,9 @@ function PropertyEditor() {
   const [images, setImages] = useState<string[]>([]);
   const [videoUrl, setVideoUrl] = useState('');
   const [uploadingVideo, setUploadingVideo] = useState(false);
+  // ตั้งค่าลายน้ำอัตโนมัติบนรูปที่อัปโหลด
+  const [watermarkEnabled, setWatermarkEnabled] = useState(true);
+  const [watermarkPosition, setWatermarkPosition] = useState<WatermarkOptions['position']>('bottom-right');
   const [compressionProgress, setCompressionProgress] = useState<{
     current: number;
     total: number;
@@ -199,7 +213,7 @@ function PropertyEditor() {
   const [eligibleStaff, setEligibleStaff] = useState<UserProfile[]>([]);
   const [selectedAgentId, setSelectedAgentId] = useState<string>('');
   const [agentPhone, setAgentPhone] = useState<string>('081-604-0097');
-  const [agentLine, setAgentLine] = useState<string>('@chantakorn');
+  const [agentLine, setAgentLine] = useState<string>('@930xzcyi');
   const [agentFacebook, setAgentFacebook] = useState<string>('');
   const [currentUserRole, setCurrentUserRole] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -233,7 +247,7 @@ function PropertyEditor() {
       landmarks: autoLandmarks?.map(l => `${l.title} (${l.combinedText})`) || [],
       agentName: chosenAgent?.full_name || 'คุณฉันทากร (เบนซ์)',
       agentPhone: agentPhone || chosenAgent?.phone || '081-604-0097',
-      agentLine: agentLine || chosenAgent?.line_id || '@chantakorn',
+      agentLine: agentLine || chosenAgent?.line_id || '@930xzcyi',
       agentFacebook: agentFacebook || chosenAgent?.facebook || DEFAULT_OFFICIAL_FACEBOOK,
     };
   };
@@ -551,7 +565,7 @@ function PropertyEditor() {
             role: 'ADMIN',
             email: 'benzttr12@gmail.com',
             phone: '081-604-0097',
-            line_id: '@chantakorn',
+            line_id: '@930xzcyi',
             facebook: DEFAULT_OFFICIAL_FACEBOOK,
             avatar_url: 'https://images.unsplash.com/photo-1560250097-0b93528c311a?auto=format&fit=crop&w=600&q=80',
           });
@@ -570,7 +584,7 @@ function PropertyEditor() {
           }
           setSelectedAgentId(chosen.id);
           setAgentPhone(chosen.phone || '081-604-0097');
-          setAgentLine(chosen.line_id || '@chantakorn');
+          setAgentLine(chosen.line_id || '@930xzcyi');
           setAgentFacebook(chosen.facebook || (chosen.role === 'ADMIN' ? DEFAULT_OFFICIAL_FACEBOOK : ''));
         }
       } catch (err) {
@@ -586,7 +600,7 @@ function PropertyEditor() {
     const target = eligibleStaff.find(s => s.id === agentId);
     if (target) {
       setAgentPhone(target.phone || '081-604-0097');
-      setAgentLine(target.line_id || '@chantakorn');
+      setAgentLine(target.line_id || '@930xzcyi');
       setAgentFacebook(target.facebook || (target.role === 'ADMIN' ? DEFAULT_OFFICIAL_FACEBOOK : ''));
     }
   };
@@ -632,7 +646,7 @@ function PropertyEditor() {
       }
       setSelectedAgentId(property.agent_id || property.agent?.id || '');
       setAgentPhone(property.agent?.phone || '081-604-0097');
-      setAgentLine(property.agent?.line_id || '@chantakorn');
+      setAgentLine(property.agent?.line_id || '@930xzcyi');
       setAgentFacebook(property.agent?.facebook || '');
       setPublished(property.published);
       setEditorLoaded(true);
@@ -845,6 +859,9 @@ function PropertyEditor() {
           compressedSize: item.compressedSizeFormatted,
           percentSaved: item.percentSaved,
         });
+      }, {
+        enableWatermark: watermarkEnabled,
+        position: watermarkPosition,
       });
 
       const newPhotos = results.map(r => r.dataUrl);
@@ -871,7 +888,7 @@ function PropertyEditor() {
     }
   };
 
-  // Video File Upload Handler (MP4, WebM, MOV up to 100MB)
+  // Video File Upload Handler (MP4, WebM, MOV — โหมด local เก็บ data URL ใน localStorage ได้จำกัด)
   const handleVideoFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -879,8 +896,10 @@ function PropertyEditor() {
       setError('กรุณาเลือกไฟล์วิดีโอที่ถูกต้อง (MP4, WebM, MOV)');
       return;
     }
-    if (file.size > MAX_UPLOAD_VIDEO_SIZE_BYTES) {
-      setError(`ไฟล์วิดีโอมีขนาด ${formatBytes(file.size)} ซึ่งเกินขนาดสูงสุด 100MB`);
+    // โหมด local เก็บไฟล์ใน localStorage (จำกัด ~5MB) — วิดีโอ base64 ขยาย ~1.4 เท่า
+    const LOCAL_VIDEO_LIMIT_BYTES = 5 * 1024 * 1024;
+    if (file.size > LOCAL_VIDEO_LIMIT_BYTES) {
+      setError(`ไฟล์วิดีโอ "${file.name}" มีขนาด ${formatBytes(file.size)} — โหมดท้องถิ่นรองรับไฟล์แนบสูงสุด 5MB สำหรับคลิปสั้น แนะนำอัปโหลดขึ้น YouTube แล้ววางลิงก์แทน (รองรับทุกขนาด ไม่ใช้พื้นที่เว็บ)`);
       return;
     }
 
@@ -918,14 +937,40 @@ function PropertyEditor() {
     if (files.length > 0) processFiles(files);
   };
 
-  const handleAddImageUrl = () => {
-    if (/^https?:\/\//i.test(imageUrlInput.trim())) {
-      setImages([...images, imageUrlInput.trim()]);
-      if (!coverImage) setCoverImage(imageUrlInput.trim());
-      setError('');
+  const handleAddImageUrl = async () => {
+    const url = imageUrlInput.trim();
+    if (!/^https?:\/\//i.test(url)) {
+      setError('กรุณาระบุ URL รูปภาพที่ขึ้นต้นด้วย https:// หรือ http://');
+      return;
+    }
+    setError('');
+    setUploadingImages(true);
+    try {
+      // พยายามดาวน์โหลด → บีบอัด + ใส่ลายน้ำเหมือนรูปที่อัปโหลด
+      const result = await compressImageFromUrl(url, {
+        enableWatermark: watermarkEnabled,
+        position: watermarkPosition,
+      });
+      setImages(prev => {
+        const updated = [...prev, result.dataUrl];
+        if (!coverImage && updated.length > 0) setCoverImage(updated[0]);
+        return updated;
+      });
+      if (result.processed && typeof result.percentSaved === 'number' && result.percentSaved > 0) {
+        setUploadStatsList(prev => [...prev, {
+          url: result.dataUrl,
+          origSize: formatBytes(result.originalSize || 0),
+          compSize: formatBytes(result.compressedSize || 0),
+          saved: result.percentSaved || 0,
+        }]);
+      }
       setImageUrlInput('');
-    } else { 
-      setError('กรุณาระบุ URL รูปภาพที่ขึ้นต้นด้วย https:// หรือ http://'); 
+    } catch {
+      setImages([...images, url]);
+      if (!coverImage) setCoverImage(url);
+      setImageUrlInput('');
+    } finally {
+      setUploadingImages(false);
     }
   };
 
@@ -999,7 +1044,7 @@ function PropertyEditor() {
         rank: resolvedRank,
         title: resolvedRank,
         phone: agentPhone.trim() || agentProfile?.phone || '081-604-0097',
-        line_id: agentLine.trim() || agentProfile?.line_id || '@chantakorn',
+        line_id: agentLine.trim() || agentProfile?.line_id || '@930xzcyi',
         facebook: agentFacebook.trim() || agentProfile?.facebook || (resolvedRank === 'แอดมิน' ? DEFAULT_OFFICIAL_FACEBOOK : ''),
         email: agentProfile?.email || 'chantakorn@chantakornproperty.com',
         photo_url: agentProfile?.avatar_url || 'https://images.unsplash.com/photo-1560250097-0b93528c311a?auto=format&fit=crop&w=600&q=80',
@@ -2490,6 +2535,56 @@ function PropertyEditor() {
             </div>
           </div>
 
+          {/* Watermark Settings */}
+          <div className="bg-navy-950 border border-navy-800 rounded-2xl p-4 text-xs space-y-3 shadow-sm">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="flex items-center space-x-2">
+                <Sparkles className="w-4 h-4 text-gold-400" />
+                <span className="font-bold text-white">ลายน้ำอัตโนมัติ (Watermark)</span>
+                <span className="bg-gold-500/20 text-gold-300 text-[10px] font-extrabold px-2 py-0.5 rounded-full border border-gold-500/30">
+                  CHANTAKORN PROPERTY
+                </span>
+              </div>
+              <label className="flex items-center space-x-2 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={watermarkEnabled}
+                  onChange={(e) => setWatermarkEnabled(e.target.checked)}
+                  className="w-4 h-4 accent-gold-500 cursor-pointer"
+                />
+                <span className="font-semibold text-gray-300">{watermarkEnabled ? 'เปิดใช้งาน' : 'ปิดใช้งาน'}</span>
+              </label>
+            </div>
+            {watermarkEnabled && (
+              <div className="flex flex-wrap items-center gap-2 pt-1">
+                <span className="text-gray-400 font-medium">ตำแหน่งลายน้ำ:</span>
+                {([
+                  { value: 'bottom-right', label: '↘ ล่างขวา' },
+                  { value: 'bottom-left', label: '↙ ล่างซ้าย' },
+                  { value: 'top-right', label: '↗ บนขวา' },
+                  { value: 'top-left', label: '↖ บนซ้าย' },
+                  { value: 'center', label: '◉ กลางภาพ' },
+                ] as const).map((opt) => (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    onClick={() => setWatermarkPosition(opt.value)}
+                    className={`px-3 py-1.5 rounded-lg font-bold text-[11px] transition-all cursor-pointer ${
+                      watermarkPosition === opt.value
+                        ? 'bg-gold-500 text-navy-950 shadow-sm'
+                        : 'bg-navy-800 text-gray-300 hover:bg-navy-700 border border-navy-700'
+                    }`}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+                <span className="text-[10px] text-gray-500 w-full sm:w-auto sm:ml-1">
+                  ใช้กับรูปที่อัปโหลด/เพิ่มจากลิงก์ครั้งถัดไป — ข้อความลายน้ำ: ชื่อบริษัท + เบอร์ติดต่อ + เว็บไซต์
+                </span>
+              </div>
+            )}
+          </div>
+
           {/* Real-time Compression Progress Indicator */}
           {compressionProgress && (
             <div className="bg-emerald-50 border-2 border-emerald-400 rounded-2xl p-4 text-xs text-emerald-950 space-y-2.5 shadow-sm animate-in fade-in duration-300">
@@ -2721,7 +2816,7 @@ function PropertyEditor() {
               {/* Or Direct Video File Upload */}
               <div className="pt-2 border-t border-gray-100">
                 <span className="block text-xs font-bold text-navy-950 mb-2">
-                  หรือเลือกอัปโหลดไฟล์คลิปวิดีโอจากเครื่อง (สูงสุด 100MB):
+                  หรือเลือกอัปโหลดไฟล์คลิปวิดีโอจากเครื่อง (คลิปสั้นสูงสุด 5MB):
                 </span>
 
                 <div className="flex flex-wrap items-center gap-2">
@@ -2758,7 +2853,7 @@ function PropertyEditor() {
                   )}
                 </div>
                 <p className="text-[11px] text-gray-500 mt-1.5">
-                  รองรับนามสกุล .mp4, .webm, .mov (ขนาดสูงสุด 100MB)
+                  รองรับนามสกุล .mp4, .webm, .mov (คลิปสั้นสูงสุด 5MB สำหรับโหมดท้องถิ่น — คลิปเต็มแนะนำอัปโหลด YouTube แล้ววางลิงก์ด้านบน)
                 </p>
               </div>
             </div>
@@ -2897,7 +2992,7 @@ function PropertyEditor() {
                     type="text"
                     value={agentLine}
                     onChange={(e) => setAgentLine(e.target.value)}
-                    placeholder="เช่น @chantakorn หรือ benz_agent หรือ https://line.me/ti/p/~..."
+                    placeholder="เช่น @930xzcyi หรือ benz_agent หรือ https://line.me/ti/p/~..."
                     className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3 pr-20 text-xs text-navy-950 focus:bg-white focus:ring-2 focus:ring-[#06C755] outline-none transition-all"
                   />
                   <div className="absolute right-2.5 top-1/2 -translate-y-1/2">
@@ -3022,7 +3117,7 @@ function PropertyEditor() {
                   <MessageCircle className="w-3.5 h-3.5 text-[#06C755] mx-auto mb-1" />
                   <span className="block text-[10px] font-bold text-[#06C755]">LINE</span>
                   <span className="block text-[9px] text-gray-300 truncate" title={agentLine}>
-                    {agentLine || '@chantakorn'}
+                    {agentLine || '@930xzcyi'}
                   </span>
                 </div>
 
@@ -3047,7 +3142,7 @@ function PropertyEditor() {
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-400">💬 LINE:</span>
-                  <span className="font-semibold text-emerald-400 max-w-[140px] truncate">{agentLine || '@chantakorn'}</span>
+                  <span className="font-semibold text-emerald-400 max-w-[140px] truncate">{agentLine || '@930xzcyi'}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-400">🌐 Facebook:</span>
@@ -3169,9 +3264,14 @@ function PropertyEditor() {
 
               <div className="space-y-2 pt-2">
                 <a
-                  href={`https://line.me/R/oaMessage/${encodeURIComponent('@930xzcyi')}/?${encodeURIComponent(`📢 ลงประกาศอสังหาริมทรัพย์ใหม่บนเว็บไซต์ Chantakorn Property!\n🏡 ${createdSuccessData.title}\n💰 ราคา: ฿${createdSuccessData.price?.toLocaleString() || 0} บาท\n🔗 ดูรายละเอียด:\n👉 ${typeof window !== 'undefined' ? window.location.origin : ''}/properties/${encodeURIComponent(createdSuccessData.slug)}`)}`}
+                  href={createdSuccessData ? getLineOaChatUrl(buildAnnouncementMessage(createdSuccessData)).url : 'https://lin.ee/NMSe28T3'}
                   target="_blank"
                   rel="noreferrer"
+                  onClick={() => {
+                    if (typeof navigator !== 'undefined' && navigator.clipboard && createdSuccessData) {
+                      navigator.clipboard.writeText(buildAnnouncementMessage(createdSuccessData)).catch(() => {});
+                    }
+                  }}
                   className="w-full py-3.5 bg-gradient-to-r from-emerald-600 via-[#06C755] to-emerald-500 hover:from-emerald-500 hover:to-[#05b34c] text-white font-black text-xs sm:text-sm rounded-xl flex items-center justify-center gap-2 shadow-lg transition-all cursor-pointer active:scale-95 group"
                 >
                   <MessageCircle className="w-4 h-4 fill-current group-hover:scale-110 transition-transform" />
@@ -3191,7 +3291,7 @@ function PropertyEditor() {
 
                 <div className="grid grid-cols-2 gap-2 pt-1">
                   <Link
-                    href={`/properties/${createdSuccessData.slug}`}
+                    href={propertyHref(createdSuccessData)}
                     target="_blank"
                     className="py-2.5 px-3 bg-navy-950 hover:bg-navy-900 text-gold-400 font-bold text-xs rounded-xl flex items-center justify-center gap-1 shadow-sm transition-all"
                   >

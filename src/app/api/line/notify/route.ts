@@ -2,6 +2,7 @@ import { jsonResponse } from '@/lib/api-response';
 import { requireStaff } from '@/lib/server-auth';
 import { getFirestoreDocument, patchFirestoreDocument } from '@/lib/firestore-rest';
 import { getLinePropertyImageUrl } from '@/lib/line-property-image';
+import { formatPropertyCode } from '@/lib/format-code';
 
 const OFFICIAL_LINE_OA_URL = 'https://lin.ee/NMSe28T3';
 const DEFAULT_PHONE = '081-604-0097';
@@ -264,8 +265,14 @@ LINE Official Account: ${OFFICIAL_LINE_OA_URL}`;
     } else {
       // 2. Standard Property Listing Notification
       const { title, price, status, district, subdistrict, slug, agent } = body;
-      
-      propertyUrl = slug ? `${hostOrigin}/properties/detail/?slug=${encodeURIComponent(slug)}` : `${hostOrigin}/properties/`;
+
+      // ลิงก์สั้นด้วยรหัสทรัพย์ เช่น /properties/CK-813F2B
+      const propertyCode = formatPropertyCode(body.id || '');
+      propertyUrl = propertyCode && propertyCode !== '-'
+        ? `${hostOrigin}/properties/${encodeURIComponent(propertyCode)}`
+        : slug
+          ? `${hostOrigin}/properties/${encodeURIComponent(slug)}`
+          : `${hostOrigin}/properties/`;
       const priceFormatted = price 
         ? new Intl.NumberFormat('th-TH', { style: 'currency', currency: 'THB', maximumFractionDigits: 0 }).format(price)
         : 'ราคาพิเศษ';
@@ -284,7 +291,11 @@ LINE Official Account: ${OFFICIAL_LINE_OA_URL}`;
 
 LINE Official Account: ${OFFICIAL_LINE_OA_URL}`;
 
-      const heroImg = getLinePropertyImageUrl(body, new URL(req.url).origin);
+      // LINE ดึงรูปได้เฉพาะ URL https สาธารณะเท่านั้น — รูปให้บริการจาก origin ของ API เอง
+      // (localhost/โดเมนภายในจะถูกข้าม เพื่อไม่ให้การ์ดมีรูปแตก)
+      const requestOrigin = new URL(req.url).origin;
+      const imageOrigin = /^https:\/\//i.test(requestOrigin) ? requestOrigin : null;
+      const heroImg = imageOrigin ? getLinePropertyImageUrl(body, imageOrigin) : null;
 
       flexMessagePayload = {
         type: "flex",
@@ -434,10 +445,10 @@ LINE Official Account: ${OFFICIAL_LINE_OA_URL}`;
     }
 
     if (!lineAccessToken.trim()) {
-      return jsonResponse({ success: false, isRealSent: false, code: 'LINE_TOKEN_MISSING', error: 'ยังไม่ได้ตั้ง LINE_CHANNEL_ACCESS_TOKEN ใน Vercel Production กรุณาตั้งค่าแล้ว Redeploy' }, { status: 503 });
+      return jsonResponse({ success: false, isRealSent: false, code: 'LINE_TOKEN_MISSING', error: 'ยังไม่ได้ตั้ง LINE_CHANNEL_ACCESS_TOKEN — เพิ่มในไฟล์ .env.local (รันเครื่อง) หรือ Environment Variables ของ Vercel (production) แล้วรีสตาร์ท/Redeploy' }, { status: 503 });
     }
     if (recipients.length === 0) {
-      return jsonResponse({ success: false, isRealSent: false, code: 'LINE_RECIPIENT_MISSING', error: 'ยังไม่ได้กำหนดผู้รับแจ้งเตือน ตั้ง LINE_TARGET_USER_ID หรือ LINE_ADMIN_USER_IDS ใน Vercel Production แล้ว Redeploy' }, { status: 503 });
+      return jsonResponse({ success: false, isRealSent: false, code: 'LINE_RECIPIENT_MISSING', error: 'ยังไม่ได้กำหนดผู้รับแจ้งเตือน — ตั้ง LINE_TARGET_USER_ID หรือ LINE_ADMIN_USER_IDS ในไฟล์ .env.local หรือ Vercel (ค่าต้องเป็น LINE User ID รูปแบบ Uxxxxxxxx) แล้วรีสตาร์ท/Redeploy' }, { status: 503 });
     }
     if (!recipients.every(validRecipient)) {
       return jsonResponse({ success: false, isRealSent: false, code: 'LINE_RECIPIENT_INVALID', error: 'ผู้รับแจ้งเตือนไม่ใช่ LINE user ID ที่ถูกต้อง ต้องเป็น U ตามด้วยเลขฐานสิบหก 32 ตัว ไม่ใช่ชื่อหรือ @LINE ID' }, { status: 503 });

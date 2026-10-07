@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import React, { useState } from 'react';
 import Image from 'next/image';
@@ -206,7 +206,7 @@ export default function AgentCard({ agent = DEFAULT_AGENT, property }: AgentCard
               </span>
               <div className="flex items-center gap-1.5">
                 <span className="font-semibold text-gray-800 max-w-[130px] truncate" title={agent.line_id}>
-                  {agent.line_id || '@chantakorn'}
+                  {agent.line_id || '@930xzcyi'}
                 </span>
                 {agent.line_id && (
                   <button

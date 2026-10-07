@@ -266,7 +266,7 @@ export default function GooglePropertyMap({
 
           {/* Action Tools: Property Count, Layers, Fullscreen */}
           <div className="flex items-center space-x-2 pointer-events-auto self-end sm:self-auto">
-            <div className="px-3 py-1.5 rounded-xl bg-navy-950/90 backdrop-blur-md border border-white/15 text-white text-xs font-bold shadow-xl flex items-center space-x-1.5">
+            <div className={`px-3 py-1.5 rounded-xl bg-navy-950/90 backdrop-blur-md border border-white/15 text-white text-xs font-bold shadow-xl items-center space-x-1.5 ${isFullScreen ? 'flex' : 'hidden'}`}>
               <MapPin className="w-3.5 h-3.5 text-emerald-400" />
               <span>{validProperties.length} ทรัพย์บนแผนที่</span>
             </div>

@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import React, { useState, useEffect } from 'react';
 import Image from 'next/image';
@@ -103,7 +103,7 @@ export default function AdminAgentsPage() {
         name: member.full_name,
         phone: member.phone || editingAgent.phone || '081-604-0097',
         email: member.email || editingAgent.email || '',
-        line_id: member.line_id || editingAgent.line_id || '@chantakorn',
+        line_id: member.line_id || editingAgent.line_id || '@930xzcyi',
         facebook: member.facebook || editingAgent.facebook || '',
         photo_url: member.avatar_url || editingAgent.photo_url || 'https://images.unsplash.com/photo-1560250097-0b93528c311a?auto=format&fit=crop&w=600&q=80',
         rank: member.role === 'ADMIN' ? 'แอดมิน' : 'นายหน้า',
@@ -309,9 +309,9 @@ export default function AdminAgentsPage() {
                     <Phone className="w-3 h-3 text-navy-900 shrink-0" />
                     <span className="font-mono truncate">{agent.phone}</span>
                   </div>
-                  <div className="flex items-center space-x-1 text-[#06C755] truncate" title={`LINE: ${agent.line_id || '@chantakorn'}`}>
+                  <div className="flex items-center space-x-1 text-[#06C755] truncate" title={`LINE: ${agent.line_id || '@930xzcyi'}`}>
                     <MessageSquare className="w-3 h-3 shrink-0" />
-                    <span className="truncate">{agent.line_id || '@chantakorn'}</span>
+                    <span className="truncate">{agent.line_id || '@930xzcyi'}</span>
                   </div>
                   <a 
                     href={formatFacebookUrl(agent.facebook)} 
@@ -478,7 +478,7 @@ export default function AdminAgentsPage() {
                     value={editingAgent.line_id}
                     onChange={(e) => setEditingAgent({ ...editingAgent, line_id: e.target.value })}
                     className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs sm:text-sm text-navy-950 focus:ring-2 focus:ring-gold-400 outline-none"
-                    placeholder="@chantakorn"
+                    placeholder="@930xzcyi"
                   />
                 </div>
 

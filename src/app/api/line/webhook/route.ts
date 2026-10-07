@@ -1,8 +1,9 @@
-import { jsonResponse } from '@/lib/api-response';
+﻿import { jsonResponse } from '@/lib/api-response';
 import { Property } from '@/lib/types';
 import { requireStaff } from '@/lib/server-auth';
 import { createFirestoreDocument, listFirestoreDocuments } from '@/lib/firestore-rest';
 import { getLinePropertyImageUrl } from '@/lib/line-property-image';
+import { formatPropertyCode } from '@/lib/format-code';
 
 const OFFICIAL_LINE_OA_URL = 'https://lin.ee/NMSe28T3';
 const DEFAULT_PHONE = '081-604-0097';
@@ -104,7 +105,7 @@ async function saveInquiry(inquiryData: {
     const response = await createFirestoreDocument('inquiries', {
       name: inquiryData.name || `ลูกค้า LINE OA (${inquiryData.userId ? inquiryData.userId.slice(0, 8) : 'ผู้ใช้'})`,
       phone: '-',
-      line_id: inquiryData.userId || '@chantakorn',
+      line_id: inquiryData.userId || '@930xzcyi',
       message: inquiryData.message,
       inquiry_type: inquiryData.inquiry_type || 'inquiry',
       property_title: inquiryData.property_title || '',
@@ -158,8 +159,14 @@ function buildPropertyCarouselFlex(properties: Property[], hostOrigin: string, q
       ? new Intl.NumberFormat('th-TH', { style: 'currency', currency: 'THB', maximumFractionDigits: 0 }).format(p.price)
       : 'ราคาพิเศษ';
     const actionText = p.status === 'rent' ? 'ปล่อยเช่า' : 'เสนอขาย';
-    const detailUrl = p.slug ? `${hostOrigin}/properties/detail/?slug=${encodeURIComponent(p.slug)}` : `${hostOrigin}/properties/`;
-    const coverImg = getLinePropertyImageUrl(p, imageOrigin);
+    // ลิงก์สั้นด้วยรหัสทรัพย์ (หน้า detail ค้นจากทั้งรหัส, id และ slug)
+    const shortCode = formatPropertyCode(p.id);
+    const detailUrl = shortCode && shortCode !== '-'
+      ? `${hostOrigin}/properties/${encodeURIComponent(shortCode)}`
+      : p.slug ? `${hostOrigin}/properties/${encodeURIComponent(p.slug)}` : `${hostOrigin}/properties/`;
+    // LINE ดึงรูปได้เฉพาะ https สาธารณะ — localhost/โดเมนภายในจะทำให้การ์ดไม่มีรูป
+    const publicImageOrigin = /^https:\/\//i.test(imageOrigin) ? imageOrigin : null;
+    const coverImg = publicImageOrigin ? getLinePropertyImageUrl(p, publicImageOrigin) : null;
 
     return {
       type: 'bubble',

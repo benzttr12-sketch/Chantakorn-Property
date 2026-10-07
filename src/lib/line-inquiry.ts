@@ -1,4 +1,5 @@
-import { formatPrice, formatPropertyCode, DEFAULT_OFFICIAL_LINE_URL, propertyHref } from '@/lib/utils';
+import { formatPrice, formatPropertyCode, DEFAULT_OFFICIAL_LINE_URL } from '@/lib/utils';
+import { propertyHref } from '@/components/properties/property-link';
 import { Property, PropertyCardProps } from '@/lib/types';
 
 export interface PropertyLineData {
@@ -25,7 +26,7 @@ export function generatePropertyLineMessage(
   origin?: string
 ): string {
   const baseUrl = origin || (typeof window !== 'undefined' ? window.location.origin : 'https://chantakornproperty.com');
-  const propertyUrl = `${baseUrl}${propertyHref(property.slug)}`;
+  const propertyUrl = `${baseUrl}${propertyHref(property)}`;
   const code = formatPropertyCode(property.id);
   const formattedPrice = formatPrice(property.price, (property.status as any) || 'sale');
   const locationText = [property.district, property.province].filter(Boolean).join(', ') || 'หาดใหญ่ สงขลา';
@@ -58,10 +59,32 @@ export const OFFICIAL_LINE_BASIC_ID = '@930xzcyi';
 /**
  * สร้าง URL สำหรับส่งข้อความเข้าแชท LINE Official Account โดยตรง (@930xzcyi)
  * เปิดห้องแชทของ LINE OA พร้อมพิมพ์ข้อความใส่ในช่องพิมพ์ข้อความให้อัตโนมัติ 1 คลิก
+ * ⚠️ ลิงก์นี้ใช้ได้เฉพาะอุปกรณ์ที่มีแอป LINE (มือถือ/แท็บเล็ต) — บนคอมพิวเตอร์จะถูก
+ * redirect กลับไปหน้าแรก line.me ให้ใช้ OFFICIAL_LINE_OA_URL แทน
  */
 export function getLineOaDirectMessageUrl(message: string, basicId: string = OFFICIAL_LINE_BASIC_ID): string {
   const cleanId = basicId.startsWith('@') ? basicId : `@${basicId}`;
   return `https://line.me/R/oaMessage/${encodeURIComponent(cleanId)}/?${encodeURIComponent(message)}`;
+}
+
+/**
+ * ตรวจว่ากำลังเปิดบนอุปกรณ์เคลื่อนที่ (มีแอป LINE) หรือคอมพิวเตอร์
+ */
+export function isMobileDevice(): boolean {
+  if (typeof window === 'undefined') return false;
+  return /Android|iPhone|iPad|iPod|Mobile|Opera Mini/i.test(navigator.userAgent);
+}
+
+/**
+ * เลือกลิงก์ LINE OA ที่เหมาะกับอุปกรณ์:
+ * - มือถือ: เปิดแอป LINE พร้อมข้อความอัตโนมัติ
+ * - คอมพิวเตอร์: เปิดหน้าโปรไฟล์ OA (เพิ่มเพื่อน/สแกน QR) เพราะ deep link แชทใช้ไม่ได้บนเว็บ
+ */
+export function getLineOaChatUrl(message: string): { url: string; mode: 'app' | 'web' } {
+  if (isMobileDevice()) {
+    return { url: getLineOaDirectMessageUrl(message), mode: 'app' };
+  }
+  return { url: OFFICIAL_LINE_OA_URL, mode: 'web' };
 }
 
 /**

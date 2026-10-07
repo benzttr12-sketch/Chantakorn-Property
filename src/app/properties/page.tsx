@@ -44,6 +44,15 @@ function filtersFromQuery(query: string): PropertyFilters {
 
 export type ViewMode = 'grid' | 'split' | 'map';
 
+const PROPERTY_TYPE_LABELS: Record<string, string> = {
+  house: 'บ้านเดี่ยว / ทาวน์โฮม',
+  condo: 'คอนโดมิเนียม',
+  land: 'ที่ดิน',
+  commercial: 'อาคารพาณิชย์',
+  investment: 'เพื่อการลงทุน',
+  consignment: 'ฝากขาย',
+};
+
 function PropertiesContent() {
   const searchParams = useSearchParams();
 
@@ -123,7 +132,7 @@ function PropertiesContent() {
     <div className="bg-surface-bg min-h-screen pb-20">
       {/* Top Banner / Search Context */}
       <div className="bg-navy-950 text-white py-7 border-b border-navy-800">
-        <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div>
               <div className="text-xs font-semibold text-gold-400 uppercase tracking-wider mb-1 flex items-center">
@@ -225,7 +234,7 @@ function PropertiesContent() {
                 onClick={() => setFilters({ ...filters, type: filters.type === item.val ? 'all' : item.val as PropertyType })}
                 className={`px-3 py-1.5 rounded-xl font-medium flex-shrink-0 transition-all ${
                   filters.type === item.val
-                    ? 'bg-white text-navy-950 font-bold'
+                    ? 'bg-gold-400 text-navy-950 font-bold shadow-sm'
                     : 'bg-navy-900 text-gray-300 hover:bg-navy-800'
                 }`}
               >
@@ -255,7 +264,7 @@ function PropertiesContent() {
       </div>
 
       {/* Main Container */}
-      <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 pt-6">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6">
         {/* Mobile Control Bar */}
         <div className="lg:hidden flex items-center justify-between bg-white p-3 rounded-2xl border border-surface-border shadow-sm mb-4">
           <button
@@ -460,7 +469,7 @@ function PropertiesContent() {
 
                   {filters.type !== 'all' && (
                     <span className="inline-flex items-center space-x-1 px-2.5 py-1 rounded-full bg-blue-50 text-blue-800 font-medium text-[11px]">
-                      <span>{filters.type}</span>
+                      <span>{PROPERTY_TYPE_LABELS[filters.type ?? ''] || filters.type}</span>
                       <button type="button" onClick={() => setFilters({ ...filters, type: 'all' })} className="hover:text-red-600">
                         <X className="w-3 h-3" />
                       </button>

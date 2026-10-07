@@ -27,6 +27,7 @@ function load({ staff = false, env = {}, firestore = {}, fetch = async () => { t
       if (name === '@/lib/api-response') return { jsonResponse: (body, init) => Response.json(body, init) };
       if (name === '@/lib/server-auth') return { requireStaff: async () => staff ? null : Response.json({ error: 'Unauthorized' }, { status: 401 }) };
       if (name === '@/lib/line-property-image') return loadPropertyImageHelper();
+      if (name === '@/lib/format-code') return { formatPropertyCode: (id) => id ? 'CK-' + String(id).replace(/[^a-zA-Z0-9]/g, '').slice(0, 6).toUpperCase() : '-' };
       if (name === '@/lib/firestore-rest') return {
         getFirestoreDocument: firestore.getFirestoreDocument || (async () => Response.json({}, { status: 404 })),
         patchFirestoreDocument: firestore.patchFirestoreDocument || (async () => { throw Error('Unexpected settings write'); }),
@@ -265,7 +266,7 @@ test('uploaded notification cover uses the API origin while detail links use the
   }, { NEXT_PUBLIC_SITE_URL: 'https://static.example.test/property-site/' });
   const hero = payload.messages[1].contents.hero;
   assert.equal(hero.url, uploadedImageUrl('home one', photo));
-  assert.equal(hero.action.uri, 'https://static.example.test/property-site/properties/detail/?slug=home%20one');
+  assert.equal(hero.action.uri, 'https://static.example.test/property-site/properties/CK-HOMEON');
   assert.equal(JSON.stringify(payload).includes('data:image/'), false);
 });
 

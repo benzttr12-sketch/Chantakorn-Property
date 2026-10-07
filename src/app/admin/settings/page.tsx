@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { fetchStaffApi } from '@/lib/staff-api';
 import { apiUrl } from '@/lib/api-url';
@@ -130,7 +130,7 @@ export default function AdminSettingsPage() {
           agent: {
             name: 'คุณเบนซ์ (แอดมิน Chantakorn)',
             phone: '081-604-0097',
-            line_id: '@chantakorn'
+            line_id: '@930xzcyi'
           }
         })
       });
@@ -518,7 +518,7 @@ export default function AdminSettingsPage() {
         <div className="text-xs space-y-1.5 text-gray-700">
           <p><span className="text-gray-400 font-medium">ชื่อโครงการ:</span> <strong>CHANTAKORN PROPERTY (ฉันทากร พร็อพเพอร์ตี้ หาดใหญ่สงขลา)</strong></p>
           <p><span className="text-gray-400 font-medium">โทรศัพท์ผู้บริหาร:</span> <strong>081-604-0097</strong></p>
-          <p><span className="text-gray-400 font-medium">ไลน์ออฟฟิเชียล:</span> <strong>@chantakorn (<a href="https://lin.ee/NMSe28T3" target="_blank" rel="noreferrer" className="text-[#06C755] hover:underline">https://lin.ee/NMSe28T3</a>)</strong></p>
+          <p><span className="text-gray-400 font-medium">ไลน์ออฟฟิเชียล:</span> <strong>@930xzcyi (<a href="https://lin.ee/NMSe28T3" target="_blank" rel="noreferrer" className="text-[#06C755] hover:underline">https://lin.ee/NMSe28T3</a>)</strong></p>
         </div>
         <p className="text-xs leading-relaxed text-gray-500 pt-1">
           ระบบควบคุมความปลอดภัย (Access Control) ได้รับการเข้ารหัสและดูแลอย่างเข้มงวด สิทธิ์ผู้ใช้งานทั่วไปจะถูกบล็อกจากการเข้าถึงหน้าควบคุมหลังบ้านโดยอัตโนมัติ

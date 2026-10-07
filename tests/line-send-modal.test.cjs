@@ -37,6 +37,8 @@ function modal(response) {
       if (name === '@/lib/line-inquiry') return {
         generatePropertyLineMessage: () => 'Property details', getLineShareUrl: () => 'https://example.test/share',
         getLineOaDirectMessageUrl: () => 'https://example.test/chat', OFFICIAL_LINE_OA_URL: 'https://example.test/oa',
+        getLineOaChatUrl: () => ({ url: 'https://example.test/oa', mode: 'web' }),
+        isMobileDevice: () => false,
       };
       if (name === '@/lib/staff-api') return { fetchStaffApi: async (url, init) => {
         requests.push({ url, body: JSON.parse(init.body) });

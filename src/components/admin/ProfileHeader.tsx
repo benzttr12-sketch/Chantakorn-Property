@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
 import Image from 'next/image';
@@ -446,7 +446,7 @@ export default function ProfileHeader({ onProfileUpdated, className = '' }: Prof
                     type="text"
                     value={lineId}
                     onChange={(e) => setLineId(e.target.value)}
-                    placeholder="เช่น @chantakorn"
+                    placeholder="เช่น @930xzcyi"
                     className="w-full text-xs sm:text-sm px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-gold-400 text-navy-950"
                   />
                 </div>

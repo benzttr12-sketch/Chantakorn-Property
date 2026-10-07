@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import React, { useState, useEffect } from 'react';
 import { 
@@ -104,7 +104,7 @@ export default function AdminUsersPage() {
       rank: user.role === 'ADMIN' ? 'แอดมิน' : 'นายหน้า',
       title: user.role === 'ADMIN' ? 'ผู้บริหาร & หัวหน้าฝ่ายที่ปรึกษา' : 'ที่ปรึกษาอสังหาริมทรัพย์มืออาชีพ',
       phone: user.phone || '081-604-0097',
-      line_id: user.line_id || '@chantakorn',
+      line_id: user.line_id || '@930xzcyi',
       facebook: user.facebook || '',
       email: user.email || 'contact@chantakornproperty.com',
       photo_url: user.avatar_url || 'https://images.unsplash.com/photo-1560250097-0b93528c311a?auto=format&fit=crop&w=600&q=80',
@@ -564,7 +564,7 @@ export default function AdminUsersPage() {
                 </label>
                 <input
                   type="text"
-                  placeholder="เช่น @chantakorn หรือ somchai_agent"
+                  placeholder="เช่น @930xzcyi หรือ somchai_agent"
                   value={newLineId}
                   onChange={(e) => setNewLineId(e.target.value)}
                   className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3 text-xs text-gray-900 focus:bg-white focus:ring-2 focus:ring-emerald-500 outline-none"
@@ -725,7 +725,7 @@ export default function AdminUsersPage() {
                   value={editLineId}
                   onChange={(e) => setEditLineId(e.target.value)}
                   className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3 text-xs text-gray-900 focus:bg-white focus:ring-2 focus:ring-emerald-500 outline-none"
-                  placeholder="เช่น @chantakorn หรือ benz_agent"
+                  placeholder="เช่น @930xzcyi หรือ benz_agent"
                 />
               </div>
 

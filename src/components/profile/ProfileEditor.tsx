@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
@@ -522,7 +522,7 @@ export default function ProfileEditor({ isAdminView = false }: ProfileEditorProp
                 <input
                   id="profile-line-input"
                   type="text"
-                  placeholder="เช่น @chantakorn"
+                  placeholder="เช่น @930xzcyi"
                   value={lineId}
                   onChange={(e) => setLineId(e.target.value)}
                   className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-2.5 text-xs sm:text-sm text-gray-900 focus:bg-white focus:ring-2 focus:ring-gold-500 outline-none transition-all"

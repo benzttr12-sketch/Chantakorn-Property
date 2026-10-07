@@ -61,7 +61,7 @@ export default function SendToLineButton({
       <button
         type="button"
         onClick={handleClick}
-        className={`w-full py-2 px-3 bg-emerald-50 hover:bg-[#06C755] text-emerald-800 hover:text-white rounded-xl text-xs font-bold flex items-center justify-center space-x-1.5 transition-all duration-200 border border-emerald-200 hover:border-[#06C755] cursor-pointer group/line ${className}`}
+        className={`w-full py-2.5 px-3 bg-emerald-50 hover:bg-[#06C755] text-emerald-800 hover:text-white rounded-xl text-xs font-bold flex items-center justify-center space-x-1.5 transition-all duration-200 border border-emerald-200 hover:border-[#06C755] cursor-pointer group/line ${className}`}
         title="สร้างข้อความอัตโนมัติแล้วส่งหาทีมงานทาง LINE"
       >
         <MessageCircle className="w-3.5 h-3.5 fill-current text-[#06C755] group-hover/line:text-white transition-colors" />

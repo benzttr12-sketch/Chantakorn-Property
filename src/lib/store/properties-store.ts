@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { Property, PropertyFilters, Inquiry, UserProfile, Agent, AgentRank } from '@/lib/types';
 import { SAMPLE_PROPERTIES } from '@/data/sample-properties';
@@ -42,12 +42,14 @@ function readArray<T>(key: string, fallback: T[], valid: (item: unknown) => item
   return fallback;
 }
 
-function writeArray<T>(key: string, value: T[]) {
-  if (typeof window === 'undefined') return;
+function writeArray<T>(key: string, value: T[]): boolean {
+  if (typeof window === 'undefined') return true;
   try {
     window.localStorage.setItem(key, JSON.stringify(value));
+    return true;
   } catch {
-    console.warn('Cannot write to localStorage');
+    console.warn('Cannot write to localStorage (quota exceeded?)');
+    return false;
   }
 }
 
@@ -87,8 +89,11 @@ export function getLocalProperties(): Property[] {
   return readArray(STORAGE_KEY_PROPERTIES, SAMPLE_PROPERTIES, isProperty);
 }
 
-export function saveLocalProperties(properties: Property[]) {
-  writeArray(STORAGE_KEY_PROPERTIES, properties);
+export function saveLocalProperties(properties: Property[]): void {
+  const ok = writeArray(STORAGE_KEY_PROPERTIES, properties);
+  if (!ok) {
+    throw new Error('พื้นที่จัดเก็บของเบราว์เซอร์เต็ม (โหมดท้องถิ่นจำกัดประมาณ 5MB) — ลดจำนวน/ขนาดรูปภาพ หรือใช้ลิงก์ YouTube แทนการแนบไฟล์วิดีโอ แล้วลองบันทึกใหม่');
+  }
 }
 
 type PropertyRow = Property & {
@@ -225,12 +230,23 @@ export async function fetchAdminProperties(filters?: PropertyFilters): Promise<P
 
 export async function fetchPropertyBySlug(slug: string): Promise<Property | null> {
   requireConnection();
+  const normalized = slug.trim();
+  const normalizedLower = normalized.toLowerCase();
+  const matchesKey = (property: Property) =>
+    property.slug === normalized ||
+    property.id === normalized ||
+    formatPropertyCode(property.id).toLowerCase() === normalizedLower;
   if (dataBackend === 'supabase') {
     if (supabase) {
       const { data, error } = await supabase.from('properties').select(PROPERTY_SELECT)
-        .eq('slug', slug).eq('published', true).maybeSingle();
+        .eq('slug', normalized).eq('published', true).maybeSingle();
       if (error) throw error;
-      return data ? rowToProperty(data as PropertyRow) : null;
+      if (data) return rowToProperty(data as PropertyRow);
+      // รองรับลิงก์สั้น (รหัสทรัพย์ เช่น CK-813F2B) และค้นด้วย id
+      const { data: list, error: listError } = await supabase.from('properties').select(PROPERTY_SELECT).eq('published', true);
+      if (listError) throw listError;
+      const found = (list || []).map(row => rowToProperty(row as PropertyRow)).find(matchesKey);
+      return found || null;
     }
     return null;
   }
@@ -238,11 +254,11 @@ export async function fetchPropertyBySlug(slug: string): Promise<Property | null
   if (dataBackend === 'firebase') {
     if (firestore) {
       const all = await loadProperties(false);
-      return all.find(property => property.slug === slug) || null;
+      return all.find(matchesKey) || null;
     }
     return null;
   }
-  return (await loadProperties(false)).find(property => property.slug === slug) || null;
+  return (await loadProperties(false)).find(matchesKey) || null;
 }
 
 function generateShortPropertyId(): string {
@@ -636,7 +652,7 @@ export async function fetchUsers(): Promise<UserProfile[]> {
           email: 'benzttr12@gmail.com', 
           role: 'ADMIN',
           phone: '081-604-0097',
-          line_id: '@chantakorn',
+          line_id: '@930xzcyi',
           facebook: 'https://www.facebook.com/chantakornproperty',
           avatar_url: 'https://images.unsplash.com/photo-1560250097-0b93528c311a?auto=format&fit=crop&w=600&q=80',
           bio: 'ผู้ก่อตั้งและผู้บริหาร Chantakorn Property ยินดีให้คำปรึกษาอสังหาริมทรัพย์ระดับมืออาชีพในหาดใหญ่และสงขลา'
