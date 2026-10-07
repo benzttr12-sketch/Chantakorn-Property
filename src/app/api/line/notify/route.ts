@@ -1,8 +1,7 @@
 import { jsonResponse } from '@/lib/api-response';
 import { requireStaff } from '@/lib/server-auth';
-import { getFirestoreDocument, patchFirestoreDocument } from '@/lib/firestore-rest';
+import { getFirestoreDocument, patchFirestoreDocument, listFirestoreDocuments } from '@/lib/firestore-rest';
 import { getLinePropertyImageUrl } from '@/lib/line-property-image';
-import { formatPropertyCode } from '@/lib/format-code';
 
 const OFFICIAL_LINE_OA_URL = 'https://lin.ee/NMSe28T3';
 const DEFAULT_PHONE = '081-604-0097';
@@ -265,14 +264,8 @@ LINE Official Account: ${OFFICIAL_LINE_OA_URL}`;
     } else {
       // 2. Standard Property Listing Notification
       const { title, price, status, district, subdistrict, slug, agent } = body;
-
-      // ลิงก์สั้นด้วยรหัสทรัพย์ เช่น /properties/CK-813F2B
-      const propertyCode = formatPropertyCode(body.id || '');
-      propertyUrl = propertyCode && propertyCode !== '-'
-        ? `${hostOrigin}/properties/${encodeURIComponent(propertyCode)}`
-        : slug
-          ? `${hostOrigin}/properties/${encodeURIComponent(slug)}`
-          : `${hostOrigin}/properties/`;
+      
+      propertyUrl = slug ? `${hostOrigin}/properties/detail/?slug=${encodeURIComponent(slug)}` : `${hostOrigin}/properties/`;
       const priceFormatted = price 
         ? new Intl.NumberFormat('th-TH', { style: 'currency', currency: 'THB', maximumFractionDigits: 0 }).format(price)
         : 'ราคาพิเศษ';
@@ -291,11 +284,7 @@ LINE Official Account: ${OFFICIAL_LINE_OA_URL}`;
 
 LINE Official Account: ${OFFICIAL_LINE_OA_URL}`;
 
-      // LINE ดึงรูปได้เฉพาะ URL https สาธารณะเท่านั้น — รูปให้บริการจาก origin ของ API เอง
-      // (localhost/โดเมนภายในจะถูกข้าม เพื่อไม่ให้การ์ดมีรูปแตก)
-      const requestOrigin = new URL(req.url).origin;
-      const imageOrigin = /^https:\/\//i.test(requestOrigin) ? requestOrigin : null;
-      const heroImg = imageOrigin ? getLinePropertyImageUrl(body, imageOrigin) : null;
+      const heroImg = getLinePropertyImageUrl(body, new URL(req.url).origin);
 
       flexMessagePayload = {
         type: "flex",
@@ -445,10 +434,10 @@ LINE Official Account: ${OFFICIAL_LINE_OA_URL}`;
     }
 
     if (!lineAccessToken.trim()) {
-      return jsonResponse({ success: false, isRealSent: false, code: 'LINE_TOKEN_MISSING', error: 'ยังไม่ได้ตั้ง LINE_CHANNEL_ACCESS_TOKEN — เพิ่มในไฟล์ .env.local (รันเครื่อง) หรือ Environment Variables ของ Vercel (production) แล้วรีสตาร์ท/Redeploy' }, { status: 503 });
+      return jsonResponse({ success: false, isRealSent: false, code: 'LINE_TOKEN_MISSING', error: 'ยังไม่ได้ตั้ง LINE_CHANNEL_ACCESS_TOKEN ใน Vercel Production กรุณาตั้งค่าแล้ว Redeploy' }, { status: 503 });
     }
     if (recipients.length === 0) {
-      return jsonResponse({ success: false, isRealSent: false, code: 'LINE_RECIPIENT_MISSING', error: 'ยังไม่ได้กำหนดผู้รับแจ้งเตือน — ตั้ง LINE_TARGET_USER_ID หรือ LINE_ADMIN_USER_IDS ในไฟล์ .env.local หรือ Vercel (ค่าต้องเป็น LINE User ID รูปแบบ Uxxxxxxxx) แล้วรีสตาร์ท/Redeploy' }, { status: 503 });
+      return jsonResponse({ success: false, isRealSent: false, code: 'LINE_RECIPIENT_MISSING', error: 'ยังไม่ได้กำหนดผู้รับแจ้งเตือน ตั้ง LINE_TARGET_USER_ID หรือ LINE_ADMIN_USER_IDS ใน Vercel Production แล้ว Redeploy' }, { status: 503 });
     }
     if (!recipients.every(validRecipient)) {
       return jsonResponse({ success: false, isRealSent: false, code: 'LINE_RECIPIENT_INVALID', error: 'ผู้รับแจ้งเตือนไม่ใช่ LINE user ID ที่ถูกต้อง ต้องเป็น U ตามด้วยเลขฐานสิบหก 32 ตัว ไม่ใช่ชื่อหรือ @LINE ID' }, { status: 503 });
@@ -475,10 +464,54 @@ LINE Official Account: ${OFFICIAL_LINE_OA_URL}`;
     }
     acceptedRecipients += 1;
     }
+
+    // Property sends also notify registered LINE OA followers (customers who added the official account).
+    let customerRecipients = 0;
+    let customerDelivered = 0;
+    if (!publicInquiry && body.notifyCustomers !== false) {
+      try {
+        const followers = (await listFirestoreDocuments('line_followers', 200)) as Array<Record<string, unknown>>;
+        const alreadySent = new Set(recipients.map((id) => id.toLowerCase()));
+        const seen = new Set<string>();
+        const customerIds: string[] = [];
+        for (const follower of followers) {
+          const id = String(follower.user_id || follower.id || '').trim();
+          if (!validRecipient(id) || seen.has(id) || alreadySent.has(id.toLowerCase())) continue;
+          if (follower.is_active === false) continue;
+          seen.add(id);
+          customerIds.push(id);
+        }
+        customerRecipients = customerIds.length;
+        for (const customerId of customerIds) {
+          try {
+            const customerResponse = await fetch('https://api.line.me/v2/bot/message/push', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${lineAccessToken.trim()}` },
+              body: JSON.stringify({
+                to: customerId,
+                messages: [{ type: 'text', text: messageText.slice(0, 5000) }, { ...flexMessagePayload, altText: flexMessagePayload.altText.slice(0, 400) }],
+              }),
+            });
+            if (customerResponse.ok) {
+              customerDelivered += 1;
+            } else {
+              console.error('LINE customer push rejected', { customerId: customerId.slice(0, 6), status: customerResponse.status, requestId: customerResponse.headers.get('x-line-request-id') });
+            }
+          } catch (customerError) {
+            console.error('LINE customer push failed', { customerId: customerId.slice(0, 6), error: customerError });
+          }
+        }
+      } catch (followerError) {
+        console.warn('Could not load LINE followers for customer notification:', followerError);
+      }
+    }
     return jsonResponse({
       success: true, isRealSent: true, simulated: false, acceptedRecipients,
+      customerRecipients, customerDelivered,
       deliveryStatus: 'accepted',
-      message: 'LINE รับคำขอส่งข้อความถึงเจ้าของบัญชีแล้ว',
+      message: customerRecipients > 0
+        ? `LINE รับคำขอส่งข้อความแล้ว: ทีมงาน ${acceptedRecipients} คน · ลูกค้าที่ติดตาม OA ${customerDelivered}/${customerRecipients} คน`
+        : 'LINE รับคำขอส่งข้อความถึงเจ้าของบัญชีแล้ว',
     });
 
   } catch (error: any) {

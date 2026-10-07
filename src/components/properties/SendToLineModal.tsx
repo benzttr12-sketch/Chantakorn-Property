@@ -19,7 +19,7 @@ import {
   PropertyLineData, 
   generatePropertyLineMessage, 
   getLineShareUrl, 
-  getLineOaChatUrl,
+  getLineOaDirectMessageUrl,
   OFFICIAL_LINE_OA_URL 
 } from '@/lib/line-inquiry';
 import { OFFICIAL_LINE_BASIC_ID } from '@/lib/line-auth';
@@ -40,7 +40,6 @@ export default function SendToLineModal({ isOpen, onClose, property, autoSend = 
   const [pushSuccess, setPushSuccess] = useState(false);
   const [pushMessage, setPushMessage] = useState('');
   const [mounted, setMounted] = useState(false);
-  const [lineChat, setLineChat] = useState<{ url: string; mode: 'app' | 'web' }>({ url: OFFICIAL_LINE_OA_URL, mode: 'web' });
 
   useEffect(() => {
     setMounted(true);
@@ -51,11 +50,7 @@ export default function SendToLineModal({ isOpen, onClose, property, autoSend = 
 
   const message = property ? generatePropertyLineMessage(property, origin) : '';
   const lineShareUrl = getLineShareUrl(message);
-  // เลือกลิงก์ตามอุปกรณ์: มือถือเปิดแอป LINE พร้อมข้อความ / คอมเปิดหน้าโปรไฟล์ OA
-  useEffect(() => {
-    setLineChat(property ? getLineOaChatUrl(message) : { url: OFFICIAL_LINE_OA_URL, mode: 'web' });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [property, origin]);
+  const lineOaDirectUrl = property ? getLineOaDirectMessageUrl(message) : OFFICIAL_LINE_OA_URL;
 
   const handleCopyText = async () => {
     if (!message) return;
@@ -113,7 +108,7 @@ export default function SendToLineModal({ isOpen, onClose, property, autoSend = 
       const data = await res.json();
       if (res.ok && data.success && data.isRealSent) {
         setPushSuccess(true);
-        setPushMessage('LINE รับคำขอส่งการ์ดถึงเจ้าหน้าที่ที่ตั้งค่าไว้แล้ว กรุณาตรวจการได้รับข้อความใน LINE');
+        setPushMessage(data.message || 'LINE รับคำขอส่งการ์ดแล้ว กรุณาตรวจการได้รับข้อความใน LINE');
       } else {
         setPushMessage(data.error || data.message || 'ยังไม่ได้ส่งแจ้งเตือน กรุณาลองใหม่หรือเปิดแชท LINE OA');
       }
@@ -193,10 +188,10 @@ export default function SendToLineModal({ isOpen, onClose, property, autoSend = 
             </button>
           </div>
 
-          {/* Action 1 (Primary): Open LINE OA chat — platform-aware URL */}
+          {/* Action 1 (Primary): Direct 1-Click Message to Official LINE OA (@930xzcyi) */}
           <div className="space-y-2.5 pt-1">
             <a
-              href={lineChat.url}
+              href={lineOaDirectUrl}
               target="_blank"
               rel="noopener noreferrer"
               onClick={() => {
@@ -205,28 +200,9 @@ export default function SendToLineModal({ isOpen, onClose, property, autoSend = 
               className="w-full py-4 px-4 bg-gradient-to-r from-emerald-600 via-[#06C755] to-emerald-500 hover:from-emerald-500 hover:to-[#05b34c] active:scale-[0.99] text-white rounded-2xl font-black text-sm sm:text-base shadow-lg hover:shadow-xl flex items-center justify-center space-x-2 transition-all cursor-pointer group"
             >
               <MessageCircle className="w-5 h-5 fill-current group-hover:scale-110 transition-transform" />
-              <span>
-                {lineChat.mode === 'app'
-                  ? 'เปิด LINE พร้อมข้อความ แล้วกดส่งในแชท'
-                  : `เปิดหน้า LINE OA (${OFFICIAL_LINE_BASIC_ID})`}
-              </span>
+              <span>เปิด LINE พร้อมข้อความ แล้วกดส่งในแชท</span>
               <ExternalLink className="w-4 h-4 ml-1 opacity-90" />
             </a>
-
-            {lineChat.mode === 'web' && (
-              <div className="p-3 bg-sky-50 border border-sky-200 rounded-2xl text-[11px] text-sky-900 space-y-1">
-                <span className="font-bold flex items-center space-x-1 text-sky-800">
-                  <Sparkles className="w-3.5 h-3.5 text-sky-600" />
-                  <span>วิธีส่งข้อความจากคอมพิวเตอร์:</span>
-                </span>
-                <p className="leading-relaxed">
-                  1. ข้อความสอบถามถูกคัดลอกไว้แล้วอัตโนมัติ · 2. กดปุ่มด้านบนเพื่อเปิดหน้า LINE OA
-                  แล้วกด <strong>&ldquo;เพิ่มเพื่อน&rdquo;</strong> (หรือสแกน QR ด้วยมือถือ) · 3.
-                  เปิดแชทกับ @930xzcyi แล้ววางข้อความกดส่ง — หากมีแอป LINE บนมือถือ
-                  เปิดเว็บนี้บนมือถือแล้วกดปุ่มเดียวจะเด้งเข้าแชทพร้อมข้อความทันที
-                </p>
-              </div>
-            )}
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
               {/* Action 2: Direct Server Push Notification */}
