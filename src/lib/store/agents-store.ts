@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import { ExtendedAgent, AGENTS as DEFAULT_AGENTS } from '@/data/agents';
 import { UserProfile } from '@/lib/types';

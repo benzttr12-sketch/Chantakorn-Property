@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import { WorkJob, WorkPhase, WorkJobStatus } from '@/lib/types';
 import { db } from '@/lib/firebase/client';
