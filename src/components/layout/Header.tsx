@@ -1,126 +1,22 @@
-﻿'use client';
+'use client';
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { 
-  Menu, 
-  X, 
-  Phone, 
-  PlusCircle, 
-  User, 
-  Heart, 
-  Building2, 
-  ShieldCheck,
-  ChevronRight,
-  Facebook,
-  MessageCircle,
-  LogIn,
-  LogOut,
-  LayoutDashboard,
-  UserCircle
+  Menu, X, Phone, Home, Search, Building2, Landmark, Building, 
+  Info, Mail, LogIn, ChevronDown, LayoutDashboard, ChevronRight, Briefcase,
+  Heart, User, LandPlot, HomeIcon, BuildingIcon, Warehouse, Factory, BuildingOffice2, LogOut, MessageCircle, Facebook, ShieldCheck
 } from 'lucide-react';
-import { getFavoriteIds } from '@/lib/store/properties-store';
-import { getStoredUser, logoutUser, syncFirebaseUserProfile } from '@/lib/auth-helpers';
-import { auth } from '@/lib/firebase/client';
-import { onAuthStateChanged } from 'firebase/auth';
+import { formatLineUrl } from '@/lib/utils';
+import { getCurrentUserProfile, logoutUser } from '@/lib/auth-helpers';
 import { UserProfile } from '@/lib/types';
-import { dataBackend } from '@/lib/backend';
 
-export default function Header() {
-  const [isScrolled, setIsScrolled] = useState(false);
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [favCount, setFavCount] = useState(0);
-  const [currentUser, setCurrentUser] = useState<UserProfile | null>(null);
-  const rawPathname = usePathname();
-  const pathname = rawPathname || '';
-
-  useEffect(() => {
-    const handleScroll = () => {
-      setIsScrolled(window.scrollY > 20);
-    };
-    window.addEventListener('scroll', handleScroll);
-    return () => window.removeEventListener('scroll', handleScroll);
-  }, []);
-
-  // Listen to favorites
-  useEffect(() => {
-    const updateFavs = () => {
-      setFavCount(getFavoriteIds().length);
-    };
-    updateFavs();
-    window.addEventListener('favorites-updated', updateFavs);
-    window.addEventListener('storage', updateFavs);
-    return () => { 
-      window.removeEventListener('favorites-updated', updateFavs); 
-      window.removeEventListener('storage', updateFavs); 
-    };
-  }, []);
-
-  // Listen to user auth state
-  useEffect(() => {
-    setCurrentUser(getStoredUser());
-
-    const handleAuthCustom = (e: any) => {
-      setCurrentUser(e.detail || null);
-    };
-    window.addEventListener('chantakorn_auth_change', handleAuthCustom);
-
-    let unsubscribe = () => {};
-    if (dataBackend === 'firebase' && auth) {
-      unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-        if (!firebaseUser) {
-          setCurrentUser(null);
-        } else {
-          try {
-            setCurrentUser(await syncFirebaseUserProfile(firebaseUser));
-          } catch {
-            setCurrentUser(null);
-          }
-        }
-      });
-    }
-
-    return () => {
-      window.removeEventListener('chantakorn_auth_change', handleAuthCustom);
-      unsubscribe();
-    };
-  }, []);
-
-  // Close mobile menu on route change
-  useEffect(() => {
-    setMobileMenuOpen(false);
-  }, [pathname]);
-
-  // Lock body scroll while the mobile menu is open
-  useEffect(() => {
-    document.body.style.overflow = mobileMenuOpen ? 'hidden' : '';
-    return () => {
-      document.body.style.overflow = '';
-    };
-  }, [mobileMenuOpen]);
-
-  const handleLogout = async () => {
-    await logoutUser();
-    setCurrentUser(null);
-  };
-
-  const navLinks = [
-    { name: 'หน้าแรก', href: '/' },
-    { name: 'ซื้อ', href: '/buy' },
-    { name: 'เช่า', href: '/rent' },
-    { name: 'ฝากขาย', href: '/sell' },
-    { name: 'บ้าน', href: '/properties?type=house' },
-    { name: 'ที่ดิน', href: '/properties?type=land' },
-    { name: 'คอนโด', href: '/properties?type=condo' },
-    { name: 'บริการ', href: '/services' },
-  ];
-
+const TopBar = () => {
   return (
-    <>
-      {/* Top Notification / Trust Bar */}
-      <div className="bg-navy-950 text-white text-xs py-2 px-4 hidden md:block border-b border-navy-800 shadow-inner">
-        <div className="max-w-7xl mx-auto flex justify-between items-center">
+    <div className="hidden md:block bg-navy-950 text-sm border-b border-white/5">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="h-10 flex items-center justify-between">
           <div className="flex items-center space-x-3 min-w-0">
             <span className="inline-flex items-center text-gold-300 font-bold tracking-wide whitespace-nowrap">
               <ShieldCheck className="w-4 h-4 mr-1.5 text-gold-400 flex-shrink-0" />
@@ -129,8 +25,7 @@ export default function Header() {
             <span className="text-navy-600">|</span>
             <span className="text-gray-200 font-normal whitespace-nowrap hidden xl:inline">บริการซื้อ ขาย เช่า ฝากขาย ให้คำปรึกษาฟรี</span>
           </div>
-
-          <div className="flex items-center space-x-4 text-xs">
+          <div className="flex items-center space-x-6 text-xs flex-shrink-0">
             <a 
               href="tel:0816040097" 
               className="hover:text-gold-300 text-white transition-colors flex items-center group font-medium whitespace-nowrap"
@@ -138,354 +33,540 @@ export default function Header() {
               <Phone className="w-3.5 h-3.5 mr-1.5 text-gold-400 group-hover:scale-110 transition-transform" />
               <span className="font-semibold">081-604-0097</span>
             </a>
-
-            <span className="text-navy-600">•</span>
-
-            <a
-              href="https://www.facebook.com/people/Chantakorn-Property-%E0%B8%99%E0%B8%B2%E0%B8%A2%E0%B8%AB%E0%B8%99%E0%B9%89%E0%B8%B2-%E0%B8%9A%E0%B9%89%E0%B8%B2%E0%B8%99-%E0%B8%97%E0%B8%B5%E0%B9%88%E0%B8%94%E0%B8%B4%E0%B8%99-%E0%B8%84%E0%B8%AD%E0%B8%99%E0%B9%82%E0%B8%94-%E0%B8%AB%E0%B8%B2%E0%B8%94%E0%B9%83%E0%B8%AB%E0%B8%8D%E0%B9%88-%E0%B8%AA%E0%B8%87%E0%B8%82%E0%B8%A5%E0%B8%B2/61593092347613/"
-              target="_blank"
-              rel="noreferrer"
+            <a 
+              href="https://www.facebook.com/people/Chantakorn-Property-%E0%B8%99%E0%B8%B2%E0%B8%A2%E0%B8%AB%E0%B8%99%E0%B9%89%E0%B8%B2-%E0%B8%9A%E0%B9%89%E0%B8%B2%E0%B8%99-%E0%B8%97%E0%B8%B5%E0%B9%88%E0%B8%94%E0%B8%B4%E0%B8%99-%E0%B8%84%E0%B8%AD%E0%B8%99%E0%B9%82%E0%B8%94-%E0%B8%AB%E0%B8%B2%E0%B8%94%E0%B9%83%E0%B8%AB%E0%B8%8D%E0%B9%88-%E0%B8%AA%E0%B8%87%E0%B8%82%E0%B8%A5%E0%B8%B2/61593092347613/" 
+              target="_blank" 
+              rel="noopener noreferrer"
               className="hover:text-gold-300 text-white transition-colors flex items-center font-medium whitespace-nowrap"
               title="Facebook Page: Chantakorn Property"
             >
               <Facebook className="w-3.5 h-3.5 mr-1.5 text-[#3b82f6]" />
               <span className="hidden lg:inline">Facebook</span>
             </a>
-
-            <span className="text-navy-600">•</span>
-
-            <a
-              href="https://lin.ee/NMSe28T3"
-              target="_blank"
-              rel="noreferrer"
+            <a 
+              href="https://lin.ee/NMSe28T3" 
+              target="_blank" 
+              rel="noopener noreferrer"
               className="hover:text-gold-300 text-white transition-colors flex items-center group font-medium whitespace-nowrap"
               title="LINE Official Account: Chantakorn Property (คลิกเพื่อแอดไลน์)"
             >
               <MessageCircle className="w-3.5 h-3.5 mr-1.5 text-[#06C755] fill-current group-hover:scale-110 transition-transform" />
               <span className="hidden lg:inline">LINE: <span className="text-gold-300 font-bold">Official Account</span></span>
             </a>
-
-            <span className="text-navy-600">•</span>
-
-            {/* User Access: เข้าสู่ระบบ or Logged-in profile */}
-            {currentUser ? (
-              <Link
-                id="topbar-profile-link"
-                href={currentUser.role === 'ADMIN' || currentUser.role === 'AGENT' ? '/admin' : '/profile'}
-                className="inline-flex items-center space-x-1.5 px-3 py-1 rounded-full bg-navy-900 border border-gold-400/50 text-gold-300 hover:text-white hover:border-gold-300 transition-all text-[11px]"
-              >
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
-                <span className="font-bold max-w-[120px] truncate text-white">{currentUser.full_name || 'บัญชีของฉัน'}</span>
-                <span className="text-[10px] px-1.5 py-0.5 bg-gold-400 text-navy-950 rounded font-black">
-                  {currentUser.role}
-                </span>
-              </Link>
-            ) : (
-              <Link 
-                id="topbar-login-link"
-                href="/login" 
-                className="inline-flex items-center space-x-1 px-3 py-1 rounded-full bg-gold-400 text-navy-950 hover:bg-gold-300 hover:text-navy-900 font-bold text-xs shadow-sm transition-all"
-              >
-                <LogIn className="w-3.5 h-3.5 text-navy-950 stroke-[2.5]" />
-                <span>เข้าสู่ระบบ</span>
-              </Link>
-            )}
           </div>
         </div>
       </div>
+    </div>
+  );
+};
 
-      {/* Main Sticky Header */}
-      <header
-        className={`sticky top-0 z-[60] w-full transition-all duration-300 ${
-          isScrolled
-            ? 'bg-navy-950 shadow-xl border-b border-gold-500/20 py-2.5'
-            : 'bg-navy-950 border-b border-navy-800/90 py-3.5'
-        }`}
-        style={{ backgroundColor: '#020812' }}
-      >
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between">
-          {/* Brand Logo */}
-          <Link href="/" className="flex items-center space-x-3 group">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-gold-400 via-gold-500 to-amber-600 flex items-center justify-center text-navy-950 font-bold shadow-md shadow-gold-500/20 group-hover:scale-105 group-hover:shadow-gold-500/30 transition-all">
-              <Building2 className="w-6 h-6 text-navy-950" />
+const categoryIconMap: Record<string, React.ElementType> = {
+  house: HomeIcon,
+  land: LandPlot,
+  condo: BuildingIcon,
+  commercial: BuildingOffice2,
+  investment: Factory,
+  consignment: Warehouse
+};
+
+const categoryLinks = [
+  { type: 'house', label: 'บ้าน / ทาวน์โฮม', description: 'พร้อมอยู่ ทำเลชุมชน ใกล้สถานศึกษา', href: '/buy?type=house' },
+  { type: 'land', label: 'ที่ดิน', description: 'แปลงสวย ผลตอบแทนสูง ติดถนนใหญ่', href: '/buy?type=land' },
+  { type: 'condo', label: 'คอนโดมิเนียม', description: 'เหมาะพักอาศัยและลงทุนเช่าในเมือง', href: '/buy?type=condo' },
+  { type: 'commercial', label: 'อาคารพาณิชย์', description: 'หน้าร้าน เกษตร หรือที่ตั้งธุรกิจ', href: '/buy?type=commercial' },
+  { type: 'investment', label: 'ทรัพย์เพื่อการลงทุน', description: 'ไหลเวียนเร็ว ผลตอบแทนชัดเจน', href: '/buy?type=investment' },
+  { type: 'consignment', label: 'ทรัพย์รับขายฝาก', description: 'ทรัพย์ปลอดภัย เอกสารสมบูรณ์', href: '/buy?type=consignment' }
+];
+
+const navLinks = [
+  { href: '/', label: 'หน้าแรก' },
+  { href: '/buy', label: 'ซื้อ' },
+  { href: '/rent', label: 'เช่า' },
+  { href: '/sell', label: 'ฝากขาย' }
+];
+
+const serviceLinks = [
+  { href: '/services', label: 'บริการของเรา', description: 'บริการครบวงจรด้านอสังหาริมทรัพย์' },
+  { href: '/valuation', label: 'ประเมินราคาฟรี', description: 'ประเมินมูลค่าทรัพย์ด้วยข้อมูลตลาดจริง' },
+  { href: '/sell', label: 'ฝากขายกับเรา', description: 'ลงประกาศขาย/เช่า พร้อมทีมการตลาด' },
+  { href: '/about', label: 'เกี่ยวกับเรา', description: 'ทำความรู้จักทีม Chantakorn Property' }
+];
+
+export default function Header() {
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [isBuyDropdownOpen, setIsBuyDropdownOpen] = useState(false);
+  const [isServiceDropdownOpen, setIsServiceDropdownOpen] = useState(false);
+  const [isScrolled, setIsScrolled] = useState(false);
+  const [currentUser, setCurrentUser] = useState<UserProfile | null>(null);
+  const pathname = usePathname();
+  const router = useRouter();
+
+  useEffect(() => {
+    const handleScroll = () => {
+      setIsScrolled(window.scrollY > 10);
+    };
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
+
+  // Auth state from verified backend profile
+  useEffect(() => {
+    let active = true;
+    const loadProfile = async () => {
+      try {
+        const profile = await getCurrentUserProfile();
+        if (active) setCurrentUser(profile);
+      } catch {
+        if (active) setCurrentUser(null);
+      }
+    };
+    loadProfile();
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent<UserProfile | null>).detail || null;
+      setCurrentUser(detail);
+    };
+    window.addEventListener('chantakorn_auth_change', handler);
+    return () => {
+      active = false;
+      window.removeEventListener('chantakorn_auth_change', handler);
+    };
+  }, [pathname]);
+
+  const handleLogout = async () => {
+    try {
+      await logoutUser();
+    } finally {
+      setIsMenuOpen(false);
+      router.push('/');
+    }
+  };
+
+  const handleMobileNavClick = () => {
+    setIsMenuOpen(false);
+    setIsBuyDropdownOpen(false);
+    setIsServiceDropdownOpen(false);
+  };
+
+  const toggleBuyDropdown = () => setIsBuyDropdownOpen((open) => !open);
+  const toggleServiceDropdown = () => setIsServiceDropdownOpen((open) => !open);
+
+  const isActive = (href: string) => (href === '/' ? pathname === '/' : pathname.startsWith(href));
+
+  return (
+    <header className="sticky top-0 z-50 bg-navy-950/95 backdrop-blur-md border-b border-white/5">
+      <TopBar />
+      <nav className={`transition-all duration-300 ${isScrolled ? 'h-14' : 'h-16'} flex items-center`}>
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full">
+          <div className="flex items-center justify-between h-full">
+            {/* Logo */}
+            <Link href="/" className="flex items-center space-x-3 group flex-shrink-0" onClick={handleMobileNavClick}>
+              <div className="relative">
+                <div className="w-10 h-10 bg-gradient-to-br from-gold-400 to-gold-600 rounded-xl flex items-center justify-center shadow-lg shadow-gold-500/20 group-hover:shadow-gold-500/40 transition-all duration-300">
+                  <Building2 className="w-6 h-6 text-navy-950" strokeWidth={2.2} />
+                </div>
+                <div className="absolute inset-0 bg-gold-400 rounded-xl blur-lg opacity-20 group-hover:opacity-40 transition-opacity" />
+              </div>
+              <div className="flex flex-col">
+                <span className="text-lg md:text-xl font-black tracking-tight text-white leading-none">
+                  CHANTAKORN
+                </span>
+                <span className="text-[10px] md:text-xs font-bold tracking-[0.2em] text-gold-400 leading-none mt-1">
+                  PROPERTY
+                </span>
+              </div>
+            </Link>
+
+            {/* Desktop Menu */}
+            <div className="hidden lg:flex items-center space-x-1">
+              {navLinks.map((link) => (
+                <Link
+                  key={link.href}
+                  href={link.href}
+                  className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all duration-200 relative group ${
+                    isActive(link.href)
+                      ? 'text-gold-400'
+                      : 'text-white hover:text-gold-300'
+                  }`}
+                >
+                  {link.label}
+                  <span className={`absolute bottom-0 left-4 right-4 h-0.5 bg-gold-400 transform transition-transform duration-300 ${
+                    isActive(link.href) ? 'scale-x-100' : 'scale-x-0 group-hover:scale-x-100'
+                  }`} />
+                </Link>
+              ))}
+
+              {/* Buy Dropdown */}
+              <div 
+                className="relative"
+                onMouseEnter={() => setIsBuyDropdownOpen(true)}
+                onMouseLeave={() => setIsBuyDropdownOpen(false)}
+              >
+                <button
+                  onClick={toggleBuyDropdown}
+                  className={`px-4 py-2 rounded-lg text-sm font-semibold flex items-center space-x-1 transition-colors duration-200 ${
+                    pathname.startsWith('/properties') || pathname.startsWith('/buy')
+                      ? 'text-gold-400'
+                      : 'text-white hover:text-gold-300'
+                  }`}
+                >
+                  <span>ประเภททรัพย์</span>
+                  <ChevronDown className={`w-4 h-4 transition-transform duration-200 ${isBuyDropdownOpen ? 'rotate-180' : ''}`} />
+                </button>
+
+                <div className={`absolute top-full left-0 pt-2 transition-all duration-200 ${
+                  isBuyDropdownOpen ? 'opacity-100 visible translate-y-0' : 'opacity-0 invisible -translate-y-2'
+                }`}>
+                  <div className="bg-white rounded-2xl shadow-2xl border border-gray-100 p-3 w-[560px]">
+                    <div className="grid grid-cols-2 gap-1">
+                      {categoryLinks.map((cat) => {
+                        const IconComp = categoryIconMap[cat.type] || Building;
+                        return (
+                          <Link
+                            key={cat.type}
+                            href={cat.href}
+                            onClick={() => setIsBuyDropdownOpen(false)}
+                            className="flex items-start space-x-3 p-3 rounded-xl hover:bg-gold-50 transition-colors duration-200 group"
+                          >
+                            <div className="w-9 h-9 rounded-lg bg-navy-50 text-navy-700 flex items-center justify-center group-hover:bg-gold-500 group-hover:text-navy-950 transition-colors flex-shrink-0">
+                              <IconComp className="w-5 h-5" />
+                            </div>
+                            <div>
+                              <p className="text-sm font-bold text-navy-950 leading-snug">{cat.label}</p>
+                              <p className="text-xs text-gray-500 mt-0.5 leading-snug">{cat.description}</p>
+                            </div>
+                          </Link>
+                        );
+                      })}
+                    </div>
+                    <div className="border-t border-gray-100 mt-2 pt-2">
+                      <Link
+                        href="/properties"
+                        onClick={() => setIsBuyDropdownOpen(false)}
+                        className="flex items-center justify-center space-x-1 text-sm font-bold text-gold-600 hover:text-gold-700 py-2 rounded-lg hover:bg-gold-50 transition-colors"
+                      >
+                        <Search className="w-4 h-4" />
+                        <span>ดูประกาศทรัพย์ทั้งหมด</span>
+                        <ChevronRight className="w-4 h-4" />
+                      </Link>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Services Dropdown */}
+              <div 
+                className="relative"
+                onMouseEnter={() => setIsServiceDropdownOpen(true)}
+                onMouseLeave={() => setIsServiceDropdownOpen(false)}
+              >
+                <button
+                  onClick={toggleServiceDropdown}
+                  className={`px-4 py-2 rounded-lg text-sm font-semibold flex items-center space-x-1 transition-colors duration-200 ${
+                    ['/services', '/valuation', '/sell', '/about'].some((p) => pathname.startsWith(p))
+                      ? 'text-gold-400'
+                      : 'text-white hover:text-gold-300'
+                  }`}
+                >
+                  <span>บริการ</span>
+                  <ChevronDown className={`w-4 h-4 transition-transform duration-200 ${isServiceDropdownOpen ? 'rotate-180' : ''}`} />
+                </button>
+
+                <div className={`absolute top-full left-0 pt-2 transition-all duration-200 ${
+                  isServiceDropdownOpen ? 'opacity-100 visible translate-y-0' : 'opacity-0 invisible -translate-y-2'
+                }`}>
+                  <div className="bg-white rounded-2xl shadow-2xl border border-gray-100 p-2 w-80">
+                    {serviceLinks.map((svc) => (
+                      <Link
+                        key={svc.href}
+                        href={svc.href}
+                        onClick={() => setIsServiceDropdownOpen(false)}
+                        className="flex items-start space-x-3 p-3 rounded-xl hover:bg-gold-50 transition-colors duration-200 group"
+                      >
+                        <div className="w-9 h-9 rounded-lg bg-navy-50 text-navy-700 flex items-center justify-center group-hover:bg-gold-500 group-hover:text-navy-950 transition-colors flex-shrink-0">
+                          <Briefcase className="w-5 h-5" />
+                        </div>
+                        <div>
+                          <p className="text-sm font-bold text-navy-950">{svc.label}</p>
+                          <p className="text-xs text-gray-500 mt-0.5">{svc.description}</p>
+                        </div>
+                      </Link>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              <Link
+                href="/contact"
+                className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all duration-200 relative group ${
+                  isActive('/contact') ? 'text-gold-400' : 'text-white hover:text-gold-300'
+                }`}
+              >
+                ติดต่อเรา
+                <span className={`absolute bottom-0 left-4 right-4 h-0.5 bg-gold-400 transform transition-transform duration-300 ${
+                  isActive('/contact') ? 'scale-x-100' : 'scale-x-0 group-hover:scale-x-100'
+                }`} />
+              </Link>
             </div>
-            <div className="flex flex-col">
-              <span className="text-white font-black text-lg tracking-wider leading-none group-hover:text-gold-200 transition-colors">
-                CHANTAKORN
-              </span>
-              <span className="text-gold-400 text-xs font-bold tracking-widest leading-tight">
-                PROPERTY
-              </span>
+
+            {/* Desktop Action Buttons */}
+            <div className="hidden lg:flex items-center space-x-3">
+              <Link
+                href="/favorites"
+                className="relative p-2.5 text-white hover:text-gold-300 transition-colors rounded-lg hover:bg-white/5"
+                title="รายการโปรด"
+              >
+                <Heart className="w-5 h-5" />
+              </Link>
+
+              {currentUser ? (
+                <div className="flex items-center space-x-2">
+                  {currentUser.role === 'ADMIN' && (
+                    <Link
+                      href="/admin"
+                      className="flex items-center space-x-1.5 px-4 py-2.5 rounded-xl bg-gold-500 hover:bg-gold-400 text-navy-950 font-bold text-sm transition-all shadow-lg shadow-gold-500/20"
+                    >
+                      <LayoutDashboard className="w-4 h-4" />
+                      <span>แอดมิน</span>
+                    </Link>
+                  )}
+                  <Link
+                    href="/profile"
+                    className="flex items-center space-x-1.5 px-4 py-2.5 rounded-xl border border-white/15 hover:border-gold-400/50 text-white hover:text-gold-300 font-semibold text-sm transition-all"
+                  >
+                    <User className="w-4 h-4" />
+                    <span>{currentUser.full_name?.split(' ')[0] || 'โปรไฟล์'}</span>
+                  </Link>
+                  <button
+                    onClick={handleLogout}
+                    className="p-2.5 text-gray-300 hover:text-red-400 transition-colors rounded-lg hover:bg-white/5"
+                    title="ออกจากระบบ"
+                  >
+                    <LogOut className="w-5 h-5" />
+                  </button>
+                </div>
+              ) : (
+                <>
+                  <Link
+                    href="/login"
+                    className="flex items-center space-x-1.5 px-4 py-2.5 rounded-xl border border-white/15 hover:border-gold-400/50 text-white hover:text-gold-300 font-semibold text-sm transition-all"
+                  >
+                    <LogIn className="w-4 h-4" />
+                    <span>เข้าสู่ระบบ</span>
+                  </Link>
+                  <Link
+                    href="/sell"
+                    className="flex items-center space-x-1.5 px-5 py-2.5 rounded-xl bg-gold-500 hover:bg-gold-400 text-navy-950 font-bold text-sm transition-all shadow-lg shadow-gold-500/20 hover:shadow-gold-500/30 hover:-translate-y-0.5"
+                  >
+                    <Home className="w-4 h-4" />
+                    <span>ลงประกาศ</span>
+                  </Link>
+                </>
+              )}
             </div>
+
+            {/* Mobile Action Buttons */}
+            <div className="flex lg:hidden items-center space-x-2">
+              <Link
+                href="/favorites"
+                className="relative p-2 text-white hover:text-gold-300 transition-colors"
+                title="รายการโปรด"
+              >
+                <Heart className="w-6 h-6" />
+              </Link>
+              <button
+                onClick={() => setIsMenuOpen(!isMenuOpen)}
+                className="p-2 text-white hover:text-gold-300 transition-colors"
+                aria-label="เปิดเมนู"
+              >
+                {isMenuOpen ? <X className="w-7 h-7" /> : <Menu className="w-7 h-7" />}
+              </button>
+            </div>
+          </div>
+        </div>
+      </nav>
+
+      {/* Mobile Menu */}
+      <div className={`lg:hidden fixed inset-x-0 top-[92px] bottom-0 bg-navy-950 border-t border-white/10 overflow-y-auto transition-all duration-300 z-40 ${
+        isMenuOpen ? 'translate-x-0 opacity-100 visible' : 'translate-x-full opacity-0 invisible'
+      }`}>
+        <div className="px-4 py-6 space-y-1 pb-32">
+          {navLinks.map((link) => (
+            <Link
+              key={link.href}
+              href={link.href}
+              onClick={handleMobileNavClick}
+              className={`flex items-center justify-between px-4 py-3.5 rounded-xl font-semibold transition-colors ${
+                isActive(link.href)
+                  ? 'bg-gold-500/10 text-gold-400 border border-gold-500/20'
+                  : 'text-white hover:bg-white/5'
+              }`}
+            >
+              {link.label}
+              <ChevronRight className="w-4 h-4 opacity-50" />
+            </Link>
+          ))}
+
+          {/* Mobile: Property Types Accordion */}
+          <div className="rounded-xl overflow-hidden">
+            <button
+              onClick={toggleBuyDropdown}
+              className={`w-full flex items-center justify-between px-4 py-3.5 font-semibold transition-colors ${
+                isBuyDropdownOpen ? 'bg-white/5 text-gold-400' : 'text-white hover:bg-white/5'
+              }`}
+            >
+              <span>ประเภททรัพย์</span>
+              <ChevronDown className={`w-4 h-4 transition-transform duration-200 ${isBuyDropdownOpen ? 'rotate-180' : ''}`} />
+            </button>
+            {isBuyDropdownOpen && (
+              <div className="pb-2">
+                {categoryLinks.map((cat) => {
+                  const IconComp = categoryIconMap[cat.type] || Building;
+                  return (
+                    <Link
+                      key={cat.type}
+                      href={cat.href}
+                      onClick={handleMobileNavClick}
+                      className="flex items-center space-x-3 px-6 py-3 text-sm text-gray-200 hover:text-gold-300 hover:bg-white/5 transition-colors"
+                    >
+                      <IconComp className="w-4 h-4 text-gold-500" />
+                      <span>{cat.label}</span>
+                    </Link>
+                  );
+                })}
+                <Link
+                  href="/properties"
+                  onClick={handleMobileNavClick}
+                  className="flex items-center space-x-3 px-6 py-3 text-sm font-bold text-gold-400 hover:bg-white/5 transition-colors"
+                >
+                  <Search className="w-4 h-4" />
+                  <span>ดูประกาศทั้งหมด</span>
+                </Link>
+              </div>
+            )}
+          </div>
+
+          {/* Mobile: Services Accordion */}
+          <div className="rounded-xl overflow-hidden">
+            <button
+              onClick={toggleServiceDropdown}
+              className={`w-full flex items-center justify-between px-4 py-3.5 font-semibold transition-colors ${
+                isServiceDropdownOpen ? 'bg-white/5 text-gold-400' : 'text-white hover:bg-white/5'
+              }`}
+            >
+              <span>บริการ</span>
+              <ChevronDown className={`w-4 h-4 transition-transform duration-200 ${isServiceDropdownOpen ? 'rotate-180' : ''}`} />
+            </button>
+            {isServiceDropdownOpen && (
+              <div className="pb-2">
+                {serviceLinks.map((svc) => (
+                  <Link
+                    key={svc.href}
+                    href={svc.href}
+                    onClick={handleMobileNavClick}
+                    className="flex items-center space-x-3 px-6 py-3 text-sm text-gray-200 hover:text-gold-300 hover:bg-white/5 transition-colors"
+                  >
+                    <Briefcase className="w-4 h-4 text-gold-500" />
+                    <span>{svc.label}</span>
+                  </Link>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <Link
+            href="/contact"
+            onClick={handleMobileNavClick}
+            className={`flex items-center justify-between px-4 py-3.5 rounded-xl font-semibold transition-colors ${
+              isActive('/contact') ? 'bg-gold-500/10 text-gold-400 border border-gold-500/20' : 'text-white hover:bg-white/5'
+            }`}
+          >
+            ติดต่อเรา
+            <ChevronRight className="w-4 h-4 opacity-50" />
           </Link>
 
-          {/* Center Navigation Links (Desktop) */}
-          <nav className="hidden lg:flex items-center space-x-0.5 xl:space-x-1">
-            {navLinks.map((link) => {
-              const isActive = pathname === link.href;
-              return (
-                <Link
-                  key={link.name}
-                  href={link.href}
-                  onClick={() => setMobileMenuOpen(false)}
-                  className={`relative px-3 py-2 text-sm tracking-wide transition-colors after:absolute after:left-3 after:right-3 after:bottom-0.5 after:h-[2px] after:rounded-full after:bg-gradient-to-r after:from-gold-300 after:to-gold-500 after:transition-opacity after:duration-300 ${
-                    isActive
-                      ? 'text-gold-300 font-bold after:opacity-100'
-                      : 'text-slate-200 font-medium hover:text-gold-200 after:opacity-0'
-                  }`}
-                >
-                  {link.name}
-                </Link>
-              );
-            })}
-          </nav>
-
-          {/* Right Actions (Desktop) */}
-          <div className="hidden lg:flex items-center space-x-2 xl:space-x-3">
-            <Link
-              href="/favorites"
-              className="relative p-2 text-white hover:text-gold-300 hover:bg-navy-900 rounded-xl border border-transparent hover:border-navy-700 transition-all"
-              title="ทรัพย์ที่บันทึกไว้"
-            >
-              <Heart className="w-5 h-5" />
-              {favCount > 0 && (
-                <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center shadow-sm">
-                  {favCount}
-                </span>
-              )}
-            </Link>
-
-            {/* Login / Profile Button */}
+          {/* Mobile: Auth Section */}
+          <div className="pt-4 mt-4 border-t border-white/10 space-y-2">
             {currentUser ? (
-              <Link
-                id="main-user-profile-btn"
-                href={currentUser.role === 'ADMIN' || currentUser.role === 'AGENT' ? '/admin' : '/profile'}
-                className="flex items-center space-x-2 pl-2 pr-3 py-1.5 bg-navy-900 hover:bg-navy-850 rounded-full border border-gold-400/50 hover:border-gold-300 shadow-sm transition-all group"
-                title="คลิกเพื่อจัดการโปรไฟล์"
-              >
-                <div className="w-7 h-7 rounded-full overflow-hidden ring-2 ring-gold-400 bg-navy-950 flex items-center justify-center flex-shrink-0">
-                  {currentUser.avatar_url ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={currentUser.avatar_url} alt={currentUser.full_name} className="w-full h-full object-cover" />
-                  ) : (
-                    <span className="text-xs font-bold text-gold-400">
-                      {(currentUser.full_name || 'U').charAt(0).toUpperCase()}
-                    </span>
-                  )}
-                </div>
-                <div className="flex flex-col text-left">
-                  <span className="text-xs font-bold text-white group-hover:text-gold-200 transition-colors max-w-[100px] truncate leading-tight">
-                    {currentUser.full_name || 'ผู้ใช้งาน'}
-                  </span>
-                  <span className="text-[10px] text-gold-300 font-bold leading-none">
-                    {currentUser.role === 'ADMIN' ? 'ผู้ดูแลระบบ' : currentUser.role === 'AGENT' ? 'เจ้าหน้าที่' : 'สมาชิก'}
-                  </span>
-                </div>
-              </Link>
-            ) : (
-              <Link
-                id="main-login-btn"
-                href="/login"
-                className="flex items-center space-x-2 bg-navy-900 hover:bg-navy-850 text-white hover:text-gold-300 px-3.5 py-1.5 text-sm font-bold rounded-xl border border-gold-400/40 hover:border-gold-300 transition-all shadow-sm group"
-              >
-                <LogIn className="w-4 h-4 text-gold-400 group-hover:translate-x-0.5 transition-transform" />
-                <span className="text-white group-hover:text-gold-300">เข้าสู่ระบบ</span>
-              </Link>
-            )}
-
-            <Link
-              href="/sell"
-              className="flex items-center space-x-1.5 px-3.5 py-1.5 text-xs font-bold text-gold-300 border border-gold-400/50 hover:border-gold-300 hover:bg-gold-500/15 rounded-xl transition-all shadow-sm"
-            >
-              <PlusCircle className="w-3.5 h-3.5 text-gold-400" />
-              <span>ลงประกาศ</span>
-            </Link>
-
-            <Link
-              href="/contact"
-              className="px-4 py-2 text-xs font-bold text-navy-950 bg-gradient-to-r from-gold-400 via-gold-500 to-amber-500 hover:from-gold-300 hover:to-gold-400 rounded-xl shadow-md hover:shadow-gold-500/25 transition-all transform hover:-translate-y-0.5"
-            >
-              ติดต่อเรา
-            </Link>
-          </div>
-
-          {/* Mobile Right Icons & Hamburger */}
-          <div className="flex items-center space-x-2 lg:hidden">
-            <Link
-              href="/favorites"
-              className="relative p-2 text-gray-300 hover:text-gold-400 rounded-lg"
-            >
-              <Heart className="w-5 h-5" />
-              {favCount > 0 && (
-                <span className="absolute -top-0.5 -right-0.5 w-4 h-4 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center">
-                  {favCount}
-                </span>
-              )}
-            </Link>
-
-            <button
-              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="p-2 text-gray-200 hover:text-gold-400 hover:bg-navy-900 rounded-lg focus:outline-none"
-              aria-label="Toggle Navigation Menu"
-            >
-              {mobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
-            </button>
-          </div>
-        </div>
-      </header>
-
-      {/* Mobile Slide-down Navigation Menu */}
-      {mobileMenuOpen && (
-        <div 
-          className="lg:hidden fixed inset-0 top-[60px] z-[60] bg-[#020812] border-t border-navy-800 flex flex-col p-5 overflow-y-auto animate-fadeIn shadow-2xl"
-          style={{ backgroundColor: '#020812' }}
-        >
-          {/* User Account Card in Mobile Menu if logged in */}
-          {currentUser && (
-            <div className="mb-5 p-4 rounded-2xl bg-navy-900 border border-gold-500/40 flex items-center justify-between shadow-md">
-              <div className="flex items-center space-x-3">
-                <div className="w-10 h-10 rounded-full overflow-hidden ring-2 ring-gold-400 bg-navy-950 flex items-center justify-center flex-shrink-0">
-                  {currentUser.avatar_url ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={currentUser.avatar_url} alt={currentUser.full_name} className="w-full h-full object-cover" />
-                  ) : (
-                    <span className="text-sm font-bold text-gold-400">
-                      {(currentUser.full_name || 'U').charAt(0).toUpperCase()}
-                    </span>
-                  )}
-                </div>
-                <div>
-                  <div className="font-bold text-white text-sm">
-                    {currentUser.full_name || 'ผู้ใช้งาน'}
-                  </div>
-                  <div className="text-xs text-gold-400 font-semibold">
-                    {currentUser.role === 'ADMIN' ? 'ผู้ดูแลระบบ (Admin)' : currentUser.role === 'AGENT' ? 'เจ้าหน้าที่ (Agent)' : 'สมาชิก'}
-                  </div>
-                </div>
-              </div>
-              <Link
-                href="/profile"
-                onClick={() => setMobileMenuOpen(false)}
-                className="px-3 py-1.5 bg-navy-800 text-gold-300 text-xs font-bold rounded-xl border border-gold-400/40 hover:bg-navy-750 transition-all"
-              >
-                โปรไฟล์
-              </Link>
-            </div>
-          )}
-
-          <div className="flex flex-col space-y-2 mb-6">
-            <div className="text-xs font-bold text-gold-400 uppercase tracking-wider mb-2 px-2 flex items-center justify-between">
-              <span>เมนูหลัก</span>
-              <span className="text-[11px] text-gray-400 font-normal">Chantakorn Property</span>
-            </div>
-            {navLinks.map((link) => {
-              const isActive = pathname === link.href;
-              return (
-                <Link
-                  key={link.name}
-                  href={link.href}
-                  onClick={() => setMobileMenuOpen(false)}
-                  className={`flex items-center justify-between px-4 py-3 rounded-xl text-base transition-all ${
-                    isActive
-                      ? 'bg-navy-900 text-gold-300 font-bold border border-gold-400/60 shadow-md ring-1 ring-gold-400/30'
-                      : 'text-white hover:text-gold-300 font-semibold bg-navy-900/70 hover:bg-navy-850 border border-navy-800'
-                  }`}
-                >
-                  <span className="tracking-wide">{link.name}</span>
-                  <ChevronRight className={`w-4 h-4 flex-shrink-0 ${isActive ? 'text-gold-400' : 'text-gray-400'}`} />
-                </Link>
-              );
-            })}
-          </div>
-
-          <div className="border-t border-navy-800 pt-5 flex flex-col space-y-3 pb-24">
-            <Link
-              href="/sell"
-              onClick={() => setMobileMenuOpen(false)}
-              className="w-full flex items-center justify-center space-x-2 py-3 px-4 rounded-xl border border-gold-400/50 bg-navy-900 text-gold-300 font-bold hover:bg-navy-850 transition-all shadow-sm"
-            >
-              <PlusCircle className="w-4 h-4 text-gold-400" />
-              <span>ลงประกาศ / ฝากขายทรัพย์</span>
-            </Link>
-
-            {currentUser ? (
-              <div className="space-y-2">
-                {(currentUser.role === 'ADMIN' || currentUser.role === 'AGENT') && (
-                  <Link
-                    href="/admin"
-                    onClick={() => setMobileMenuOpen(false)}
-                    className="w-full flex items-center justify-center space-x-2 py-3 px-4 rounded-xl bg-navy-900 border border-gold-500/40 text-gold-300 font-bold hover:bg-navy-850 transition-all"
-                  >
-                    <LayoutDashboard className="w-4 h-4" />
-                    <span>แผงควบคุมระบบ (Admin Panel)</span>
-                  </Link>
-                )}
+              <>
                 <Link
                   href="/profile"
-                  onClick={() => setMobileMenuOpen(false)}
-                  className="w-full flex items-center justify-center space-x-2 py-3 px-4 rounded-xl bg-navy-850 text-white font-medium hover:bg-navy-800 transition-all border border-navy-800"
+                  onClick={handleMobileNavClick}
+                  className="flex items-center space-x-3 px-4 py-3.5 rounded-xl bg-white/5 text-white font-semibold"
                 >
-                  <UserCircle className="w-4 h-4" />
-                  <span>จัดการโปรไฟล์ส่วนตัว</span>
+                  <User className="w-5 h-5 text-gold-400" />
+                  <span>{currentUser.full_name || 'โปรไฟล์ของฉัน'}</span>
                 </Link>
+                {currentUser.role === 'ADMIN' && (
+                  <Link
+                    href="/admin"
+                    onClick={handleMobileNavClick}
+                    className="flex items-center space-x-3 px-4 py-3.5 rounded-xl bg-gold-500 text-navy-950 font-bold"
+                  >
+                    <LayoutDashboard className="w-5 h-5" />
+                    <span>แผงควบคุมแอดมิน</span>
+                  </Link>
+                )}
                 <button
-                  type="button"
-                  onClick={() => {
-                    handleLogout();
-                    setMobileMenuOpen(false);
-                  }}
-                  className="w-full flex items-center justify-center space-x-2 py-2.5 px-4 rounded-xl bg-red-950/50 border border-red-800/60 text-red-300 text-xs font-semibold hover:bg-red-900/40 transition-all"
+                  onClick={handleLogout}
+                  className="w-full flex items-center space-x-3 px-4 py-3.5 rounded-xl bg-red-500/10 text-red-400 font-semibold"
                 >
-                  <LogOut className="w-4 h-4" />
+                  <LogOut className="w-5 h-5" />
                   <span>ออกจากระบบ</span>
                 </button>
-              </div>
+              </>
             ) : (
-              <Link
-                href="/login"
-                onClick={() => setMobileMenuOpen(false)}
-                className="w-full flex items-center justify-center space-x-2 py-3 px-4 rounded-xl bg-gold-400 text-navy-950 font-bold hover:bg-gold-300 transition-all shadow-md"
-              >
-                <LogIn className="w-4 h-4 text-navy-950 stroke-[2.5]" />
-                <span>เข้าสู่ระบบ / สมัครสมาชิก</span>
-              </Link>
+              <div className="grid grid-cols-2 gap-3">
+                <Link
+                  href="/login"
+                  onClick={handleMobileNavClick}
+                  className="flex items-center justify-center space-x-1.5 px-4 py-3.5 rounded-xl border border-white/15 text-white font-semibold"
+                >
+                  <LogIn className="w-4 h-4" />
+                  <span>เข้าสู่ระบบ</span>
+                </Link>
+                <Link
+                  href="/sell"
+                  onClick={handleMobileNavClick}
+                  className="flex items-center justify-center space-x-1.5 px-4 py-3.5 rounded-xl bg-gold-500 text-navy-950 font-bold"
+                >
+                  <Home className="w-4 h-4" />
+                  <span>ลงประกาศ</span>
+                </Link>
+              </div>
             )}
+          </div>
 
-            <Link
-              href="/contact"
-              onClick={() => setMobileMenuOpen(false)}
-              className="w-full flex items-center justify-center py-3.5 px-4 rounded-xl bg-gradient-to-r from-gold-400 via-gold-500 to-amber-500 text-navy-950 font-black shadow-md hover:shadow-gold-500/25 transition-all"
+          {/* Mobile: Contact Info */}
+          <div className="pt-6 mt-2 border-t border-white/10">
+            <p className="px-4 text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">ติดต่อสื่อสาร</p>
+            <a
+              href="tel:0816040097"
+              className="flex items-center space-x-3 px-4 py-3 text-sm text-gray-200 hover:text-gold-300 transition-colors"
             >
-              ติดต่อ Chantakorn Property
-            </Link>
-
-            <div className="mt-4 pt-4 border-t border-navy-800 text-center text-xs text-gray-200 space-y-2">
-              <div>โทร: <a href="tel:0816040097" className="text-gold-300 font-bold hover:underline">081-604-0097</a></div>
-              <div>
-                <a
-                  href="https://lin.ee/NMSe28T3"
-                  target="_blank"
-                  rel="noreferrer"
-                  className="text-[#06C755] hover:underline font-bold inline-flex items-center space-x-1"
-                >
-                  <MessageCircle className="w-3.5 h-3.5 fill-current inline mr-1" />
-                  <span>LINE Official: @930xzcyi (คลิกเพื่อแอดไลน์)</span>
-                </a>
-              </div>
-              <div>
-                <a
-                  href="https://www.facebook.com/people/Chantakorn-Property-%E0%B8%99%E0%B8%B2%E0%B8%A2%E0%B8%AB%E0%B8%99%E0%B9%89%E0%B8%B2-%E0%B8%9A%E0%B9%89%E0%B8%B2%E0%B8%99-%E0%B8%97%E0%B8%B5%E0%B9%88%E0%B8%94%E0%B8%B4%E0%B8%99-%E0%B8%84%E0%B8%AD%E0%B8%99%E0%B9%82%E0%B8%94-%E0%B8%AB%E0%B8%B2%E0%B8%94%E0%B9%83%E0%B8%AB%E0%B8%8D%E0%B9%88-%E0%B8%AA%E0%B8%87%E0%B8%82%E0%B8%A5%E0%B8%B2/61593092347613/"
-                  target="_blank"
-                  rel="noreferrer"
-                  className="text-blue-400 hover:underline font-medium"
-                >
-                  Facebook: Chantakorn Property
-                </a>
-              </div>
-            </div>
+              <Phone className="w-4 h-4 text-gold-400" />
+              <span>โทร: 081-604-0097</span>
+            </a>
+            <a
+              href={formatLineUrl('@930xzcyi')}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center space-x-3 px-4 py-3 text-sm text-gray-200 hover:text-gold-300 transition-colors"
+            >
+              <MessageCircle className="w-4 h-4 text-[#06C755]" />
+              <span>LINE Official: @930xzcyi (คลิกเพื่อแอดไลน์)</span>
+            </a>
+            <a
+              href="https://www.facebook.com/people/Chantakorn-Property-%E0%B8%99%E0%B8%B2%E0%B8%A2%E0%B8%AB%E0%B8%99%E0%B9%89%E0%B8%B2-%E0%B8%9A%E0%B9%89%E0%B8%B2%E0%B8%99-%E0%B8%97%E0%B8%B5%E0%B9%88%E0%B8%94%E0%B8%B4%E0%B8%99-%E0%B8%84%E0%B8%AD%E0%B8%99%E0%B9%82%E0%B8%94-%E0%B8%AB%E0%B8%B2%E0%B8%94%E0%B9%83%E0%B8%AB%E0%B8%8D%E0%B9%88-%E0%B8%AA%E0%B8%87%E0%B8%82%E0%B8%A5%E0%B8%B2/61593092347613/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center space-x-3 px-4 py-3 text-sm text-gray-200 hover:text-gold-300 transition-colors"
+            >
+              <Facebook className="w-4 h-4 text-[#3b82f6]" />
+              <span>Facebook: Chantakorn Property หน้าหลัก</span>
+            </a>
           </div>
         </div>
-      )}
-    </>
+      </div>
+    </header>
   );
 }
