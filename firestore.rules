@@ -13,18 +13,15 @@ service cloud.firestore {
 
     function isStaff() {
       return isSignedIn() && request.auth.token.email_verified == true && (
-        request.auth.token.email == 'benzttr12@gmail.com' ||
-        request.auth.token.email == 'agent@chantakornproperty.com' ||
-        (exists(/databases/$(database)/documents/profiles/$(request.auth.uid)) &&
-         (getUserData().role == 'ADMIN' || getUserData().role == 'AGENT'))
+        exists(/databases/$(database)/documents/profiles/$(request.auth.uid)) &&
+        (getUserData().role == 'ADMIN' || getUserData().role == 'AGENT')
       );
     }
 
     function isAdmin() {
       return isSignedIn() && request.auth.token.email_verified == true && (
-        request.auth.token.email == 'benzttr12@gmail.com' ||
-        (exists(/databases/$(database)/documents/profiles/$(request.auth.uid)) &&
-         getUserData().role == 'ADMIN')
+        exists(/databases/$(database)/documents/profiles/$(request.auth.uid)) &&
+        getUserData().role == 'ADMIN'
       );
     }
 
@@ -57,12 +54,8 @@ service cloud.firestore {
         resource.data.role in ['ADMIN', 'AGENT']
       );
 
-      // Prevent self-assigned roles during signup (must register as USER, unless they are verified root admin or agent)
-      allow create: if isOwner(userId) && (
-        request.resource.data.role == 'USER' ||
-        (request.resource.data.role == 'ADMIN' && request.auth.token.email_verified == true && request.auth.token.email == 'benzttr12@gmail.com') ||
-        (request.resource.data.role == 'AGENT' && request.auth.token.email_verified == true && request.auth.token.email == 'agent@chantakornproperty.com')
-      );
+      // Prevent self-assigned roles during signup (must register as USER)
+      allow create: if isOwner(userId) && request.resource.data.role == 'USER';
 
       // Owners can edit their own profile fields except 'role' (privilege escalation protection)
       allow update: if (isOwner(userId) && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role'])) || isAdmin();
@@ -99,6 +92,12 @@ service cloud.firestore {
     // 9. Work Jobs (7-Phase Workflow & Operations)
     match /work_jobs/{jobId} {
       allow read, write: if isStaff();
+    }
+
+    // 10. LINE OA follower registry (webhook upserts anonymously; staff read/manage)
+    match /line_followers/{followerId} {
+      allow create, update: if true;
+      allow read, delete: if isStaff();
     }
   }
 }

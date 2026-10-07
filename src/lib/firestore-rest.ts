@@ -67,14 +67,16 @@ export async function getFirestoreDocument(collection: string, id: string, token
   });
 }
 
-export async function patchFirestoreDocument(collection: string, id: string, fields: Record<string, unknown>, token: string) {
+export async function patchFirestoreDocument(collection: string, id: string, fields: Record<string, unknown>, token?: string) {
   const url = new URL(withApiKey(`${documentsUrl}/${encodeURIComponent(collection)}/${encodeURIComponent(id)}`));
   for (const field of Object.keys(fields)) url.searchParams.append('updateMask.fieldPaths', field);
   const firestoreFields: Record<string, FirestoreValue> = {};
   for (const [key, value] of Object.entries(fields)) firestoreFields[key] = toFirestoreValue(value);
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  if (token) headers.Authorization = `Bearer ${token}`;
   return fetch(url, {
     method: 'PATCH',
-    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    headers,
     body: JSON.stringify({ fields: firestoreFields }),
     signal: AbortSignal.timeout(10000),
   });
