@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Smart Property Text Parser & Auto-Extractor
  * แปลงข้อความดิบจาก LINE, Facebook, หรือโน้ตของนายหน้าเป็นข้อมูลทรัพย์สินอัตโนมัติ
  * Chantakorn Property - หาดใหญ่ สงขลา
