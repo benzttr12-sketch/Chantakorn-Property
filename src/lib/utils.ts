@@ -219,7 +219,7 @@ export function parseGoogleMapsCoordinates(input: string): ParsedCoordinates | n
   }
 
   // 4. พิกัด DMS (Degrees, Minutes, Seconds) เช่น 7°00'31.1"N 100°28'29.0"E
-  const dmsRegex = /(\d+)[°\s]+(\d+)['\s]+([0-9.]+)["]?\s*([NSns])[,;\s]+(\d+)[°\s]+(\d+)['\s]+([0-9.]+)["]?\s*([EWew])/;
+  const dmsRegex = /(\d+)[°\s]+(\d+)['\s]+([0-9.]+)"]?\s*([NSns])[,;\s]+(\d+)[°\s]+(\d+)['\s]+([0-9.]+)"]?\s*([EWew])/;
   const dmsMatch = trimmed.match(dmsRegex);
   if (dmsMatch) {
     const latDeg = parseFloat(dmsMatch[1]);
@@ -301,6 +301,8 @@ export function formatLineUrl(lineId?: string): string {
     return trimmed;
   }
   if (
+    trimmed === '@930xzcyi' ||
+    trimmed === '930xzcyi' ||
     trimmed === '@chantakorn' ||
     trimmed === 'chantakorn' ||
     trimmed === '@chantakornproperty' ||
@@ -408,6 +410,3 @@ ${featuresList}
 📱 LINE OA: ${lineId} (คลิกลิงก์: ${lineLink})
 ━━━━━━━━━━━━━━━━━━━━`;
 }
-
-
-
