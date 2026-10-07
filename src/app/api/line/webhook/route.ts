@@ -1,9 +1,8 @@
-﻿import { jsonResponse } from '@/lib/api-response';
+import { jsonResponse } from '@/lib/api-response';
 import { Property } from '@/lib/types';
 import { requireStaff } from '@/lib/server-auth';
-import { createFirestoreDocument, listFirestoreDocuments } from '@/lib/firestore-rest';
+import { createFirestoreDocument, listFirestoreDocuments, patchFirestoreDocument } from '@/lib/firestore-rest';
 import { getLinePropertyImageUrl } from '@/lib/line-property-image';
-import { formatPropertyCode } from '@/lib/format-code';
 
 const OFFICIAL_LINE_OA_URL = 'https://lin.ee/NMSe28T3';
 const DEFAULT_PHONE = '081-604-0097';
@@ -105,7 +104,7 @@ async function saveInquiry(inquiryData: {
     const response = await createFirestoreDocument('inquiries', {
       name: inquiryData.name || `ลูกค้า LINE OA (${inquiryData.userId ? inquiryData.userId.slice(0, 8) : 'ผู้ใช้'})`,
       phone: '-',
-      line_id: inquiryData.userId || '@930xzcyi',
+      line_id: inquiryData.userId || '-',
       message: inquiryData.message,
       inquiry_type: inquiryData.inquiry_type || 'inquiry',
       property_title: inquiryData.property_title || '',
@@ -116,6 +115,24 @@ async function saveInquiry(inquiryData: {
     if (!response.ok) throw new Error(`Firestore write failed with status ${response.status}`);
   } catch (err) {
     console.warn('[LINE Webhook] Could not save inquiry to Firestore:', err);
+  }
+}
+
+// Register/refresh the LINE follower so the system can notify them about new properties later.
+async function upsertFollower(userId: string | undefined) {
+  if (!userId || !userId.startsWith('U')) return;
+  try {
+    const nowIso = new Date().toISOString();
+    const response = await patchFirestoreDocument('line_followers', userId, {
+      user_id: userId,
+      followed_at: nowIso,
+      last_active_at: nowIso,
+      is_active: true,
+      source: 'line_webhook',
+    });
+    if (!response.ok) throw new Error(`Follower upsert failed with status ${response.status}`);
+  } catch (err) {
+    console.warn('[LINE Webhook] Could not register LINE follower:', err);
   }
 }
 
@@ -159,14 +176,8 @@ function buildPropertyCarouselFlex(properties: Property[], hostOrigin: string, q
       ? new Intl.NumberFormat('th-TH', { style: 'currency', currency: 'THB', maximumFractionDigits: 0 }).format(p.price)
       : 'ราคาพิเศษ';
     const actionText = p.status === 'rent' ? 'ปล่อยเช่า' : 'เสนอขาย';
-    // ลิงก์สั้นด้วยรหัสทรัพย์ (หน้า detail ค้นจากทั้งรหัส, id และ slug)
-    const shortCode = formatPropertyCode(p.id);
-    const detailUrl = shortCode && shortCode !== '-'
-      ? `${hostOrigin}/properties/${encodeURIComponent(shortCode)}`
-      : p.slug ? `${hostOrigin}/properties/${encodeURIComponent(p.slug)}` : `${hostOrigin}/properties/`;
-    // LINE ดึงรูปได้เฉพาะ https สาธารณะ — localhost/โดเมนภายในจะทำให้การ์ดไม่มีรูป
-    const publicImageOrigin = /^https:\/\//i.test(imageOrigin) ? imageOrigin : null;
-    const coverImg = publicImageOrigin ? getLinePropertyImageUrl(p, publicImageOrigin) : null;
+    const detailUrl = p.slug ? `${hostOrigin}/properties/detail/?slug=${encodeURIComponent(p.slug)}` : `${hostOrigin}/properties/`;
+    const coverImg = getLinePropertyImageUrl(p, imageOrigin);
 
     return {
       type: 'bubble',
@@ -664,11 +675,14 @@ export async function POST(req: Request) {
 
       // Event A: User adds LINE OA as friend (Follow)
       if (type === 'follow') {
-        if (!isSimulation) await saveInquiry({
-          userId,
-          message: 'ผู้ใช้เพิ่มเพื่อนใหม่ (Followed LINE Official Account)',
-          inquiry_type: 'inquiry',
-        });
+        if (!isSimulation) {
+          await upsertFollower(userId);
+          await saveInquiry({
+            userId,
+            message: 'ผู้ใช้เพิ่มเพื่อนใหม่ (Followed LINE Official Account)',
+            inquiry_type: 'inquiry',
+          });
+        }
 
         const welcomeFlex = buildWelcomeFlex(hostOrigin);
         await reply(replyToken, [welcomeFlex]);
@@ -682,12 +696,15 @@ export async function POST(req: Request) {
         // Website form submissions are already stored before the customer opens LINE.
         // Keep the LINE chat message, but avoid creating a duplicate inbox record.
         const isWebsiteFormSubmission = /\[CP-WEB-FORM:[0-9a-f-]{36}\]/i.test(userText);
-        if (!isSimulation && !isWebsiteFormSubmission) {
-          await saveInquiry({
-            userId,
-            message: userText,
-            inquiry_type: 'inquiry',
-          });
+        if (!isSimulation) {
+          await upsertFollower(userId);
+          if (!isWebsiteFormSubmission) {
+            await saveInquiry({
+              userId,
+              message: userText,
+              inquiry_type: 'inquiry',
+            });
+          }
         }
 
         // Intent 1: Greetings, Help, Main Menu
