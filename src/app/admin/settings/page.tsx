@@ -20,6 +20,12 @@ export default function AdminSettingsPage() {
   const [testWebhookRunning, setTestWebhookRunning] = useState(false);
   const [webhookSimKeyword, setWebhookSimKeyword] = useState('สวัสดี');
   const [webhookTestResult, setWebhookTestResult] = useState<any>(null);
+  const [checkingConnection, setCheckingConnection] = useState(false);
+  const [connectionResult, setConnectionResult] = useState<{
+    ready: boolean;
+    message: string;
+    checks: Array<{ name: string; ok: boolean; code: string; message: string }>;
+  } | null>(null);
 
   const [testResult, setTestResult] = useState<{
     success: boolean;
@@ -160,6 +166,25 @@ export default function AdminSettingsPage() {
     }
   };
 
+  const handleCheckConnection = async () => {
+    setCheckingConnection(true);
+    setConnectionResult(null);
+    try {
+      const res = await fetchStaffApi('/api/line/diagnostics', { cache: 'no-store' });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'ตรวจการเชื่อมต่อ LINE ไม่สำเร็จ');
+      setConnectionResult({ ready: data.ready === true, message: data.message, checks: data.checks || [] });
+    } catch (err) {
+      setConnectionResult({
+        ready: false,
+        message: err instanceof Error ? err.message : 'ตรวจการเชื่อมต่อ LINE ไม่สำเร็จ',
+        checks: [],
+      });
+    } finally {
+      setCheckingConnection(false);
+    }
+  };
+
   // Webhook Simulator Test Handler
   const handleTestWebhookSimulator = async () => {
     setTestWebhookRunning(true);
@@ -266,6 +291,31 @@ export default function AdminSettingsPage() {
         </div>
 
         {/* Setup Steps Guide */}
+        <div className="space-y-3 rounded-xl border border-emerald-200 bg-white p-4">
+          <p className="text-xs text-gray-700">ตรวจบัญชีบอต การเปิดรับข้อความ และรายการทรัพย์จากการเชื่อมต่อจริง</p>
+          <button
+            type="button"
+            disabled={checkingConnection}
+            onClick={handleCheckConnection}
+            className="flex items-center gap-2 rounded-lg bg-[#06C755] px-4 py-2 text-xs font-bold text-white disabled:opacity-50"
+          >
+            {checkingConnection ? <Loader2 className="h-4 w-4 animate-spin" /> : <ShieldCheck className="h-4 w-4" />}
+            {checkingConnection ? 'กำลังตรวจการเชื่อมต่อ...' : 'ตรวจการเชื่อมต่อ LINE OA'}
+          </button>
+          {connectionResult && (
+            <div role="status" className="space-y-2 text-xs">
+              <p className={connectionResult.ready ? 'font-bold text-emerald-700' : 'font-bold text-red-700'}>{connectionResult.message}</p>
+              <ul className="space-y-1">
+                {connectionResult.checks.map((check) => (
+                  <li key={check.name} className={check.ok ? 'text-emerald-800' : 'text-red-800'}>
+                    {check.ok ? '✓' : '•'} {check.message}
+                  </li>
+                ))}
+              </ul>
+              <p className="text-gray-600">หลังตรวจผ่าน ให้ส่ง “ดูทรัพย์” จาก LINE ของลูกค้าและตรวจว่าได้รับการ์ดจริง</p>
+            </div>
+          )}
+        </div>
         <div className="bg-white/90 border border-emerald-200 rounded-xl p-4 text-xs text-gray-800 space-y-2">
           <p className="font-bold text-navy-950 flex items-center gap-1.5">
             <Info className="w-4 h-4 text-[#06C755]" />

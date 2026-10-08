@@ -7,7 +7,7 @@ const vm = require('node:vm');
 const ts = require('typescript');
 const sharp = require('sharp');
 
-function load(file, { env = {}, fetch = async () => { throw Error('Unexpected request'); }, firestore = {}, requireStaff = async () => null } = {}) {
+function load(file, { env = {}, fetch = async () => { throw Error('Unexpected request'); }, firestore = {}, requireStaff = async () => null, log = () => {} } = {}) {
   const module = { exports: {} };
   const source = ts.transpileModule(fs.readFileSync(path.join(__dirname, '../src', file), 'utf8'), {
     compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
@@ -15,7 +15,7 @@ function load(file, { env = {}, fetch = async () => { throw Error('Unexpected re
   const context = vm.createContext({
     module, exports: module.exports, Request, Response, URL, URLSearchParams, Headers, AbortSignal, Buffer,
     TextEncoder, crypto: webcrypto, btoa: text => Buffer.from(text, 'binary').toString('base64'),
-    fetch, process: { env }, console: { log() {}, info() {}, warn() {}, error() {} },
+    fetch, process: { env }, console: Object.fromEntries(['log', 'info', 'warn', 'error'].map(level => [level, (...args) => log(level, ...args)])),
     require(name) {
       if (name === '@/lib/api-response') return { jsonResponse: (body, init) => Response.json(body, init) };
       if (name === '@/lib/server-auth') return { requireStaff };
@@ -27,6 +27,7 @@ function load(file, { env = {}, fetch = async () => { throw Error('Unexpected re
       if (name === 'node:crypto') return require(name);
       if (name === '@/lib/firestore-rest') return {
         createFirestoreDocument: firestore.createFirestoreDocument || (async () => ({ ok: true })),
+        patchFirestoreDocument: firestore.patchFirestoreDocument || (async () => ({ ok: true })),
         listFirestoreDocuments: firestore.listFirestoreDocuments || (async () => []),
         getFirestoreDocument: firestore.getFirestoreDocument || (async () => { throw Error('Unexpected document read'); }),
       };
@@ -197,6 +198,233 @@ test('LINE property carousel contains only published homes with static-site link
   assert.equal(bubbles.length, 1);
   assert.equal(bubbles[0].body.contents[1].text, 'Public home');
   assert.equal(bubbles[0].footer.contents[0].action.uri, 'https://example.com/site/properties/CK-HOME%20ONE');
+});
+
+async function customerReply(text, properties, options = {}) {
+  const sent = [];
+  const api = load('app/api/line/webhook/route.ts', {
+    env: { LINE_CHANNEL_SECRET: 'test-secret', LINE_CHANNEL_ACCESS_TOKEN: 'test-token', NEXT_PUBLIC_SITE_URL: 'https://site.example.com' },
+    firestore: { listFirestoreDocuments: async () => properties, ...options.firestore },
+    fetch: async (_url, init) => { sent.push(JSON.parse(init.body)); return Response.json({}); },
+    ...options,
+  });
+  const response = await api.POST(signedRequest(text));
+  return { sent, response, result: await response.json() };
+}
+
+const searchableProperties = [
+  { id: '813f2b90-36a7-488a-baf7-e7a79cd7c475', title: 'ที่ดินสิงหนคร', published: true, property_type: 'land', status: 'sale', district: 'สิงหนคร', province: 'สงขลา' },
+  { id: 'house-one', title: 'บ้านขายหาดใหญ่', published: true, property_type: 'house', status: 'sale', district: 'หาดใหญ่', province: 'สงขลา' },
+  { id: 'house-two', title: 'บ้านเช่าหาดใหญ่', published: true, property_type: 'house', status: 'rent', district: 'หาดใหญ่', province: 'สงขลา' },
+  { id: 'land-three', title: 'ที่ดินขายหาดใหญ่', published: true, property_type: 'land', status: 'sale', district: 'หาดใหญ่', province: 'สงขลา' },
+];
+
+test('Thai buyer phrases search by type, sale status and location instead of opening the seller form', async () => {
+  for (const [phrase, expectedTitle] of [
+    ['มีขายที่ดิน สิงหนครไหมครับ', 'ที่ดินสิงหนคร'],
+    ['ขอดูบ้านขายแถวหาดใหญ่หน่อยครับ', 'บ้านขายหาดใหญ่'],
+    ['อยากซื้อบ้าน ในหาดใหญ่', 'บ้านขายหาดใหญ่'],
+    ['หาบ้านเช่าหาดใหญ่ค่ะ', 'บ้านเช่าหาดใหญ่'],
+  ]) {
+    const { sent, result } = await customerReply(phrase, searchableProperties);
+    assert.equal(result.successfulReplies, 1);
+    const bubbles = sent[0].messages[0].contents.contents;
+    assert.equal(bubbles.length, 1, phrase);
+    assert.equal(bubbles[0].body.contents[1].text, expectedTitle, phrase);
+  }
+});
+
+test('explicit seller requests and website consignment markers still open the seller flow', async () => {
+  for (const phrase of ['ต้องการขายที่ดิน สิงหนคร', 'อยากขายบ้าน', 'ฝากขายบ้าน', '[CP-WEB-FORM:813f2b90-36a7-488a-baf7-e7a79cd7c475] ข้อมูลผู้ติดต่อ']) {
+    let reads = 0;
+    let writes = 0;
+    const { sent } = await customerReply(phrase, searchableProperties, { firestore: {
+      listFirestoreDocuments: async () => { reads += 1; return searchableProperties; },
+      createFirestoreDocument: async () => { writes += 1; return { ok: true }; },
+    } });
+    assert.equal(reads, 0, phrase);
+    assert.equal(writes, phrase.startsWith('[CP-WEB-FORM:') ? 0 : 1, phrase);
+    assert.equal(sent[0].messages[0].contents.body.contents.at(-1).action.uri, 'https://site.example.com/sell');
+  }
+});
+
+test('property codes find a specific listing and general listing commands return published results', async () => {
+  const { sent } = await customerReply('ขอดูรหัสทรัพย์ CK-813F2B', searchableProperties);
+  assert.equal(sent[0].messages[0].contents.contents.length, 1);
+  assert.equal(sent[0].messages[0].contents.contents[0].body.contents[1].text, 'ที่ดินสิงหนคร');
+  for (const phrase of ['ดูทรัพย์', 'ค้นหาทรัพย์', 'รายการทรัพย์', 'ทั้งหมด']) {
+    const reply = await customerReply(phrase, searchableProperties);
+    assert.equal(reply.sent[0].messages[0].contents.contents.length, 4, phrase);
+  }
+});
+
+test('unmatched locations or property codes never return unrelated homes', async () => {
+  for (const phrase of ['บ้านขายเชียงใหม่', 'ที่ดิน ตรัง', 'CK-999999']) {
+    const { sent, result } = await customerReply(phrase, searchableProperties);
+    assert.equal(result.successfulReplies, 1);
+    assert.equal(sent[0].messages.length, 1);
+    assert.equal(sent[0].messages[0].type, 'text');
+    assert.match(sent[0].messages[0].text, /ยังไม่พบทรัพย์ที่ตรงกับคำค้น/);
+    assert.match(sent[0].messages[0].text, /https:\/\/site\.example\.com\/properties/);
+  }
+});
+
+test('a place beginning with บ้าน stays a location and Thai place names are not shortened by filler removal', async () => {
+  const properties = [
+    { id: 'banpru-land', title: 'ที่ดินใกล้สวน', published: true, property_type: 'land', status: 'sale', district: 'หาดใหญ่', subdistrict: 'บ้านพรุ' },
+    { id: 'hatyai-house', title: 'บ้านใจกลางเมือง', published: true, property_type: 'house', status: 'sale', district: 'หาดใหญ่', subdistrict: 'คอหงส์' },
+    { id: 'similar-word', title: 'โครงการดใหญ่', published: true, property_type: 'house', status: 'sale', district: 'สะเดา' },
+  ];
+  const land = await customerReply('ขอดูที่ดิน บ้านพรุ', properties);
+  assert.equal(land.sent[0].messages[0].contents.contents.length, 1);
+  assert.equal(land.sent[0].messages[0].contents.contents[0].body.contents[1].text, 'ที่ดินใกล้สวน');
+  const house = await customerReply('บ้านขาย หาดใหญ่', properties);
+  assert.equal(house.sent[0].messages[0].contents.contents.length, 1);
+  assert.equal(house.sent[0].messages[0].contents.contents[0].body.contents[1].text, 'บ้านใจกลางเมือง');
+});
+
+test('a long customer query cannot overflow Flex alternative text or split an emoji', async () => {
+  const { sent, result } = await customerReply(`CK-813F2B ${'🙂'.repeat(2400)}`, searchableProperties);
+  assert.equal(result.successfulReplies, 1);
+  const message = sent[0].messages[0];
+  assert.ok(message.altText.length <= 400);
+  assert.equal(message.altText.includes('\uFFFD'), false);
+  assert.equal(message.contents.contents.length, 1);
+});
+
+test('unavailable property storage and an empty published catalog produce different honest replies', async () => {
+  const empty = await customerReply('ดูทรัพย์', []);
+  assert.match(empty.sent[0].messages[0].text, /ยังไม่มีรายการทรัพย์ที่เผยแพร่/);
+  const unavailable = await customerReply('ดูทรัพย์', [], { firestore: {
+    listFirestoreDocuments: async () => { throw Error('private storage details'); },
+    createFirestoreDocument: async () => ({ ok: true }),
+  } });
+  assert.match(unavailable.sent[0].messages[0].text, /ขัดข้องชั่วคราว/);
+  assert.match(unavailable.sent[0].messages[0].text, /https:\/\/site\.example\.com\/properties/);
+  assert.equal(unavailable.result.unavailableSearches, 1);
+  assert.deepEqual(unavailable.result.errorCodes, ['PROPERTY_STORAGE_UNAVAILABLE']);
+  assert.equal(JSON.stringify(unavailable.sent).includes('ได้รับข้อความ'), false);
+  assert.equal(JSON.stringify(unavailable.result).includes('private storage details'), false);
+});
+
+test('every reply in a batch precedes potentially slow inquiry writes', async () => {
+  const order = [];
+  const api = load('app/api/line/webhook/route.ts', {
+    env: { LINE_CHANNEL_SECRET: 'test-secret', LINE_CHANNEL_ACCESS_TOKEN: 'test-token' },
+    firestore: {
+      listFirestoreDocuments: async () => searchableProperties,
+      createFirestoreDocument: async () => { order.push('write'); assert.deepEqual(order.slice(0, 2), ['reply', 'reply']); return { ok: true }; },
+    },
+    fetch: async (_url, init) => { assert.ok(init.signal instanceof AbortSignal); order.push('reply'); return Response.json({}); },
+  });
+  const body = JSON.stringify({ events: [
+    { type: 'follow', replyToken: 'follow-reply', source: { userId: 'Uone' } },
+    { type: 'message', replyToken: 'message-reply', source: { userId: 'Utwo' }, message: { type: 'text', text: 'ดูทรัพย์' } },
+  ] });
+  const signature = createHmac('sha256', 'test-secret').update(body).digest('base64');
+  const response = await api.POST(new Request('https://example.com/api/line/webhook', { method: 'POST', headers: { 'x-line-signature': signature }, body }));
+  assert.equal((await response.json()).successfulReplies, 2);
+  assert.deepEqual(order, ['reply', 'reply', 'write', 'write']);
+});
+
+test('reply rejection diagnostics classify LINE failures without logging credentials or customer data', async () => {
+  for (const [status, message, expectedCode] of [
+    [401, 'private-token private-secret private-customer-text real-reply-token', 'LINE_TOKEN_REJECTED'],
+    [400, 'Invalid reply token real-reply-token', 'LINE_REPLY_TOKEN_EXPIRED'],
+    [400, 'A message (private-customer-text) is invalid', 'LINE_MESSAGE_INVALID'],
+    [429, 'Rate limit exceeded', 'LINE_RATE_LIMITED'],
+    [503, 'Service unavailable', 'LINE_REPLY_UNAVAILABLE'],
+  ]) {
+    const logs = [];
+    const api = load('app/api/line/webhook/route.ts', {
+      env: { LINE_CHANNEL_SECRET: 'private-secret', LINE_CHANNEL_ACCESS_TOKEN: 'private-token' },
+      firestore: { listFirestoreDocuments: async () => searchableProperties },
+      fetch: async () => Response.json({ message }, { status }),
+      log: (...args) => logs.push(args),
+    });
+    const response = await api.POST(signedRequest('private-customer-text', 'private-secret'));
+    const result = await response.json();
+    assert.equal(result.failedReplies, 1);
+    assert.deepEqual(result.errorCodes, [expectedCode]);
+    for (const sensitive of ['private-token', 'private-secret', 'private-customer-text', 'real-reply-token']) {
+      assert.equal(JSON.stringify({ logs, result }).includes(sensitive), false, sensitive);
+    }
+  }
+});
+
+test('follower registration runs after replies, deduplicates customers and reports storage failure safely', async () => {
+  const order = [];
+  const customerId = `U${'a'.repeat(32)}`;
+  const api = load('app/api/line/webhook/route.ts', {
+    env: { LINE_CHANNEL_SECRET: 'test-secret', LINE_CHANNEL_ACCESS_TOKEN: 'test-token' },
+    firestore: {
+      listFirestoreDocuments: async () => searchableProperties,
+      createFirestoreDocument: async () => ({ ok: true }),
+      patchFirestoreDocument: async (collection, id, fields) => {
+        order.push('follower');
+        assert.deepEqual(order, ['reply', 'reply', 'follower']);
+        assert.equal(collection, 'line_followers');
+        assert.equal(id, customerId);
+        assert.equal(fields.user_id, customerId);
+        assert.equal(fields.is_active, true);
+        throw Error(`Private storage error ${customerId}`);
+      },
+    },
+    fetch: async () => { order.push('reply'); return Response.json({}); },
+  });
+  const body = JSON.stringify({ events: [
+    { type: 'follow', replyToken: 'follow-reply', source: { userId: customerId } },
+    { type: 'message', replyToken: 'message-reply', source: { userId: customerId }, message: { type: 'text', text: 'ดูทรัพย์' } },
+  ] });
+  const signature = createHmac('sha256', 'test-secret').update(body).digest('base64');
+  const response = await api.POST(new Request('https://example.com/api/line/webhook', {
+    method: 'POST', headers: { 'x-line-signature': signature }, body,
+  }));
+  const result = await response.json();
+  assert.equal(result.successfulReplies, 2);
+  assert.equal(result.failedReplies, 0);
+  assert.equal(result.failedFollowerWrites, 1);
+  assert.deepEqual(result.errorCodes, ['FOLLOWER_STORAGE_UNAVAILABLE']);
+  assert.equal(JSON.stringify(result).includes(customerId), false);
+});
+
+test('staff simulation never registers real-looking follower IDs', async () => {
+  const api = load('app/api/line/webhook/route.ts', {
+    firestore: { patchFirestoreDocument: async () => { throw Error('Unexpected follower write'); } },
+  });
+  const response = await api.POST(new Request('https://example.com/api/line/webhook', {
+    method: 'POST', headers: { 'x-line-simulation': 'true' },
+    body: JSON.stringify({ events: [{ type: 'follow', replyToken: 'test_follow', source: { userId: `U${'a'.repeat(32)}` } }] }),
+  }));
+  const result = await response.json();
+  assert.equal(result.simulatedReplies, 1);
+  assert.equal(result.failedFollowerWrites, 0);
+});
+
+test('reply timeouts have a stable code and failed inbox writes remain visible after a successful reply', async () => {
+  const timedOut = await customerReply('ดูทรัพย์', searchableProperties, { fetch: async () => { throw Object.assign(Error('private details'), { name: 'TimeoutError' }); } });
+  assert.deepEqual(timedOut.result.errorCodes, ['LINE_REPLY_TIMEOUT']);
+  const inboxFailure = await customerReply('ดูทรัพย์', searchableProperties, { firestore: {
+    listFirestoreDocuments: async () => searchableProperties,
+    createFirestoreDocument: async () => ({ ok: false, status: 403 }),
+  } });
+  assert.equal(inboxFailure.result.successfulReplies, 1);
+  assert.equal(inboxFailure.result.failedInquiryWrites, 1);
+  assert.deepEqual(inboxFailure.result.errorCodes, ['INQUIRY_STORAGE_UNAVAILABLE']);
+});
+
+test('malformed signed event payloads are rejected before writes or reply calls', async () => {
+  for (const payload of [null, { events: {} }, { events: [null] }, { events: [{ type: 'message', message: { type: 'text', text: 123 } }] }]) {
+    const api = load('app/api/line/webhook/route.ts', {
+      env: { LINE_CHANNEL_SECRET: 'test-secret' },
+      firestore: { createFirestoreDocument: async () => { throw Error('Unexpected write'); } },
+    });
+    const body = JSON.stringify(payload);
+    const signature = createHmac('sha256', 'test-secret').update(body).digest('base64');
+    const response = await api.POST(new Request('https://example.com/api/line/webhook', { method: 'POST', headers: { 'x-line-signature': signature }, body }));
+    assert.equal(response.status, 400);
+    assert.equal((await response.json()).code, 'LINE_EVENT_PAYLOAD_INVALID');
+  }
 });
 
 test('LINE property carousel preserves the selected HTTPS cover instead of another gallery photo', async () => {

@@ -48,22 +48,23 @@ async function verifyLineSignature(bodyText: string, signature: string | null, c
       difference |= expected.charCodeAt(index) ^ signature.charCodeAt(index);
     }
     return difference === 0;
-  } catch (err) {
-    console.error('Error verifying LINE signature:', err);
+  } catch {
+    console.error('[LINE Webhook] Signature verification failed', { code: 'LINE_SIGNATURE_ERROR' });
     return false;
   }
 }
 
 // Send reply message using LINE Messaging API
-async function replyLineMessage(replyToken: string, channelAccessToken: string, messages: any[]): Promise<boolean> {
+type ReplyResult = { success: true } | { success: false; code: string };
+
+async function replyLineMessage(replyToken: string, channelAccessToken: string, messages: any[]): Promise<ReplyResult> {
   if (!channelAccessToken || !channelAccessToken.trim()) {
-    console.error('[LINE Webhook] Channel Access Token not configured; reply not sent.');
-    return false;
+    return { success: false, code: 'LINE_TOKEN_MISSING' };
   }
 
-  if (!replyToken || replyToken === '00000000000000000000000000000000' || replyToken.startsWith('test_')) {
+  if (typeof replyToken !== 'string' || !replyToken || replyToken === '00000000000000000000000000000000' || replyToken.startsWith('test_')) {
     // Verification has no events; simulated events are handled separately.
-    return false;
+    return { success: false, code: 'LINE_REPLY_TOKEN_INVALID' };
   }
 
   try {
@@ -77,30 +78,44 @@ async function replyLineMessage(replyToken: string, channelAccessToken: string, 
         replyToken,
         messages: messages.slice(0, 5), // LINE supports max 5 messages per reply
       }),
+      signal: AbortSignal.timeout(8000),
     });
 
     if (!response.ok) {
-      console.error('[LINE Webhook] Failed to send reply', {
-        status: response.status, requestId: response.headers.get('x-line-request-id'),
-      });
-      return false;
+      // Classify LINE's validation response without logging its body, which may echo customer data.
+      let validationMessage = '';
+      try {
+        const errorBody = await response.json();
+        if (typeof errorBody?.message === 'string') validationMessage = errorBody.message;
+      } catch { /* The HTTP status still identifies the failure category. */ }
+      const code = response.status === 401 || response.status === 403 ? 'LINE_TOKEN_REJECTED'
+        : response.status === 429 ? 'LINE_RATE_LIMITED'
+        : response.status === 400 && /invalid reply token/i.test(validationMessage) ? 'LINE_REPLY_TOKEN_EXPIRED'
+        : response.status === 400 ? 'LINE_MESSAGE_INVALID'
+        : 'LINE_REPLY_UNAVAILABLE';
+      console.error('[LINE Webhook] Reply rejected', { code, status: response.status });
+      return { success: false, code };
     }
 
-    return true;
+    return { success: true };
   } catch (error) {
-    console.error('[LINE Webhook] Error calling LINE Reply API:', error);
-    return false;
+    const name = error && typeof error === 'object' && 'name' in error ? error.name : '';
+    const code = name === 'TimeoutError' || name === 'AbortError' ? 'LINE_REPLY_TIMEOUT' : 'LINE_REPLY_NETWORK_ERROR';
+    console.error('[LINE Webhook] Reply request failed', { code });
+    return { success: false, code };
   }
 }
 
 // Save customer inquiry into Firestore database
-async function saveInquiry(inquiryData: {
+type InquiryData = {
   userId?: string;
   name?: string;
   message: string;
   inquiry_type?: string;
   property_title?: string;
-}) {
+};
+
+async function saveInquiry(inquiryData: InquiryData): Promise<boolean> {
   try {
     const response = await createFirestoreDocument('inquiries', {
       name: inquiryData.name || `ลูกค้า LINE OA (${inquiryData.userId ? inquiryData.userId.slice(0, 8) : 'ผู้ใช้'})`,
@@ -113,15 +128,19 @@ async function saveInquiry(inquiryData: {
       created_at: new Date().toISOString(),
       source: 'line_messaging_api_webhook',
     });
-    if (!response.ok) throw new Error(`Firestore write failed with status ${response.status}`);
-  } catch (err) {
-    console.warn('[LINE Webhook] Could not save inquiry to Firestore:', err);
+    if (!response.ok) {
+      console.warn('[LINE Webhook] Inquiry storage failed', { code: 'INQUIRY_STORAGE_UNAVAILABLE', status: response.status });
+      return false;
+    }
+    return true;
+  } catch {
+    console.warn('[LINE Webhook] Inquiry storage failed', { code: 'INQUIRY_STORAGE_UNAVAILABLE' });
+    return false;
   }
 }
 
 // Register/refresh the LINE follower so the system can notify them about new properties later.
-async function upsertFollower(userId: string | undefined) {
-  if (!userId || !userId.startsWith('U')) return;
+async function upsertFollower(userId: string): Promise<boolean> {
   try {
     const nowIso = new Date().toISOString();
     const response = await patchFirestoreDocument('line_followers', userId, {
@@ -131,43 +150,95 @@ async function upsertFollower(userId: string | undefined) {
       is_active: true,
       source: 'line_webhook',
     });
-    if (!response.ok) throw new Error(`Follower upsert failed with status ${response.status}`);
-  } catch (err) {
-    console.warn('[LINE Webhook] Could not register LINE follower:', err);
+    if (!response.ok) {
+      console.warn('[LINE Webhook] Follower storage failed', { code: 'FOLLOWER_STORAGE_UNAVAILABLE', status: response.status });
+      return false;
+    }
+    return true;
+  } catch {
+    console.warn('[LINE Webhook] Follower storage failed', { code: 'FOLLOWER_STORAGE_UNAVAILABLE' });
+    return false;
   }
 }
 
-// Search properties from Firestore or Sample Data
-async function searchProperties(keyword: string): Promise<Property[]> {
-  let list: Property[] = [];
+type PropertySearchResult =
+  | { status: 'available'; properties: Property[]; publishedCount: number }
+  | { status: 'unavailable' };
 
-  // Try reading from Firestore first
+const PROPERTY_TYPES = [
+  { type: 'land', pattern: /ที่ดิน|\bland\b/gi },
+  { type: 'condo', pattern: /คอนโด(?:มิเนียม)?|\bcondo(?:minium)?\b/gi },
+  { type: 'commercial', pattern: /อาคารพาณิชย์|ตึกแถว|ร้านค้า|โฮมออฟฟิศ|\bcommercial\b/gi },
+  { type: 'investment', pattern: /ลงทุน|อพาร์ทเมนท์|อพาร์ทเม้นท์|อพาร์ตเมนต์|โรงแรม|\binvestment\b/gi },
+  { type: 'consignment', pattern: /ขายฝาก|\bconsignment\b/gi },
+  { type: 'house', pattern: /บ้าน(?:เดี่ยว)?|ทาวน์(?:โฮม|เฮ้าส์|เฮาส์)|\bhouse\b|\btownhome\b/gi },
+];
+
+function matchesPropertySearch(property: Property, keyword: string, knownLocations: string[]): boolean {
+  let query = keyword.toLowerCase().trim();
+  const code = query.match(/\bckp?-[a-z0-9]+\b/i)?.[0];
+  if (code) return formatPropertyCode(property.id).toLowerCase() === code;
+  if (property.id && query === property.id.toLowerCase()) return true;
+
+  // Protect place names such as บ้านพรุ from being mistaken for the house category.
+  const requestedLocations: string[] = [];
+  for (const location of knownLocations) {
+    if (query.includes(location)) {
+      requestedLocations.push(location);
+      query = query.split(location).join(' ');
+    }
+  }
+  const propertyLocation = [property.district, property.subdistrict, property.province].filter(Boolean).join(' ').toLowerCase();
+  if (requestedLocations.some(location => !propertyLocation.includes(location))) return false;
+
+  const requestedTypes: string[] = [];
+  for (const { type, pattern } of PROPERTY_TYPES) {
+    query = query.replace(pattern, () => { requestedTypes.push(type); return ' '; });
+  }
+  const wantsRent = /เช่า|\brent\b/.test(query);
+  const wantsSale = /ขาย|ซื้อ|\bsale\b|\bbuy\b/.test(query);
+  query = query.replace(/เช่า|ขาย|ซื้อ|\brent\b|\bsale\b|\bbuy\b/g, ' ');
+  if (requestedTypes.length && !requestedTypes.includes(property.property_type)) return false;
+  if (wantsRent && !wantsSale && property.status !== 'rent') return false;
+  if (wantsSale && !wantsRent && property.status !== 'sale') return false;
+
+  // Remove conversational phrasing while retaining unknown places/keywords as constraints.
+  query = query.replace(/อสังหาริมทรัพย์|อสังหาฯ|รายการทรัพย์|ดูทรัพย์|ค้นหาทรัพย์|ทรัพย์ทั้งหมด|ทั้งหมด|\ball\b|\bproperties\b|\bproperty\b|\bplease\b|\bfind\b|\bshow\b/gi, ' ').trim();
+  query = query.replace(/^(?:(?:ต้องการ|กำลัง|สนใจ|อยาก|ค้นหา|ช่วยหา|มี|ขอดู|ขอ|ดู|หา|แถว|โซน|ย่าน|บริเวณ|ให้|ปล่อย|สำหรับ|ใน|ที่)(?=\s|$)\s*)+/, ' ');
+  query = query.replace(/(?:\s*(?:ไหม|มั้ย|บ้าง|หน่อย|ครับ|ค่ะ|คะ|นะ))+\s*$/, ' ');
+  query = query.replace(/(^|\s)(?:และ|หรือ|ใน|ที่)(?=\s|$)|(^|\s)(?:อ\.|ต\.|จ\.|อำเภอ|ตำบล|จังหวัด)/g, ' ');
+  const terms = query.split(/[\s,/?!ๆ]+/).filter(Boolean);
+  const searchable = [property.title, property.description, property.district, property.subdistrict, property.province, property.slug]
+    .filter(value => typeof value === 'string').join(' ').toLowerCase();
+  return terms.every(term => searchable.includes(term));
+}
+
+function isConsignmentRequest(text: string): boolean {
+  return /ฝากขาย|ฝากเช่า|ประเมิน|จำนอง|(?:ต้องการ|อยาก|จะ|ช่วย|รับ)\s*ขาย|(?:ผม|ฉัน|ดิฉัน|เรา)\s*(?:มี.*)?(?:ขายบ้าน|ขายที่ดิน)|ปล่อยเช่า|\bconsignment\b/.test(text);
+}
+
+// Search only published production listings; failed storage is different from zero matches.
+async function searchProperties(keyword: string): Promise<PropertySearchResult> {
   try {
-    list = ((await listFirestoreDocuments('properties', 20, { publishedOnly: true })) as Property[])
+    const list = ((await listFirestoreDocuments('properties', 200, { publishedOnly: true })) as Property[])
       .filter((property) => property.published === true);
-  } catch (err) {
-    console.warn('[LINE Webhook] Firestore properties read warning:', err);
+    const knownLocations = [...new Set(list.flatMap(property => [property.district, property.subdistrict, property.province])
+      .filter((location): location is string => typeof location === 'string' && location.trim().length > 0)
+      .map(location => location.toLowerCase().trim()))].sort((a, b) => b.length - a.length);
+    return { status: 'available', properties: list.filter(property => matchesPropertySearch(property, keyword, knownLocations)).slice(0, 8), publishedCount: list.length };
+  } catch {
+    console.warn('[LINE Webhook] Property search failed', { code: 'PROPERTY_STORAGE_UNAVAILABLE' });
+    return { status: 'unavailable' };
   }
+}
 
-  const cleanKey = keyword.toLowerCase().trim();
-  if (!cleanKey || cleanKey === 'all' || cleanKey === 'ทั้งหมด' || cleanKey === 'ดูทรัพย์' || cleanKey === 'บ้าน') {
-    return list.slice(0, 8);
-  }
-
-  // Filter matching keywords
-  const matched = list.filter((p) => {
-    const titleMatch = p.title?.toLowerCase().includes(cleanKey);
-    const descMatch = p.description?.toLowerCase().includes(cleanKey);
-    const districtMatch = p.district?.toLowerCase().includes(cleanKey);
-    const subdistrictMatch = p.subdistrict?.toLowerCase().includes(cleanKey);
-    const provinceMatch = p.province?.toLowerCase().includes(cleanKey);
-    const typeMatch = p.property_type?.toLowerCase().includes(cleanKey);
-    const statusMatch = (cleanKey.includes('เช่า') && p.status === 'rent') || (cleanKey.includes('ขาย') && p.status === 'sale');
-
-    return titleMatch || descMatch || districtMatch || subdistrictMatch || provinceMatch || typeMatch || statusMatch;
-  });
-
-  return matched.length > 0 ? matched.slice(0, 8) : list.slice(0, 6);
+function buildSearchUnavailableMessage(result: PropertySearchResult, hostOrigin: string) {
+  const text = result.status === 'unavailable'
+    ? 'ขณะนี้ระบบค้นหาทรัพย์ใน LINE ขัดข้องชั่วคราว กรุณาลองใหม่ภายหลัง หรือดูรายการบนเว็บไซต์'
+    : result.publishedCount === 0
+      ? 'ขณะนี้ยังไม่มีรายการทรัพย์ที่เผยแพร่ในระบบ สามารถติดตามรายการใหม่บนเว็บไซต์ หรือติดต่อทีมงานได้'
+      : 'ยังไม่พบทรัพย์ที่ตรงกับคำค้น ลองระบุประเภททรัพย์และทำเล เช่น ที่ดิน สิงหนคร หรือดูรายการทั้งหมดบนเว็บไซต์';
+  return { type: 'text', text: `${text}\n${hostOrigin}/properties\nโทร ${DEFAULT_PHONE}` };
 }
 
 // Build LINE Flex Carousel for Properties
@@ -316,7 +387,7 @@ function buildPropertyCarouselFlex(properties: Property[], hostOrigin: string, q
 
   return {
     type: 'flex',
-    altText: `🏡 รายการอสังหาริมทรัพย์ที่ค้นพบ (${queryTitle}) - Chantakorn Property`,
+    altText: `🏡 รายการอสังหาริมทรัพย์ที่ค้นพบ (${Array.from(queryTitle).slice(0, 120).join('')}) - Chantakorn Property`,
     contents: {
       type: 'carousel',
       contents: bubbles,
@@ -654,37 +725,61 @@ export async function POST(req: Request) {
       return jsonResponse({ success: false, error: 'Invalid JSON payload' }, { status: 400 });
     }
 
-    const events: any[] = body.events || [];
+    if (!body || typeof body !== 'object' || !Array.isArray(body.events) || body.events.some((event: any) =>
+      !event || typeof event !== 'object' || typeof event.type !== 'string' ||
+      (event.type === 'message' && event.message?.type === 'text' && typeof event.message.text !== 'string')
+    )) {
+      return jsonResponse({ success: false, error: 'Invalid event payload', code: 'LINE_EVENT_PAYLOAD_INVALID' }, { status: 400 });
+    }
+    const events: any[] = body.events;
     const imageOrigin = new URL(req.url).origin;
     const hostOrigin = (process.env.NEXT_PUBLIC_SITE_URL || imageOrigin).replace(/\/+$/, '');
     let failedReplies = 0;
     let successfulReplies = 0;
     let simulatedReplies = 0;
+    let unavailableSearches = 0;
+    const errorCodes = new Set<string>();
+    const pendingInquiries: InquiryData[] = [];
+    const pendingFollowers = new Set<string>();
     const reply = async (replyToken: string, messages: any[]) => {
       if (isSimulation) {
         simulatedReplies += 1;
-      } else if (await replyLineMessage(replyToken, config.channelAccessToken, messages)) {
-        successfulReplies += 1;
       } else {
-        failedReplies += 1;
+        const result = await replyLineMessage(replyToken, config.channelAccessToken, messages);
+        if (result.success) successfulReplies += 1;
+        else {
+          failedReplies += 1;
+          errorCodes.add(result.code);
+        }
       }
+    };
+    const replyWithProperties = async (replyToken: string, keyword: string) => {
+      const result = await searchProperties(keyword);
+      if (result.status === 'unavailable') {
+        unavailableSearches += 1;
+        errorCodes.add('PROPERTY_STORAGE_UNAVAILABLE');
+      }
+      const message = result.status === 'available' && result.properties.length > 0
+        ? buildPropertyCarouselFlex(result.properties, hostOrigin, keyword, imageOrigin)
+        : buildSearchUnavailableMessage(result, hostOrigin);
+      await reply(replyToken, [message]);
     };
 
     // Handle each event in batch
     for (const event of events) {
       const { type, replyToken, source } = event;
       const userId = source?.userId;
+      if (!isSimulation && (type === 'follow' || type === 'message') && typeof userId === 'string' && /^U[0-9a-f]{32}$/i.test(userId)) {
+        pendingFollowers.add(userId);
+      }
 
       // Event A: User adds LINE OA as friend (Follow)
       if (type === 'follow') {
-        if (!isSimulation) {
-          await upsertFollower(userId);
-          await saveInquiry({
-            userId,
-            message: 'ผู้ใช้เพิ่มเพื่อนใหม่ (Followed LINE Official Account)',
-            inquiry_type: 'inquiry',
-          });
-        }
+        if (!isSimulation) pendingInquiries.push({
+          userId,
+          message: 'ผู้ใช้เพิ่มเพื่อนใหม่ (Followed LINE Official Account)',
+          inquiry_type: 'inquiry',
+        });
 
         const welcomeFlex = buildWelcomeFlex(hostOrigin);
         await reply(replyToken, [welcomeFlex]);
@@ -698,15 +793,12 @@ export async function POST(req: Request) {
         // Website form submissions are already stored before the customer opens LINE.
         // Keep the LINE chat message, but avoid creating a duplicate inbox record.
         const isWebsiteFormSubmission = /\[CP-WEB-FORM:[0-9a-f-]{36}\]/i.test(userText);
-        if (!isSimulation) {
-          await upsertFollower(userId);
-          if (!isWebsiteFormSubmission) {
-            await saveInquiry({
-              userId,
-              message: userText,
-              inquiry_type: 'inquiry',
-            });
-          }
+        if (!isSimulation && !isWebsiteFormSubmission) {
+          pendingInquiries.push({
+            userId,
+            message: userText,
+            inquiry_type: 'inquiry',
+          });
         }
 
         // Intent 1: Greetings, Help, Main Menu
@@ -727,14 +819,7 @@ export async function POST(req: Request) {
         }
 
         // Intent 2: Consignment / Selling / Valuation
-        else if (
-          lowerText.includes('ฝากขาย') ||
-          lowerText.includes('ขายบ้าน') ||
-          lowerText.includes('ขายที่ดิน') ||
-          lowerText.includes('ประเมิน') ||
-          lowerText.includes('ฝากเช่า') ||
-          lowerText.includes('จำนอง')
-        ) {
+        else if (isWebsiteFormSubmission || isConsignmentRequest(lowerText)) {
           const consignmentMsg = buildConsignmentFlex(hostOrigin);
           await reply(replyToken, [consignmentMsg]);
         }
@@ -756,19 +841,7 @@ export async function POST(req: Request) {
 
         // Intent 4: Search Properties (Houses, Land, Condo, Location, Price, Status)
         else {
-          const matchedProperties = await searchProperties(userText);
-          if (matchedProperties.length > 0) {
-            const carouselMsg = buildPropertyCarouselFlex(matchedProperties, hostOrigin, userText, imageOrigin);
-            await reply(replyToken, [carouselMsg]);
-          } else {
-            // Friendly Fallback
-            const fallbackWelcome = buildWelcomeFlex(hostOrigin);
-            const textResponse = {
-              type: 'text',
-              text: `ขอบพระคุณที่ติดต่อ Chantakorn Property ครับ/ค่ะ 🏡\n\nทีมงานได้รับข้อความ "${userText}" ของท่านเรียบร้อยแล้ว แอดมินจะรีบติดต่อกลับโดยเร็วที่สุด หรือสามารถเลือกดูรายการทรัพย์และบริการยอดนิยมด้านล่างได้ทันทีครับ`,
-            };
-            await reply(replyToken, [textResponse, fallbackWelcome]);
-          }
+          await replyWithProperties(replyToken, userText);
         }
       }
 
@@ -780,13 +853,7 @@ export async function POST(req: Request) {
 
         if (action === 'search_all' || action === 'search') {
           const keyword = params.get('keyword') || 'all';
-          const properties = await searchProperties(keyword);
-          if (properties.length > 0) {
-            const carousel = buildPropertyCarouselFlex(properties, hostOrigin, keyword, imageOrigin);
-            await reply(replyToken, [carousel]);
-          } else {
-            await reply(replyToken, [buildWelcomeFlex(hostOrigin)]);
-          }
+          await replyWithProperties(replyToken, keyword);
         } else if (action === 'consignment') {
           const consignmentMsg = buildConsignmentFlex(hostOrigin);
           await reply(replyToken, [consignmentMsg]);
@@ -800,9 +867,19 @@ export async function POST(req: Request) {
       }
     }
 
-    // Always respond 200 OK to LINE Webhook requests
+    // Keep inbox latency out of the reply-token window, including every event in a batch.
+    const [inquiryResults, followerResults] = await Promise.all([
+      Promise.all(pendingInquiries.map(saveInquiry)),
+      Promise.all([...pendingFollowers].map(upsertFollower)),
+    ]);
+    const failedInquiryWrites = inquiryResults.filter(saved => !saved).length;
+    const failedFollowerWrites = followerResults.filter(saved => !saved).length;
+    if (failedInquiryWrites) errorCodes.add('INQUIRY_STORAGE_UNAVAILABLE');
+    if (failedFollowerWrites) errorCodes.add('FOLLOWER_STORAGE_UNAVAILABLE');
+    // Acknowledge processed LINE events; reply and storage outcomes remain explicit.
     console.info('[LINE Webhook] Processing result', {
-      processedEvents: events.length, successfulReplies, failedReplies, simulatedReplies, simulation: isSimulation,
+      processedEvents: events.length, successfulReplies, failedReplies, simulatedReplies, unavailableSearches,
+      failedInquiryWrites, failedFollowerWrites, errorCodes: [...errorCodes], simulation: isSimulation,
     });
     return jsonResponse({
       success: failedReplies === 0,
@@ -810,14 +887,17 @@ export async function POST(req: Request) {
       successfulReplies,
       failedReplies,
       simulatedReplies,
+      unavailableSearches,
+      failedInquiryWrites,
+      failedFollowerWrites,
+      errorCodes: [...errorCodes],
       simulation: isSimulation,
       timestamp: new Date().toISOString(),
     });
-  } catch (error: any) {
-    console.error('[LINE Webhook] Unexpected error handling webhook request:', error);
-    // Even on error, LINE expects 200 OK so it doesn't repeatedly retry
+  } catch {
+    console.error('[LINE Webhook] Unexpected processing failure', { code: 'LINE_WEBHOOK_PROCESSING_FAILED' });
     return jsonResponse(
-      { success: false, error: error.message || 'Internal Server Error' },
+      { success: false, error: 'Webhook processing failed', code: 'LINE_WEBHOOK_PROCESSING_FAILED' },
       { status: 200 }
     );
   }
