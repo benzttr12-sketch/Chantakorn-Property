@@ -148,7 +148,7 @@ export default function CollapsiblePropertyRow({
   const handleSendToLine = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    if (onOpenLineModal) {
+    if (property.published && onOpenLineModal) {
       onOpenLineModal(property);
     }
   };
@@ -669,12 +669,14 @@ export default function CollapsiblePropertyRow({
 
             <button
               type="button"
+              disabled={busy || !property.published || !onOpenLineModal}
               onClick={handleSendToLine}
-              className="p-1.5 text-[#06C755] hover:text-white hover:bg-[#06C755] bg-emerald-50 rounded-lg cursor-pointer transition-all border border-emerald-200 hover:border-[#06C755] shadow-xs active:scale-95"
-              title="ส่งข้อมูลทรัพย์ไปยัง LINE OA (@930xzcyi)"
-              aria-label="ส่งข้อมูลทรัพย์ไปยัง LINE OA"
+              className="p-1.5 text-[#06C755] hover:text-white hover:bg-[#06C755] bg-emerald-50 rounded-lg cursor-pointer transition-all border border-emerald-200 hover:border-[#06C755] shadow-xs active:scale-95 flex items-center gap-1 disabled:opacity-40 disabled:cursor-not-allowed"
+              title={property.published ? 'ส่งทรัพย์ให้ผู้ติดตาม LINE OA ทั้งหมด' : 'เผยแพร่ทรัพย์ก่อนส่งให้ลูกค้า'}
+              aria-label="ส่งทรัพย์ให้ลูกค้าทาง LINE"
             >
               <MessageCircle className="w-4 h-4 fill-current" />
+              <span className="text-[11px] font-bold">ส่งลูกค้า</span>
             </button>
 
             <Link

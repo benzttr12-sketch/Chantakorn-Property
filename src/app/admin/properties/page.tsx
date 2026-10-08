@@ -43,7 +43,7 @@ import PropertyHistoryModal from '@/components/admin/PropertyHistoryModal';
 import AdminLandsMapsOverlayModal from '@/components/admin/AdminLandsMapsOverlayModal';
 import CollapsiblePropertyRow from '@/components/admin/CollapsiblePropertyRow';
 import CollapsiblePropertyCard from '@/components/admin/CollapsiblePropertyCard';
-import SendToLineModal from '@/components/properties/SendToLineModal';
+import PropertyBroadcastModal from '@/components/admin/PropertyBroadcastModal';
 import { 
   fetchAdminProperties, 
   updateProperty, 
@@ -105,11 +105,12 @@ export default function AdminPropertiesPage() {
   const [landsMapsModalProperty, setLandsMapsModalProperty] = useState<Property | null>(null);
   const [isLandsMapsModalOpen, setIsLandsMapsModalOpen] = useState(false);
 
-  // Direct LINE OA Share Modal State
+  // Manual property broadcast to all OA followers.
   const [lineModalProperty, setLineModalProperty] = useState<Property | null>(null);
   const [isLineModalOpen, setIsLineModalOpen] = useState(false);
 
   const handleOpenLineModal = (prop: Property) => {
+    if (!prop.published) return;
     setLineModalProperty(prop);
     setIsLineModalOpen(true);
   };
@@ -1158,30 +1159,15 @@ export default function AdminPropertiesPage() {
         onPropertyUpdated={loadData}
       />
 
-      {/* Direct LINE OA Share Modal */}
+      {/* Review the property before broadcasting to OA followers. */}
       {lineModalProperty && (
-        <SendToLineModal
+        <PropertyBroadcastModal
           isOpen={isLineModalOpen}
           onClose={() => {
             setIsLineModalOpen(false);
             setLineModalProperty(null);
           }}
-          autoSend={true}
-          property={{
-            id: lineModalProperty.id,
-            title: lineModalProperty.title,
-            price: lineModalProperty.price,
-            status: lineModalProperty.status,
-            district: lineModalProperty.district,
-            subdistrict: lineModalProperty.subdistrict,
-            province: lineModalProperty.province,
-            slug: lineModalProperty.slug,
-            cover_image: lineModalProperty.cover_image,
-            images: lineModalProperty.images,
-            property_type: lineModalProperty.property_type,
-            video_url: lineModalProperty.video_url,
-            agent: lineModalProperty.agent,
-          }}
+          propertyId={lineModalProperty.id}
         />
       )}
 
