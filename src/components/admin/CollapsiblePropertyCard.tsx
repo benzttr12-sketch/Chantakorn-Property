@@ -3,7 +3,6 @@
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { fetchStaffApi } from '@/lib/staff-api';
 import { 
   Building2, 
   Trash2, 
@@ -141,39 +140,6 @@ export default function CollapsiblePropertyCard({
   const [savingNotes, setSavingNotes] = useState(false);
   const [notesSuccess, setNotesSuccess] = useState(false);
   const [notesError, setNotesError] = useState('');
-
-  const [sendingLine, setSendingLine] = useState(false);
-  const [lineSent, setLineSent] = useState(false);
-  const [lineError, setLineError] = useState('');
-
-  const handleSendToLine = async () => {
-    setSendingLine(true);
-    setLineSent(false);
-    setLineError('');
-    try {
-      const res = await fetchStaffApi('/api/line/notify', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...property, manualSend: true }),
-      });
-      const data = await res.json();
-      if (!res.ok || !data.success || !data.isRealSent) {
-        setLineError(data.error || data.message || 'ยังไม่ได้ส่งแจ้งเตือน LINE');
-        return;
-      }
-      setLineSent(true);
-      setTimeout(() => setLineSent(false), 4000);
-      const targetUrl = data.lineOaMessageUrl || data.shareUrl;
-      if (targetUrl && typeof window !== 'undefined') {
-        window.open(targetUrl, '_blank');
-      }
-    } catch (err) {
-      setLineError(err instanceof Error ? err.message : 'ส่งแจ้งเตือน LINE ไม่สำเร็จ');
-      console.warn('Failed to send LINE notification:', err);
-    } finally {
-      setSendingLine(false);
-    }
-  };
 
   useEffect(() => {
     setNotesInput(property.internal_notes || '');
@@ -648,25 +614,17 @@ export default function CollapsiblePropertyCard({
 
           <button
             type="button"
-            disabled={sendingLine}
+            disabled={busy || !property.published || !onOpenLineModal}
             onClick={(e) => {
               e.stopPropagation();
-              if (onOpenLineModal) {
-                onOpenLineModal(property);
-              } else {
-                handleSendToLine();
-              }
+              if (property.published) onOpenLineModal?.(property);
             }}
-            className="p-1.5 text-[#06C755] hover:bg-emerald-50 rounded-lg border border-emerald-200"
-            title="ส่งทรัพย์เข้า LINE OA (@930xzcyi)"
+            className="p-1.5 text-[#06C755] hover:bg-emerald-50 rounded-lg border border-emerald-200 flex items-center gap-1 disabled:opacity-40 disabled:cursor-not-allowed"
+            title={property.published ? 'ส่งทรัพย์ให้ผู้ติดตาม LINE OA ทั้งหมด' : 'เผยแพร่ทรัพย์ก่อนส่งให้ลูกค้า'}
+            aria-label="ส่งทรัพย์ให้ลูกค้าทาง LINE"
           >
-            {sendingLine ? (
-              <Loader2 className="w-3.5 h-3.5 animate-spin text-[#06C755]" />
-            ) : lineSent ? (
-              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-            ) : (
-              <MessageCircle className="w-3.5 h-3.5 fill-current text-[#06C755]" />
-            )}
+            <MessageCircle className="w-3.5 h-3.5 fill-current text-[#06C755]" />
+            <span className="text-[11px] font-bold">ส่งลูกค้า</span>
           </button>
 
           <Link
@@ -677,8 +635,6 @@ export default function CollapsiblePropertyCard({
           >
             <Sparkles className="w-3.5 h-3.5" />
           </Link>
-          {lineError && <p role="alert" className="basis-full text-xs text-red-700">{lineError}</p>}
-
           <Link
             href={propertyHref(property.slug)}
             target="_blank"
