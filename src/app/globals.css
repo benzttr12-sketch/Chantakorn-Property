@@ -189,3 +189,123 @@
 .leaflet-container {
   font-family: 'Prompt', sans-serif !important;
 }
+
+/* Brand interactions use transform/opacity only; content stays visible without JS. */
+.property-card {
+  transition: border-color 220ms ease, box-shadow 220ms ease;
+}
+
+.property-card:focus-within {
+  border-color: rgba(197, 160, 89, 0.7);
+  box-shadow: 0 18px 38px -18px rgba(2, 8, 18, 0.22);
+}
+
+.property-card :is(a, button):focus-visible {
+  outline: 3px solid var(--gold);
+  outline-offset: 3px;
+}
+
+.property-card-image-link:focus-visible {
+  outline-offset: -5px !important;
+}
+
+.property-card-control {
+  transition: background-color 180ms ease, color 180ms ease, box-shadow 180ms ease;
+}
+
+.hero-cta {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  transition: color 200ms ease, background-color 200ms ease, border-color 200ms ease, box-shadow 200ms ease;
+}
+
+.hero-cta:focus-visible {
+  outline: 3px solid var(--gold-light);
+  outline-offset: 5px;
+}
+
+.hero-cta-primary::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: linear-gradient(110deg, transparent 25%, rgba(255, 255, 255, 0.3) 48%, transparent 72%);
+  transform: translateX(-110%);
+  pointer-events: none;
+}
+
+@keyframes favoritePop {
+  0%, 100% { transform: scale(1); }
+  45% { transform: scale(1.24); }
+  72% { transform: scale(0.94); }
+}
+
+@keyframes heroReveal {
+  from { opacity: 0.8; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes ctaSheen {
+  from { transform: translateX(-110%); }
+  to { transform: translateX(110%); }
+}
+
+@keyframes galleryImageEnter {
+  from { opacity: 0.35; }
+  to { opacity: 1; }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .property-card {
+    transition: transform 260ms ease, border-color 220ms ease, box-shadow 260ms ease;
+  }
+
+  .property-card-image {
+    transition: transform 620ms cubic-bezier(0.2, 0.7, 0.2, 1);
+  }
+
+  .property-card-control {
+    transition: transform 180ms ease, background-color 180ms ease, color 180ms ease, box-shadow 180ms ease;
+  }
+
+  .property-card-control:active { transform: scale(0.94); }
+
+  .property-card-arrow, .hero-cta-arrow { transition: transform 220ms ease; }
+
+  .property-card-cta:is(:hover, :focus-visible) .property-card-arrow,
+  .hero-cta:is(:hover, :focus-visible) .hero-cta-arrow { transform: translateX(3px); }
+
+  .favorite-pop { animation: favoritePop 340ms ease-out; }
+
+  .gallery-image-enter { animation: galleryImageEnter 220ms ease-out; }
+
+  .hero-reveal { animation: heroReveal 580ms cubic-bezier(0.2, 0.7, 0.2, 1) both; }
+  .hero-reveal-heading { animation-delay: 60ms; }
+  .hero-reveal-description { animation-delay: 110ms; }
+  .hero-reveal-actions { animation-delay: 160ms; }
+  .hero-reveal-stats { animation-delay: 200ms; }
+  .hero-reveal-search { animation-delay: 240ms; }
+
+  .hero-cta-primary:focus-visible::after { animation: ctaSheen 600ms ease-out; }
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .property-card:hover {
+    border-color: rgba(197, 160, 89, 0.6);
+    box-shadow: 0 24px 45px -22px rgba(2, 8, 18, 0.28);
+  }
+}
+
+@media (hover: hover) and (pointer: fine) and (prefers-reduced-motion: no-preference) {
+  .property-card:hover { transform: translateY(-4px); }
+  .property-card:hover .property-card-image { transform: scale(1.035); }
+  .property-card-control:hover { transform: scale(1.06); }
+  .hero-cta-primary:hover::after { animation: ctaSheen 600ms ease-out; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  .hero-reveal, .favorite-pop, .gallery-image-enter { animation: none; }
+  .hero-cta-primary::after { display: none; }
+}

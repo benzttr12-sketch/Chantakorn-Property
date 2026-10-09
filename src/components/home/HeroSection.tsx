@@ -16,7 +16,7 @@ export default function HeroSection() {
           fill
           priority
           placeholder="blur"
-          className="object-cover object-center scale-105 transform duration-1000 ease-out"
+          className="object-cover object-center"
           referrerPolicy="no-referrer"
         />
         {/* Layered Luxury Scrims & Ambient Lighting */}
@@ -30,15 +30,15 @@ export default function HeroSection() {
       <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full flex-grow flex flex-col justify-center">
         <div className="max-w-3xl">
           {/* Luxury Brand Kicker (No cheap pill enclosure - clean unboxed typography with separator) */}
-          <div className="flex items-center space-x-2 text-xs font-semibold text-gold-400 tracking-wider uppercase mb-5">
-            <span className="w-2 h-2 rounded-full bg-gold-400 animate-pulse" />
+          <div className="hero-reveal flex items-center space-x-2 text-xs font-semibold text-gold-400 tracking-wider uppercase mb-5">
+            <span className="w-2 h-2 rounded-full bg-gold-400" />
             <span className="font-bold tracking-widest text-gold-300">CHANTAKORN PROPERTY</span>
             <span className="text-white/40">·</span>
             <span className="text-slate-200">นายหน้าอสังหาริมทรัพย์มืออาชีพ หาดใหญ่–สงขลา</span>
           </div>
 
           {/* Main Headline */}
-          <h1 className="text-4xl sm:text-5xl lg:text-[3.4rem] font-black text-white tracking-tight leading-[1.14] mb-6 text-balance">
+          <h1 className="hero-reveal hero-reveal-heading text-4xl sm:text-5xl lg:text-[3.4rem] font-black text-white tracking-tight leading-[1.14] mb-6 text-balance">
             ซื้อ ขาย เช่า <span className="whitespace-nowrap">ฝากขาย</span>{' '}
             <span className="bg-gradient-to-r from-[#F4E3BA] via-[#D4AF37] to-[#AA771C] bg-clip-text text-transparent">
               บ้าน ที่ดิน คอนโด
@@ -48,25 +48,25 @@ export default function HeroSection() {
           </h1>
 
           {/* Subheadline */}
-          <p className="text-base sm:text-lg text-slate-200 leading-relaxed font-normal mb-8 max-w-2xl">
+          <p className="hero-reveal hero-reveal-description text-base sm:text-lg text-slate-200 leading-relaxed font-normal mb-8 max-w-2xl">
             บริการรับฝากขาย ฝากเช่า บ้านเดี่ยว ที่ดินเปล่า คอนโดมิเนียม อาคารพาณิชย์ และขายฝากจำนอง <br className="hidden sm:inline" />
             ตรวจสอบเอกสารสิทธิ์และโฉนดชัดเจน โปร่งใส พร้อมดูแลยื่นสินเชื่อธนาคารจนถึงวันโอนกรรมสิทธิ์
           </p>
 
           {/* Action CTAs */}
-          <div className="flex flex-wrap items-center gap-4 mb-10">
+          <div className="hero-reveal hero-reveal-actions flex flex-wrap items-center gap-4 mb-10">
             <Link
               href="/properties"
-              className="px-8 py-4 bg-gradient-to-r from-gold-400 via-gold-500 to-amber-500 hover:from-gold-300 hover:to-gold-400 text-navy-950 font-black text-sm rounded-xl shadow-xl hover:shadow-gold-500/30 flex items-center space-x-2.5 transition-all transform hover:-translate-y-0.5 active:translate-y-0 group"
+              className="hero-cta hero-cta-primary px-8 py-4 bg-gradient-to-r from-gold-400 via-gold-500 to-amber-500 hover:from-gold-300 hover:to-gold-400 text-navy-950 font-black text-sm rounded-xl shadow-xl hover:shadow-gold-500/30 flex items-center space-x-2.5 group"
             >
               <Search className="w-4 h-4 text-navy-950 stroke-[2.5]" />
               <span>ค้นหาบ้านและที่ดินทั้งหมด</span>
-              <ChevronRight className="w-4 h-4 text-navy-950 transform group-hover:translate-x-0.5 transition-transform" />
+              <ChevronRight className="hero-cta-arrow w-4 h-4 text-navy-950" />
             </Link>
 
             <Link
               href="/sell"
-              className="px-8 py-4 bg-white/10 hover:bg-white/20 text-white hover:text-gold-300 border border-white/25 hover:border-gold-400/60 font-bold text-sm rounded-xl backdrop-blur-md flex items-center space-x-2.5 transition-all transform hover:-translate-y-0.5 active:translate-y-0 shadow-lg"
+              className="hero-cta px-8 py-4 bg-white/10 hover:bg-white/20 text-white hover:text-gold-300 border border-white/25 hover:border-gold-400/60 font-bold text-sm rounded-xl backdrop-blur-md flex items-center space-x-2.5 shadow-lg"
             >
               <PlusCircle className="w-4 h-4 text-gold-400" />
               <span>ฝากขาย & บริการขายฝาก</span>
@@ -74,7 +74,7 @@ export default function HeroSection() {
           </div>
 
           {/* Stat Counter Strip */}
-          <div className="grid grid-cols-3 gap-4 sm:gap-6 text-xs text-slate-200 pt-6 border-t border-white/15">
+          <div className="hero-reveal hero-reveal-stats grid grid-cols-3 gap-4 sm:gap-6 text-xs text-slate-200 pt-6 border-t border-white/15">
             <div className="space-y-0.5">
               <div className="text-2xl sm:text-3xl font-black text-gold-300 tabular-nums">500+</div>
               <span className="text-[11px] text-slate-300 font-medium">ทรัพย์คุณภาพคัดสรร</span>
@@ -92,7 +92,7 @@ export default function HeroSection() {
       </div>
 
       {/* Floating Search Panel Attached at Bottom */}
-      <div className="relative z-20 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full mt-10">
+      <div className="hero-reveal hero-reveal-search relative z-20 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full mt-10">
         <FloatingSearchBox />
       </div>
     </section>
