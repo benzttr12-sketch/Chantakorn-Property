@@ -1,100 +1,42 @@
-import React from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { Search, PlusCircle, ChevronRight, Award, ShieldCheck, Star } from 'lucide-react';
+import { Search, PlusCircle, ChevronRight, MapPin, ShieldCheck, HeartHandshake, ArrowDown } from 'lucide-react';
 import FloatingSearchBox from './FloatingSearchBox';
+import HomeMoodSelector from './HomeMoodSelector';
 import { hatyaiModernHouseHero } from '@/assets/images';
 
 export default function HeroSection() {
   return (
-    <section className="relative min-h-[740px] lg:min-h-[840px] flex flex-col justify-between pt-20 pb-16 lg:pt-28 lg:pb-24 overflow-hidden bg-navy-950">
-      {/* Background Photography with Luxury Depth */}
-      <div className="absolute inset-0 z-0 overflow-hidden">
-        <Image
-          src={hatyaiModernHouseHero}
-          alt="CHANTAKORN PROPERTY - Luxury Modern House in Hat Yai Real Estate Agency"
-          fill
-          priority
-          placeholder="blur"
-          className="object-cover object-center"
-          referrerPolicy="no-referrer"
-        />
-        {/* Layered Luxury Scrims & Ambient Lighting */}
-        <div className="absolute inset-0 bg-gradient-to-r from-[#020812]/95 via-[#020812]/80 to-[#0B192C]/40" />
-        <div className="absolute inset-0 bg-gradient-to-t from-[#020812] via-transparent to-black/60" />
-        <div className="absolute -top-32 -left-32 w-[600px] h-[600px] bg-gold-500/10 rounded-full blur-[140px] pointer-events-none" />
-        <div className="absolute bottom-20 right-10 w-[500px] h-[500px] bg-amber-500/10 rounded-full blur-[120px] pointer-events-none" />
+    <section className="relative overflow-hidden bg-navy-950 pb-10 pt-12 sm:pb-14 sm:pt-16 lg:pt-20">
+      <div className="pointer-events-none absolute inset-0" aria-hidden="true">
+        <Image src={hatyaiModernHouseHero} alt="" fill priority placeholder="blur" sizes="100vw" className="object-cover object-center opacity-30" />
+        <div className="absolute inset-0 bg-gradient-to-r from-navy-950 via-navy-950/90 to-navy-950/50" />
+        <div className="home-hero-grid absolute inset-0 opacity-15" />
+        <div className="absolute -left-40 top-0 h-[480px] w-[480px] rounded-full bg-gold-500/10 blur-[100px]" />
+        <div className="absolute bottom-0 right-0 h-[400px] w-[400px] rounded-full bg-gold-500/10 blur-[100px]" />
       </div>
-
-      {/* Hero Content */}
-      <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full flex-grow flex flex-col justify-center">
-        <div className="max-w-3xl">
-          {/* Luxury Brand Kicker (No cheap pill enclosure - clean unboxed typography with separator) */}
-          <div className="hero-reveal flex items-center space-x-2 text-xs font-semibold text-gold-400 tracking-wider uppercase mb-5">
-            <span className="w-2 h-2 rounded-full bg-gold-400" />
-            <span className="font-bold tracking-widest text-gold-300">CHANTAKORN PROPERTY</span>
-            <span className="text-white/40">·</span>
-            <span className="text-slate-200">นายหน้าอสังหาริมทรัพย์มืออาชีพ หาดใหญ่–สงขลา</span>
-          </div>
-
-          {/* Main Headline */}
-          <h1 className="hero-reveal hero-reveal-heading text-4xl sm:text-5xl lg:text-[3.4rem] font-black text-white tracking-tight leading-[1.14] mb-6 text-balance">
-            ซื้อ ขาย เช่า <span className="whitespace-nowrap">ฝากขาย</span>{' '}
-            <span className="bg-gradient-to-r from-[#F4E3BA] via-[#D4AF37] to-[#AA771C] bg-clip-text text-transparent">
-              บ้าน ที่ดิน คอนโด
-            </span>
-            <br className="hidden sm:inline" />
-            <span className="text-white"> ในหาดใหญ่–สงขลา</span>
+      <div className="relative mx-auto grid w-full max-w-7xl items-center gap-10 px-4 sm:px-6 lg:grid-cols-[1.1fr_0.9fr] lg:gap-14 lg:px-8">
+        <div className="min-w-0">
+          <p className="hero-reveal mb-6 flex flex-wrap items-center gap-2 text-[10px] font-semibold tracking-[0.15em] text-gold-300 sm:text-xs"><span className="h-px w-8 bg-gold-400" /> CHANTAKORN PROPERTY <span className="text-white/40">/</span> หาดใหญ่–สงขลา</p>
+          <h1 className="hero-reveal hero-reveal-heading text-[2.5rem] font-semibold leading-[1.3] tracking-tight text-white sm:text-5xl lg:text-[3.5rem]">
+            บ้านที่ใช่<br />
+            <span className="bg-gradient-to-r from-gold-100 via-gold-300 to-gold-500 bg-clip-text text-transparent">ในทำเลที่คุณรัก</span>
           </h1>
-
-          {/* Subheadline */}
-          <p className="hero-reveal hero-reveal-description text-base sm:text-lg text-slate-200 leading-relaxed font-normal mb-8 max-w-2xl">
-            บริการรับฝากขาย ฝากเช่า บ้านเดี่ยว ที่ดินเปล่า คอนโดมิเนียม อาคารพาณิชย์ และขายฝากจำนอง <br className="hidden sm:inline" />
-            ตรวจสอบเอกสารสิทธิ์และโฉนดชัดเจน โปร่งใส พร้อมดูแลยื่นสินเชื่อธนาคารจนถึงวันโอนกรรมสิทธิ์
-          </p>
-
-          {/* Action CTAs */}
-          <div className="hero-reveal hero-reveal-actions flex flex-wrap items-center gap-4 mb-10">
-            <Link
-              href="/properties"
-              className="hero-cta hero-cta-primary px-8 py-4 bg-gradient-to-r from-gold-400 via-gold-500 to-amber-500 hover:from-gold-300 hover:to-gold-400 text-navy-950 font-black text-sm rounded-xl shadow-xl hover:shadow-gold-500/30 flex items-center space-x-2.5 group"
-            >
-              <Search className="w-4 h-4 text-navy-950 stroke-[2.5]" />
-              <span>ค้นหาบ้านและที่ดินทั้งหมด</span>
-              <ChevronRight className="hero-cta-arrow w-4 h-4 text-navy-950" />
-            </Link>
-
-            <Link
-              href="/sell"
-              className="hero-cta px-8 py-4 bg-white/10 hover:bg-white/20 text-white hover:text-gold-300 border border-white/25 hover:border-gold-400/60 font-bold text-sm rounded-xl backdrop-blur-md flex items-center space-x-2.5 shadow-lg"
-            >
-              <PlusCircle className="w-4 h-4 text-gold-400" />
-              <span>ฝากขาย & บริการขายฝาก</span>
-            </Link>
+          <p className="hero-reveal hero-reveal-description mt-5 max-w-lg text-sm leading-7 text-slate-300 sm:text-base sm:leading-8">ซื้อ ขาย เช่า ฝากขาย บ้าน ที่ดิน และคอนโดในหาดใหญ่–สงขลา เริ่มต้นค้นหาทรัพย์ที่ตอบโจทย์ชีวิต พร้อมทีมงานดูแลตั้งแต่วันแรกจนถึงวันโอน</p>
+          <div className="hero-reveal hero-reveal-actions mt-7 flex flex-wrap gap-3">
+            <Link href="/properties" className="hero-cta hero-cta-primary flex min-h-12 items-center gap-2.5 rounded-xl bg-gold-400 px-5 py-3.5 text-sm font-semibold text-navy-950 shadow-lg hover:bg-gold-300"><Search size={17} aria-hidden="true" />ค้นหาทรัพย์ทั้งหมด<ChevronRight size={16} aria-hidden="true" className="hero-cta-arrow" /></Link>
+            <Link href="/sell" className="hero-cta flex min-h-12 items-center gap-2 rounded-xl border border-white/25 bg-white/5 px-5 py-3.5 text-sm font-medium text-white hover:bg-white/10"><PlusCircle size={17} aria-hidden="true" className="text-gold-300" />ฝากขายกับเรา</Link>
           </div>
-
-          {/* Stat Counter Strip */}
-          <div className="hero-reveal hero-reveal-stats grid grid-cols-3 gap-4 sm:gap-6 text-xs text-slate-200 pt-6 border-t border-white/15">
-            <div className="space-y-0.5">
-              <div className="text-2xl sm:text-3xl font-black text-gold-300 tabular-nums">500+</div>
-              <span className="text-[11px] text-slate-300 font-medium">ทรัพย์คุณภาพคัดสรร</span>
-            </div>
-            <div className="space-y-0.5 sm:border-l sm:border-white/15 sm:pl-6">
-              <div className="text-2xl sm:text-3xl font-black text-gold-300 tabular-nums">99%</div>
-              <span className="text-[11px] text-slate-300 font-medium">อัตราอนุมัติสินเชื่อ</span>
-            </div>
-            <div className="space-y-0.5 sm:border-l sm:border-white/15 sm:pl-6">
-              <div className="text-2xl sm:text-3xl font-black text-gold-300 tabular-nums">100%</div>
-              <span className="text-[11px] text-slate-300 font-medium">ตรวจสอบเอกสารสิทธิ์</span>
-            </div>
+          <div className="hero-reveal hero-reveal-stats mt-8 flex flex-wrap gap-x-5 gap-y-3 border-t border-white/15 pt-5 text-[11px] text-slate-300 sm:text-xs">
+            <span className="flex items-center gap-2"><MapPin size={15} aria-hidden="true" className="text-gold-300" />เชี่ยวชาญทำเลในพื้นที่</span>
+            <span className="flex items-center gap-2"><ShieldCheck size={15} aria-hidden="true" className="text-gold-300" />ดูแลเรื่องเอกสาร</span>
+            <span className="flex items-center gap-2"><HeartHandshake size={15} aria-hidden="true" className="text-gold-300" />ปรึกษาทีมงานได้</span>
           </div>
+          <a href="#home-properties" className="mt-7 inline-flex min-h-11 items-center gap-3 text-[11px] text-slate-300 hover:text-gold-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-gold-300"><span className="flex h-8 w-8 items-center justify-center rounded-full border border-white/20"><ArrowDown size={14} aria-hidden="true" /></span>เลื่อนลงเพื่อค้นพบทรัพย์ที่ใช่</a>
         </div>
+        <div className="hero-reveal hero-reveal-actions min-w-0"><HomeMoodSelector /></div>
       </div>
-
-      {/* Floating Search Panel Attached at Bottom */}
-      <div className="hero-reveal hero-reveal-search relative z-20 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full mt-10">
-        <FloatingSearchBox />
-      </div>
+      <div className="hero-reveal hero-reveal-search relative mx-auto mt-10 w-full max-w-7xl px-4 sm:mt-12 sm:px-6 lg:px-8"><FloatingSearchBox /></div>
     </section>
   );
 }

@@ -43,10 +43,11 @@ export default function FloatingSearchBox() {
     <div className="w-full max-w-5xl mx-auto bg-white/95 backdrop-blur-2xl rounded-3xl shadow-[0_25px_50px_-12px_rgba(2,8,18,0.25)] border border-slate-200/90 p-5 sm:p-7 transition-all">
       {/* Tabs: ซื้อ / เช่า / ขายฝาก */}
       <div className="flex flex-wrap items-center justify-between border-b border-slate-100 pb-4 mb-5 gap-3">
-        <div className="flex items-center space-x-2">
+        <div role="group" aria-label="เลือกซื้อ เช่า หรือขายฝาก" className="flex flex-wrap items-center gap-2">
           <button
             type="button"
             onClick={() => setTab('sale')}
+            aria-pressed={tab === 'sale'}
             className={`flex items-center space-x-2 px-5 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer ${
               tab === 'sale'
                 ? 'bg-navy-950 text-gold-400 shadow-md ring-1 ring-gold-400/40'
@@ -60,6 +61,7 @@ export default function FloatingSearchBox() {
           <button
             type="button"
             onClick={() => setTab('rent')}
+            aria-pressed={tab === 'rent'}
             className={`flex items-center space-x-2 px-5 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer ${
               tab === 'rent'
                 ? 'bg-navy-950 text-gold-400 shadow-md ring-1 ring-gold-400/40'
@@ -73,6 +75,7 @@ export default function FloatingSearchBox() {
           <button
             type="button"
             onClick={() => setTab('consignment')}
+            aria-pressed={tab === 'consignment'}
             className={`flex items-center space-x-2 px-5 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer ${
               tab === 'consignment'
                 ? 'bg-navy-950 text-gold-400 shadow-md ring-1 ring-gold-400/40'
@@ -114,11 +117,12 @@ export default function FloatingSearchBox() {
         <form onSubmit={handleSearch} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5 sm:gap-4 items-end">
           {/* Field 1: ประเภททรัพย์ */}
           <div>
-            <label className="block text-xs font-bold text-slate-800 mb-1.5 flex items-center">
+            <label htmlFor="home-search-type" className="block text-xs font-bold text-slate-800 mb-1.5 flex items-center">
               <Home className="w-3.5 h-3.5 mr-1.5 text-gold-600" />
               ประเภททรัพย์
             </label>
             <select
+              id="home-search-type"
               value={propertyType}
               onChange={(e) => setPropertyType(e.target.value)}
               className="w-full bg-slate-50 hover:bg-white border border-slate-200 rounded-xl py-3 px-3.5 text-xs sm:text-sm text-slate-900 font-medium focus:outline-none focus:ring-2 focus:ring-gold-500 focus:bg-white transition-all cursor-pointer"
@@ -134,11 +138,12 @@ export default function FloatingSearchBox() {
 
           {/* Field 2: ทำเล */}
           <div>
-            <label className="block text-xs font-bold text-slate-800 mb-1.5 flex items-center">
+            <label htmlFor="home-search-district" className="block text-xs font-bold text-slate-800 mb-1.5 flex items-center">
               <MapPin className="w-3.5 h-3.5 mr-1.5 text-gold-600" />
               ทำเล (หาดใหญ่-สงขลา)
             </label>
             <select
+              id="home-search-district"
               value={district}
               onChange={(e) => setDistrict(e.target.value)}
               className="w-full bg-slate-50 hover:bg-white border border-slate-200 rounded-xl py-3 px-3.5 text-xs sm:text-sm text-slate-900 font-medium focus:outline-none focus:ring-2 focus:ring-gold-500 focus:bg-white transition-all cursor-pointer"
@@ -154,11 +159,12 @@ export default function FloatingSearchBox() {
 
           {/* Field 3: ช่วงราคา */}
           <div>
-            <label className="block text-xs font-bold text-slate-800 mb-1.5 flex items-center">
+            <label htmlFor="home-search-budget" className="block text-xs font-bold text-slate-800 mb-1.5 flex items-center">
               <Coins className="w-3.5 h-3.5 mr-1.5 text-gold-600" />
               งบประมาณ
             </label>
             <select
+              id="home-search-budget"
               value={maxPrice}
               onChange={(e) => setMaxPrice(e.target.value)}
               className="w-full bg-slate-50 hover:bg-white border border-slate-200 rounded-xl py-3 px-3.5 text-xs sm:text-sm text-slate-900 font-medium focus:outline-none focus:ring-2 focus:ring-gold-500 focus:bg-white transition-all cursor-pointer"
