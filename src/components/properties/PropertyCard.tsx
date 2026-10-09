@@ -35,11 +35,13 @@ export default function PropertyCard({
   const [isFavorite, setIsFavorite] = useState(false);
   const [isComparing, setIsComparing] = useState(false);
   const [imageError, setImageError] = useState(false);
+  const [favoriteFeedback, setFavoriteFeedback] = useState(false);
 
   useEffect(() => {
     const favs = getFavoriteIds();
     setIsFavorite(favs.includes(id));
     setIsComparing(getCompareIds().includes(id));
+    setFavoriteFeedback(false);
 
     const handleFavUpdate = () => {
       setIsFavorite(getFavoriteIds().includes(id));
@@ -61,6 +63,7 @@ export default function PropertyCard({
     e.stopPropagation();
     const newState = toggleFavoriteId(id);
     setIsFavorite(newState);
+    setFavoriteFeedback(newState);
   };
 
   const handleToggleCompare = (e: React.MouseEvent) => {
@@ -82,17 +85,17 @@ export default function PropertyCard({
     : coverImage || images[0] || villaModernEstate;
 
   return (
-    <div className="group bg-white rounded-3xl overflow-hidden border border-slate-200/80 hover:border-gold-400/50 shadow-sm hover:shadow-2xl transition-all duration-300 flex flex-col h-full transform hover:-translate-y-1">
+    <div className="property-card group bg-white rounded-3xl overflow-hidden border border-slate-200/80 shadow-sm flex flex-col h-full">
       {/* 4:3 Image Container with Overlays */}
       <div className="relative aspect-[4/3] w-full overflow-hidden bg-slate-100">
-        <Link href={propertyHref(slug)} className="relative block w-full h-full">
+        <Link href={propertyHref(slug)} className="property-card-image-link relative block w-full h-full">
           <Image
             src={displayImage}
             alt={title}
             fill
             unoptimized={typeof displayImage === 'string' && displayImage.startsWith('data:')}
             sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
-            className="object-cover group-hover:scale-105 transition-transform duration-700 ease-out"
+            className="property-card-image object-cover"
             onError={() => {
               if (typeof displayImage === 'string' && !displayImage.startsWith('data:')) {
                 setImageError(true);
@@ -120,8 +123,9 @@ export default function PropertyCard({
             type="button"
             onClick={handleToggleCompare}
             aria-label={isComparing ? 'ยกเลิกการเปรียบเทียบ' : 'เลือกเปรียบเทียบ'}
+            aria-pressed={isComparing}
             title={isComparing ? 'คลิกเพื่อนำออกจากการเปรียบเทียบ' : 'คลิกเพื่อเลือกเปรียบเทียบ (สูงสุด 4 หลัง)'}
-            className={`w-9 h-9 rounded-full backdrop-blur-md flex items-center justify-center shadow-md hover:scale-110 active:scale-95 transition-all cursor-pointer ${
+            className={`property-card-control w-9 h-9 rounded-full backdrop-blur-md flex items-center justify-center shadow-md cursor-pointer ${
               isComparing
                 ? 'bg-navy-950 text-gold-400 ring-2 ring-gold-400 font-bold'
                 : 'bg-white/90 text-slate-700 hover:text-navy-950 hover:bg-white'
@@ -134,13 +138,17 @@ export default function PropertyCard({
             type="button"
             onClick={handleToggleFav}
             aria-label={isFavorite ? 'ลบออกจากรายการโปรด' : 'บันทึกในรายการโปรด'}
-            className="w-9 h-9 rounded-full bg-white/90 hover:bg-white backdrop-blur-md flex items-center justify-center text-slate-700 hover:text-red-500 shadow-md hover:scale-110 active:scale-95 transition-all cursor-pointer"
+            aria-pressed={isFavorite}
+            className="property-card-control w-9 h-9 rounded-full bg-white/90 hover:bg-white backdrop-blur-md flex items-center justify-center text-slate-700 hover:text-red-500 shadow-md cursor-pointer"
           >
-            <Heart
-              className={`w-5 h-5 transition-colors ${
-                isFavorite ? 'fill-red-500 text-red-500' : 'text-slate-600 stroke-[2]'
-              }`}
-            />
+            <span className={`inline-flex ${favoriteFeedback ? 'favorite-pop' : ''}`} onAnimationEnd={() => setFavoriteFeedback(false)}>
+              <Heart
+                aria-hidden="true"
+                className={`w-5 h-5 transition-colors ${
+                  isFavorite ? 'fill-red-500 text-red-500' : 'text-slate-600 stroke-[2]'
+                }`}
+              />
+            </span>
           </button>
         </div>
 
@@ -240,10 +248,10 @@ export default function PropertyCard({
           <div className="mt-4 pt-1 grid grid-cols-2 gap-2">
             <Link
               href={propertyHref(slug)}
-              className="py-2.5 px-3 bg-navy-950 hover:bg-navy-800 text-gold-400 rounded-xl text-xs font-bold flex items-center justify-center space-x-1.5 transition-all duration-200 group/btn border border-navy-950 hover:border-navy-800"
+              className="property-card-cta py-2.5 px-3 bg-navy-950 hover:bg-navy-800 text-gold-400 rounded-xl text-xs font-bold flex items-center justify-center space-x-1.5 transition-colors duration-200 group/btn border border-navy-950 hover:border-navy-800"
             >
               <span>ดูรายละเอียด</span>
-              <ArrowRight className="w-3.5 h-3.5 transform group-hover/btn:translate-x-1 transition-transform text-gold-400" />
+              <ArrowRight className="property-card-arrow w-3.5 h-3.5 text-gold-400" />
             </Link>
 
             <SendToLineButton
