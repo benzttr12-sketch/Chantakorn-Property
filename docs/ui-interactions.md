@@ -19,3 +19,7 @@ Verification covers gesture thresholds, empty/single-photo navigation, zoom rese
 - Search controls have associated labels and pressed states. Purchase/rental/consignment buttons wrap on small screens. New motion honors reduced-motion settings and requires no added dependency.
 
 Manual smoke checks: switch all three hero options and confirm their links; follow every section shortcut; filter an empty category and recover; select each location and cycle previous/next; inspect the inquiry link; check 320px and 390px widths for horizontal overflow and visible controls.
+
+Mobile fixed controls: the comparison dock clears the bottom navigation, and LINE moves above the dock while comparisons are selected. Both offsets account for `safe-area-inset-bottom`; clearing the selection restores LINE. The mobile menu exposes its expanded state and the bottom navigation identifies the current page.
+
+Check the comparison action at 320×640, 360×800 and 390×844: its center must hit the actual button, the dock must sit above navigation, and LINE must sit above the dock. Open/close the comparison table and clear the selection. Viewport checks do not replace a physical iPhone safe-area test.

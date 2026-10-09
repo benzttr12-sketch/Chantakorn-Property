@@ -1,13 +1,26 @@
 'use client';
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { MessageCircle } from 'lucide-react';
+import { getCompareIds } from '@/lib/store/compare-store';
 
 export default function FloatingLineButton() {
   const lineUrl = 'https://lin.ee/NMSe28T3';
+  const [hasComparison, setHasComparison] = useState(false);
+
+  useEffect(() => {
+    const updateComparison = () => setHasComparison(getCompareIds().length > 0);
+    updateComparison();
+    window.addEventListener('compare-updated', updateComparison);
+    window.addEventListener('storage', updateComparison);
+    return () => {
+      window.removeEventListener('compare-updated', updateComparison);
+      window.removeEventListener('storage', updateComparison);
+    };
+  }, []);
 
   return (
-    <aside aria-label="ช่องทางติดต่อ LINE" className="fixed bottom-20 md:bottom-8 right-5 z-40">
+    <aside aria-label="ช่องทางติดต่อ LINE" data-compare-active={hasComparison} className="mobile-line-dock fixed right-5 z-40">
       <a
         href={lineUrl}
         target="_blank"

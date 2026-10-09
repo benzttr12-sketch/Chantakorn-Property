@@ -48,7 +48,7 @@ export default function CompareBar() {
 
   return (
     <>
-      <div className="fixed bottom-4 left-4 right-4 md:left-auto md:right-8 md:bottom-8 z-40 max-w-2xl bg-navy-950 text-white rounded-3xl p-3.5 sm:p-4 shadow-2xl border border-navy-800 animate-in slide-in-from-bottom duration-300">
+      <div className="mobile-compare-dock fixed left-4 right-4 md:left-auto md:right-8 z-40 max-w-2xl bg-navy-950 text-white rounded-3xl p-3.5 sm:p-4 shadow-2xl border border-navy-800 animate-in slide-in-from-bottom duration-300">
         <div className="flex flex-wrap items-center justify-between gap-3">
           {/* Left: Info & Thumbnails */}
           <div className="flex items-center space-x-3 overflow-hidden">

@@ -310,6 +310,15 @@
   .hero-cta-primary::after { display: none; }
 }
 
+/* Keep floating controls above the mobile navigation and home indicator. */
+.mobile-bottom-nav { padding-bottom: calc(0.5rem + env(safe-area-inset-bottom, 0px)); }
+.mobile-compare-dock, .mobile-line-dock { bottom: calc(5rem + env(safe-area-inset-bottom, 0px)); }
+.mobile-line-dock[data-compare-active="true"] { bottom: calc(14rem + env(safe-area-inset-bottom, 0px)); }
+
+@media (min-width: 768px) {
+  .mobile-compare-dock, .mobile-line-dock, .mobile-line-dock[data-compare-active="true"] { bottom: 2rem; }
+}
+
 /* Homepage discovery keeps every section readable before hydration. */
 .home-hero-grid {
   background-image: linear-gradient(rgba(197, 160, 89, 0.35) 1px, transparent 1px), linear-gradient(90deg, rgba(197, 160, 89, 0.35) 1px, transparent 1px);
