@@ -305,6 +305,7 @@ export default function Header() {
           <div className="flex items-center space-x-2 lg:hidden">
             <Link
               href="/favorites"
+              aria-label="ทรัพย์ที่บันทึกไว้"
               className="relative p-2 text-gray-300 hover:text-gold-400 rounded-lg"
             >
               <Heart className="w-5 h-5" />
@@ -316,9 +317,12 @@ export default function Header() {
             </Link>
 
             <button
+              type="button"
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="p-2 text-gray-200 hover:text-gold-400 hover:bg-navy-900 rounded-lg focus:outline-none"
-              aria-label="Toggle Navigation Menu"
+              className="p-2 text-gray-200 hover:text-gold-400 hover:bg-navy-900 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-400 focus-visible:ring-offset-2 focus-visible:ring-offset-navy-950"
+              aria-label={mobileMenuOpen ? 'ปิดเมนูหลัก' : 'เปิดเมนูหลัก'}
+              aria-expanded={mobileMenuOpen}
+              aria-controls="mobile-navigation-menu"
             >
               {mobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
             </button>
@@ -329,6 +333,7 @@ export default function Header() {
       {/* Mobile Slide-down Navigation Menu */}
       {mobileMenuOpen && (
         <div 
+          id="mobile-navigation-menu"
           className="lg:hidden fixed inset-0 top-[60px] z-[60] bg-[#020812] border-t border-navy-800 flex flex-col p-5 overflow-y-auto animate-fadeIn shadow-2xl"
           style={{ backgroundColor: '#020812' }}
         >

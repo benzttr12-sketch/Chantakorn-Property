@@ -29,7 +29,7 @@ export default function MobileBottomNav() {
   ];
 
   return (
-    <div className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-navy-950/95 backdrop-blur-md border-t border-navy-800 py-2 px-6 safe-area-pb">
+    <nav aria-label="เมนูหลักบนมือถือ" className="mobile-bottom-nav md:hidden fixed bottom-0 left-0 right-0 z-50 bg-navy-950/95 backdrop-blur-md border-t border-navy-800 py-2 px-6">
       <div className="flex justify-between items-center max-w-sm mx-auto">
         {items.map((item) => {
           const isActive = pathname === item.href || (item.href !== '/' && pathname.startsWith(item.href));
@@ -38,6 +38,7 @@ export default function MobileBottomNav() {
             <Link
               key={item.label}
               href={item.href}
+              aria-current={isActive ? 'page' : undefined}
               className={`flex flex-col items-center justify-center relative py-1 px-3 rounded-lg transition-all ${
                 isActive ? 'text-gold-400' : 'text-gray-400 hover:text-gray-200'
               }`}
@@ -57,6 +58,6 @@ export default function MobileBottomNav() {
           );
         })}
       </div>
-    </div>
+    </nav>
   );
 }
