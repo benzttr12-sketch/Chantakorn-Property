@@ -1,511 +1,234 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
-import { usePathname, useRouter } from 'next/navigation';
-import { supabase } from '@/lib/supabase/client';
-import { auth, db } from '@/lib/firebase/client';
-import { onAuthStateChanged } from 'firebase/auth';
-import { doc, getDoc, getDocFromServer } from 'firebase/firestore';
-import { dataBackend, isDemoAuthEnabled } from '@/lib/backend';
-import { logoutUser, getStoredUser } from '@/lib/auth-helpers';
-import { 
-  LayoutDashboard, 
-  Building2, 
-  PlusCircle, 
-  MessageSquare, 
-  Users, 
-  Settings, 
-  LogOut, 
-  ExternalLink,
-  ChevronRight,
-  ShieldCheck,
-  ShieldAlert,
-  Menu,
-  X,
-  UserCheck,
-  Star,
-  Sparkles,
-  Layers,
-  MapPin
-} from 'lucide-react';
 import Image from 'next/image';
-import ProfileHeader from '@/components/admin/ProfileHeader';
+import { usePathname, useRouter } from 'next/navigation';
+import { onAuthStateChanged } from 'firebase/auth';
+import { Building2, ExternalLink, LoaderCircle, LogOut, Menu, Plus, RefreshCw, ShieldAlert, UserRound, X } from 'lucide-react';
+import { auth } from '@/lib/firebase/client';
+import { supabase } from '@/lib/supabase/client';
+import { dataBackend } from '@/lib/backend';
+import { getCurrentUserProfile, logoutUser } from '@/lib/auth-helpers';
 import { fetchInquiries } from '@/lib/store/properties-store';
+import type { UserProfile } from '@/lib/types';
+import AdminNavigation, { getAdminPageTitle } from '@/components/admin/AdminNavigation';
+
+type SessionState = 'checking' | 'ready' | 'denied' | 'error' | 'redirecting';
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
-  const rawPathname = usePathname();
-  const pathname = rawPathname || '';
+  const pathname = usePathname() || '';
   const router = useRouter();
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
-  const [isAuthorized, setIsAuthorized] = useState(false);
-  const [accessDeniedUser, setAccessDeniedUser] = useState<any>(null);
-  const [pendingInquiriesCount, setPendingInquiriesCount] = useState<number>(0);
-  const [currentUser, setCurrentUser] = useState<any>({
-    full_name: 'ผู้ดูแลระบบ (Admin)',
-    role: 'ADMIN',
-    email: 'admin@chantakornproperty.com',
-    avatar_url: '',
-  });
+  const [sessionState, setSessionState] = useState<SessionState>('checking');
+  const [currentUser, setCurrentUser] = useState<UserProfile | null>(null);
+  const [sessionAttempt, setSessionAttempt] = useState(0);
+  const [logoutError, setLogoutError] = useState('');
+  const [loggingOut, setLoggingOut] = useState(false);
+  const [pendingInquiriesCount, setPendingInquiriesCount] = useState(0);
+  const menuButtonRef = useRef<HTMLButtonElement>(null);
+  const drawerRef = useRef<HTMLDivElement>(null);
+  const closeButtonRef = useRef<HTMLButtonElement>(null);
+  const isStaff = currentUser?.role === 'ADMIN' || currentUser?.role === 'AGENT';
+  const restrictedPage = pathname.startsWith('/admin/users') && currentUser?.role !== 'ADMIN';
 
   useEffect(() => {
     let active = true;
-    const loadBadges = async () => {
+    let revision = 0;
+    let profileRequests = 0;
+    let pendingRecheck = false;
+    const loadSession = async (showChecking = true) => {
+      if (!active) return;
+      const requestRevision = ++revision;
+      profileRequests += 1;
+      if (showChecking) setSessionState('checking');
       try {
-        const inqs = await fetchInquiries();
-        if (active) {
-          const pending = inqs.filter((i) => i.status === 'new').length;
-          setPendingInquiriesCount(pending);
-        }
-      } catch {}
-    };
-    if (isAuthorized) {
-      loadBadges();
-    }
-    return () => { active = false; };
-  }, [isAuthorized, pathname]);
-
-  useEffect(() => {
-    let unsubscribeFirebase: (() => void) | undefined;
-
-    const handleAuthChange = (e: any) => {
-      if (e.detail) {
-        const u = e.detail;
-        const r = u.role;
-        if (['ADMIN', 'AGENT'].includes(r)) {
-          setCurrentUser((prev: any) => ({ ...prev, ...u, role: r }));
-        }
-      }
-    };
-    window.addEventListener('chantakorn_auth_change', handleAuthChange);
-
-    async function authorize() {
-      let isDenied = false;
-
-      // 1. Supabase Backend
-      if (dataBackend === 'supabase' && supabase) {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) {
+        const profile = await getCurrentUserProfile();
+        if (!active || requestRevision !== revision) return;
+        setCurrentUser(profile);
+        if (!profile) {
+          setSessionState('redirecting');
           router.replace('/login?reason=admin_required');
-          return;
-        }
-
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('id', user.id)
-          .single();
-        if (!profile || !['ADMIN', 'AGENT'].includes(profile.role)) {
-          setAccessDeniedUser({ ...profile, email: user.email, role: 'USER' });
-          setIsAuthorized(false);
-          return;
-        }
-        if (pathname.startsWith('/admin/users') && profile.role !== 'ADMIN') {
-          router.replace('/admin');
-          return;
-        }
-        setCurrentUser({ ...profile, email: user.email });
-        setIsAuthorized(true);
-        return;
-      }
-
-      // 2. Stored Profile check (handles preview domains & fallback sessions)
-      const stored = getStoredUser();
-      if (stored) {
-        const userRole = stored.role || 'USER';
-        if (['ADMIN', 'AGENT'].includes(userRole)) {
-          if (pathname.startsWith('/admin/users') && userRole !== 'ADMIN') {
-            router.replace('/admin');
-            return;
-          }
-          setCurrentUser({ ...stored, role: userRole });
-          setIsAuthorized(true);
-          return;
         } else {
-          // Regular user explicitly attempting to access admin
-          isDenied = true;
-          setAccessDeniedUser({ ...stored, role: userRole });
-          setIsAuthorized(false);
-          return;
+          setSessionState(profile.role === 'ADMIN' || profile.role === 'AGENT' ? 'ready' : 'denied');
+        }
+      } catch {
+        if (active && requestRevision === revision) {
+          setCurrentUser(null);
+          setSessionState('error');
+        }
+      } finally {
+        profileRequests -= 1;
+        if (active && profileRequests === 0 && pendingRecheck) {
+          pendingRecheck = false;
+          void loadSession(false);
         }
       }
+    };
 
-      // 3. Firebase Auth check
-      if (dataBackend === 'firebase' && auth && db) {
-        if (auth.currentUser) {
-          try {
-            let snap;
-            try {
-              snap = await getDocFromServer(doc(db, 'profiles', auth.currentUser.uid));
-            } catch {
-              snap = await getDoc(doc(db, 'profiles', auth.currentUser.uid));
-            }
-
-            const docRole = snap.exists() ? snap.data()?.role : null;
-            const effectiveRole = docRole || 'USER';
-
-            if (['ADMIN', 'AGENT'].includes(effectiveRole)) {
-              const profile = snap.exists() ? snap.data() : {};
-              if (pathname.startsWith('/admin/users') && effectiveRole !== 'ADMIN') {
-                router.replace('/admin');
-                return;
-              }
-              setCurrentUser({
-                id: auth.currentUser.uid,
-                full_name: profile.full_name || auth.currentUser.displayName || 'เจ้าหน้าที่',
-                email: auth.currentUser.email,
-                role: effectiveRole,
-                avatar_url: profile.avatar_url || auth.currentUser.photoURL || '',
-              });
-              setIsAuthorized(true);
-              return;
-            } else {
-              isDenied = true;
-              setAccessDeniedUser({
-                id: auth.currentUser.uid,
-                email: auth.currentUser.email,
-                role: 'USER',
-              });
-              setIsAuthorized(false);
-              return;
-            }
-          } catch {}
-        }
-      }
-
-      if (!isDenied) {
-        router.replace('/login?reason=admin_required');
-      }
-    }
-
-    setIsAuthorized(false);
-    authorize().catch(() => router.replace('/login?reason=admin_required'));
-
-    if (dataBackend === 'firebase' && auth && db) {
-      const firestore = db;
-      unsubscribeFirebase = onAuthStateChanged(auth, async (firebaseUser) => {
-        if (firebaseUser) {
-          let role = 'USER';
-          let avatar = firebaseUser.photoURL || '';
-          let name = firebaseUser.displayName || firebaseUser.email?.split('@')[0] || 'ผู้ดูแลระบบ';
-          try {
-            let snap;
-            try {
-              snap = await getDocFromServer(doc(firestore, 'profiles', firebaseUser.uid));
-            } catch {
-              snap = await getDoc(doc(firestore, 'profiles', firebaseUser.uid));
-            }
-
-            if (snap.exists()) {
-              const data = snap.data();
-              if (data.role) role = data.role;
-              if (data.avatar_url) avatar = data.avatar_url;
-              if (data.full_name) name = data.full_name;
-            }
-          } catch {}
-
-          if (['ADMIN', 'AGENT'].includes(role)) {
-            setCurrentUser({
-              full_name: name,
-              email: firebaseUser.email,
-              avatar_url: avatar,
-              role,
-            });
-            setIsAuthorized(true);
-            setAccessDeniedUser(null);
-          } else {
-            // User is authenticated but role is USER (regular user)
-            setAccessDeniedUser({
-              full_name: name,
-              email: firebaseUser.email,
-              role: 'USER',
-              avatar_url: avatar
-            });
-            setIsAuthorized(false);
-          }
+    // Notifications request a fresh server profile, never grant an event's role.
+    // Queue changes received during a read so a saved profile is not missed.
+    const handleProfileChange = () => {
+      if (profileRequests === 0) void loadSession(false);
+      else pendingRecheck = true;
+    };
+    window.addEventListener('chantakorn_auth_change', handleProfileChange);
+    let unsubscribe: (() => void) | undefined;
+    if (dataBackend === 'firebase' && auth) {
+      unsubscribe = onAuthStateChanged(auth, (user) => {
+        if (user) {
+          void loadSession();
         } else {
-          const stored = getStoredUser();
-          if (stored && ['ADMIN', 'AGENT'].includes(stored.role)) {
-            setCurrentUser(stored);
-            setIsAuthorized(true);
-            setAccessDeniedUser(null);
-          } else if (!stored) {
-            router.replace('/login?reason=admin_required');
-          }
+          revision += 1;
+          setCurrentUser(null);
+          setSessionState('redirecting');
+          router.replace('/login?reason=admin_required');
         }
       });
+    } else {
+      void loadSession();
+      if (dataBackend === 'supabase' && supabase) {
+        const { data: { subscription } } = supabase.auth.onAuthStateChange(() => {
+          setTimeout(() => { if (active) void loadSession(); }, 0);
+        });
+        unsubscribe = () => subscription.unsubscribe();
+      }
     }
-
     return () => {
-      window.removeEventListener('chantakorn_auth_change', handleAuthChange);
-      if (unsubscribeFirebase) unsubscribeFirebase();
+      active = false;
+      revision += 1;
+      unsubscribe?.();
+      window.removeEventListener('chantakorn_auth_change', handleProfileChange);
     };
-  }, [router, pathname]);
+  }, [router, sessionAttempt]);
+
+  useEffect(() => {
+    if (sessionState === 'ready' && restrictedPage) router.replace('/admin');
+  }, [restrictedPage, router, sessionState]);
+
+  useEffect(() => {
+    let active = true;
+    if (sessionState === 'ready' && isStaff) {
+      fetchInquiries().then((items) => {
+        if (active) setPendingInquiriesCount(items.filter((item) => item.status === 'new').length);
+      }).catch(() => { if (active) setPendingInquiriesCount(0); });
+    }
+    return () => { active = false; };
+  }, [isStaff, pathname, sessionState]);
+
+  useEffect(() => { setMobileSidebarOpen(false); }, [pathname]);
+  useEffect(() => {
+    if (sessionState !== 'ready') setMobileSidebarOpen(false);
+  }, [sessionState]);
+
+  useEffect(() => {
+    if (!mobileSidebarOpen) return;
+    const menuButton = menuButtonRef.current;
+    const originalOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    closeButtonRef.current?.focus();
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        setMobileSidebarOpen(false);
+      }
+      if (event.key === 'Tab') {
+        const elements = drawerRef.current?.querySelectorAll<HTMLElement>('a[href], button:not([disabled])');
+        if (!elements?.length) return;
+        const first = elements[0];
+        const last = elements[elements.length - 1];
+        if (event.shiftKey && document.activeElement === first) {
+          event.preventDefault(); last.focus();
+        } else if (!event.shiftKey && document.activeElement === last) {
+          event.preventDefault(); first.focus();
+        }
+      }
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    const handleDesktop = () => { if (window.innerWidth >= 768) setMobileSidebarOpen(false); };
+    window.addEventListener('resize', handleDesktop);
+    return () => {
+      document.body.style.overflow = originalOverflow;
+      document.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('resize', handleDesktop);
+      menuButton?.focus();
+    };
+  }, [mobileSidebarOpen]);
 
   const handleLogout = async () => {
-    if (dataBackend === 'supabase' && supabase) await supabase.auth.signOut();
-    await logoutUser();
-    router.push('/');
+    if (loggingOut) return;
+    setLoggingOut(true);
+    setLogoutError('');
+    try {
+      await logoutUser();
+      router.replace('/');
+    } catch {
+      setLogoutError('ออกจากระบบไม่สำเร็จ กรุณาลองอีกครั้ง');
+      setLoggingOut(false);
+    }
   };
 
-  const navItems = [
-    { label: 'แดชบอร์ดภาพรวม', href: '/admin', icon: LayoutDashboard },
-    { label: 'ประเมินราคาที่ดิน & LandsMaps', href: '/admin/valuation', icon: MapPin },
-    { label: 'ติดตามเฟสงาน', href: '/admin/work-phases', icon: Layers, badge: 'ใหม่' },
-    { label: 'ระบบอัตโนมัติ AI', href: '/admin/automation', icon: Sparkles, badge: 'AI ช่วยโพสต์' },
-    { label: 'จัดการอสังหาริมทรัพย์', href: '/admin/properties', icon: Building2 },
-    { label: 'เพิ่มทรัพย์ใหม่', href: '/admin/properties/new', icon: PlusCircle },
-    { label: 'จัดการนายหน้าแนะนำ', href: '/admin/agents', icon: UserCheck },
-    { label: 'จัดการรีวิวจากลูกค้า', href: '/admin/reviews', icon: Star },
-    { label: 'รายการผู้ติดต่อ & ฝากขาย', href: '/admin/inquiries', icon: MessageSquare },
-    { label: 'จัดการสมาชิก & สิทธิ์', href: '/admin/users', icon: Users },
-    { label: 'ตั้งค่าระบบ', href: '/admin/settings', icon: Settings },
-  ];
-
-  if (accessDeniedUser) {
+  if (sessionState !== 'ready' || !currentUser || !isStaff || restrictedPage) {
+    const denied = sessionState === 'denied';
+    const failed = sessionState === 'error';
     return (
-      <div className="min-h-screen bg-slate-900 flex items-center justify-center p-4">
-        <div className="max-w-md w-full bg-white rounded-3xl p-7 sm:p-8 border border-surface-border shadow-2xl text-center space-y-5 animate-in fade-in zoom-in-95 duration-200">
-          <div className="w-16 h-16 rounded-2xl bg-rose-50 text-rose-600 mx-auto flex items-center justify-center border border-rose-200 shadow-sm">
-            <ShieldAlert className="w-8 h-8" />
+      <main className="admin-workspace flex min-h-[100dvh] items-center justify-center bg-slate-50 p-6">
+        <div className="w-full max-w-md rounded-3xl border border-slate-200 bg-white p-7 text-center shadow-sm">
+          <div className="mx-auto mb-5 flex h-14 w-14 items-center justify-center rounded-2xl bg-navy-50 text-navy-900">
+            {denied || failed ? <ShieldAlert className="h-7 w-7" /> : <LoaderCircle className="h-7 w-7 animate-spin motion-reduce:animate-none" />}
           </div>
-
-          <div className="space-y-2">
-            <h1 className="text-xl font-extrabold text-navy-950">ไม่มีสิทธิ์เข้าถึงระบบหลังบ้าน</h1>
-            <p className="text-xs text-brand-muted leading-relaxed">
-              คุณได้เข้าสู่ระบบด้วยบัญชี <strong className="text-navy-950">{accessDeniedUser.email || accessDeniedUser.full_name}</strong>
-            </p>
-            <div className="p-3 bg-amber-50 rounded-2xl border border-amber-200 text-amber-900 text-xs text-left space-y-1">
-              <span className="font-bold flex items-center space-x-1 text-amber-800">
-                <ShieldAlert className="w-3.5 h-3.5 mr-1" />
-                <span>ข้อจำกัดด้านสิทธิ์การใช้งาน (Role Permissions):</span>
-              </span>
-              <p className="text-[11px] text-amber-800/90 leading-relaxed">
-                บัญชีของคุณมียศเป็น <strong>ผู้ใช้ทั่วไป (USER)</strong> ระบบหลังบ้านสงวนสิทธิ์การเข้าใช้งานเฉพาะสมาชิกที่มียศ <strong>นายหน้า (AGENT)</strong> และ <strong>ผู้ดูแลระบบ (ADMIN)</strong> เท่านั้น
-              </p>
-            </div>
-          </div>
-
-          <div className="flex flex-col gap-2 pt-2">
-            <Link
-              href="/"
-              className="w-full py-2.5 px-4 rounded-xl bg-navy-950 hover:bg-navy-900 text-white font-bold text-xs shadow-md transition-all active:scale-95"
-            >
-              กลับสู่หน้าหลักเว็บไซต์
-            </Link>
-            <button
-              onClick={handleLogout}
-              className="w-full py-2.5 px-4 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold text-xs transition-colors"
-            >
-              ออกจากระบบ / เข้าสู่ระบบด้วยบัญชีเจ้าหน้าที่
-            </button>
-          </div>
+          <h1 className="text-xl font-bold text-navy-950">{denied ? 'บัญชีนี้ยังไม่มีสิทธิ์เข้าหลังบ้าน' : failed ? 'เชื่อมต่อบัญชีไม่ได้' : 'กำลังตรวจสอบบัญชี'}</h1>
+          <p className="mt-3 text-sm leading-relaxed text-slate-500" role={failed ? 'alert' : 'status'}>
+            {denied ? 'ระบบนี้สำหรับผู้ดูแลระบบและนายหน้า กรุณาใช้บัญชีเจ้าหน้าที่หรือติดต่อผู้ดูแลระบบ' : failed ? 'กรุณาตรวจการเชื่อมต่ออินเทอร์เน็ต แล้วลองใหม่อีกครั้ง' : 'กรุณารอสักครู่ ระบบกำลังตรวจสอบสิทธิ์ของคุณ'}
+          </p>
+          {failed && <button onClick={() => setSessionAttempt((value) => value + 1)} className="mt-5 inline-flex min-h-11 items-center gap-2 rounded-xl bg-navy-950 px-5 text-sm font-bold text-white"><RefreshCw className="h-4 w-4" />ลองใหม่</button>}
+          {denied && <div className="mt-6 flex flex-col gap-3"><button disabled={loggingOut} onClick={handleLogout} className="min-h-11 rounded-xl bg-navy-950 px-4 text-sm font-bold text-white">เข้าสู่ระบบด้วยบัญชีเจ้าหน้าที่</button><Link href="/" className="py-2 text-sm text-slate-600">กลับหน้าเว็บไซต์</Link></div>}
+          {logoutError && <p role="alert" className="mt-3 text-sm text-red-700">{logoutError}</p>}
         </div>
-      </div>
+      </main>
     );
   }
 
-  if (!isAuthorized) return null;
+  const sidebarContent = (
+    <>
+      <div className="flex shrink-0 items-center justify-between px-6 pb-5 pt-7">
+        <Link href="/admin" onClick={() => setMobileSidebarOpen(false)} className="flex items-center gap-3 rounded-lg focus-visible:outline focus-visible:outline-2 focus-visible:outline-gold-400">
+          <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-gold-400 text-navy-950"><Building2 className="h-5 w-5" /></span>
+          <span><span className="block text-sm font-bold tracking-wider text-white">CHANTAKORN</span><span className="mt-1 block text-[11px] text-slate-400">พื้นที่ทำงานของทีม</span></span>
+        </Link>
+        <button ref={closeButtonRef} onClick={() => setMobileSidebarOpen(false)} aria-label="ปิดเมนูหลังบ้าน" className="rounded-lg p-2 text-slate-300 hover:bg-white/10 md:hidden"><X className="h-5 w-5" /></button>
+      </div>
+      <div className="shrink-0 px-5 pb-3"><Link href="/admin/properties/new" onClick={() => setMobileSidebarOpen(false)} className="flex min-h-11 items-center justify-center gap-2 rounded-xl bg-gold-400 px-4 text-sm font-bold text-navy-950 transition-colors hover:bg-gold-300"><Plus className="h-4 w-4" />เพิ่มทรัพย์ใหม่</Link></div>
+      <AdminNavigation pathname={pathname} role={currentUser.role} pendingCount={pendingInquiriesCount} onNavigate={() => setMobileSidebarOpen(false)} />
+      <div className="shrink-0 border-t border-white/10 px-5 py-4">
+        <div className="flex items-center gap-2">
+          <Link href="/admin/profile" onClick={() => setMobileSidebarOpen(false)} className="flex min-w-0 flex-1 items-center gap-3 rounded-xl p-2 transition-colors hover:bg-white/5" aria-label="แก้ไขโปรไฟล์ของฉัน">
+            <span className="relative flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-full bg-white/10 text-gold-300">
+              {currentUser.avatar_url ? <Image src={currentUser.avatar_url} alt="" fill unoptimized referrerPolicy="no-referrer" className="object-cover" /> : <UserRound className="h-4 w-4" />}
+            </span>
+            <span className="min-w-0"><span className="block truncate text-xs font-semibold text-white">{currentUser.full_name}</span><span className="mt-1 block text-[11px] text-slate-400">{currentUser.role === 'ADMIN' ? 'ผู้ดูแลระบบ' : 'นายหน้า'} · โปรไฟล์</span></span>
+          </Link>
+          <button disabled={loggingOut} onClick={handleLogout} aria-label="ออกจากระบบ" className="rounded-xl p-3 text-slate-400 hover:bg-white/10 hover:text-white disabled:opacity-50"><LogOut className="h-4 w-4" /></button>
+        </div>
+        {logoutError && <p role="alert" className="mt-2 text-xs text-red-300">{logoutError}</p>}
+      </div>
+    </>
+  );
 
   return (
-    <div className="min-h-screen bg-gray-100 flex flex-col md:flex-row">
-      {/* Mobile Top Header */}
-      <div className="md:hidden bg-navy-950 text-white p-4 flex items-center justify-between border-b border-navy-800">
-        <div className="flex items-center space-x-2">
-          <button
-            onClick={() => setMobileSidebarOpen(!mobileSidebarOpen)}
-            className="p-1.5 text-gray-300 hover:text-white"
-          >
-            {mobileSidebarOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
-          </button>
-          <span className="font-bold text-sm tracking-wide">CHANTAKORN CRM</span>
-        </div>
-        <Link href="/" className="text-xs text-gold-400 font-semibold flex items-center">
-          <span>หน้าเว็บไซต์</span>
-          <ExternalLink className="w-3 h-3 ml-1" />
-        </Link>
+    <div className="admin-workspace flex min-h-[100dvh] bg-[#F5F6FA] text-navy-950">
+      <aside className="sticky top-0 hidden h-[100dvh] w-64 shrink-0 flex-col bg-navy-950 md:flex" aria-label="เมนูหลังบ้าน">{sidebarContent}</aside>
+      {mobileSidebarOpen && <div className="fixed inset-0 z-[70] md:hidden"><div className="absolute inset-0 bg-navy-950/60" onClick={() => setMobileSidebarOpen(false)} aria-hidden="true" /><div ref={drawerRef} role="dialog" aria-modal="true" aria-label="เมนูหลังบ้าน" id="admin-mobile-menu" className="relative flex h-[100dvh] w-[min(288px,calc(100vw-40px))] flex-col bg-navy-950 shadow-2xl">{sidebarContent}</div></div>}
+      <div className="min-w-0 flex-1">
+        <header className="flex min-h-[76px] items-center justify-between gap-3 border-b border-slate-200/80 bg-white/95 px-4 sm:px-7 lg:px-9">
+          <div className="flex min-w-0 items-center gap-3">
+            <button ref={menuButtonRef} onClick={() => setMobileSidebarOpen(true)} aria-label="เปิดเมนูหลังบ้าน" aria-expanded={mobileSidebarOpen} aria-controls="admin-mobile-menu" className="shrink-0 rounded-xl border border-slate-200 p-2.5 text-navy-950 md:hidden"><Menu className="h-5 w-5" /></button>
+            <div className="min-w-0"><span className="hidden text-[11px] text-slate-400 sm:block">Chantakorn Property / หลังบ้าน</span><span className="block truncate text-sm font-semibold sm:mt-1">{getAdminPageTitle(pathname)}</span></div>
+          </div>
+          <Link href="/" target="_blank" rel="noopener noreferrer" className="flex shrink-0 min-h-10 items-center gap-2 rounded-xl border border-slate-200 px-3 text-xs font-semibold text-slate-600 transition-colors hover:bg-slate-50"><ExternalLink className="h-4 w-4" /><span className="hidden sm:inline">ดูหน้าเว็บไซต์</span><span className="sr-only sm:hidden">ดูหน้าเว็บไซต์</span></Link>
+        </header>
+        <main id="admin-main-content" className="mx-auto w-full max-w-[1440px] px-4 py-6 sm:px-7 sm:py-8 lg:px-9">{children}</main>
       </div>
-
-      {/* Sidebar (Desktop + Mobile Drawer) */}
-      <aside
-        className={`fixed md:sticky top-0 z-50 h-screen w-64 bg-navy-950 text-gray-300 flex flex-col justify-between p-5 border-r border-navy-800/80 transition-transform duration-300 ${
-          mobileSidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'
-        }`}
-      >
-        <div>
-          {/* Brand Header */}
-          <div className="pb-6 border-b border-navy-800 flex items-center justify-between">
-            <Link href="/admin" className="flex items-center space-x-3">
-              <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-gold-400 to-gold-600 flex items-center justify-center text-navy-950 font-bold shadow-md">
-                <Building2 className="w-5 h-5 text-navy-950" />
-              </div>
-              <div className="flex flex-col">
-                <span className="text-white font-bold text-sm tracking-wider leading-none">
-                  CHANTAKORN
-                </span>
-                <span className="text-gold-400 text-[10px] font-semibold tracking-widest leading-tight">
-                  ADMIN DASHBOARD
-                </span>
-              </div>
-            </Link>
-          </div>
-
-          {/* User Badge */}
-          <div className="mt-4 p-3 bg-navy-900/80 rounded-xl border border-navy-800 flex items-center space-x-3">
-            <div className="relative w-9 h-9 rounded-full overflow-hidden bg-gold-500/20 text-gold-400 flex items-center justify-center font-bold text-xs border border-gold-500/40 flex-shrink-0">
-              {currentUser.avatar_url ? (
-                <Image
-                  src={currentUser.avatar_url}
-                  alt={currentUser.full_name || 'Admin'}
-                  fill
-                  unoptimized
-                  className="object-cover"
-                  referrerPolicy="no-referrer"
-                />
-              ) : (
-                <span>{currentUser.full_name?.charAt(0) || 'A'}</span>
-              )}
-            </div>
-            <div className="min-w-0 flex-grow">
-              <span className="text-xs font-bold text-white block truncate">
-                {currentUser.full_name}
-              </span>
-              <span className="text-[10px] text-gold-400 block font-semibold truncate">
-                บทบาท: {currentUser.role === 'ADMIN' ? 'ผู้ดูแลระบบ (ADMIN)' : 'นายหน้า (AGENT)'}
-              </span>
-            </div>
-          </div>
-
-            {/* Navigation Links */}
-          <nav className="mt-6 space-y-1.5">
-            {navItems.filter(item => item.href !== '/admin/users' || currentUser.role === 'ADMIN').map((item) => {
-              const isActive = pathname === item.href;
-              const Icon = item.icon;
-              const isLeadItem = item.href === '/admin/inquiries';
-              const isAutomation = item.href === '/admin/automation';
-              return (
-                <Link
-                  key={item.label}
-                  href={item.href}
-                  onClick={() => setMobileSidebarOpen(false)}
-                  className={`flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-all ${
-                    isActive
-                      ? 'bg-gold-500 text-navy-950 font-bold shadow-sm'
-                      : isAutomation
-                      ? 'text-gold-300 bg-navy-900/60 hover:bg-navy-900 hover:text-gold-200 border border-gold-500/20'
-                      : 'text-gray-300 hover:bg-navy-900 hover:text-white'
-                  }`}
-                >
-                  <div className="flex items-center space-x-2.5 min-w-0">
-                    <Icon className={`w-4 h-4 flex-shrink-0 ${isAutomation && !isActive ? 'text-gold-400' : ''}`} />
-                    <span className="truncate">{item.label}</span>
-                  </div>
-                  <div className="flex items-center space-x-1.5 flex-shrink-0">
-                    {isAutomation && (
-                      <span className={`px-1.5 py-0.5 rounded-md text-[9px] font-black uppercase tracking-wider ${
-                        isActive
-                          ? 'bg-navy-950 text-gold-400'
-                          : 'bg-gradient-to-r from-gold-500 to-amber-500 text-navy-950 shadow-xs'
-                      }`}>
-                        AI เทพ
-                      </span>
-                    )}
-                    {isLeadItem && pendingInquiriesCount > 0 && (
-                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-black ${
-                        isActive 
-                          ? 'bg-navy-950 text-gold-400' 
-                          : 'bg-amber-400 text-navy-950'
-                      }`}>
-                        {pendingInquiriesCount}
-                      </span>
-                    )}
-                    {isActive && <ChevronRight className="w-3.5 h-3.5" />}
-                  </div>
-                </Link>
-              );
-            })}
-          </nav>
-        </div>
-
-        {/* Bottom Actions */}
-        <div className="pt-6 border-t border-navy-800 space-y-2">
-          <Link
-            href="/"
-            target="_blank"
-            className="flex items-center space-x-2 px-3.5 py-2 text-xs font-semibold text-gray-400 hover:text-gold-400 hover:bg-navy-900 rounded-xl transition-colors"
-          >
-            <ExternalLink className="w-4 h-4" />
-            <span>ดูหน้าเว็บลูกค้า</span>
-          </Link>
-
-          <button
-            onClick={handleLogout}
-            className="w-full flex items-center space-x-2 px-3.5 py-2 text-xs font-semibold text-red-400 hover:bg-red-950/40 rounded-xl transition-colors text-left"
-          >
-            <LogOut className="w-4 h-4" />
-            <span>ออกจากระบบ</span>
-          </button>
-        </div>
-      </aside>
-
-      {/* Mobile Backdrop */}
-      {mobileSidebarOpen && (
-        <div
-          onClick={() => setMobileSidebarOpen(false)}
-          className="fixed inset-0 bg-black/60 backdrop-blur-xs z-40 md:hidden"
-          aria-hidden="true"
-        />
-      )}
-
-      {/* Main Content Area */}
-      <main className="flex-grow p-4 sm:p-8 overflow-y-auto max-w-7xl mx-auto w-full space-y-6">
-        {/* Quick Top Utility Bar */}
-        <div className="flex flex-wrap items-center justify-between gap-3 pb-2 border-b border-gray-200">
-          <div className="flex items-center space-x-2 text-xs text-gray-500">
-            <Link href="/admin" className="hover:text-navy-950 font-semibold flex items-center space-x-1">
-              <LayoutDashboard className="w-3.5 h-3.5 text-gold-600" />
-              <span>แอดมิน</span>
-            </Link>
-            <span>/</span>
-            <span className="text-navy-950 font-bold">
-              {pathname === '/admin' ? 'แดชบอร์ดภาพรวม'
-                : pathname.startsWith('/admin/automation') ? 'ศูนย์ระบบอัตโนมัติ AI'
-                : pathname.startsWith('/admin/properties/new') ? 'ลงประกาศ / แก้ไขข้อมูลทรัพย์'
-                : pathname.startsWith('/admin/properties') ? 'จัดการอสังหาริมทรัพย์'
-                : pathname.startsWith('/admin/inquiries') ? 'รายการผู้ติดต่อ & ฝากขาย'
-                : pathname.startsWith('/admin/users') ? 'จัดการสมาชิก & สิทธิ์'
-                : 'ตั้งค่าระบบ'}
-            </span>
-          </div>
-
-          <div className="flex items-center space-x-2">
-            {pathname !== '/admin/properties/new' && (
-              <Link
-                href="/admin/properties/new"
-                className="px-3.5 py-1.5 bg-navy-950 hover:bg-navy-900 text-gold-400 font-bold text-xs rounded-xl shadow-xs flex items-center space-x-1.5 transition-all"
-              >
-                <PlusCircle className="w-3.5 h-3.5 text-gold-400" />
-                <span>+ เพิ่มทรัพย์ใหม่</span>
-              </Link>
-            )}
-            <Link
-              href="/"
-              target="_blank"
-              className="px-3 py-1.5 bg-white hover:bg-gray-50 text-gray-700 font-semibold text-xs rounded-xl border border-gray-200 shadow-xs flex items-center space-x-1.5 transition-all"
-            >
-              <ExternalLink className="w-3.5 h-3.5 text-gray-500" />
-              <span>ดูหน้าเว็บ</span>
-            </Link>
-          </div>
-        </div>
-
-        <ProfileHeader 
-          onProfileUpdated={(updated) => {
-            setCurrentUser((prev: any) => ({ ...prev, ...updated }));
-          }} 
-        />
-        {children}
-      </main>
     </div>
   );
 }

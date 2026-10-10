@@ -26,8 +26,8 @@ import {
   CheckCircle2
 } from 'lucide-react';
 import { ExtendedAgent } from '@/data/agents';
-import { getAgents, fetchAgents, saveAgents, updateAgent, deleteAgent, resetAgentsToDefault } from '@/lib/store/agents-store';
-import { fetchUsers, updateUserProfile, addUser } from '@/lib/store/properties-store';
+import { fetchAgents, updateAgent, deleteAgent } from '@/lib/store/agents-store';
+import { fetchUsers, updateUserProfile } from '@/lib/store/properties-store';
 import { UserProfile } from '@/lib/types';
 import { formatFacebookUrl, formatLineUrl } from '@/lib/utils';
 
@@ -37,6 +37,11 @@ export default function AdminAgentsPage() {
   const [editingAgent, setEditingAgent] = useState<ExtendedAgent | null>(null);
   const [isCreating, setIsCreating] = useState(false);
   const [notification, setNotification] = useState<string | null>(null);
+
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [busy, setBusy] = useState(false);
+  const [syncLinkedProfile, setSyncLinkedProfile] = useState(false);
 
   // Member selection helper
   const [selectedMemberId, setSelectedMemberId] = useState<string>('');
@@ -48,7 +53,7 @@ export default function AdminAgentsPage() {
   };
 
   useEffect(() => {
-    fetchAgents().then(setAgents).catch(() => setAgents(getAgents()));
+    fetchAgents().then(setAgents).catch(() => setError('โหลดรายชื่อนายหน้าไม่สำเร็จ กรุณาลองอัปเดตรายการอีกครั้ง')).finally(() => setLoading(false));
     fetchUsers().then(setUsers).catch(() => {});
 
     const handleUpdate = (e: any) => {
@@ -62,6 +67,8 @@ export default function AdminAgentsPage() {
     setIsCreating(false);
     setSelectedMemberId('');
     setMemberImportSuccess(null);
+    setSyncLinkedProfile(false);
+    setError('');
     setEditingAgent({ ...agent });
   };
 
@@ -75,18 +82,20 @@ export default function AdminAgentsPage() {
       line_id: '',
       facebook: '',
       email: '',
-      photo_url: 'https://images.unsplash.com/photo-1560250097-0b93528c311a?auto=format&fit=crop&w=600&q=80',
+      photo_url: '',
       bio: 'พร้อมให้คำปรึกษา แนะนำการซื้อ-ขาย-เช่า-ขายฝาก อสังหาริมทรัพย์ในหาดใหญ่และสงขลาอย่างมืออาชีพ',
       specialty: 'บ้านเดี่ยว, คอนโด, ทาวน์โฮม, ที่ดิน',
       zone: 'โซนหาดใหญ่ – สงขลา',
-      experienceYears: 3,
-      closedDeals: 15,
-      rating: 5.0,
-      languages: ['ไทย', 'English'],
+      experienceYears: 0,
+      closedDeals: 0,
+      rating: 0,
+      languages: ['ไทย'],
     };
     setIsCreating(true);
     setSelectedMemberId('');
     setMemberImportSuccess(null);
+    setSyncLinkedProfile(false);
+    setError('');
     setEditingAgent(newAgent);
   };
 
@@ -100,12 +109,13 @@ export default function AdminAgentsPage() {
     if (editingAgent) {
       setEditingAgent({
         ...editingAgent,
+        user_id: member.id,
         name: member.full_name,
-        phone: member.phone || editingAgent.phone || '081-604-0097',
+        phone: member.phone || editingAgent.phone || '',
         email: member.email || editingAgent.email || '',
-        line_id: member.line_id || editingAgent.line_id || '@930xzcyi',
+        line_id: member.line_id || editingAgent.line_id || '',
         facebook: member.facebook || editingAgent.facebook || '',
-        photo_url: member.avatar_url || editingAgent.photo_url || 'https://images.unsplash.com/photo-1560250097-0b93528c311a?auto=format&fit=crop&w=600&q=80',
+        photo_url: member.avatar_url || editingAgent.photo_url || '',
         rank: member.role === 'ADMIN' ? 'แอดมิน' : 'นายหน้า',
         title: member.role === 'ADMIN' ? 'ผู้บริหาร & หัวหน้าฝ่ายที่ปรึกษา' : 'ที่ปรึกษาอสังหาริมทรัพย์มืออาชีพ',
         bio: member.bio || editingAgent.bio || 'พร้อมดูแลและให้คำปรึกษาด้านอสังหาริมทรัพย์อย่างจริงใจและตรงไปตรงมา',
@@ -117,86 +127,59 @@ export default function AdminAgentsPage() {
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!editingAgent) return;
-
+    if (!editingAgent || busy) return;
     if (!editingAgent.name.trim() || !editingAgent.phone.trim()) {
-      alert('กรุณากรอกชื่อและเบอร์โทรศัพท์');
+      setError('กรุณากรอกชื่อและเบอร์โทรศัพท์');
       return;
     }
-
+    setBusy(true);
+    setError('');
     try {
-      const updated = updateAgent(editingAgent.id, editingAgent);
-      setAgents(updated);
-
-      // Bidirectionally sync with user profile in DB
       const targetUserId = editingAgent.user_id || selectedMemberId;
-      if (targetUserId) {
-        await updateUserProfile(targetUserId, {
-          full_name: editingAgent.name,
-          phone: editingAgent.phone,
-          email: editingAgent.email,
-          line_id: editingAgent.line_id,
-          facebook: editingAgent.facebook,
-          avatar_url: editingAgent.photo_url,
-          bio: editingAgent.bio,
-          role: editingAgent.rank === 'แอดมิน' ? 'ADMIN' : 'AGENT',
+      if (syncLinkedProfile && targetUserId) {
+        const updatedUsers = await updateUserProfile(targetUserId, {
+          full_name: editingAgent.name, phone: editingAgent.phone, line_id: editingAgent.line_id,
+          facebook: editingAgent.facebook, avatar_url: editingAgent.photo_url, bio: editingAgent.bio,
         });
-      } else if (isCreating) {
-        // Create user profile for this agent
-        const newUid = `user-${Date.now()}`;
-        editingAgent.user_id = newUid;
-        await addUser({
-          id: newUid,
-          full_name: editingAgent.name,
-          phone: editingAgent.phone,
-          email: editingAgent.email,
-          line_id: editingAgent.line_id,
-          facebook: editingAgent.facebook,
-          avatar_url: editingAgent.photo_url,
-          bio: editingAgent.bio,
-          role: editingAgent.rank === 'แอดมิน' ? 'ADMIN' : 'AGENT',
-        });
+        setUsers(updatedUsers);
       }
-
-      // Re-fetch users to keep everything fresh
-      const latestUsers = await fetchUsers();
-      setUsers(latestUsers);
-
-      if (isCreating) {
-        showNotification(`เพิ่ม "${editingAgent.name}" เป็นนายหน้าแนะนำและเชื่อมโยงบัญชีสมาชิกสำเร็จ!`);
-      } else {
-        showNotification(`บันทึกข้อมูล "${editingAgent.name}" และอัปเดตข้อมูลที่เชื่อมโยงกันสำเร็จ!`);
-      }
-    } catch (err) {
-      console.error('Error saving agent and syncing user:', err);
-      showNotification(`บันทึกข้อมูลเรียบร้อยแล้ว`);
-    }
-
-    setEditingAgent(null);
-    setIsCreating(false);
-  };
-
-  const handleDelete = (id: string, name: string) => {
-    if (confirm(`คุณแน่ใจหรือไม่ว่าต้องการลบนายหน้า "${name}" ออกจากระบบแนะนำ?`)) {
-      const updated = deleteAgent(id);
+      const updated = await updateAgent(editingAgent.id, { ...editingAgent, user_id: targetUserId || undefined });
       setAgents(updated);
-      showNotification(`ลบข้อมูลนายหน้าเรียบร้อยแล้ว`);
+      showNotification('บันทึกข้อมูลนายหน้าที่แสดงบนหน้าเว็บแล้ว');
+      setEditingAgent(null);
+      setIsCreating(false);
+    } catch (failure) {
+      setError(failure instanceof Error ? failure.message : 'บันทึกนายหน้าไม่สำเร็จ กรุณาตรวจสอบสิทธิ์และลองใหม่');
+    } finally {
+      setBusy(false);
     }
   };
 
-  const handleReset = () => {
-    if (confirm('คุณต้องการรีเซ็ตรายชื่อนายหน้าแนะนำกลับเป็นค่าเริ่มต้นหรือไม่?')) {
-      const def = resetAgentsToDefault();
-      setAgents(def);
-      showNotification('รีเซ็ตรายชื่อนายหน้าแนะนำเป็นค่าเริ่มต้นแล้ว');
-    }
+  const handleDelete = async (id: string, name: string) => {
+    if (busy || !confirm(`ต้องการลบนายหน้า "${name}" ออกจากรายการแนะนำหรือไม่? บัญชีสมาชิกยังคงอยู่`)) return;
+    setBusy(true);
+    setError('');
+    try {
+      setAgents(await deleteAgent(id));
+      showNotification('ลบนายหน้าออกจากรายการแนะนำแล้ว');
+    } catch (failure) {
+      setError(failure instanceof Error ? failure.message : 'ลบนายหน้าไม่สำเร็จ กรุณาลองใหม่');
+    } finally { setBusy(false); }
+  };
+
+  const handleRefresh = async () => {
+    setLoading(true);
+    setError('');
+    try { setAgents(await fetchAgents()); }
+    catch { setError('โหลดรายชื่อนายหน้าไม่สำเร็จ กรุณาลองอีกครั้ง'); }
+    finally { setLoading(false); }
   };
 
   return (
     <div className="p-4 sm:p-8 max-w-7xl mx-auto space-y-8">
       {/* Toast Notification */}
       {notification && (
-        <div className="fixed top-6 right-6 z-50 bg-emerald-600 text-white px-5 py-3 rounded-2xl shadow-xl flex items-center space-x-2 text-xs sm:text-sm font-bold animate-fadeIn">
+        <div role="status" className="fixed top-6 right-6 z-50 bg-emerald-600 text-white px-5 py-3 rounded-2xl shadow-xl flex items-center space-x-2 text-xs sm:text-sm font-bold animate-fadeIn">
           <Check className="w-4 h-4" />
           <span>{notification}</span>
         </div>
@@ -220,12 +203,12 @@ export default function AdminAgentsPage() {
         <div className="flex items-center space-x-3">
           <button
             type="button"
-            onClick={handleReset}
+            onClick={handleRefresh}
             className="px-3.5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition-colors flex items-center space-x-1.5 cursor-pointer"
-            title="รีเซ็ตเป็นค่าเริ่มต้น"
+            title="อัปเดตรายการ"
           >
             <RotateCcw className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">รีเซ็ตค่าเริ่มต้น</span>
+            <span className="hidden sm:inline">อัปเดตรายการ</span>
           </button>
 
           <button
@@ -239,6 +222,9 @@ export default function AdminAgentsPage() {
         </div>
       </div>
 
+      {error && <p role="alert" className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800">{error}</p>}
+      {loading && <p role="status" className="text-sm text-slate-500">กำลังโหลดรายชื่อนายหน้า…</p>}
+      {!loading && !error && agents.length === 0 && <p className="rounded-2xl border border-dashed border-slate-300 bg-white p-8 text-center text-sm text-slate-500">ยังไม่มีนายหน้าแนะนำ เริ่มจากเพิ่มข้อมูลหรือเลือกสมาชิกที่มีอยู่</p>}
       {/* Agents Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {agents.map((agent) => (
@@ -249,19 +235,19 @@ export default function AdminAgentsPage() {
             <div>
               {/* Agent Photo & Header */}
               <div className="relative h-56 w-full bg-slate-100">
-                <Image
-                  src={agent.photo_url || 'https://images.unsplash.com/photo-1560250097-0b93528c311a?auto=format&fit=crop&w=600&q=80'}
+                {agent.photo_url ? <Image
+                  src={agent.photo_url}
                   alt={agent.name}
                   fill
                   sizes="(max-width: 768px) 100vw, 33vw"
                   className="object-cover"
                   referrerPolicy="no-referrer"
-                />
+                /> : <span className="flex h-full items-center justify-center bg-navy-900 text-2xl font-bold text-gold-300">{agent.name.slice(0, 1)}</span>}
                 <div className="absolute inset-0 bg-gradient-to-t from-navy-950/90 via-navy-950/20 to-transparent" />
                 
                 <div className="absolute top-3 right-3 bg-white/95 px-2.5 py-1 rounded-full text-xs font-bold text-slate-800 flex items-center space-x-1 shadow-sm">
                   <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
-                  <span className="font-mono">{agent.rating ? agent.rating.toFixed(1) : '5.0'}</span>
+                  <span className="font-mono">{agent.rating ? agent.rating.toFixed(1) : 'ยังไม่มีคะแนน'}</span>
                 </div>
 
                 <div className="absolute top-3 left-3 bg-navy-950/80 text-gold-400 text-[10px] font-bold px-2.5 py-1 rounded-full border border-gold-400/40">
@@ -292,11 +278,11 @@ export default function AdminAgentsPage() {
                 <div className="grid grid-cols-2 gap-2 text-center text-slate-600">
                   <div className="p-2 bg-slate-50 rounded-xl border border-slate-100">
                     <span className="block text-[10px] text-slate-400">ปิดการขาย</span>
-                    <strong className="text-navy-950 font-bold font-mono">{agent.closedDeals || 10}+ รายการ</strong>
+                    <strong className="text-navy-950 font-bold font-mono">{agent.closedDeals ?? 0}+ รายการ</strong>
                   </div>
                   <div className="p-2 bg-slate-50 rounded-xl border border-slate-100">
                     <span className="block text-[10px] text-slate-400">ประสบการณ์</span>
-                    <strong className="text-navy-950 font-bold font-mono">{agent.experienceYears || 3} ปี</strong>
+                    <strong className="text-navy-950 font-bold font-mono">{agent.experienceYears ?? 0} ปี</strong>
                   </div>
                 </div>
 
@@ -367,7 +353,8 @@ export default function AdminAgentsPage() {
               </div>
               <button
                 type="button"
-                onClick={() => setEditingAgent(null)}
+                disabled={busy}
+                  onClick={() => setEditingAgent(null)}
                 className="p-2 text-slate-400 hover:text-slate-700 rounded-full hover:bg-slate-100 transition-colors cursor-pointer"
               >
                 <X className="w-5 h-5" />
@@ -375,7 +362,9 @@ export default function AdminAgentsPage() {
             </div>
 
             {/* Modal Form */}
-            <form onSubmit={handleSave} className="p-6 space-y-5">
+            <form onSubmit={handleSave} aria-busy={busy} className="p-6 space-y-5">
+              {error && <p role="alert" className="rounded-xl bg-red-50 p-3 text-sm text-red-800">{error}</p>}
+              {(editingAgent.user_id || selectedMemberId) && <label className="flex items-start gap-3 rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm"><input type="checkbox" checked={syncLinkedProfile} onChange={event => setSyncLinkedProfile(event.target.checked)} className="mt-1" /><span>อัปเดตข้อมูลติดต่อของสมาชิกที่เชื่อมโยงด้วย<span className="mt-1 block text-xs text-slate-500">ใช้สิทธิ์แก้ไขสมาชิกของคุณ โดยไม่เปลี่ยนสิทธิ์เข้าสู่ระบบ</span></span></label>}
               {/* MEMBER SELECTION BOX (ดึงข้อมูลของสมาชิก) */}
               <div className="bg-gradient-to-r from-gold-50/80 to-amber-50/50 p-4 rounded-2xl border border-gold-200 space-y-2">
                 <div className="flex items-center justify-between">
@@ -608,6 +597,7 @@ export default function AdminAgentsPage() {
               <div className="pt-4 border-t border-slate-100 flex items-center justify-end space-x-3">
                 <button
                   type="button"
+                  disabled={busy}
                   onClick={() => setEditingAgent(null)}
                   className="px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition-colors cursor-pointer"
                 >
@@ -615,10 +605,11 @@ export default function AdminAgentsPage() {
                 </button>
                 <button
                   type="submit"
+                  disabled={busy}
                   className="px-6 py-2.5 rounded-xl bg-navy-950 hover:bg-navy-900 text-gold-400 text-xs font-black shadow-md flex items-center space-x-2 transition-all cursor-pointer"
                 >
                   <Save className="w-4 h-4 text-gold-400" />
-                  <span>บันทึกข้อมูลนายหน้า</span>
+                  <span>{busy ? 'กำลังบันทึก…' : 'บันทึกข้อมูลนายหน้า'}</span>
                 </button>
               </div>
             </form>

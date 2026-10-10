@@ -1,665 +1,151 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import Image from 'next/image';
-import { 
-  Building2, 
-  Tag, 
-  Key, 
-  MessageSquare, 
-  TrendingUp, 
-  PlusCircle, 
-  ArrowUpRight, 
-  Eye, 
-  CheckCircle2,
-  Clock,
-  Phone,
-  MessageCircle,
-  Copy,
-  ExternalLink,
-  Edit3,
-  Star,
-  Layers,
-  MapPin,
-  Check,
-  Sparkles,
-  Wand2,
-  FileText,
-  Users
-} from 'lucide-react';
+import { ArrowRight, Building2, Check, CheckCircle2, ChevronDown, Copy, Edit3, ExternalLink, FileText, Layers, LoaderCircle, MapPin, MessageCircle, MessageSquare, Phone, Plus, RefreshCw, Sparkles, Users, Wand2 } from 'lucide-react';
 import { fetchAdminProperties, fetchInquiries, updateInquiryStatus } from '@/lib/store/properties-store';
-import { Property, Inquiry } from '@/lib/types';
-import { formatPrice, propertyHref, formatPropertyCode, getPropertyTypeName, formatThaiDate } from '@/lib/utils';
-import SystemActivityFeed from '@/components/admin/SystemActivityFeed';
-import InvestmentZoneDistributionMap from '@/components/admin/InvestmentZoneDistributionMap';
+import type { Inquiry, Property } from '@/lib/types';
+import { formatPrice, formatPropertyCode, formatThaiDate, propertyHref } from '@/lib/utils';
+import AdminMonthlyActivity from '@/components/admin/AdminMonthlyActivity';
+
+const InvestmentZoneDistributionMap = dynamic(() => import('@/components/admin/InvestmentZoneDistributionMap'), { loading: () => <p className="p-5 text-sm text-slate-500">กำลังเปิดแผนที่...</p> });
+const SystemActivityFeed = dynamic(() => import('@/components/admin/SystemActivityFeed'), { loading: () => <p className="p-5 text-sm text-slate-500">กำลังเปิดประวัติกิจกรรม...</p> });
+
+const businessTools = [
+  { title: 'ร่างโพสต์การตลาด', description: 'ข้อความสำหรับ Facebook, TikTok และ LINE', href: '/admin/automation?tab=marketing', icon: Wand2 },
+  { title: 'จับคู่ลูกค้ากับทรัพย์', description: 'ค้นหาทรัพย์ที่ตรงกับผู้สนใจ', href: '/admin/automation?tab=leads', icon: Users },
+  { title: 'ประเมินราคาและผลตอบแทน', description: 'ค่างวด ผลตอบแทน และข้อมูลที่ดิน', href: '/admin/automation?tab=valuation', icon: MapPin },
+  { title: 'ร่างสัญญา', description: 'จัดเตรียมสัญญาจะซื้อจะขาย', href: '/admin/automation?tab=contracts', icon: FileText },
+  { title: 'ติดตามเฟสงาน', description: 'ติดตามขั้นตอนและงานของทีม', href: '/admin/work-phases', icon: Layers },
+  { title: 'ประเมินที่ดิน / LandsMaps', description: 'ค้นหาแปลงและประเมินราคาที่ดิน', href: '/admin/valuation', icon: MapPin },
+];
+
+const inquiryStatusLabels: Record<Inquiry['status'], string> = { new: 'รอติดต่อ', contacted: 'ติดต่อแล้ว', scheduled: 'นัดชมแล้ว', closed: 'ปิดรายการ' };
 
 export default function AdminDashboardPage() {
   const [properties, setProperties] = useState<Property[]>([]);
   const [inquiries, setInquiries] = useState<Inquiry[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [actionMessage, setActionMessage] = useState('');
   const [copiedWebsite, setCopiedWebsite] = useState(false);
   const [updatingInquiryId, setUpdatingInquiryId] = useState<string | null>(null);
+  const [updatedAt, setUpdatedAt] = useState<Date | null>(null);
+  const [mapOpen, setMapOpen] = useState(false);
+  const [activityOpen, setActivityOpen] = useState(false);
+  const requestRevision = useRef(0);
+  const copyTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const updatingInquiryRef = useRef(false);
 
-  const loadDashboardData = async () => {
+  const loadDashboardData = useCallback(async () => {
+    const revision = ++requestRevision.current;
+    setLoading(true);
+    setError('');
     try {
-      const [p, inq] = await Promise.all([fetchAdminProperties(), fetchInquiries()]);
-      setProperties(p);
-      setInquiries(inq);
+      const [propertyData, inquiryData] = await Promise.all([fetchAdminProperties(), fetchInquiries()]);
+      if (revision !== requestRevision.current) return;
+      setProperties(propertyData);
+      setInquiries(inquiryData);
+      setUpdatedAt(new Date());
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'โหลดข้อมูลไม่สำเร็จ');
+      if (revision === requestRevision.current) setError(err instanceof Error ? err.message : 'โหลดข้อมูลไม่สำเร็จ');
     } finally {
-      setLoading(false);
+      if (revision === requestRevision.current) setLoading(false);
     }
-  };
-
-  useEffect(() => {
-    loadDashboardData();
   }, []);
 
-  const handleQuickStatusUpdate = async (id: string, newStatus: Inquiry['status']) => {
+  useEffect(() => {
+    void loadDashboardData();
+    return () => {
+      requestRevision.current += 1;
+      if (copyTimer.current) clearTimeout(copyTimer.current);
+    };
+  }, [loadDashboardData]);
+
+  const handleQuickStatusUpdate = async (id: string, status: Inquiry['status']) => {
+    if (updatingInquiryRef.current) return;
+    updatingInquiryRef.current = true;
     setUpdatingInquiryId(id);
+    setActionMessage('');
     try {
-      await updateInquiryStatus(id, newStatus);
-      setInquiries(prev => prev.map(item => item.id === id ? { ...item, status: newStatus } : item));
+      const saved = await updateInquiryStatus(id, status);
+      if (!saved) throw new Error('บันทึกสถานะไม่สำเร็จ กรุณาลองอีกครั้ง');
+      setInquiries((items) => items.map((item) => item.id === id ? saved : item));
+      setActionMessage(`บันทึกสถานะเป็น “${inquiryStatusLabels[saved.status]}” แล้ว`);
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'ไม่สามารถอัปเดตสถานะได้');
+      setActionMessage(err instanceof Error ? err.message : 'ไม่สามารถบันทึกสถานะได้');
     } finally {
+      updatingInquiryRef.current = false;
       setUpdatingInquiryId(null);
     }
   };
 
-  const handleCopyWebsiteLink = () => {
-    const origin = typeof window !== 'undefined' ? window.location.origin : '';
-    if (navigator.clipboard) {
-      navigator.clipboard.writeText(origin);
+  const handleCopyWebsiteLink = async () => {
+    setActionMessage('');
+    try {
+      await navigator.clipboard.writeText(window.location.origin);
       setCopiedWebsite(true);
-      setTimeout(() => setCopiedWebsite(false), 2000);
+      if (copyTimer.current) clearTimeout(copyTimer.current);
+      copyTimer.current = setTimeout(() => setCopiedWebsite(false), 2500);
+    } catch {
+      setActionMessage('คัดลอกลิงก์ไม่สำเร็จ กรุณาคัดลอกจากแถบที่อยู่ของหน้าเว็บไซต์');
     }
   };
 
-  const totalListings = properties.length;
-  const saleListings = properties.filter((p) => p.status === 'sale').length;
-  const rentListings = properties.filter((p) => p.status === 'rent').length;
-  const featuredListings = properties.filter((p) => p.featured).length;
-  const totalInquiries = inquiries.length;
-  const newInquiries = inquiries.filter((i) => i.status === 'new').length;
-
-  const statCards = [
-    {
-      title: 'ทรัพย์ทั้งหมด',
-      value: totalListings,
-      change: `${saleListings} ขาย / ${rentListings} เช่า`,
-      icon: Building2,
-      color: 'text-navy-950',
-      bg: 'bg-blue-50',
-      href: '/admin/properties',
-    },
-    {
-      title: 'ทรัพย์สำหรับขาย',
-      value: saleListings,
-      change: 'พร้อมเปิดให้เข้าชม',
-      icon: Tag,
-      color: 'text-gold-700',
-      bg: 'bg-gold-50',
-      href: '/admin/properties?status=sale',
-    },
-    {
-      title: 'ทรัพย์สำหรับเช่า',
-      value: rentListings,
-      change: 'สัญญาพร้อมเข้าอยู่',
-      icon: Key,
-      color: 'text-emerald-700',
-      bg: 'bg-emerald-50',
-      href: '/admin/properties?status=rent',
-    },
-    {
-      title: 'ข้อความ & ผู้สนใจ',
-      value: totalInquiries,
-      change: newInquiries > 0 ? `🔥 ${newInquiries} รายการรอติดต่อกลับ` : 'ตอบกลับครบทุกรายแล้ว',
-      icon: MessageSquare,
-      color: newInquiries > 0 ? 'text-amber-700' : 'text-purple-700',
-      bg: newInquiries > 0 ? 'bg-amber-50' : 'bg-purple-50',
-      href: '/admin/inquiries',
-    },
+  const saleCount = properties.filter((property) => property.status === 'sale').length;
+  const rentCount = properties.filter((property) => property.status === 'rent').length;
+  const publishedCount = properties.filter((property) => property.published).length;
+  const draftCount = properties.length - publishedCount;
+  const newInquiries = inquiries.filter((inquiry) => inquiry.status === 'new');
+  const scheduledCount = inquiries.filter((inquiry) => inquiry.status === 'scheduled').length;
+  const featuredCount = properties.filter((property) => property.featured).length;
+  const latestProperties = [...properties].sort((a, b) => (Date.parse(b.created_at) || 0) - (Date.parse(a.created_at) || 0)).slice(0, 4);
+  const priorityInquiries = [...inquiries].sort((a, b) => Number(b.status === 'new') - Number(a.status === 'new') || (Date.parse(b.created_at) || 0) - (Date.parse(a.created_at) || 0)).slice(0, 5);
+  const stats = [
+    { label: 'ทรัพย์ทั้งหมด', count: properties.length, note: `${saleCount} ขาย · ${rentCount} เช่า`, href: '/admin/properties', icon: Building2 },
+    { label: 'เผยแพร่บนเว็บ', count: publishedCount, note: 'รายการที่ลูกค้าเปิดดูได้', href: '/admin/properties?filter=published', icon: CheckCircle2 },
+    { label: 'ฉบับร่าง', count: draftCount, note: 'เตรียมข้อมูลก่อนเผยแพร่', href: '/admin/properties?filter=draft', icon: FileText },
+    { label: 'ลูกค้ารอติดต่อ', count: newInquiries.length, note: `${scheduledCount} รายการนัดชมแล้ว`, href: '/admin/inquiries?filter=new', icon: MessageSquare },
   ];
-
-  // Demo trend data for visualizations
-  const trendMonths = ['ต.ค.', 'พ.ย.', 'ธ.ค.', 'ม.ค.', 'ก.พ.', 'มี.ค.'];
-  const listingData = [12, 15, 18, 22, 28, Math.max(32, properties.length)];
-  const inquiryData = [8, 14, 19, 25, 34, Math.max(42, inquiries.length)];
+  const dataUnavailable = Boolean(error) && !updatedAt;
 
   return (
-    <div className="space-y-6 sm:space-y-8">
-      {error && <p role="alert" className="rounded-xl bg-red-50 p-4 text-sm text-red-700">{error}</p>}
-      
-      {/* Welcome Banner */}
-      <div className="bg-gradient-to-r from-navy-950 via-navy-900 to-navy-950 text-white rounded-3xl p-6 sm:p-8 border border-navy-800 shadow-md flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <span className="text-xs font-bold text-gold-400 uppercase tracking-widest flex items-center gap-1.5">
-            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-            CHANTAKORN PROPERTY CONTROL CENTER
-          </span>
-          <h1 className="text-2xl sm:text-3xl font-extrabold text-white mt-1">
-            แดชบอร์ดจัดการระบบ
-          </h1>
-          <p className="text-xs sm:text-sm text-gray-300 mt-1 max-w-xl">
-            ศูนย์ควบคุมจัดการอสังหาริมทรัพย์ ตรวจสอบผู้ติดต่อ และติดตามผลงานในเขตหาดใหญ่–สงขลา
-          </p>
-        </div>
-
-        <div className="flex flex-wrap items-center gap-2.5">
-          <button
-            type="button"
-            onClick={handleCopyWebsiteLink}
-            className="px-4 py-2.5 bg-navy-800 hover:bg-navy-700 text-gray-200 hover:text-white font-semibold text-xs rounded-xl border border-navy-700 flex items-center space-x-2 transition-all cursor-pointer"
-            title="คัดลอกลิงก์หน้าแรกเว็บไซต์ส่งให้ลูกค้า"
-          >
-            {copiedWebsite ? (
-              <>
-                <Check className="w-4 h-4 text-emerald-400" />
-                <span className="text-emerald-400 font-bold">คัดลอกลิงก์แล้ว!</span>
-              </>
-            ) : (
-              <>
-                <Copy className="w-4 h-4 text-gold-400" />
-                <span>แชร์ลิงก์หน้าเว็บ</span>
-              </>
-            )}
-          </button>
-
-          <Link
-            href="/admin/properties/new"
-            className="px-5 py-2.5 bg-gold-500 hover:bg-gold-400 text-navy-950 font-black text-xs rounded-xl shadow-md flex items-center space-x-2 transition-all active:scale-95 cursor-pointer"
-          >
-            <PlusCircle className="w-4 h-4 text-navy-950" />
-            <span>+ ลงประกาศทรัพย์ใหม่</span>
-          </Link>
-        </div>
+    <div className="space-y-6 sm:space-y-7">
+      <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
+        <div><p className="text-[11px] font-semibold tracking-wider text-gold-700">CHANTAKORN WORKSPACE</p><h1 className="mt-2 text-2xl font-bold tracking-tight text-navy-950 sm:text-3xl">ภาพรวมวันนี้</h1><p className="mt-2 text-sm text-slate-500">จัดการทรัพย์ ติดตามลูกค้า และวางแผนงานของทีมในที่เดียว</p></div>
+        <div className="flex items-center gap-2"><button onClick={() => void loadDashboardData()} disabled={loading} aria-label="รีเฟรชข้อมูลภาพรวม" className="flex min-h-11 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white px-3 text-slate-500 hover:bg-slate-50 disabled:opacity-50"><RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin motion-reduce:animate-none' : ''}`} /></button><Link href="/admin/properties/new" className="inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded-xl bg-navy-950 px-5 text-sm font-bold text-white transition-colors hover:bg-navy-900 sm:flex-none"><Plus className="h-4 w-4 text-gold-300" />เพิ่มทรัพย์ใหม่</Link></div>
       </div>
 
-      {/* Quick Action Shortcuts (แผงทางลัดด่วน) */}
-      <div className="bg-white rounded-2xl p-4 sm:p-5 border border-surface-border shadow-xs">
-        <div className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-3">
-          ⚡ เมนูลัดใช้งานบ่อย (Quick Shortcuts)
-        </div>
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          <Link
-            href="/admin/properties/new"
-            className="p-3.5 rounded-xl bg-navy-50 hover:bg-navy-100/80 border border-navy-100 transition-all flex items-center space-x-3 group cursor-pointer"
-          >
-            <div className="w-9 h-9 rounded-lg bg-navy-950 text-gold-400 flex items-center justify-center font-bold flex-shrink-0 group-hover:scale-105 transition-transform">
-              <PlusCircle className="w-5 h-5 text-gold-400" />
-            </div>
-            <div className="min-w-0">
-              <div className="text-xs font-bold text-navy-950 group-hover:text-gold-600 truncate">ลงประกาศทรัพย์ใหม่</div>
-              <div className="text-[10px] text-gray-500">กรอกข้อมูล & อัปโหลดรูป</div>
-            </div>
-          </Link>
+      {error && <div role="alert" className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-800"><span>{updatedAt ? 'รีเฟรชไม่สำเร็จ กำลังแสดงข้อมูลที่โหลดไว้ก่อนหน้า · ' : ''}{error}</span><button disabled={loading} onClick={() => void loadDashboardData()} className="rounded-lg border border-red-200 px-3 py-2 font-semibold">ลองใหม่</button></div>}
+      {actionMessage && <p role="status" className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700">{actionMessage}</p>}
 
-          <Link
-            href="/admin/inquiries?filter=new"
-            className={`p-3.5 rounded-xl border transition-all flex items-center space-x-3 group cursor-pointer ${
-              newInquiries > 0 
-                ? 'bg-amber-50/80 hover:bg-amber-100 border-amber-200' 
-                : 'bg-gray-50 hover:bg-gray-100 border-gray-100'
-            }`}
-          >
-            <div className={`w-9 h-9 rounded-lg flex items-center justify-center font-bold flex-shrink-0 group-hover:scale-105 transition-transform ${
-              newInquiries > 0 ? 'bg-amber-500 text-navy-950' : 'bg-gray-200 text-gray-700'
-            }`}>
-              <MessageSquare className="w-5 h-5" />
-            </div>
-            <div className="min-w-0">
-              <div className="text-xs font-bold text-navy-950 flex items-center gap-1.5 truncate">
-                <span>ผู้ติดต่อใหม่</span>
-                {newInquiries > 0 && (
-                  <span className="px-1.5 py-0.2 bg-amber-500 text-navy-950 font-black text-[10px] rounded-full">
-                    {newInquiries}
-                  </span>
-                )}
-              </div>
-              <div className="text-[10px] text-gray-500">
-                {newInquiries > 0 ? 'รอโทรกลับด่วน' : 'ไม่มีค้างติดต่อ'}
-              </div>
-            </div>
-          </Link>
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">{stats.map(({ label, count, note, href, icon: Icon }) => <Link key={label} href={href} className="min-w-0 rounded-2xl border border-slate-200/80 bg-white p-4 shadow-sm transition-colors hover:border-gold-300 sm:p-5"><div className="flex items-start justify-between gap-2"><p className="text-xs font-medium text-slate-500">{label}</p><Icon className="h-4 w-4 shrink-0 text-gold-600" /></div><p className="mt-4 text-3xl font-bold tracking-tight text-navy-950">{loading || dataUnavailable ? '—' : count.toLocaleString('th-TH')}</p><p className="mt-2 text-[11px] leading-relaxed text-slate-400">{dataUnavailable ? 'ยังโหลดข้อมูลไม่ได้' : loading ? 'กำลังโหลดข้อมูล' : note}</p></Link>)}</div>
 
-          <Link
-            href="/admin/properties"
-            className="p-3.5 rounded-xl bg-blue-50/60 hover:bg-blue-100/70 border border-blue-100 transition-all flex items-center space-x-3 group cursor-pointer"
-          >
-            <div className="w-9 h-9 rounded-lg bg-blue-600 text-white flex items-center justify-center font-bold flex-shrink-0 group-hover:scale-105 transition-transform">
-              <Layers className="w-5 h-5" />
-            </div>
-            <div className="min-w-0">
-              <div className="text-xs font-bold text-navy-950 group-hover:text-blue-700 truncate">จัดการคลังทรัพย์</div>
-              <div className="text-[10px] text-gray-500">{totalListings} รายการในระบบ</div>
-            </div>
-          </Link>
+      <div className="grid gap-5 xl:grid-cols-[minmax(0,1.55fr)_minmax(0,1fr)]">
+        <section className="min-w-0 rounded-2xl border border-slate-200/80 bg-white shadow-sm">
+          <div className="flex items-start justify-between gap-3 border-b border-slate-100 px-5 py-5"><div><h2 className="text-base font-bold text-navy-950">ลูกค้าที่ต้องติดตาม</h2><p className="mt-1 text-xs text-slate-400">แสดงรายการรอติดต่อก่อน ตามด้วยรายการล่าสุด</p></div><Link href="/admin/inquiries" className="inline-flex shrink-0 items-center gap-1 py-1 text-xs font-semibold text-gold-700">ดูทั้งหมด<ArrowRight className="h-3.5 w-3.5" /></Link></div>
+          {loading ? <div className="p-7 text-sm text-slate-400" role="status">กำลังโหลดลูกค้า...</div> : dataUnavailable ? <div className="p-7 text-sm text-slate-500">ยังแสดงรายการลูกค้าไม่ได้ กรุณาลองโหลดข้อมูลอีกครั้ง</div> : !priorityInquiries.length ? <div className="flex flex-col items-center px-5 py-12 text-center"><MessageSquare className="mb-3 h-8 w-8 text-slate-300" /><p className="text-sm font-semibold text-navy-950">ยังไม่มีรายการผู้ติดต่อ</p><p className="mt-2 max-w-xs text-xs leading-relaxed text-slate-400">ลูกค้าที่สอบถาม ฝากขาย หรือนัดชมผ่านเว็บจะแสดงที่นี่</p></div> : <div className="divide-y divide-slate-100">{priorityInquiries.map((inquiry) => <article key={inquiry.id} className="px-5 py-4"><div className="flex items-start justify-between gap-3"><div className="min-w-0"><h3 className="break-words text-sm font-semibold text-navy-950">{inquiry.name}</h3><p className="mt-1 text-[11px] text-slate-400">{formatThaiDate(inquiry.created_at)} · {inquiry.inquiry_type === 'viewing' ? 'นัดชมทรัพย์' : inquiry.inquiry_type === 'consignment_sell' ? 'ฝากขายทรัพย์' : 'สอบถามข้อมูล'}</p></div><span className={`shrink-0 rounded-full px-2 py-1 text-[10px] font-semibold ${inquiry.status === 'new' ? 'bg-amber-50 text-amber-800' : 'bg-slate-100 text-slate-600'}`}>{inquiryStatusLabels[inquiry.status]}</span></div>{inquiry.property_title && <p className="mt-2 truncate text-xs text-gold-700">{inquiry.property_title}</p>}<p className="mt-2 line-clamp-2 break-words text-xs leading-relaxed text-slate-500">{inquiry.message}</p><div className="mt-3 flex flex-wrap items-center gap-2">{inquiry.phone && <a href={`tel:${inquiry.phone}`} className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-slate-200 px-2.5 text-xs font-medium text-navy-950"><Phone className="h-3 w-3" />{inquiry.phone}</a>}{inquiry.line_id && <a href={`https://line.me/R/ti/p/${encodeURIComponent(inquiry.line_id)}`} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-9 items-center gap-1.5 rounded-lg bg-emerald-50 px-2.5 text-xs font-semibold text-emerald-700"><MessageCircle className="h-3 w-3" />LINE</a>}{inquiry.status === 'new' && <button disabled={updatingInquiryId !== null} onClick={() => void handleQuickStatusUpdate(inquiry.id, 'contacted')} className="inline-flex min-h-9 items-center gap-1.5 rounded-lg bg-navy-950 px-2.5 text-xs font-semibold text-white disabled:opacity-50">{updatingInquiryId === inquiry.id ? <LoaderCircle className="h-3 w-3 animate-spin" /> : <Check className="h-3 w-3" />}ติดต่อแล้ว</button>}{inquiry.status === 'contacted' && <button disabled={updatingInquiryId !== null} onClick={() => void handleQuickStatusUpdate(inquiry.id, 'new')} className="min-h-9 px-2 text-[11px] text-slate-400 disabled:opacity-50">คืนเป็นรอติดต่อ</button>}</div></article>)}</div>}
+        </section>
 
-          <Link
-            href="/admin/properties?filter=featured"
-            className="p-3.5 rounded-xl bg-gold-50/60 hover:bg-gold-100/70 border border-gold-100 transition-all flex items-center space-x-3 group cursor-pointer"
-          >
-            <div className="w-9 h-9 rounded-lg bg-gold-500 text-navy-950 flex items-center justify-center font-bold flex-shrink-0 group-hover:scale-105 transition-transform">
-              <Star className="w-5 h-5 fill-navy-950" />
-            </div>
-            <div className="min-w-0">
-              <div className="text-xs font-bold text-navy-950 group-hover:text-gold-700 truncate">ทรัพย์เด่นหน้าแรก</div>
-              <div className="text-[10px] text-gray-500">{featuredListings} รายการแนะนำ</div>
-            </div>
-          </Link>
-        </div>
+        <section className="min-w-0 rounded-2xl border border-slate-200/80 bg-white shadow-sm">
+          <div className="flex items-start justify-between gap-3 border-b border-slate-100 px-5 py-5"><div><h2 className="text-base font-bold text-navy-950">ทรัพย์ล่าสุด</h2><p className="mt-1 text-xs text-slate-400">เปิดดูหรือแก้ไขข้อมูลได้ทันที</p></div><Link href="/admin/properties" className="inline-flex shrink-0 items-center gap-1 py-1 text-xs font-semibold text-gold-700">ดูทั้งหมด<ArrowRight className="h-3.5 w-3.5" /></Link></div>
+          {loading ? <div className="p-7 text-sm text-slate-400" role="status">กำลังโหลดทรัพย์...</div> : dataUnavailable ? <div className="p-7 text-sm text-slate-500">ยังแสดงรายการทรัพย์ไม่ได้ กรุณาลองโหลดข้อมูลอีกครั้ง</div> : !latestProperties.length ? <div className="px-5 py-12 text-center"><Building2 className="mx-auto mb-3 h-8 w-8 text-slate-300" /><p className="text-sm font-semibold text-navy-950">เริ่มต้นด้วยทรัพย์รายการแรก</p><Link href="/admin/properties/new" className="mt-4 inline-flex items-center gap-1.5 text-xs font-bold text-gold-700"><Plus className="h-3.5 w-3.5" />เพิ่มทรัพย์ใหม่</Link></div> : <div className="divide-y divide-slate-100">{latestProperties.map((property) => <article key={property.id} className="flex gap-3 px-5 py-4"><div className="relative flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-slate-100">{property.cover_image ? <Image src={property.cover_image} alt={property.title} fill unoptimized referrerPolicy="no-referrer" className="object-cover" /> : <Building2 className="h-6 w-6 text-slate-300" />}</div><div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-x-2 gap-y-1"><span className="text-[10px] font-medium text-slate-400">{formatPropertyCode(property.id)}</span><span className={`text-[10px] font-medium ${property.published ? 'text-emerald-700' : 'text-amber-700'}`}>{property.published ? 'เผยแพร่' : 'ฉบับร่าง'}</span></div><h3 className="mt-1 line-clamp-2 text-xs font-semibold leading-relaxed text-navy-950">{property.title}</h3><p className="mt-1 text-xs font-bold text-navy-950">{formatPrice(property.price, property.status)}</p><div className="mt-2 flex flex-wrap items-center gap-3"><Link href={`/admin/properties/new?id=${encodeURIComponent(property.id)}`} className="inline-flex min-h-8 items-center gap-1 text-[11px] font-semibold text-gold-700"><Edit3 className="h-3 w-3" />แก้ไข</Link>{property.published && <Link href={propertyHref(property.slug)} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-8 items-center gap-1 text-[11px] text-slate-500"><ExternalLink className="h-3 w-3" />หน้าเว็บ</Link>}</div></div></article>)}</div>}
+          <div className="flex flex-wrap gap-2 border-t border-slate-100 px-5 py-4">{[{ label: 'ขาย', count: saleCount, filter: 'sale' }, { label: 'เช่า', count: rentCount, filter: 'rent' }, { label: 'ทรัพย์เด่น', count: featuredCount, filter: 'featured' }].map((item) => <Link key={item.filter} href={`/admin/properties?filter=${item.filter}`} className="rounded-full border border-slate-200 px-3 py-1.5 text-[11px] text-slate-500">{item.label} <span className="ml-1 font-semibold text-navy-950">{loading || dataUnavailable ? '—' : item.count}</span></Link>)}</div>
+        </section>
       </div>
 
-      {/* AI Automation Super Suite Banner */}
-      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-navy-950 via-slate-900 to-navy-900 text-white p-6 sm:p-7 border border-gold-500/30 shadow-xl space-y-4">
-        <div className="absolute top-0 right-0 -mr-12 -mt-12 w-64 h-64 rounded-full bg-gold-500/10 blur-3xl pointer-events-none" />
-        
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div className="space-y-1">
-            <div className="inline-flex items-center space-x-1.5 px-3 py-1 rounded-full bg-gold-500/20 border border-gold-500/40 text-gold-300 text-xs font-bold uppercase tracking-wider">
-              <Sparkles className="w-3.5 h-3.5 text-gold-400" />
-              <span>เครื่องมือผู้ช่วย AI และการตลาดอัตโนมัติ</span>
-            </div>
-            <h2 className="text-lg sm:text-xl font-extrabold text-white">
-              ระบบช่วยร่างโพสต์โซเชียลมีเดีย และจับคู่ทรัพย์กับลูกค้า
-            </h2>
-            <p className="text-xs text-gray-300 max-w-2xl">
-              ช่วยร่างข้อความการตลาดสำหรับ Facebook/TikTok/LINE, ค้นหาจับคู่ผู้สนใจซื้อ และช่วยคำนวณผลตอบแทนการลงทุนอสังหาริมทรัพย์
-            </p>
-          </div>
+      <section className="rounded-2xl bg-navy-950 px-5 py-5 text-white sm:px-6"><div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center"><div><h2 className="text-base font-bold">ส่งทรัพย์และติดตามงานได้เร็วขึ้น</h2><p className="mt-2 text-xs leading-relaxed text-slate-400">เลือกทรัพย์แล้วกดส่ง LINE ถึงผู้ติดตาม OA หรือแชร์ลิงก์เว็บไซต์ให้ลูกค้า</p></div><div className="flex flex-wrap items-center gap-2"><Link href="/admin/properties" className="inline-flex min-h-10 items-center gap-2 rounded-xl bg-gold-400 px-4 text-xs font-bold text-navy-950"><MessageCircle className="h-4 w-4" />เลือกทรัพย์ส่ง LINE</Link><button onClick={() => void handleCopyWebsiteLink()} className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-white/15 px-4 text-xs font-medium text-slate-200">{copiedWebsite ? <Check className="h-3.5 w-3.5 text-emerald-300" /> : <Copy className="h-3.5 w-3.5" />}{copiedWebsite ? 'คัดลอกแล้ว' : 'คัดลอกลิงก์เว็บ'}</button></div></div></section>
 
-          <Link
-            href="/admin/automation"
-            className="px-4 py-2.5 bg-gradient-to-r from-gold-500 to-amber-500 hover:from-gold-400 hover:to-amber-400 text-navy-950 font-black text-xs rounded-xl shadow-md flex items-center justify-center space-x-2 transition-all self-start sm:self-auto flex-shrink-0"
-          >
-            <span>เปิดศูนย์ระบบอัตโนมัติ</span>
-            <ArrowUpRight className="w-4 h-4" />
-          </Link>
-        </div>
+      <AdminMonthlyActivity properties={properties} inquiries={inquiries} loading={loading} unavailable={dataUnavailable} now={updatedAt || undefined} />
 
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-2">
-          <Link
-            href="/admin/automation?tab=marketing"
-            className="p-3 rounded-2xl bg-white/5 hover:bg-white/10 border border-white/10 transition-all flex items-center space-x-2.5 group"
-          >
-            <div className="w-8 h-8 rounded-xl bg-gold-500/20 text-gold-400 flex items-center justify-center font-bold flex-shrink-0 group-hover:scale-105 transition-transform">
-              <Wand2 className="w-4 h-4" />
-            </div>
-            <div className="min-w-0">
-              <div className="text-xs font-bold text-white group-hover:text-gold-300 truncate">ผลิตคอนเทนต์ AI</div>
-              <div className="text-[10px] text-gray-400">FB, TikTok, LINE, IG</div>
-            </div>
-          </Link>
+      <details className="group rounded-2xl border border-slate-200/80 bg-white shadow-sm"><summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-5 py-5"><span className="flex items-center gap-3"><Sparkles className="h-4 w-4 text-gold-600" /><span><span className="block text-sm font-bold text-navy-950">เครื่องมือธุรกิจและผู้ช่วย AI</span><span className="mt-1 block text-xs font-normal text-slate-400">ร่างโพสต์ จับคู่ลูกค้า ประเมินราคา และร่างสัญญา</span></span></span><ChevronDown className="h-4 w-4 shrink-0 text-slate-400 transition-transform group-open:rotate-180" /></summary><div className="grid gap-3 border-t border-slate-100 p-5 sm:grid-cols-2 lg:grid-cols-3">{businessTools.map(({ title, description, href, icon: Icon }) => <Link key={href} href={href} className="rounded-xl border border-slate-200 p-4 transition-colors hover:border-gold-300"><Icon className="mb-3 h-5 w-5 text-gold-600" /><span className="block text-xs font-semibold text-navy-950">{title}</span><span className="mt-2 block text-[11px] leading-relaxed text-slate-400">{description}</span></Link>)}</div></details>
 
-          <Link
-            href="/admin/automation?tab=leads"
-            className="p-3 rounded-2xl bg-white/5 hover:bg-white/10 border border-white/10 transition-all flex items-center space-x-2.5 group"
-          >
-            <div className="w-8 h-8 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center font-bold flex-shrink-0 group-hover:scale-105 transition-transform">
-              <Users className="w-4 h-4" />
-            </div>
-            <div className="min-w-0">
-              <div className="text-xs font-bold text-white group-hover:text-emerald-300 truncate">จับคู่ลูกค้าอัจฉริยะ</div>
-              <div className="text-[10px] text-gray-400">Smart Lead Matcher</div>
-            </div>
-          </Link>
+      <details onToggle={(event) => setMapOpen(event.currentTarget.open)} className="group rounded-2xl border border-slate-200/80 bg-white shadow-sm"><summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-5 py-5"><span><span className="block text-sm font-bold text-navy-950">แผนที่ทรัพย์และโซนการลงทุน</span><span className="mt-1 block text-xs text-slate-400">เปิดดูการกระจายตัวของทรัพย์ตามพื้นที่</span></span><ChevronDown className="h-4 w-4 shrink-0 text-slate-400 transition-transform group-open:rotate-180" /></summary>{mapOpen && <div className="border-t border-slate-100 p-3 sm:p-5">{loading || dataUnavailable ? <p className="p-4 text-sm text-slate-500">{loading ? 'กำลังโหลดข้อมูลทรัพย์...' : 'กรุณาโหลดข้อมูลทรัพย์อีกครั้งก่อนเปิดแผนที่'}</p> : <InvestmentZoneDistributionMap properties={properties} />}</div>}</details>
 
-          <Link
-            href="/admin/automation?tab=valuation"
-            className="p-3 rounded-2xl bg-white/5 hover:bg-white/10 border border-white/10 transition-all flex items-center space-x-2.5 group"
-          >
-            <div className="w-8 h-8 rounded-xl bg-blue-500/20 text-blue-400 flex items-center justify-center font-bold flex-shrink-0 group-hover:scale-105 transition-transform">
-              <TrendingUp className="w-4 h-4" />
-            </div>
-            <div className="min-w-0">
-              <div className="text-xs font-bold text-white group-hover:text-blue-300 truncate">ประเมินราคา & Yield</div>
-              <div className="text-[10px] text-gray-400">ค่างวดผ่อน & ROI</div>
-            </div>
-          </Link>
-
-          <Link
-            href="/admin/automation?tab=contracts"
-            className="p-3 rounded-2xl bg-white/5 hover:bg-white/10 border border-white/10 transition-all flex items-center space-x-2.5 group"
-          >
-            <div className="w-8 h-8 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center font-bold flex-shrink-0 group-hover:scale-105 transition-transform">
-              <FileText className="w-4 h-4" />
-            </div>
-            <div className="min-w-0">
-              <div className="text-xs font-bold text-white group-hover:text-amber-300 truncate">ร่างสัญญาจะซื้อจะขาย</div>
-              <div className="text-[10px] text-gray-400">พิมพ์สัญญา A4 ใน 1 คลิก</div>
-            </div>
-          </Link>
-        </div>
-      </div>
-
-      {/* 4 Metric Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5">
-        {statCards.map((c) => {
-          const Icon = c.icon;
-          return (
-            <Link
-              key={c.title}
-              href={c.href}
-              className="bg-white rounded-2xl p-5 sm:p-6 border border-surface-border shadow-xs hover:shadow-md transition-all flex flex-col justify-between group cursor-pointer"
-            >
-              <div className="flex items-center justify-between mb-4">
-                <span className="text-xs font-bold text-gray-500 group-hover:text-navy-950 transition-colors">{c.title}</span>
-                <div className={`w-10 h-10 rounded-xl ${c.bg} ${c.color} flex items-center justify-center group-hover:scale-105 transition-transform`}>
-                  <Icon className="w-5 h-5" />
-                </div>
-              </div>
-              <div>
-                <div className={`text-3xl font-black ${c.color}`}>
-                  {c.value}
-                </div>
-                <div className="text-[11px] text-gray-500 mt-1 flex items-center font-medium">
-                  <TrendingUp className="w-3 h-3 text-emerald-600 mr-1" />
-                  <span>{c.change}</span>
-                </div>
-              </div>
-            </Link>
-          );
-        })}
-      </div>
-
-      {/* Recently Added Properties (ทรัพย์ที่ลงประกาศล่าสุด) */}
-      <div className="bg-white rounded-2xl p-5 sm:p-6 border border-surface-border shadow-xs">
-        <div className="flex items-center justify-between mb-4 pb-3 border-b border-gray-100">
-          <div>
-            <h3 className="font-bold text-navy-950 text-base flex items-center gap-2">
-              <Building2 className="w-4 h-4 text-gold-600" />
-              <span>อสังหาริมทรัพย์ที่ลงประกาศล่าสุด</span>
-            </h3>
-            <p className="text-xs text-gray-500">ทรัพย์ล่าสุดที่เพิ่มในระบบ พร้อมดูหน้าเว็บหรือแก้ไขทันที</p>
-          </div>
-          <Link
-            href="/admin/properties"
-            className="text-xs font-bold text-navy-950 hover:text-gold-600 flex items-center space-x-1"
-          >
-            <span>ดูทั้งหมด ({properties.length})</span>
-            <ArrowUpRight className="w-3.5 h-3.5" />
-          </Link>
-        </div>
-
-        {loading ? (
-          <div className="py-8 text-center text-xs text-gray-400">กำลังโหลดรายการทรัพย์...</div>
-        ) : properties.length === 0 ? (
-          <div className="py-8 text-center text-xs text-gray-500">
-            ยังไม่มีรายการทรัพย์ในระบบ คลิกที่ &ldquo;+ ลงประกาศทรัพย์ใหม่&rdquo; เพื่อเริ่มต้น
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
-            {properties.slice(0, 4).map((prop) => (
-              <div
-                key={prop.id}
-                className="bg-gray-50/70 hover:bg-gray-50 border border-gray-200/80 rounded-xl p-3 flex flex-col justify-between transition-all group"
-              >
-                <div className="space-y-2">
-                  <div className="relative w-full h-28 rounded-lg overflow-hidden bg-gray-200 border border-gray-200">
-                    <Image
-                      src={prop.cover_image}
-                      alt={prop.title}
-                      fill
-                      unoptimized
-                      referrerPolicy="no-referrer"
-                      className="object-cover group-hover:scale-105 transition-transform duration-300"
-                    />
-                    <div className="absolute top-1.5 left-1.5 flex gap-1">
-                      <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold ${
-                        prop.status === 'rent' ? 'bg-emerald-600 text-white' : 'bg-gold-500 text-navy-950'
-                      }`}>
-                        {prop.status === 'rent' ? 'เช่า' : 'ขาย'}
-                      </span>
-                      {prop.featured && (
-                        <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-amber-500 text-navy-950 flex items-center gap-0.5">
-                          ★ เด่น
-                        </span>
-                      )}
-                    </div>
-                    <span className="absolute bottom-1.5 right-1.5 font-mono text-[9px] font-bold bg-navy-950/80 text-white px-1.5 py-0.5 rounded">
-                      {formatPropertyCode(prop.id)}
-                    </span>
-                  </div>
-
-                  <div>
-                    <h4 className="font-bold text-navy-950 text-xs line-clamp-1 group-hover:text-gold-600">
-                      {prop.title}
-                    </h4>
-                    <div className="text-xs font-black text-navy-950 mt-0.5">
-                      {formatPrice(prop.price, prop.status)}
-                    </div>
-                    <div className="text-[10px] text-gray-500 flex items-center mt-0.5">
-                      <MapPin className="w-3 h-3 mr-0.5 text-gray-400 flex-shrink-0" />
-                      <span className="truncate">{prop.district}, {prop.province}</span>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="pt-3 mt-2 border-t border-gray-200/60 flex items-center justify-between gap-1.5">
-                  <Link
-                    href={propertyHref(prop.slug)}
-                    target="_blank"
-                    className="flex-1 py-1.5 px-2 bg-white hover:bg-gray-100 text-navy-950 border border-gray-200 rounded-lg text-[10px] font-bold flex items-center justify-center gap-1 transition-colors"
-                  >
-                    <Eye className="w-3 h-3 text-gray-500" />
-                    <span>ดูหน้าเว็บ</span>
-                  </Link>
-
-                  <Link
-                    href={`/admin/properties/new?id=${encodeURIComponent(prop.id)}`}
-                    className="flex-1 py-1.5 px-2 bg-navy-950 hover:bg-navy-900 text-gold-400 rounded-lg text-[10px] font-bold flex items-center justify-center gap-1 transition-colors"
-                  >
-                    <Edit3 className="w-3 h-3 text-gold-400" />
-                    <span>แก้ไข</span>
-                  </Link>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-
-      {/* D3 Geospatial Property Price Distribution & Investment Zones Map */}
-      <InvestmentZoneDistributionMap properties={properties} />
-
-      {/* Analytics Trend Charts */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Chart 1: Listings Growth Over Time */}
-        <div className="bg-white rounded-2xl p-6 border border-surface-border shadow-xs">
-          <div className="flex items-center justify-between mb-6">
-            <div>
-              <h3 className="font-bold text-navy-950 text-base">การเติบโตของรายการทรัพย์ (Listings)</h3>
-              <p className="text-xs text-gray-500">จำนวนอสังหาริมทรัพย์ที่รับฝากและเปิดขายในระบบ 6 เดือนย้อนหลัง</p>
-            </div>
-            <span className="text-xs font-bold text-gold-600 bg-gold-50 px-2.5 py-1 rounded-md">
-              +166% Growth
-            </span>
-          </div>
-
-          <div className="h-48 flex items-end justify-between gap-3 pt-4 px-2">
-            {listingData.map((val, idx) => {
-              const heightPercent = (val / 40) * 100;
-              return (
-                <div key={idx} className="flex-1 flex flex-col items-center group">
-                  <span className="text-[10px] font-bold text-navy-950 mb-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                    {val}
-                  </span>
-                  <div
-                    style={{ height: `${Math.min(100, Math.max(15, heightPercent))}%` }}
-                    className="w-full bg-navy-900 group-hover:bg-gold-500 rounded-t-lg transition-all duration-300 shadow-xs"
-                  />
-                  <span className="text-[11px] text-gray-500 font-semibold mt-2">
-                    {trendMonths[idx]}
-                  </span>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* Chart 2: Inquiries Over Time */}
-        <div className="bg-white rounded-2xl p-6 border border-surface-border shadow-xs">
-          <div className="flex items-center justify-between mb-6">
-            <div>
-              <h3 className="font-bold text-navy-950 text-base">ยอดผู้ติดต่อ & ฝากขาย (Inquiries)</h3>
-              <p className="text-xs text-gray-500">จำนวนข้อความสอบถามและนัดชมทรัพย์ 6 เดือนย้อนหลัง</p>
-            </div>
-            <span className="text-xs font-bold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-md">
-              +425% Leads
-            </span>
-          </div>
-
-          <div className="h-48 flex items-end justify-between gap-3 pt-4 px-2">
-            {inquiryData.map((val, idx) => {
-              const heightPercent = (val / 50) * 100;
-              return (
-                <div key={idx} className="flex-1 flex flex-col items-center group">
-                  <span className="text-[10px] font-bold text-navy-950 mb-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                    {val}
-                  </span>
-                  <div
-                    style={{ height: `${Math.min(100, Math.max(15, heightPercent))}%` }}
-                    className="w-full bg-gold-500 group-hover:bg-gold-600 rounded-t-lg transition-all duration-300 shadow-xs"
-                  />
-                  <span className="text-[11px] text-gray-500 font-semibold mt-2">
-                    {trendMonths[idx]}
-                  </span>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      </div>
-
-      {/* Recent Inquiries Preview Table with 1-Click Fast Actions */}
-      <div className="bg-white rounded-2xl p-5 sm:p-6 border border-surface-border shadow-xs">
-        <div className="flex items-center justify-between mb-4 pb-3 border-b border-gray-100">
-          <div>
-            <h3 className="font-bold text-navy-950 text-base flex items-center gap-2">
-              <MessageSquare className="w-4 h-4 text-purple-600" />
-              <span>รายการผู้ติดต่อล่าสุด</span>
-            </h3>
-            <p className="text-xs text-gray-500">โทรติดต่อกลับหรือเปิด LINE คุยกับลูกค้าได้ทันทีจากตรงนี้</p>
-          </div>
-          <Link
-            href="/admin/inquiries"
-            className="text-xs font-bold text-navy-950 hover:text-gold-600 flex items-center space-x-1"
-          >
-            <span>ดูทั้งหมด ({inquiries.length})</span>
-            <ArrowUpRight className="w-3.5 h-3.5" />
-          </Link>
-        </div>
-
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs">
-            <thead>
-              <tr className="text-gray-500 border-b border-gray-100">
-                <th className="pb-3 font-semibold">ชื่อผู้ติดต่อ</th>
-                <th className="pb-3 font-semibold">ช่องทางติดต่อด่วน</th>
-                <th className="pb-3 font-semibold">ประเภท & ทรัพย์</th>
-                <th className="pb-3 font-semibold">ข้อความ</th>
-                <th className="pb-3 font-semibold">สถานะ</th>
-                <th className="pb-3 font-semibold text-right">ดำเนินการ</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-50">
-              {loading ? (
-                <tr>
-                  <td colSpan={6} className="py-6 text-center text-gray-400">กำลังโหลด...</td>
-                </tr>
-              ) : inquiries.length === 0 ? (
-                <tr>
-                  <td colSpan={6} className="py-6 text-center text-gray-400">ไม่มีข้อความผู้ติดต่อใหม่</td>
-                </tr>
-              ) : (
-                inquiries.slice(0, 5).map((inq) => (
-                  <tr key={inq.id} className="hover:bg-gray-50/80 transition-colors">
-                    <td className="py-3 font-bold text-navy-950">
-                      <div>{inq.name}</div>
-                      <div className="text-[10px] text-gray-400 font-normal">{formatThaiDate(inq.created_at)}</div>
-                    </td>
-                    <td className="py-3 text-gray-600">
-                      <div className="flex items-center space-x-2">
-                        <a
-                          href={`tel:${inq.phone}`}
-                          className="inline-flex items-center px-2 py-0.5 rounded-md bg-navy-950 text-gold-400 text-[10px] font-bold hover:bg-navy-900 transition-colors"
-                          title="กดเพื่อโทรออก"
-                        >
-                          <Phone className="w-2.5 h-2.5 mr-1" />
-                          <span>{inq.phone}</span>
-                        </a>
-                        {inq.line_id && (
-                          <a
-                            href={`https://line.me/R/ti/p/${inq.line_id}`}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="inline-flex items-center px-2 py-0.5 rounded-md bg-[#06C755] text-white text-[10px] font-bold hover:bg-[#05b34c] transition-colors"
-                            title="ทัก LINE"
-                          >
-                            <MessageCircle className="w-2.5 h-2.5 mr-1 fill-current" />
-                            <span>LINE</span>
-                          </a>
-                        )}
-                      </div>
-                    </td>
-                    <td className="py-3">
-                      <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-gray-100 text-gray-800 block w-fit">
-                        {inq.inquiry_type === 'viewing' ? 'นัดชมสถานที่' : inq.inquiry_type === 'consignment_sell' ? 'ฝากขายทรัพย์' : 'สอบถามข้อมูล'}
-                      </span>
-                      {inq.property_title && (
-                        <span className="text-[10px] text-gold-700 font-medium block truncate max-w-[160px] mt-0.5">
-                          {inq.property_title}
-                        </span>
-                      )}
-                    </td>
-                    <td className="py-3 text-gray-600 max-w-xs truncate">{inq.message}</td>
-                    <td className="py-3">
-                      <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold ${
-                        inq.status === 'new' 
-                          ? 'bg-amber-100 text-amber-800 animate-pulse' 
-                          : 'bg-emerald-100 text-emerald-800'
-                      }`}>
-                        {inq.status === 'new' ? 'รอดำเนินการ' : 'ติดต่อแล้ว'}
-                      </span>
-                    </td>
-                    <td className="py-3 text-right">
-                      {inq.status === 'new' ? (
-                        <button
-                          type="button"
-                          disabled={updatingInquiryId === inq.id}
-                          onClick={() => handleQuickStatusUpdate(inq.id, 'contacted')}
-                          className="px-2.5 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-lg text-[10px] font-bold transition-all cursor-pointer inline-flex items-center gap-1"
-                          title="คลิกเพื่อเปลี่ยนสถานะเป็นติดต่อแล้ว"
-                        >
-                          <CheckCircle2 className="w-3 h-3 text-emerald-600" />
-                          <span>เสร็จสิ้น</span>
-                        </button>
-                      ) : (
-                        <button
-                          type="button"
-                          disabled={updatingInquiryId === inq.id}
-                          onClick={() => handleQuickStatusUpdate(inq.id, 'new')}
-                          className="px-2 py-1 text-gray-400 hover:text-amber-600 rounded-lg text-[10px] font-medium transition-colors cursor-pointer"
-                          title="เปลี่ยนกลับเป็นรอดำเนินการ"
-                        >
-                          ย้อนกลับ
-                        </button>
-                      )}
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      {/* System Activity Feed Timeline */}
-      <SystemActivityFeed />
+      <details onToggle={(event) => setActivityOpen(event.currentTarget.open)} className="group rounded-2xl border border-slate-200/80 bg-white shadow-sm"><summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-5 py-5"><span><span className="block text-sm font-bold text-navy-950">ประวัติกิจกรรมของทีม</span><span className="mt-1 block text-xs text-slate-400">ค้นหาและตรวจสอบรายการเปลี่ยนแปลงในระบบ</span></span><ChevronDown className="h-4 w-4 shrink-0 text-slate-400 transition-transform group-open:rotate-180" /></summary>{activityOpen && <div className="border-t border-slate-100 p-3 sm:p-5"><SystemActivityFeed /></div>}</details>
+      {updatedAt && <p className="text-center text-[11px] text-slate-400">อัปเดตล่าสุด {updatedAt.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' })} · ข้อมูลจากรายการในระบบ</p>}
     </div>
   );
 }

@@ -1,231 +1,153 @@
 'use client';
 
 import { ExtendedAgent, AGENTS as DEFAULT_AGENTS } from '@/data/agents';
-import { UserProfile } from '@/lib/types';
+import type { UserProfile } from '@/lib/types';
 import { db } from '@/lib/firebase/client';
+import { supabase } from '@/lib/supabase/client';
 import { dataBackend } from '@/lib/backend';
-import { 
-  collection, 
-  getDocs, 
-  doc, 
-  setDoc, 
-  deleteDoc,
-  Firestore
-} from 'firebase/firestore';
+import { collection, getDocs, doc, setDoc, deleteDoc } from 'firebase/firestore';
 
-// In-memory runtime cache for seamless UI rendering
+const LOCAL_KEY = 'chantakorn_featured_agents_v1';
 let inMemoryAgents: ExtendedAgent[] = [];
+const clone = <T,>(value: T): T => JSON.parse(JSON.stringify(value));
 
-export function getAgents(): ExtendedAgent[] {
-  return inMemoryAgents;
+function publish(agents: ExtendedAgent[]): ExtendedAgent[] {
+  inMemoryAgents = clone(agents);
+  if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('chantakorn_agents_updated', { detail: clone(agents) }));
+  return getAgents();
 }
 
-/**
- * ดึงข้อมูลนายหน้าทั้งหมดจากคลาวด์ Firebase Firestore โดยตรง
- */
+function requireConnection() {
+  if (dataBackend === 'firebase' && !db) throw new Error('ระบบฐานข้อมูล Firebase ยังไม่ได้ตั้งค่า');
+  if (dataBackend === 'supabase' && !supabase) throw new Error('ระบบฐานข้อมูล Supabase ยังไม่ได้ตั้งค่า');
+}
+
+function normalize(agent: Partial<ExtendedAgent>): ExtendedAgent {
+  return {
+    id: agent.id || '', user_id: agent.user_id, name: agent.name || '', rank: agent.rank || 'นายหน้า',
+    title: agent.title || '', phone: agent.phone || '', line_id: agent.line_id || '', facebook: agent.facebook || '',
+    email: agent.email || '', photo_url: agent.photo_url || '', bio: agent.bio || '', specialty: agent.specialty || '',
+    zone: agent.zone || '', experienceYears: agent.experienceYears ?? 0, closedDeals: agent.closedDeals ?? 0,
+    rating: agent.rating ?? 0, languages: Array.isArray(agent.languages) ? [...agent.languages] : [],
+  };
+}
+
+function validate(agent: ExtendedAgent) {
+  if (!agent.id || agent.id.length > 120 || agent.id.includes('/') || !agent.name.trim() || agent.name.length > 200) throw new Error('กรุณาระบุชื่อนายหน้าและรหัสรายการให้ถูกต้อง');
+  // Profile photos may be compressed data URLs from the existing avatar uploader.
+  for (const [field, max] of Object.entries({ title: 300, phone: 50, line_id: 200, facebook: 2000, email: 254, photo_url: 700000, bio: 4000, specialty: 1000, zone: 500 })) {
+    const value = agent[field as keyof ExtendedAgent];
+    if (typeof value !== 'string' || value.length > max) throw new Error('ข้อมูลนายหน้าบางรายการยาวเกินกำหนด');
+  }
+  if (![agent.experienceYears, agent.closedDeals, agent.rating].every(value => Number.isFinite(value) && value >= 0) || agent.rating > 5 || agent.experienceYears > 100 || agent.closedDeals > 1000000 || agent.languages.length > 10 || agent.languages.some(value => typeof value !== 'string' || value.length > 50)) throw new Error('กรุณาตรวจสอบประสบการณ์ จำนวนงาน และคะแนนของนายหน้า');
+}
+
+function localWrite(agents: ExtendedAgent[]) {
+  if (typeof window === 'undefined') throw new Error('โหมดทดลองต้องใช้งานผ่านเบราว์เซอร์');
+  window.localStorage.setItem(LOCAL_KEY, JSON.stringify(agents));
+}
+
+function supabaseRow(agent: ExtendedAgent) {
+  const { id, name, title, phone, line_id, facebook, email, photo_url, bio, ...metadata } = agent;
+  return { id, name, title, phone, line_id, facebook, email, photo_url, bio, metadata };
+}
+
+async function persistAgent(agent: ExtendedAgent) {
+  requireConnection();
+  validate(agent);
+  if (dataBackend === 'firebase') {
+    await setDoc(doc(db!, 'agents', agent.id), clone(agent), { merge: true });
+  } else if (dataBackend === 'supabase') {
+    const { data, error } = await supabase!.from('agents').upsert(supabaseRow(agent), { onConflict: 'id' }).select('id');
+    if (error) throw error;
+    if (!data?.some(row => row.id === agent.id)) throw new Error('บันทึกนายหน้าไม่สำเร็จ กรุณาตรวจสอบสิทธิ์');
+  }
+}
+
+export function getAgents(): ExtendedAgent[] { return clone(inMemoryAgents); }
+
 export async function fetchAgents(): Promise<ExtendedAgent[]> {
-  const firestore: Firestore | null = db;
-  if (dataBackend === 'firebase' && firestore) {
-    try {
-      const snap = await getDocs(collection(firestore, 'agents'));
-      if (!snap.empty) {
-        const list: ExtendedAgent[] = snap.docs.map(d => ({
-          ...d.data(),
-          id: d.id,
-        } as ExtendedAgent));
-        inMemoryAgents = list;
-        if (typeof window !== 'undefined') {
-          window.dispatchEvent(new CustomEvent('chantakorn_agents_updated', { detail: list }));
-        }
-        return list;
-      } else {
-        inMemoryAgents = [];
-        return [];
-      }
-    } catch (err) {
-      console.warn('Fetch agents from Firestore warning:', err);
+  requireConnection();
+  if (dataBackend === 'firebase') {
+    const snapshot = await getDocs(collection(db!, 'agents'));
+    return publish(snapshot.docs.map(item => normalize({ ...item.data(), id: item.id })));
+  }
+  if (dataBackend === 'supabase') {
+    const { data, error } = await supabase!.from('agents').select('*').order('name');
+    if (error) throw error;
+    return publish((data || []).map(row => normalize({ ...row, ...row.metadata, id: row.id })));
+  }
+  if (typeof window !== 'undefined') {
+    const stored = window.localStorage.getItem(LOCAL_KEY);
+    if (stored !== null) {
+      const rows = JSON.parse(stored);
+      if (!Array.isArray(rows)) throw new Error('ข้อมูลนายหน้าในโหมดทดลองไม่ถูกต้อง');
+      return publish(rows.map(normalize));
     }
   }
-  return inMemoryAgents;
+  return getAgents();
 }
 
 export async function saveAgentsToCloud(agents: ExtendedAgent[]): Promise<void> {
-  inMemoryAgents = agents;
-  if (typeof window !== 'undefined') {
-    window.dispatchEvent(new CustomEvent('chantakorn_agents_updated', { detail: agents }));
-  }
-  const firestore: Firestore | null = db;
-  if (dataBackend === 'firebase' && firestore) {
-    try {
-      const promises = agents.map(a => 
-        setDoc(doc(firestore, 'agents', a.id), JSON.parse(JSON.stringify(a)), { merge: true })
-      );
-      await Promise.all(promises);
-    } catch (err) {
-      console.error('Failed to save agents to Firestore:', err);
-    }
-  }
+  requireConnection();
+  const next = agents.map(normalize);
+  next.forEach(validate);
+  if (dataBackend === 'local') localWrite(next);
+  else await Promise.all(next.map(persistAgent));
+  publish(next);
 }
 
-export function saveAgents(agents: ExtendedAgent[]): void {
-  saveAgentsToCloud(agents).catch(console.error);
+export async function saveAgents(agents: ExtendedAgent[]): Promise<void> { await saveAgentsToCloud(agents); }
+
+export async function resetAgentsToDefault(): Promise<ExtendedAgent[]> {
+  if (dataBackend !== 'local') throw new Error('ข้อมูลตัวอย่างใช้ได้เฉพาะโหมดทดลอง');
+  await saveAgents(DEFAULT_AGENTS);
+  return getAgents();
 }
 
-export function resetAgentsToDefault(): ExtendedAgent[] {
-  inMemoryAgents = [...DEFAULT_AGENTS];
-  if (typeof window !== 'undefined') {
-    window.dispatchEvent(new CustomEvent('chantakorn_agents_updated', { detail: inMemoryAgents }));
-  }
-  const firestore: Firestore | null = db;
-  if (dataBackend === 'firebase' && firestore) {
-    try {
-      DEFAULT_AGENTS.forEach(a => {
-        setDoc(doc(firestore, 'agents', a.id), JSON.parse(JSON.stringify(a)), { merge: true }).catch(() => {});
-      });
-    } catch (err) {
-      console.warn('Reset agents in cloud error:', err);
-    }
-  }
-  return inMemoryAgents;
-}
-
-/**
- * ซิงก์ข้อมูลระหว่างตารางสมาชิก (Users/Profiles) กับระบบนายหน้าแนะนำ (Agents) อัตโนมัติในฐานข้อมูลคลาวด์
- */
+/** Reflect real profile fields in the current view. Reading profiles never writes agents. */
 export function syncAgentsFromUsers(users: UserProfile[]): ExtendedAgent[] {
   if (!Array.isArray(users)) return getAgents();
-  
-  const currentAgents = getAgents();
-  let changed = false;
-  const updatedAgents = [...currentAgents];
-
-  users.forEach((user) => {
-    const matchIndex = updatedAgents.findIndex((a) => 
-      a.user_id === user.id ||
-      a.id === user.id ||
-      a.id === `agent-${user.id}` ||
-      (user.email && a.email && a.email.toLowerCase() === user.email.toLowerCase()) ||
-      a.name.trim() === user.full_name.trim()
-    );
-
-    if (matchIndex >= 0) {
-      const existing = updatedAgents[matchIndex];
-      const isDifferent = 
-        (user.full_name && existing.name !== user.full_name) ||
-        (user.phone && existing.phone !== user.phone) ||
-        (user.email && existing.email !== user.email) ||
-        (user.avatar_url && existing.photo_url !== user.avatar_url) ||
-        (user.line_id && existing.line_id !== user.line_id) ||
-        (user.facebook && existing.facebook !== user.facebook) ||
-        (user.bio && existing.bio !== user.bio) ||
-        existing.user_id !== user.id;
-
-      if (isDifferent) {
-        updatedAgents[matchIndex] = {
-          ...existing,
-          user_id: user.id,
-          name: user.full_name || existing.name,
-          phone: user.phone || existing.phone,
-          email: user.email || existing.email,
-          line_id: user.line_id || existing.line_id,
-          facebook: user.facebook || existing.facebook,
-          photo_url: user.avatar_url || existing.photo_url,
-          bio: user.bio || existing.bio,
-          rank: user.role === 'ADMIN' ? 'แอดมิน' : 'นายหน้า',
-        };
-        changed = true;
-      }
-    } else if (user.role === 'AGENT' || user.role === 'ADMIN') {
-      updatedAgents.push({
-        id: `agent-${user.id}`,
-        user_id: user.id,
-        name: user.full_name,
-        rank: user.role === 'ADMIN' ? 'แอดมิน' : 'นายหน้า',
-        title: user.role === 'ADMIN' ? 'ผู้บริหาร & ที่ปรึกษาอสังหาริมทรัพย์' : 'ที่ปรึกษาอสังหาริมทรัพย์มืออาชีพ',
-        phone: user.phone || '081-604-0097',
-        line_id: user.line_id || '@930xzcyi',
-        facebook: user.facebook || '',
-        email: user.email || 'contact@chantakornproperty.com',
-        photo_url: user.avatar_url || 'https://images.unsplash.com/photo-1560250097-0b93528c311a?auto=format&fit=crop&w=600&q=80',
-        bio: user.bio || 'พร้อมดูแลและให้คำปรึกษาการซื้อ-ขาย-เช่า-ขายฝาก อสังหาริมทรัพย์ในหาดใหญ่และสงขลาอย่างมืออาชีพ',
-        specialty: 'บ้านเดี่ยว, คอนโด, ทาวน์โฮม, ที่ดิน',
-        zone: 'โซนหาดใหญ่ – สงขลา',
-        experienceYears: 3,
-        closedDeals: 15,
-        rating: 5.0,
-        languages: ['ไทย', 'English'],
-      });
-      changed = true;
-    }
-  });
-
-  if (changed) {
-    saveAgents(updatedAgents);
+  const next = getAgents();
+  for (const user of users) {
+    if (!['ADMIN', 'AGENT'].includes(user.role)) continue;
+    const index = next.findIndex(agent => agent.user_id === user.id || agent.id === user.id || agent.id === `agent-${user.id}` || (!!user.email && agent.email.toLowerCase() === user.email.toLowerCase()));
+    // A member becomes featured only after an explicit successful agent save.
+    // In particular, reading members must not recreate a deleted featured agent.
+    if (index < 0) continue;
+    const old = next[index];
+    const updated = normalize({ ...old, user_id: user.id, name: user.full_name || old.name,
+      phone: user.phone ?? old.phone, email: user.email ?? old.email, line_id: user.line_id ?? old.line_id,
+      facebook: user.facebook ?? old.facebook, photo_url: user.avatar_url ?? old.photo_url, bio: user.bio ?? old.bio,
+      rank: user.role === 'ADMIN' ? 'แอดมิน' : 'นายหน้า' });
+    next[index] = updated;
   }
-  return updatedAgents;
+  return publish(next);
 }
 
-export function updateAgent(agentId: string, updatedFields: Partial<ExtendedAgent>): ExtendedAgent[] {
-  const current = [...inMemoryAgents];
-  const index = current.findIndex((a) => a.id === agentId);
-  let finalAgent: ExtendedAgent;
-
-  if (index >= 0) {
-    current[index] = { ...current[index], ...updatedFields };
-    finalAgent = current[index];
-  } else {
-    finalAgent = {
-      id: agentId,
-      user_id: updatedFields.user_id,
-      name: updatedFields.name || 'นายหน้าใหม่',
-      rank: updatedFields.rank || 'นายหน้า',
-      title: updatedFields.title || 'ที่ปรึกษาอสังหาริมทรัพย์มืออาชีพ',
-      phone: updatedFields.phone || '081-604-0097',
-      line_id: updatedFields.line_id || '@930xzcyi',
-      facebook: updatedFields.facebook || '',
-      email: updatedFields.email || 'contact@chantakornproperty.com',
-      photo_url: updatedFields.photo_url || 'https://images.unsplash.com/photo-1560250097-0b93528c311a?auto=format&fit=crop&w=600&q=80',
-      bio: updatedFields.bio || 'พร้อมดูแลและให้คำปรึกษาการซื้อ-ขาย-เช่า-ขายฝาก อสังหาริมทรัพย์ในหาดใหญ่และสงขลาอย่างมืออาชีพ',
-      specialty: updatedFields.specialty || 'บ้านเดี่ยว, คอนโด, ที่ดิน',
-      zone: updatedFields.zone || 'หาดใหญ่ - สงขลา',
-      experienceYears: updatedFields.experienceYears || 3,
-      closedDeals: updatedFields.closedDeals || 15,
-      rating: updatedFields.rating || 5.0,
-      languages: updatedFields.languages || ['ไทย'],
-      ...updatedFields,
-    };
-    current.push(finalAgent);
-  }
-
-  inMemoryAgents = current;
-  if (typeof window !== 'undefined') {
-    window.dispatchEvent(new CustomEvent('chantakorn_agents_updated', { detail: current }));
-  }
-
-  // Persist directly to Firebase Firestore in the Cloud
-  const firestore: Firestore | null = db;
-  if (dataBackend === 'firebase' && firestore) {
-    setDoc(doc(firestore, 'agents', finalAgent.id), JSON.parse(JSON.stringify(finalAgent)), { merge: true }).catch((err) => {
-      console.error('Failed to update agent in Firestore cloud:', err);
-    });
-  }
-
-  return current;
+export async function updateAgent(agentId: string, updatedFields: Partial<ExtendedAgent>): Promise<ExtendedAgent[]> {
+  const current = getAgents();
+  const index = current.findIndex(agent => agent.id === agentId);
+  const updated = normalize({ ...(index >= 0 ? current[index] : {}), ...updatedFields, id: agentId });
+  validate(updated);
+  const next = [...current];
+  if (index >= 0) next[index] = updated;
+  else next.push(updated);
+  if (dataBackend === 'local') localWrite(next);
+  else await persistAgent(updated);
+  return publish(next);
 }
 
-export function deleteAgent(agentId: string): ExtendedAgent[] {
-  const filtered = inMemoryAgents.filter((a) => a.id !== agentId);
-  inMemoryAgents = filtered;
-  if (typeof window !== 'undefined') {
-    window.dispatchEvent(new CustomEvent('chantakorn_agents_updated', { detail: filtered }));
+export async function deleteAgent(agentId: string): Promise<ExtendedAgent[]> {
+  requireConnection();
+  if (!agentId || agentId.length > 120 || agentId.includes('/')) throw new Error('รหัสนายหน้าไม่ถูกต้อง');
+  if (dataBackend === 'firebase') await deleteDoc(doc(db!, 'agents', agentId));
+  else if (dataBackend === 'supabase') {
+    const { data, error } = await supabase!.from('agents').delete().eq('id', agentId).select('id');
+    if (error) throw error;
+    if (!data?.some(row => row.id === agentId)) throw new Error('ลบนายหน้าไม่สำเร็จ กรุณาตรวจสอบสิทธิ์');
   }
-
-  const firestore: Firestore | null = db;
-  if (dataBackend === 'firebase' && firestore) {
-    deleteDoc(doc(firestore, 'agents', agentId)).catch((err) => {
-      console.error('Failed to delete agent from Firestore cloud:', err);
-    });
-  }
-
-  return filtered;
+  const next = getAgents().filter(agent => agent.id !== agentId);
+  if (dataBackend === 'local') localWrite(next);
+  return publish(next);
 }

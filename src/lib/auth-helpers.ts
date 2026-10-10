@@ -66,8 +66,11 @@ export async function syncFirebaseUserProfile(user: User, customFullName?: strin
     role: user.emailVerified && validRole(data.role) ? data.role : 'USER',
     avatar_url: data.avatar_url || user.photoURL || '',
   };
+  const previousProfile = JSON.stringify(verifiedProfile, Object.keys(verifiedProfile || {}).sort());
+  const nextProfile = JSON.stringify(profile, Object.keys(profile).sort());
+  const profileChanged = previousProfile !== nextProfile;
   cacheProfile(profile);
-  notifyAuthChange(profile);
+  if (profileChanged) notifyAuthChange(profile);
   return profile;
 }
 

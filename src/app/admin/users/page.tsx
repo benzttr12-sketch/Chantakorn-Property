@@ -97,28 +97,34 @@ export default function AdminUsersPage() {
     }
   };
 
-  const handlePromoteToFeaturedAgent = (user: UserProfile) => {
+  const handlePromoteToFeaturedAgent = async (user: UserProfile) => {
     const newAgent: ExtendedAgent = {
       id: `agent-${user.id}`,
+      user_id: user.id,
       name: user.full_name,
       rank: user.role === 'ADMIN' ? 'แอดมิน' : 'นายหน้า',
       title: user.role === 'ADMIN' ? 'ผู้บริหาร & หัวหน้าฝ่ายที่ปรึกษา' : 'ที่ปรึกษาอสังหาริมทรัพย์มืออาชีพ',
-      phone: user.phone || '081-604-0097',
-      line_id: user.line_id || '@930xzcyi',
+      phone: user.phone || '',
+      line_id: user.line_id || '',
       facebook: user.facebook || '',
-      email: user.email || 'contact@chantakornproperty.com',
-      photo_url: user.avatar_url || 'https://images.unsplash.com/photo-1560250097-0b93528c311a?auto=format&fit=crop&w=600&q=80',
+      email: user.email || '',
+      photo_url: user.avatar_url || '',
       bio: user.bio || `พร้อมดูแลและให้คำปรึกษาการซื้อ-ขาย-เช่า-ขายฝาก อสังหาริมทรัพย์ในหาดใหญ่และสงขลาอย่างมืออาชีพ`,
       specialty: 'บ้านเดี่ยว, คอนโด, ทาวน์โฮม, ที่ดิน',
       zone: 'โซนหาดใหญ่ – สงขลา',
-      experienceYears: 3,
-      closedDeals: 15,
-      rating: 5.0,
-      languages: ['ไทย', 'English'],
+      experienceYears: 0,
+      closedDeals: 0,
+      rating: 0,
+      languages: ['ไทย'],
     };
 
-    updateAgent(newAgent.id, newAgent);
-    triggerNotification(`แต่งตั้ง "${user.full_name}" เป็นนายหน้าแนะนำบนหน้าแรกเรียบร้อยแล้ว!`);
+    setError('');
+    try {
+      await updateAgent(newAgent.id, newAgent);
+      triggerNotification(`เพิ่ม "${user.full_name}" เป็นนายหน้าแนะนำบนหน้าเว็บแล้ว`);
+    } catch (failure) {
+      setError(failure instanceof Error ? failure.message : 'เพิ่มนายหน้าแนะนำไม่สำเร็จ กรุณาลองใหม่');
+    }
   };
 
   const handleRoleChange = async (userId: string, newRole: 'ADMIN' | 'AGENT' | 'USER') => {

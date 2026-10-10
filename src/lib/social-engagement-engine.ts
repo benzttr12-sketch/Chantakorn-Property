@@ -24,8 +24,7 @@ export interface BestTimeRecommendation {
   hour: number;
   timeLabel: string;
   score: number;
-  expectedEngagementMultiplier: number;
-  conversionProbability: string;
+  planningPriority: string;
   targetAudience: string;
   recommendedChannel: string;
   suggestedAction: string;
@@ -69,15 +68,8 @@ const DAYS_THAI = [
   { index: 6, name: 'วันเสาร์', short: 'ส.' },
 ];
 
-/**
- * Historical engagement baseline for Southern Thailand (Hat Yai / Songkhla) real estate market.
- * Derived from empirical buyer behavior patterns:
- * - High inquiry activity during lunch (11:30 - 13:00)
- * - Peak leisure and serious property searching in the evening (18:30 - 21:30)
- * - High weekend family viewing planning on Saturday morning (08:30 - 11:00) and Sunday evening (19:00 - 22:00)
- * - Channel specific nuances (TikTok peaks later 20:00-22:30, LINE OA peaks morning and lunchtime)
- */
-export function generateHistoricalEngagementMatrix(
+/** Deterministic planning assumptions, not measured customer analytics. */
+export function generatePlanningEngagementMatrix(
   channel: string = 'all',
   propertyType?: string | PropertyType
 ): TimeSlotEngagement[] {
@@ -226,7 +218,7 @@ export function calculateBestTimeSlot(
   channel: string = 'facebook',
   targetDayIndex?: number
 ): BestTimeRecommendation {
-  const matrix = generateHistoricalEngagementMatrix(channel, property?.property_type);
+  const matrix = generatePlanningEngagementMatrix(channel, property?.property_type);
 
   // If specific day requested, filter to that day; otherwise search whole week
   const candidates = targetDayIndex !== undefined && targetDayIndex >= 0 && targetDayIndex <= 6
@@ -258,7 +250,7 @@ export function calculateBestTimeSlot(
         timeLabel: slot.timeLabel,
         score: slot.score,
         channel: channel.toUpperCase(),
-        highlight: `${slot.audienceDemographic} (คาดการณ์ยอดทัก +${Math.round(slot.score * 0.9)}%)`,
+        highlight: `${slot.audienceDemographic} (ดัชนีวางแผน ${slot.score}/100)`,
       });
     }
   }
@@ -266,7 +258,7 @@ export function calculateBestTimeSlot(
   const propTypeName = property ? getPropertyTypeName(property.property_type) : 'อสังหาริมทรัพย์';
   const districtName = property?.district ? `โซน${property.district}` : 'หาดใหญ่-สงขลา';
 
-  const strategicReason = `จากข้อมูลสถิติการทักแชท (Inquiry Rate) และความสนใจ${propTypeName}ในพื้นที่${districtName} ช่วง${best.dayName} เวลา ${best.timeLabel} เป็นช่วงที่กลุ่ม${best.audienceDemographic} มีการเปิดดูและตัดสินใจสูงสุด ดัชนีตอบรับอยู่ที่ ${best.score}/100 จุด`;
+  const strategicReason = `ใช้สมมติฐานช่วงเวลาและประเภท${propTypeName}ในพื้นที่${districtName} เพื่อช่วยเลือกช่วงทดลองโพสต์ ${best.dayName} เวลา ${best.timeLabel} สำหรับกลุ่ม${best.audienceDemographic} ดัชนีวางแผน ${best.score}/100 จุด ควรเทียบกับผลตอบรับจริงของแต่ละโพสต์`;
 
   return {
     dayName: best.dayName,
@@ -275,8 +267,7 @@ export function calculateBestTimeSlot(
     hour: best.hour,
     timeLabel: best.timeLabel,
     score: best.score,
-    expectedEngagementMultiplier: +(best.score / 45).toFixed(1),
-    conversionProbability: best.score >= 90 ? 'สูงสุด (High Conversion 🔥)' : best.score >= 80 ? 'ดีมาก (High Activity ⚡)' : 'ปานกลาง',
+    planningPriority: best.score >= 90 ? 'ลำดับแนะนำสูง' : best.score >= 80 ? 'ลำดับแนะนำดี' : 'ปานกลาง',
     targetAudience: best.audienceDemographic,
     recommendedChannel: channel.toUpperCase(),
     suggestedAction: best.recommendedFormat,
@@ -292,7 +283,7 @@ export function getHourlyEngagementAverages(
   channel: string = 'all',
   propertyType?: string | PropertyType
 ): HourlyAveragePoint[] {
-  const matrix = generateHistoricalEngagementMatrix(channel, propertyType);
+  const matrix = generatePlanningEngagementMatrix(channel, propertyType);
   const now = new Date();
   const currentHour = now.getHours();
 
@@ -333,7 +324,7 @@ export function getDailyEngagementAverages(
   channel: string = 'all',
   propertyType?: string | PropertyType
 ): DailyAveragePoint[] {
-  const matrix = generateHistoricalEngagementMatrix(channel, propertyType);
+  const matrix = generatePlanningEngagementMatrix(channel, propertyType);
 
   return DAYS_THAI.map((d) => {
     const daySlots = matrix.filter((s) => s.day === d.index);
@@ -353,14 +344,14 @@ export function getDailyEngagementAverages(
 }
 
 /**
- * Evaluates current time and gives real-time posting guidance.
+ * Evaluates the current slot against planning assumptions.
  */
 export function getCurrentPostingHealth(channel: string = 'all', propertyType?: string | PropertyType) {
   const now = new Date();
   const currentDay = now.getDay();
   const currentHour = now.getHours();
 
-  const matrix = generateHistoricalEngagementMatrix(channel, propertyType);
+  const matrix = generatePlanningEngagementMatrix(channel, propertyType);
   const currentSlot = matrix.find((s) => s.day === currentDay && s.hour === currentHour) || matrix[0];
 
   // Find next peak slot today or upcoming
@@ -368,17 +359,17 @@ export function getCurrentPostingHealth(channel: string = 'all', propertyType?: 
   const nextPeakSlot = todayUpcomingSlots[0] || [...matrix].sort((a, b) => b.score - a.score)[0];
 
   let status: 'hot' | 'good' | 'quiet' = 'quiet';
-  let badgeText = '⏳ ช่วงการเข้าถึงชะลอตัว';
-  let advice = 'แนะนำให้ตั้งเวลาล่วงหน้าเพื่อรอโพสต์ในช่วง Prime Time';
+  let badgeText = 'ดัชนีวางแผนต่ำ';
+  let advice = 'ลองเตรียมโพสต์สำหรับช่วงที่มีดัชนีสูงกว่า แล้วเทียบผลตอบรับจริง';
 
   if (currentSlot.score >= 85) {
     status = 'hot';
-    badgeText = '🔥 ช่วงเวลาทอง (Prime Time Now!)';
-    advice = 'ตอนนี้มีผู้สนใจอสังหาฯ ออนไลน์สูงสุด! กดโพสต์หรือบรอดแคสต์ทันทีเพื่อรับยอดทักแชททันที';
+    badgeText = 'ดัชนีวางแผนสูง';
+    advice = 'เป็นช่วงแนะนำให้ทดลองโพสต์จากสมมติฐานในเครื่องมือนี้ ควรวัดยอดตอบรับจริงหลังโพสต์';
   } else if (currentSlot.score >= 65) {
     status = 'good';
-    badgeText = '⚡ ช่วงเวลาดี (Good Window)';
-    advice = 'ปริมาณผู้ชมอยู่ในเกณฑ์น่าพอใจ สามารถโพสต์รูปภาพหรือสตอรี่ได้ผลดี';
+    badgeText = 'ดัชนีวางแผนปานกลาง';
+    advice = 'ลองโพสต์รูปภาพหรือสตอรี่ในช่วงนี้ แล้วเปรียบเทียบผลกับช่วงอื่น';
   }
 
   return {

@@ -1,7 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getGeminiClient } from '@/lib/gemini';
+import { requireStaff } from '@/lib/server-auth';
 
 export async function POST(req: NextRequest) {
+  const denied = await requireStaff(req);
+  if (denied) return denied;
   try {
     const body = await req.json();
     const { action, payload } = body;
@@ -87,14 +90,13 @@ export async function POST(req: NextRequest) {
       error: 'Unknown action',
     });
   } catch (error: any) {
-    console.warn('AI Automate Route warning/error, falling back to client templates:', error?.message || error);
     return NextResponse.json(
       {
         success: false,
-        error: error instanceof Error ? error.message : 'Internal Server Error',
+        error: 'สร้างข้อความด้วย AI ไม่สำเร็จ กรุณาลองใหม่หรือใช้ข้อความที่เตรียมไว้',
         fallback: true,
       },
-      { status: 200 }
+      { status: 502 }
     );
   }
 }

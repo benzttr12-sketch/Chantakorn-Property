@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { 
   Activity, 
   Building2, 
@@ -28,27 +28,35 @@ export default function SystemActivityFeed() {
   const [categoryFilter, setCategoryFilter] = useState<'all' | SystemActivityCategory>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [error, setError] = useState('');
+  const [hasLoaded, setHasLoaded] = useState(false);
+  const requestRevision = useRef(0);
 
-  const loadActivities = async () => {
+  const loadActivities = useCallback(async () => {
+    const revision = ++requestRevision.current;
     setLoading(true);
+    setError('');
     try {
       const data = await fetchSystemActivities(30);
+      if (revision !== requestRevision.current) return;
       setActivities(data);
+      setHasLoaded(true);
     } catch (err) {
-      console.error('Failed to load activity feed:', err);
+      if (revision === requestRevision.current) setError(err instanceof Error ? err.message : 'โหลดประวัติกิจกรรมไม่สำเร็จ');
     } finally {
-      setLoading(false);
+      if (revision === requestRevision.current) setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
-    loadActivities();
-  }, []);
+    void loadActivities();
+    return () => { requestRevision.current += 1; };
+  }, [loadActivities]);
 
   const handleManualRefresh = async () => {
     setIsRefreshing(true);
     await loadActivities();
-    setTimeout(() => setIsRefreshing(false), 500);
+    setIsRefreshing(false);
   };
 
   const getRelativeTime = (isoString: string) => {
@@ -123,19 +131,15 @@ export default function SystemActivityFeed() {
     <div className="bg-white rounded-3xl border border-surface-border shadow-card p-6 sm:p-7 space-y-6">
       {/* Feed Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-5 border-b border-gray-100">
-        <div className="flex items-center space-x-3">
+        <div className="flex min-w-0 items-start gap-3">
           <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-navy-950 to-blue-900 text-gold-400 flex items-center justify-center font-bold shadow-md border border-gold-500/30 flex-shrink-0">
-            <Activity className="w-5 h-5 text-gold-400 animate-pulse" />
+            <Activity className="w-5 h-5 text-gold-400" />
           </div>
-          <div>
+          <div className="min-w-0">
             <div className="flex items-center gap-2">
               <h2 className="text-lg sm:text-xl font-extrabold text-navy-950">
-                System Activity Feed
+                ประวัติกิจกรรมของทีม
               </h2>
-              <span className="relative flex h-2.5 w-2.5">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
-              </span>
             </div>
             <p className="text-xs text-gray-500 mt-0.5">
               ไทม์ไลน์บันทึกกิจกรรมสำคัญของระบบ (เพิ่มทรัพย์ใหม่, เปลี่ยนสถานะผู้ติดต่อ, อัปเดตสิทธิ์ผู้ใช้)
@@ -154,6 +158,8 @@ export default function SystemActivityFeed() {
         </button>
       </div>
 
+      {error && <div role="alert" className="space-y-3 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-800"><p className="font-semibold">โหลดประวัติกิจกรรมไม่สำเร็จ</p><p className="break-words text-xs leading-relaxed">{error}</p>{hasLoaded && <p className="text-xs">กำลังแสดงรายการที่โหลดไว้ก่อนหน้า</p>}<button type="button" disabled={loading} onClick={() => void loadActivities()} className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-red-200 bg-white px-3 text-xs font-semibold disabled:opacity-50"><RefreshCw className="h-3.5 w-3.5" />ลองโหลดใหม่</button></div>}
+
       {/* Filter and Search Bar */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 bg-slate-50/80 p-3 rounded-2xl border border-slate-200/80">
         {/* Category Pills */}
@@ -169,7 +175,7 @@ export default function SystemActivityFeed() {
           >
             <span>ทั้งหมด</span>
             <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-white/20 font-extrabold">
-              {activities.length}
+              {hasLoaded ? activities.length : '—'}
             </span>
           </button>
 
@@ -214,9 +220,11 @@ export default function SystemActivityFeed() {
         </div>
 
         {/* Search Field */}
-        <div className="relative min-w-[200px]">
+        <div className="relative min-w-0 md:min-w-[200px]">
+          <label htmlFor="activity-feed-search" className="sr-only">ค้นหาประวัติกิจกรรม</label>
           <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
           <input
+            id="activity-feed-search"
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
@@ -232,11 +240,11 @@ export default function SystemActivityFeed() {
           <RefreshCw className="w-6 h-6 animate-spin mx-auto text-gold-600" />
           <p className="text-xs font-medium">กำลังโหลดไทม์ไลน์กิจกรรมระบบ...</p>
         </div>
-      ) : filtered.length === 0 ? (
+      ) : error && !hasLoaded ? null : filtered.length === 0 ? (
         <div className="py-12 text-center text-gray-500 border border-dashed border-gray-200 rounded-2xl bg-gray-50/50 space-y-2">
           <Activity className="w-8 h-8 text-gray-300 mx-auto" />
-          <p className="text-xs font-bold text-gray-700">ไม่พบรายการกิจกรรมตามเงื่อนไขที่เลือก</p>
-          <p className="text-[11px] text-gray-400">ลองเปลี่ยนตัวกรองหมวดหมู่หรือคำค้นหา</p>
+          <p className="text-xs font-bold text-gray-700">{activities.length ? 'ไม่พบรายการกิจกรรมตามเงื่อนไขที่เลือก' : 'ยังไม่มีประวัติกิจกรรม'}</p>
+          <p className="text-[11px] text-gray-400">{activities.length ? 'ลองเปลี่ยนตัวกรองหมวดหมู่หรือคำค้นหา' : 'กิจกรรมที่ทีมบันทึกในระบบจะแสดงที่นี่'}</p>
         </div>
       ) : (
         <div className="relative pl-4 sm:pl-6 space-y-6 before:absolute before:left-2.5 sm:before:left-3.5 before:top-3 before:bottom-3 before:w-0.5 before:bg-gray-200">

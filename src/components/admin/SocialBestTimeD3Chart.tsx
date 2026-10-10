@@ -4,7 +4,7 @@ import React, { useEffect, useRef, useState, useMemo } from 'react';
 import * as d3 from 'd3';
 import { 
   TimeSlotEngagement, 
-  generateHistoricalEngagementMatrix,
+  generatePlanningEngagementMatrix,
   getHourlyEngagementAverages,
   getDailyEngagementAverages,
   calculateBestTimeSlot,
@@ -53,7 +53,7 @@ export default function SocialBestTimeD3Chart({
 
   // Generate matrix data based on current channel & property type
   const matrixData = useMemo(() => {
-    return generateHistoricalEngagementMatrix(channel, property?.property_type);
+    return generatePlanningEngagementMatrix(channel, property?.property_type);
   }, [channel, property?.property_type]);
 
   const bestSlotRec: BestTimeRecommendation = useMemo(() => {
@@ -511,15 +511,15 @@ export default function SocialBestTimeD3Chart({
             <span className="p-1.5 rounded-lg bg-gold-500/20 text-gold-400 border border-gold-500/30">
               <Clock className="w-4 h-4" />
             </span>
-            <h3 className="text-base sm:text-lg font-black text-white flex items-center gap-2">
-              <span>ระบบ AI คำนวณช่วงเวลาทองในการโพสต์</span>
+            <h3 className="text-base sm:text-lg font-black text-white flex flex-wrap items-center gap-2">
+              <span>วางแผนเวลาโพสต์</span>
               <span className="text-[11px] font-bold px-2 py-0.5 rounded-md bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
-                D3 Heatmap & Analytics
+                ดัชนีวางแผน
               </span>
             </h3>
           </div>
           <p className="text-xs text-slate-400">
-            วิเคราะห์พฤติกรรมการทักแชท (Inquiries) และความสนใจทรัพย์ย้อนหลังจากผู้ซื้อในหาดใหญ่–สงขลา กว่า 2,400+ รายการ
+            คำนวณจากสมมติฐานตามเวลาและประเภททรัพย์ ใช้เลือกช่วงทดลองโพสต์และเทียบผลจริง
           </p>
         </div>
 
@@ -575,7 +575,7 @@ export default function SocialBestTimeD3Chart({
                 ช่วงเวลาที่แนะนำสูงสุดสำหรับทรัพย์นี้
               </span>
               <span className="text-[10px] px-2 py-0.2 rounded-full bg-gold-400/20 text-gold-300 font-bold border border-gold-400/30">
-                {bestSlotRec.conversionProbability}
+                {bestSlotRec.planningPriority}
               </span>
             </div>
             <h4 className="text-lg sm:text-xl font-black text-white mt-0.5">
@@ -614,14 +614,14 @@ export default function SocialBestTimeD3Chart({
           <div className="flex items-center space-x-2 text-slate-400">
             <Info className="w-3.5 h-3.5 text-gold-400" />
             <span>แสดงตามเกณฑ์:</span>
-            <div className="inline-flex rounded-xl bg-navy-900 border border-navy-800 p-0.5">
+            <div className="inline-flex flex-wrap rounded-xl bg-navy-900 border border-navy-800 p-0.5">
               <button
                 onClick={() => setMetric('score')}
                 className={`px-2.5 py-1 rounded-lg font-bold text-[11px] ${
                   metric === 'score' ? 'bg-gold-500/20 text-gold-300 border border-gold-500/30' : 'text-slate-400 hover:text-slate-200'
                 }`}
               >
-                ดัชนีคะแนนรวม (Score %)
+                คะแนนวางแผน
               </button>
               <button
                 onClick={() => setMetric('inquiries')}
@@ -629,7 +629,7 @@ export default function SocialBestTimeD3Chart({
                   metric === 'inquiries' ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' : 'text-slate-400 hover:text-slate-200'
                 }`}
               >
-                ยอดทักแชท (Inquiries)
+                ดัชนีการติดต่อ
               </button>
               <button
                 onClick={() => setMetric('clicks')}
@@ -637,7 +637,7 @@ export default function SocialBestTimeD3Chart({
                   metric === 'clicks' ? 'bg-blue-500/20 text-blue-300 border border-blue-500/30' : 'text-slate-400 hover:text-slate-200'
                 }`}
               >
-                ยอดคลิก (CTR %)
+                ดัชนีการคลิก
               </button>
             </div>
           </div>
@@ -674,12 +674,12 @@ export default function SocialBestTimeD3Chart({
 
               <div className="grid grid-cols-2 gap-2 my-2 text-[11px]">
                 <div className="bg-slate-900 p-1.5 rounded-lg">
-                  <span className="text-slate-400 block text-[10px]">คาดการณ์ทักแชท:</span>
-                  <span className="font-bold text-emerald-400">+{hoveredSlot.inquiriesRate} รายการ</span>
+                  <span className="text-slate-400 block text-[10px]">ดัชนีการติดต่อ:</span>
+                  <span className="font-bold text-emerald-400">{hoveredSlot.inquiriesRate} จุด</span>
                 </div>
                 <div className="bg-slate-900 p-1.5 rounded-lg">
-                  <span className="text-slate-400 block text-[10px]">อัตราคลิก:</span>
-                  <span className="font-bold text-amber-400">+{hoveredSlot.clickRate}% CTR</span>
+                  <span className="text-slate-400 block text-[10px]">ดัชนีการคลิก:</span>
+                  <span className="font-bold text-amber-400">{hoveredSlot.clickRate} จุด</span>
                 </div>
               </div>
 

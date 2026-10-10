@@ -1,6 +1,6 @@
 ﻿'use client';
 
-import React, { useState, useEffect, Suspense } from 'react';
+import React, { useState, useEffect, useRef, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
@@ -55,16 +55,9 @@ import {
   fetchUsers 
 } from '@/lib/store/properties-store';
 import { getAgents } from '@/lib/store/agents-store';
-import { getLineOaChatUrl } from '@/lib/line-inquiry';
 import { propertyHref } from '@/components/properties/property-link';
 import { PropertyType, PropertyStatus, UserProfile, Agent, AgentRank, FacingDirection } from '@/lib/types';
 
-function buildAnnouncementMessage(data: { id?: string; title?: string; price?: number; slug?: string }): string {
-  const origin = typeof window !== 'undefined' ? window.location.origin : '';
-  const shortCode = data.id ? formatPropertyCode(data.id) : '';
-  const link = shortCode && shortCode !== '-' ? `/properties/${encodeURIComponent(shortCode)}` : `/properties/${encodeURIComponent(data.slug || '')}`;
-  return `📢 ลงประกาศอสังหาริมทรัพย์ใหม่บนเว็บไซต์ Chantakorn Property!\n🏡 ${data.title}\n💰 ราคา: ฿${data.price?.toLocaleString() || 0} บาท\n🔗 ดูรายละเอียด:\n👉 ${origin}${link}`;
-}
 import { 
   slugify, 
   formatPrice, 
@@ -97,25 +90,6 @@ import { parseRawPropertyText, generateProfessionalDescription } from '@/lib/pro
 import SmartDescriptionGeneratorModal, { PropertySpecsForAI } from '@/components/admin/SmartDescriptionGeneratorModal';
 import VoiceDictationBar from '@/components/ui/VoiceDictationBar';
 import PropertyFormProgress, { FormValidationItem } from '@/components/admin/PropertyFormProgress';
-
-// ตัวอย่างรูปภาพคุณภาพสูง สำหรับปุ่ม "ใส่รูปภาพตัวอย่างทันที 1 คลิก"
-const SAMPLE_HOUSE_PHOTOS = [
-  'https://images.unsplash.com/photo-1580587771525-78b9dba3b914?auto=format&fit=crop&w=1200&q=80',
-  'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=1200&q=80',
-  'https://images.unsplash.com/photo-1600566753190-17f0baa2a6c3?auto=format&fit=crop&w=1200&q=80',
-  'https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?auto=format&fit=crop&w=1200&q=80',
-];
-
-const SAMPLE_CONDO_PHOTOS = [
-  'https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?auto=format&fit=crop&w=1200&q=80',
-  'https://images.unsplash.com/photo-1512917774080-9991f1c4c750?auto=format&fit=crop&w=1200&q=80',
-  'https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?auto=format&fit=crop&w=1200&q=80',
-];
-
-const SAMPLE_LAND_PHOTOS = [
-  'https://images.unsplash.com/photo-1500382017468-9049fed747ef?auto=format&fit=crop&w=1200&q=80',
-  'https://images.unsplash.com/photo-1472214103451-9374bd1c798e?auto=format&fit=crop&w=1200&q=80',
-];
 
 function PropertyEditor() {
   const router = useRouter();
@@ -163,6 +137,7 @@ function PropertyEditor() {
     compressedSize?: string;
     percentSaved?: number;
   } | null>(null);
+
   const [uploadStatsList, setUploadStatsList] = useState<Array<{
     url: string;
     origSize: string;
@@ -176,7 +151,29 @@ function PropertyEditor() {
     title: string;
     slug: string;
     price: number;
+    published: boolean;
   } | null>(null);
+
+  const savedDialogRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!createdSuccessData) return;
+    const previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    savedDialogRef.current?.querySelector<HTMLAnchorElement>('a[href]')?.focus();
+    const handleKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') { event.preventDefault(); router.push('/admin/properties'); }
+      if (event.key !== 'Tab') return;
+      const links = savedDialogRef.current?.querySelectorAll<HTMLAnchorElement>('a[href]');
+      if (!links?.length) return;
+      const first = links[0];
+      const last = links[links.length - 1];
+      if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
+      else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
+    };
+    document.addEventListener('keydown', handleKey);
+    return () => { document.body.style.overflow = previousOverflow; document.removeEventListener('keydown', handleKey); if (previousFocus?.isConnected) previousFocus.focus(); };
+  }, [createdSuccessData, router]);
 
   // Auto-calculated nearby landmarks based on pinned coordinates
   const autoLandmarks = isValidLatLng(Number(latitude), Number(longitude))
@@ -329,20 +326,6 @@ function PropertyEditor() {
       filledCount++;
     }
 
-    // Auto-fill sample photos if no images uploaded yet
-    if (images.length === 0) {
-      if (parsed.propertyType === 'condo') {
-        setImages(SAMPLE_CONDO_PHOTOS);
-        setCoverImage(SAMPLE_CONDO_PHOTOS[0]);
-      } else if (parsed.propertyType === 'land') {
-        setImages(SAMPLE_LAND_PHOTOS);
-        setCoverImage(SAMPLE_LAND_PHOTOS[0]);
-      } else {
-        setImages(SAMPLE_HOUSE_PHOTOS);
-        setCoverImage(SAMPLE_HOUSE_PHOTOS[0]);
-      }
-    }
-
     // Polished Description Generation
     const polished = generateProfessionalDescription({
       title: parsed.title || title,
@@ -365,7 +348,7 @@ function PropertyEditor() {
 
     setSmartMessage({
       type: 'success',
-      text: `✨ ถอดรหัสสำเร็จ! ระบบสกัดข้อมูลสำคัญ ${filledCount} รายการ และแต่งบทความประกาศพร้อมรูปตัวอย่างให้เรียบร้อยแล้ว`
+      text: `✨ ถอดรหัสสำเร็จ! ระบบสกัดข้อมูลสำคัญ ${filledCount} รายการ กรุณาตรวจข้อมูลและอัปโหลดรูปทรัพย์จริงก่อนบันทึก`
     });
   };
 
@@ -696,110 +679,9 @@ function PropertyEditor() {
     setSlugEdited(true);
   };
 
-  // 1-Click Quick Preset Handler
+  // Type templates never invent prices, locations, photos or property details.
   const applyPreset = (type: 'house' | 'condo' | 'land' | 'townhome' | 'commercial') => {
-    if (type === 'house') {
-      setTitle('บ้านเดี่ยว 2 ชั้น ดีไซน์โมเดิร์น พร้อมอยู่ ทำเลควนลัง ใกล้สนามบินหาดใหญ่');
-      setPropertyType('house');
-      setStatus('sale');
-      setPrice('3890000');
-      setDistrict('หาดใหญ่');
-      setSubdistrict('ควนลัง');
-      setAddress('ซอยร่วมใจพัฒนา ถนนสนามบิน-ลพบุรีราเมศวร์ ต.ควนลัง อ.หาดใหญ่ จ.สงขลา');
-      setBedrooms('3');
-      setBathrooms('2');
-      setParking('2');
-      setLandSize('52');
-      setUsableArea('165');
-      setFurniture('พร้อมเฟอร์นิเจอร์บางส่วน');
-      setDescription('บ้านเดี่ยวสร้างใหม่สไตล์นอร์ดิก-โมเดิร์น บรรยากาศเงียบสงบ ร่มรื่น เดินทางเข้าเมืองหาดใหญ่สะดวกมาก ใกล้สนามบินนานาชาติหาดใหญ่และไทวัสดุ หลังบ้านไม่ชนใคร วัสดุก่อสร้างเกรดพรีเมียม');
-      setImages(SAMPLE_HOUSE_PHOTOS);
-      setCoverImage(SAMPLE_HOUSE_PHOTOS[0]);
-      setSelectedFeatures(['เครื่องปรับอากาศ', 'ที่จอดรถส่วนตัว', 'กล้องวงจรปิด CCTV', 'ใกล้สนามบินหาดใหญ่']);
-      handleDistrictChange('หาดใหญ่');
-      setSubdistrict('ควนลัง');
-    } else if (type === 'condo') {
-      setTitle('คอนโดแต่งครบ วิวสระว่ายน้ำ ย่าน ม.อ. หาดใหญ่ พร้อมปล่อยเช่าทันที');
-      setPropertyType('condo');
-      setStatus('rent');
-      setPrice('12000');
-      setDistrict('หาดใหญ่');
-      setSubdistrict('คอหงส์');
-      setAddress('ถนนปุณณกัณฑ์ ต.คอหงส์ อ.หาดใหญ่ จ.สงขลา');
-      setBedrooms('1');
-      setBathrooms('1');
-      setParking('1');
-      setLandSize('0');
-      setUsableArea('34');
-      setFurniture('ตกแต่งครบพร้อมอยู่ (Fully Furnished)');
-      setDescription('คอนโดมิเนียมทำเลทองใกล้มหาวิทยาลัยสงขลานครินทร์ (ม.อ.) และ รพ.สงขลานครินทร์ ห้องทิศเหนือไม่ร้อน เฟอร์นิเจอร์และเครื่องใช้ไฟฟ้าครบชุด เหมาะสำหรับนักศึกษา แพทย์ หรือผู้ที่ทำงานในหาดใหญ่');
-      setImages(SAMPLE_CONDO_PHOTOS);
-      setCoverImage(SAMPLE_CONDO_PHOTOS[0]);
-      setSelectedFeatures(['เครื่องปรับอากาศ', 'สระว่ายน้ำ', 'ระบบรักษาความปลอดภัย 24 ชม.', 'ใกล้มหาวิทยาลัยสงขลานครินทร์ (ม.อ.)']);
-      handleDistrictChange('หาดใหญ่');
-      setSubdistrict('คอหงส์');
-    } else if (type === 'land') {
-      setTitle('ที่ดินแปลงสวย เหมาะสร้างบ้านพักตากอากาศ ทำเลเมืองสงขลา ใกล้ทะเล');
-      setPropertyType('land');
-      setStatus('sale');
-      setPrice('4500000');
-      setDistrict('เมืองสงขลา');
-      setSubdistrict('บ่อยาง');
-      setAddress('ถนนชลาทัศน์ ต.บ่อยาง อ.เมืองสงขลา จ.สงขลา');
-      setBedrooms('0');
-      setBathrooms('0');
-      setParking('0');
-      setLandSize('120');
-      setUsableArea('0');
-      setFurniture('ที่ดินเปล่า');
-      setDescription('ที่ดินเปล่าถมแล้ว หน้ากว้างติดถนนสาธารณะ น้ำ-ไฟฟ้าเข้าถึงพร้อม บรรยากาศร่มรื่น รับลมทะเล ใกล้หาดชลาทัศน์และแหลมสมิหลา เหมาะสร้างบ้านพักอาศัย พูลวิลล่า หรือซื้อเก็บเพื่อการลงทุน');
-      setImages(SAMPLE_LAND_PHOTOS);
-      setCoverImage(SAMPLE_LAND_PHOTOS[0]);
-      setSelectedFeatures(['ติดถนนใหญ่']);
-      handleDistrictChange('เมืองสงขลา');
-      setSubdistrict('บ่อยาง');
-    } else if (type === 'townhome') {
-      setTitle('ทาวน์โฮม 2 ชั้น ทำเลใจกลางหาดใหญ่ เดินทางสะดวก ใกล้เซ็นทรัล');
-      setPropertyType('house');
-      setStatus('sale');
-      setPrice('2790000');
-      setDistrict('หาดใหญ่');
-      setSubdistrict('หาดใหญ่');
-      setAddress('ถนนคลองเรียน 1 ต.หาดใหญ่ อ.หาดใหญ่ จ.สงขลา');
-      setBedrooms('2');
-      setBathrooms('2');
-      setParking('1');
-      setLandSize('24');
-      setUsableArea('115');
-      setFurniture('พร้อมเข้าอยู่');
-      setDescription('ทาวน์โฮมรีโนเวทใหม่ทั้งหลัง สวยงามสไตล์มินิมอล ทำเลดีมาก อยู่ในย่านชุมชน ปลอดภัย ใกล้โรงเรียน โรงพยาบาล และห้างสรรพสินค้าเซ็นทรัลหาดใหญ่');
-      setImages(SAMPLE_HOUSE_PHOTOS);
-      setCoverImage(SAMPLE_HOUSE_PHOTOS[1]);
-      setSelectedFeatures(['เครื่องปรับอากาศ', 'ที่จอดรถส่วนตัว', 'ใกล้เซ็นทรัลหาดใหญ่']);
-      handleDistrictChange('หาดใหญ่');
-      setSubdistrict('หาดใหญ่');
-    } else if (type === 'commercial') {
-      setTitle('อาคารพาณิชย์ 3 ชั้นครึ่ง ย่านธุรกิจการค้าหาดใหญ่ เหมาะเปิดร้านและออฟฟิศ');
-      setPropertyType('commercial');
-      setStatus('sale');
-      setPrice('6900000');
-      setDistrict('หาดใหญ่');
-      setSubdistrict('หาดใหญ่');
-      setAddress('ถนนราษฎร์ยินดี (30 เมตร) ต.หาดใหญ่ อ.หาดใหญ่ จ.สงขลา');
-      setBedrooms('4');
-      setBathrooms('3');
-      setParking('2');
-      setLandSize('28');
-      setUsableArea('240');
-      setFurniture('โครงสร้างแข็งแรง พร้อมรีโนเวท');
-      setDescription('ทำเลทองติดถนนสายหลัก ย่านธุรกิจคึกคัก มีที่จอดรถด้านหน้า เหมาะสำหรับทำคลินิก สถาบันกวดวิชา ร้านอาหาร โฮสเทล หรือสำนักงานบริษัท');
-      setImages(SAMPLE_HOUSE_PHOTOS);
-      setCoverImage(SAMPLE_HOUSE_PHOTOS[2]);
-      setSelectedFeatures(['ติดถนนใหญ่', 'ที่จอดรถส่วนตัว', 'กล้องวงจรปิด CCTV']);
-      handleDistrictChange('หาดใหญ่');
-      setSubdistrict('หาดใหญ่');
-    }
-    setSlugEdited(false);
+    setPropertyType(type === 'townhome' ? 'house' : type);
   };
 
   const featureOptions = [
@@ -985,7 +867,7 @@ function PropertyEditor() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (submitting || loading) return;
+    if (submitting || loading || createdSuccessData) return;
 
     // Check required validation items
     if (!title.trim() || title.trim().length < 5) {
@@ -1096,6 +978,7 @@ function PropertyEditor() {
           title: created.title,
           slug: created.slug,
           price: created.price,
+          published: created.published,
         });
       }
     } catch (err) {
@@ -1393,7 +1276,7 @@ function PropertyEditor() {
             ) : (
               <>
                 <Sparkles className="w-4 h-4" />
-                <span>{editId ? 'บันทึกการแก้ไข' : 'บันทึกและเผยแพร่ทันที'}</span>
+                <span>{editId ? 'บันทึกการแก้ไข' : published ? 'บันทึกและเผยแพร่' : 'บันทึกฉบับร่าง'}</span>
               </>
             )}
           </button>
@@ -1493,17 +1376,7 @@ function PropertyEditor() {
                     <span>📋 วางจากคลิปบอร์ด & ถอดรหัส</span>
                   </button>
 
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const sample = 'ขายบ้านเดี่ยว 2 ชั้น ดีไซน์โมเดิร์น ทำเลควนลัง หาดใหญ่ 3 ห้องนอน 2 ห้องน้ำ ที่จอดรถ 2 คัน ที่ดิน 54 ตรว. พื้นที่ใช้สอย 165 ตรม. ราคา 3.89 ล้านบาท ใกล้สนามบินหาดใหญ่ แอร์ 3 ตัว ทิศใต้ พร้อมเฟอร์นิเจอร์บางส่วน';
-                      setSmartText(sample);
-                      handleApplySmartText(sample);
-                    }}
-                    className="px-3 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-semibold rounded-xl transition-all cursor-pointer"
-                  >
-                    ลองใส่ตัวอย่างทดสอบ
-                  </button>
+
                 </div>
 
                 {smartText && (
@@ -1527,9 +1400,9 @@ function PropertyEditor() {
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-2">
               <Zap className="w-4 h-4 text-gold-400" />
-              <span className="text-xs sm:text-sm font-bold text-white">แม่แบบโพสต์ด่วน 1 คลิก (ช่วยกรอกข้อมูลอัตโนมัติ):</span>
+              <span className="text-xs sm:text-sm font-bold text-white">เริ่มจากประเภททรัพย์:</span>
             </div>
-            <span className="text-[11px] text-gold-300/80 hidden sm:inline">คลิกเพื่อเติมข้อมูลและรูปภาพตัวอย่างทันที</span>
+            <span className="text-[11px] text-gold-300/80 hidden sm:inline">เลือกประเภท แล้วกรอกข้อมูลทรัพย์จริง</span>
           </div>
 
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
@@ -1538,7 +1411,7 @@ function PropertyEditor() {
               onClick={() => applyPreset('house')}
               className="px-3 py-2 bg-navy-800/80 hover:bg-gold-500 hover:text-navy-950 rounded-xl text-xs font-semibold text-gray-200 transition-all border border-navy-700/60 flex items-center space-x-1.5 justify-center text-center"
             >
-              <span>🏡 บ้านเดี่ยวหาดใหญ่</span>
+              <span>บ้านเดี่ยว</span>
             </button>
 
             <button
@@ -1546,7 +1419,7 @@ function PropertyEditor() {
               onClick={() => applyPreset('condo')}
               className="px-3 py-2 bg-navy-800/80 hover:bg-gold-500 hover:text-navy-950 rounded-xl text-xs font-semibold text-gray-200 transition-all border border-navy-700/60 flex items-center space-x-1.5 justify-center text-center"
             >
-              <span>🏢 คอนโดย่าน ม.อ.</span>
+              <span>คอนโด</span>
             </button>
 
             <button
@@ -1554,7 +1427,7 @@ function PropertyEditor() {
               onClick={() => applyPreset('land')}
               className="px-3 py-2 bg-navy-800/80 hover:bg-gold-500 hover:text-navy-950 rounded-xl text-xs font-semibold text-gray-200 transition-all border border-navy-700/60 flex items-center space-x-1.5 justify-center text-center"
             >
-              <span>🌳 ที่ดินเมืองสงขลา</span>
+              <span>ที่ดิน</span>
             </button>
 
             <button
@@ -1562,7 +1435,7 @@ function PropertyEditor() {
               onClick={() => applyPreset('townhome')}
               className="px-3 py-2 bg-navy-800/80 hover:bg-gold-500 hover:text-navy-950 rounded-xl text-xs font-semibold text-gray-200 transition-all border border-navy-700/60 flex items-center space-x-1.5 justify-center text-center"
             >
-              <span>🏬 ทาวน์โฮมทำเลดี</span>
+              <span>ทาวน์โฮม</span>
             </button>
 
             <button
@@ -1570,7 +1443,7 @@ function PropertyEditor() {
               onClick={() => applyPreset('commercial')}
               className="px-3 py-2 bg-navy-800/80 hover:bg-gold-500 hover:text-navy-950 rounded-xl text-xs font-semibold text-gray-200 transition-all border border-navy-700/60 flex items-center space-x-1.5 justify-center text-center col-span-2 sm:col-span-1"
             >
-              <span>🏢 อาคารพาณิชย์</span>
+              <span>อาคารพาณิชย์</span>
             </button>
           </div>
         </div>
@@ -2490,16 +2363,7 @@ function PropertyEditor() {
               </p>
             </div>
             <div className="flex items-center space-x-2">
-              <button
-                type="button"
-                onClick={() => {
-                  setImages(SAMPLE_HOUSE_PHOTOS);
-                  setCoverImage(SAMPLE_HOUSE_PHOTOS[0]);
-                }}
-                className="text-[11px] font-semibold text-gold-700 bg-gold-50 hover:bg-gold-100 px-3 py-1.5 rounded-xl border border-gold-200 transition-colors"
-              >
-                + ใส่รูปตัวอย่าง
-              </button>
+
               {images.length > 0 && (
                 <button
                   type="button"
@@ -2754,14 +2618,7 @@ function PropertyEditor() {
               </p>
             </div>
             <div className="flex items-center space-x-2">
-              <button
-                type="button"
-                onClick={() => setVideoUrl('https://www.youtube.com/watch?v=ScMzIvxBSi4')}
-                className="text-[11px] font-semibold text-red-700 bg-red-50 hover:bg-red-100 px-3 py-1.5 rounded-xl border border-red-200 transition-colors flex items-center space-x-1"
-              >
-                <Play className="w-3 h-3 fill-red-700" />
-                <span>+ ทดลองใส่วิดีโอตัวอย่าง (YouTube)</span>
-              </button>
+
               {videoUrl && (
                 <button
                   type="button"
@@ -3187,7 +3044,7 @@ function PropertyEditor() {
         </div>
 
         {/* Sticky Bottom Actions Bar */}
-        <div className="sticky bottom-4 z-40 bg-navy-950/95 backdrop-blur-md rounded-2xl p-4 border border-navy-800 shadow-2xl flex items-center justify-between gap-3">
+        <div className="sticky bottom-[calc(1rem+env(safe-area-inset-bottom,0px))] z-40 bg-navy-950/95 backdrop-blur-md rounded-2xl p-4 border border-navy-800 shadow-2xl flex flex-wrap items-center justify-between gap-3">
           <Link
             href="/admin/properties"
             className="px-5 py-2.5 rounded-xl border border-navy-700 text-gray-300 hover:text-white text-xs font-bold hover:bg-navy-900 transition-colors"
@@ -3199,7 +3056,7 @@ function PropertyEditor() {
             <button
               type="submit"
               disabled={submitting}
-              className="px-7 py-3 bg-gradient-to-r from-gold-500 to-gold-400 hover:from-gold-400 hover:to-gold-300 text-navy-950 rounded-xl text-xs font-extrabold shadow-lg transition-all active:scale-95 flex items-center space-x-2 disabled:opacity-50"
+              className="px-4 sm:px-7 py-3 bg-gradient-to-r from-gold-500 to-gold-400 hover:from-gold-400 hover:to-gold-300 text-navy-950 rounded-xl text-xs font-extrabold shadow-lg transition-all active:scale-95 flex items-center space-x-2 disabled:opacity-50"
             >
               {submitting ? (
                 <>
@@ -3209,7 +3066,7 @@ function PropertyEditor() {
               ) : (
                 <>
                   <Sparkles className="w-4 h-4 fill-navy-950" />
-                  <span>{editId ? 'บันทึกการแก้ไขทรัพย์' : 'บันทึกและเผยแพร่งานทันที'}</span>
+                  <span>{editId ? 'บันทึกการแก้ไข' : published ? 'บันทึกและเผยแพร่' : 'บันทึกฉบับร่าง'}</span>
                 </>
               )}
             </button>
@@ -3238,75 +3095,15 @@ function PropertyEditor() {
             }}
           />
         )}
-        {/* LINE OA Confirmation Modal */}
+        {/* Property persistence and LINE delivery are separate outcomes. */}
         {createdSuccessData && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-            <div className="bg-white rounded-3xl max-w-md w-full p-6 text-center space-y-4 shadow-2xl border-2 border-emerald-400 relative overflow-hidden">
-              <div className="w-16 h-16 rounded-full bg-emerald-100 text-[#06C755] flex items-center justify-center mx-auto text-3xl shadow-inner">
-                💬
-              </div>
-              <div className="space-y-1">
-                <h3 className="text-xl font-black text-navy-950">
-                  ลงประกาศและแจ้งเตือนเข้า LINE OA แล้ว!
-                </h3>
-                <p className="text-xs text-emerald-700 font-bold">
-                  ✓ ส่งข้อความ Flex Message เด้งเข้า LINE Official Account สำเร็จ
-                </p>
-              </div>
-
-              <div className="p-3.5 bg-gray-50 rounded-2xl border border-gray-200 text-left text-xs space-y-1">
-                <div className="font-bold text-navy-950 truncate">{createdSuccessData.title}</div>
-                <div className="text-emerald-700 font-bold">฿{createdSuccessData.price?.toLocaleString()} บาท</div>
-                <div className="text-gray-500 text-[11px]">
-                  LINE OA: <span className="text-[#06C755] font-semibold">https://lin.ee/NMSe28T3</span>
-                </div>
-              </div>
-
-              <div className="space-y-2 pt-2">
-                <a
-                  href={createdSuccessData ? getLineOaChatUrl(buildAnnouncementMessage(createdSuccessData)).url : 'https://lin.ee/NMSe28T3'}
-                  target="_blank"
-                  rel="noreferrer"
-                  onClick={() => {
-                    if (typeof navigator !== 'undefined' && navigator.clipboard && createdSuccessData) {
-                      navigator.clipboard.writeText(buildAnnouncementMessage(createdSuccessData)).catch(() => {});
-                    }
-                  }}
-                  className="w-full py-3.5 bg-gradient-to-r from-emerald-600 via-[#06C755] to-emerald-500 hover:from-emerald-500 hover:to-[#05b34c] text-white font-black text-xs sm:text-sm rounded-xl flex items-center justify-center gap-2 shadow-lg transition-all cursor-pointer active:scale-95 group"
-                >
-                  <MessageCircle className="w-4 h-4 fill-current group-hover:scale-110 transition-transform" />
-                  <span>🚀 กดส่งประกาศนี้เข้าห้องแชท LINE OA ทันที</span>
-                  <ExternalLink className="w-3.5 h-3.5 opacity-90" />
-                </a>
-
-                <a
-                  href="https://lin.ee/NMSe28T3"
-                  target="_blank"
-                  rel="noreferrer"
-                  className="w-full py-2 bg-gray-50 hover:bg-emerald-50 text-emerald-800 border border-emerald-200 font-bold text-xs rounded-xl flex items-center justify-center gap-1.5 transition-all cursor-pointer"
-                >
-                  <MessageCircle className="w-3.5 h-3.5 fill-current text-[#06C755]" />
-                  <span>เปิดโปรไฟล์ LINE OA (@930xzcyi)</span>
-                </a>
-
-                <div className="grid grid-cols-2 gap-2 pt-1">
-                  <Link
-                    href={propertyHref(createdSuccessData)}
-                    target="_blank"
-                    className="py-2.5 px-3 bg-navy-950 hover:bg-navy-900 text-gold-400 font-bold text-xs rounded-xl flex items-center justify-center gap-1 shadow-sm transition-all"
-                  >
-                    <Eye className="w-3.5 h-3.5" />
-                    <span>ดูหน้าเว็บ</span>
-                  </Link>
-
-                  <Link
-                    href="/admin/properties"
-                    className="py-2.5 px-3 bg-gray-100 hover:bg-gray-200 text-navy-950 font-bold text-xs rounded-xl flex items-center justify-center gap-1 transition-all"
-                  >
-                    <span>ไปหน้ารายการ</span>
-                  </Link>
-                </div>
-              </div>
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-navy-950/60 p-4">
+            <div ref={savedDialogRef} role="dialog" aria-modal="true" aria-labelledby="property-created-title" className="max-h-[90dvh] w-full max-w-md space-y-5 overflow-y-auto rounded-3xl bg-white p-6 text-center shadow-xl">
+              <CheckCircle2 className="mx-auto h-12 w-12 text-emerald-600" />
+              <div><h2 id="property-created-title" className="text-xl font-bold text-navy-950">{createdSuccessData.published ? 'บันทึกและเผยแพร่ทรัพย์แล้ว' : 'บันทึกฉบับร่างแล้ว'}</h2><p className="mt-2 text-sm text-slate-500">{createdSuccessData.published ? 'ส่งประกาศให้ลูกค้าได้จากหน้าจัดการทรัพย์' : 'ทรัพย์นี้ยังไม่แสดงบนเว็บลูกค้า สามารถกลับมาแก้ไขและเผยแพร่ภายหลัง'}</p></div>
+              <div className="rounded-2xl bg-slate-50 p-4 text-left"><p className="text-sm font-medium text-navy-950">{createdSuccessData.title}</p><p className="mt-2 text-sm text-slate-500">{formatPrice(createdSuccessData.price)}</p></div>
+              <Link href="/admin/properties" className="admin-primary w-full">{createdSuccessData.published ? 'ไปจัดการทรัพย์และส่ง LINE' : 'ไปหน้ารายการทรัพย์'}</Link>
+              {createdSuccessData.published && <Link href={propertyHref(createdSuccessData)} target="_blank" rel="noopener noreferrer" className="admin-secondary w-full"><Eye className="h-4 w-4" />ดูประกาศบนเว็บไซต์</Link>}
             </div>
           </div>
         )}
