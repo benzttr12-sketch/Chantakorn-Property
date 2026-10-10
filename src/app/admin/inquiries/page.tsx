@@ -391,7 +391,7 @@ function InquiriesContent() {
                 <div className="min-w-0 space-y-4 border-t border-slate-100 pt-4 xl:border-l xl:border-t-0 xl:pl-5 xl:pt-0">
                   <div className="space-y-2">
                     <h3 className="text-xs font-semibold text-slate-500">ติดต่อลูกค้า</h3>
-                    <div className="flex gap-2">
+                    {inquiry.phone.trim() && inquiry.phone.trim() !== '-' ? <div className="flex gap-2">
                       <a
                         href={`tel:${inquiry.phone}`}
                         className="flex min-h-11 min-w-0 flex-1 items-center justify-center gap-2 rounded-xl bg-navy-950 px-3 text-sm font-semibold text-white hover:bg-navy-900"
@@ -411,7 +411,7 @@ function InquiriesContent() {
                           <Copy className="h-4 w-4" />
                         )}
                       </button>
-                    </div>
+                    </div> : <p className="text-xs text-slate-400">ยังไม่มีเบอร์โทร</p>}
                     {inquiry.line_id && (
                       <a
                         href={`https://line.me/R/ti/p/${encodeURIComponent(inquiry.line_id)}`}
