@@ -1,579 +1,200 @@
-﻿'use client';
+'use client';
 
+import { useCallback, useEffect, useState } from 'react';
+import Link from 'next/link';
+import { ArrowUpRight, Check, ChevronDown, Copy, Database, Loader2, MessageCircle, RefreshCw, Send, ShieldCheck } from 'lucide-react';
 import { fetchStaffApi } from '@/lib/staff-api';
 import { apiUrl } from '@/lib/api-url';
-
-import React, { useState, useEffect } from 'react';
-import { Database, ShieldCheck, Loader2, Check, ExternalLink, Send, MessageCircle, Info, Copy, Globe, RefreshCw, Sparkles, Terminal } from 'lucide-react';
 import { dataBackend } from '@/lib/backend';
+import { LinePreferences, saveLinePreferences } from '@/lib/line-admin-settings';
+
+interface LineConfig extends LinePreferences {
+  isChannelTokenConfigured: boolean;
+  isRecipientConfigured: boolean;
+}
+interface ConnectionResult {
+  ready: boolean;
+  message: string;
+  checks: Array<{ name: string; ok: boolean; message: string }>;
+}
+interface SimulationResult {
+  success: boolean;
+  simulation?: boolean;
+  simulatedReplies?: number;
+  unavailableSearches?: number;
+  errorCodes?: string[];
+  error?: string;
+}
+
+const oaUrl = 'https://lin.ee/NMSe28T3';
 
 export default function AdminSettingsPage() {
-  const [autoNotify, setAutoNotify] = useState(true);
-  const [autoNotifyConsignment, setAutoNotifyConsignment] = useState(true);
-
-  const [saving, setSaving] = useState(false);
-  const [loadingConfig, setLoadingConfig] = useState(true);
-  const [lineConfig, setLineConfig] = useState<{ isChannelTokenConfigured: boolean; isRecipientConfigured: boolean } | null>(null);
+  const [config, setConfig] = useState<LineConfig | null>(null);
+  const [preferences, setPreferences] = useState<LinePreferences>({ autoNotifyNewProperty: true, autoNotifyConsignment: true });
+  const [loading, setLoading] = useState(true);
   const [configError, setConfigError] = useState('');
-  const [testing, setTesting] = useState(false);
-  const [copiedWebhook, setCopiedWebhook] = useState(false);
-  const [testWebhookRunning, setTestWebhookRunning] = useState(false);
-  const [webhookSimKeyword, setWebhookSimKeyword] = useState('สวัสดี');
-  const [webhookTestResult, setWebhookTestResult] = useState<any>(null);
-  const [checkingConnection, setCheckingConnection] = useState(false);
-  const [connectionResult, setConnectionResult] = useState<{
-    ready: boolean;
-    message: string;
-    checks: Array<{ name: string; ok: boolean; code: string; message: string }>;
-  } | null>(null);
-
-  const [testResult, setTestResult] = useState<{
-    success: boolean;
-    isRealSent?: boolean;
-    message: string;
-    shareUrl?: string;
-    lineOaUrl?: string;
-    error?: string | null;
-  } | null>(null);
-  const [saveSuccess, setSaveSuccess] = useState(false);
-
-  // Dynamic Webhook URL based on current host
+  const [saving, setSaving] = useState(false);
+  const [saveMessage, setSaveMessage] = useState('');
+  const [saveError, setSaveError] = useState('');
   const [webhookUrl, setWebhookUrl] = useState('');
+  const [copied, setCopied] = useState(false);
+  const [copyError, setCopyError] = useState('');
+  const [checking, setChecking] = useState(false);
+  const [connection, setConnection] = useState<ConnectionResult | null>(null);
+  const [keyword, setKeyword] = useState('ดูทรัพย์');
+  const [simulating, setSimulating] = useState(false);
+  const [simulation, setSimulation] = useState<SimulationResult | null>(null);
+  const [testConfirmation, setTestConfirmation] = useState(false);
+  const [sending, setSending] = useState(false);
+  const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null);
 
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      setWebhookUrl(new URL(apiUrl('/api/line/webhook'), window.location.origin).toString());
-    }
-  }, []);
-
-  // Load config on mount
-  useEffect(() => {
-    let isMounted = true;
-    // Remove credentials saved by older versions; configuration now stays on the server.
+  const loadConfig = useCallback(async () => {
+    setLoading(true);
+    setConfigError('');
     try {
-      for (const key of ['line_channel_access_token', 'line_channel_secret', 'line_notify_token']) {
-        localStorage.removeItem(key);
-      }
-    } catch { /* Storage can be disabled; never read it as a configuration fallback. */ }
-    async function loadConfig() {
-      try {
-        const res = await fetchStaffApi('/api/line/notify');
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error || 'ตรวจการตั้งค่า LINE ไม่สำเร็จ');
-        if (res.ok) {
-          if (isMounted) {
-            setLineConfig({ isChannelTokenConfigured: Boolean(data.isChannelTokenConfigured), isRecipientConfigured: Boolean(data.isRecipientConfigured) });
-            if (data.autoNotifyNewProperty !== undefined) setAutoNotify(data.autoNotifyNewProperty);
-            if (data.autoNotifyConsignment !== undefined) setAutoNotifyConsignment(data.autoNotifyConsignment);
-          }
-        }
-      } catch (err) {
-        if (isMounted) setConfigError(err instanceof Error ? err.message : 'ตรวจการตั้งค่า LINE ไม่สำเร็จ');
-        console.warn('Could not fetch LINE settings from server:', err);
-      } finally {
-        if (isMounted) {
-          setLoadingConfig(false);
-        }
-      }
-    }
-    loadConfig();
-    return () => { isMounted = false; };
-  }, []);
-
-  const handleCopyWebhookUrl = () => {
-    if (!webhookUrl) return;
-    navigator.clipboard.writeText(webhookUrl);
-    setCopiedWebhook(true);
-    setTimeout(() => setCopiedWebhook(false), 3000);
-  };
-
-  const handleSaveLineSettings = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setSaving(true);
-    setSaveSuccess(false);
-
-    try {
-      const res = await fetchStaffApi('/api/line/notify', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: 'save_settings',
-          autoNotifyNewProperty: autoNotify,
-          autoNotifyConsignment: autoNotifyConsignment,
-        })
-      });
-
-      if (res.ok) {
-        setSaveSuccess(true);
-        setTimeout(() => setSaveSuccess(false), 4000);
-      }
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const handleSendTestMessage = async () => {
-    setTesting(true);
-    setTestResult(null);
-
-    try {
-      const res = await fetchStaffApi('/api/line/notify', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          isTest: true,
-          title: 'ทดสอบระบบแจ้งเตือน Chantakorn Property',
-          slug: 'test-property',
-          price: 3890000,
-          status: 'sale',
-          district: 'หาดใหญ่',
-          subdistrict: 'คอหงส์',
-          cover_image: 'https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?auto=format&fit=crop&w=1200&q=80',
-          agent: {
-            name: 'คุณเบนซ์ (แอดมิน Chantakorn)',
-            phone: '081-604-0097',
-            line_id: '@930xzcyi'
-          }
-        })
-      });
-
-      const data = await res.json();
-      if (res.ok && data.isRealSent) {
-        setTestResult({
-          success: true,
-          isRealSent: data.isRealSent,
-          message: data.message || 'LINE รับคำขอส่งข้อความถึงเจ้าของบัญชีแล้ว',
-          error: data.error
-        });
-      } else {
-        setTestResult({
-          success: false,
-          message: data.error || data.message || 'เกิดข้อผิดพลาดในการส่งข้อความทดสอบ',
-          error: data.error
-        });
-      }
-    } catch (err: any) {
-      setTestResult({
-        success: false,
-        message: err.message || 'ไม่สามารถติดต่อเซิร์ฟเวอร์ระบบแจ้งเตือนได้'
-      });
-    } finally {
-      setTesting(false);
-    }
-  };
-
-  const handleCheckConnection = async () => {
-    setCheckingConnection(true);
-    setConnectionResult(null);
-    try {
-      const res = await fetchStaffApi('/api/line/diagnostics', { cache: 'no-store' });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'ตรวจการเชื่อมต่อ LINE ไม่สำเร็จ');
-      setConnectionResult({ ready: data.ready === true, message: data.message, checks: data.checks || [] });
-    } catch (err) {
-      setConnectionResult({
-        ready: false,
-        message: err instanceof Error ? err.message : 'ตรวจการเชื่อมต่อ LINE ไม่สำเร็จ',
-        checks: [],
-      });
-    } finally {
-      setCheckingConnection(false);
-    }
-  };
-
-  // Webhook Simulator Test Handler
-  const handleTestWebhookSimulator = async () => {
-    setTestWebhookRunning(true);
-    setWebhookTestResult(null);
-
-    try {
-      const mockEvent = {
-        events: [
-          {
-            type: 'message',
-            replyToken: 'test_simulated_token_123',
-            source: {
-              type: 'user',
-              userId: 'U_test_admin_user'
-            },
-            timestamp: Date.now(),
-            message: {
-              type: 'text',
-              id: 'msg_sim_123456',
-              text: webhookSimKeyword
-            }
-          }
-        ]
+      const response = await fetchStaffApi('/api/line/notify', { cache: 'no-store' });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || 'โหลดการตั้งค่าไม่สำเร็จ');
+      const next: LineConfig = {
+        isChannelTokenConfigured: result.isChannelTokenConfigured === true,
+        isRecipientConfigured: result.isRecipientConfigured === true,
+        autoNotifyNewProperty: result.autoNotifyNewProperty !== false,
+        autoNotifyConsignment: result.autoNotifyConsignment !== false,
       };
-
-      const res = await fetchStaffApi('/api/line/webhook', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-line-simulation': 'true'
-        },
-        body: JSON.stringify(mockEvent)
-      });
-
-      const data = await res.json();
-      setWebhookTestResult({
-        success: res.ok && data.success === true,
-        status: res.status,
-        data,
-        simulatedKeyword: webhookSimKeyword,
-        timestamp: new Date().toLocaleTimeString('th-TH')
-      });
-    } catch (err: any) {
-      setWebhookTestResult({
-        success: false,
-        status: 'error',
-        error: err.message || String(err),
-        timestamp: new Date().toLocaleTimeString('th-TH')
-      });
+      setConfig(next);
+      setPreferences({ autoNotifyNewProperty: next.autoNotifyNewProperty, autoNotifyConsignment: next.autoNotifyConsignment });
+    } catch (error) {
+      setConfigError(error instanceof Error ? error.message : 'โหลดการตั้งค่าไม่สำเร็จ');
     } finally {
-      setTestWebhookRunning(false);
+      setLoading(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    setWebhookUrl(new URL(apiUrl('/api/line/webhook'), window.location.origin).toString());
+    try {
+      for (const key of ['line_channel_access_token', 'line_channel_secret', 'line_notify_token']) localStorage.removeItem(key);
+    } catch { /* Legacy credentials are never used as a fallback. */ }
+    void loadConfig();
+  }, [loadConfig]);
+
+  const dirty = Boolean(config && (preferences.autoNotifyNewProperty !== config.autoNotifyNewProperty || preferences.autoNotifyConsignment !== config.autoNotifyConsignment));
+
+  async function save(event: React.FormEvent) {
+    event.preventDefault();
+    if (saving || !config || !dirty) return;
+    setSaving(true);
+    setSaveMessage('');
+    setSaveError('');
+    const submitted = { ...preferences };
+    try {
+      await saveLinePreferences(fetchStaffApi, submitted);
+      setConfig(previous => previous ? { ...previous, ...submitted } : previous);
+      setSaveMessage('บันทึกการแจ้งเตือนแล้ว');
+    } catch (error) {
+      setSaveError(error instanceof Error ? error.message : 'บันทึกไม่สำเร็จ');
+    } finally { setSaving(false); }
+  }
+
+  async function copyWebhook() {
+    setCopyError('');
+    try {
+      await navigator.clipboard.writeText(webhookUrl);
+      setCopied(true);
+    } catch { setCopyError('คัดลอกไม่สำเร็จ กรุณาเลือกข้อความในช่อง URL แล้วคัดลอก'); }
+  }
+
+  async function checkConnection() {
+    setChecking(true);
+    setConnection(null);
+    try {
+      const response = await fetchStaffApi('/api/line/diagnostics', { cache: 'no-store' });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || 'ตรวจการเชื่อมต่อไม่สำเร็จ');
+      setConnection({ ready: result.ready === true, message: result.message, checks: result.checks || [] });
+    } catch (error) {
+      setConnection({ ready: false, message: error instanceof Error ? error.message : 'ตรวจการเชื่อมต่อไม่สำเร็จ', checks: [] });
+    } finally { setChecking(false); }
+  }
+
+  async function simulate() {
+    if (!keyword.trim() || simulating) return;
+    setSimulating(true);
+    setSimulation(null);
+    try {
+      const response = await fetchStaffApi('/api/line/webhook', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-line-simulation': 'true' },
+        body: JSON.stringify({ events: [{ type: 'message', replyToken: 'test_simulated_token_123', source: { type: 'user', userId: 'U_test_admin_user' }, timestamp: Date.now(), message: { type: 'text', id: 'msg_sim_123456', text: keyword.trim() } }] }),
+      });
+      const result: SimulationResult = await response.json();
+      setSimulation({ ...result, success: response.ok && result.success === true && result.simulation === true });
+    } catch (error) {
+      setSimulation({ success: false, error: error instanceof Error ? error.message : 'ทดสอบไม่สำเร็จ' });
+    } finally { setSimulating(false); }
+  }
+
+  async function sendTest() {
+    if (sending) return;
+    setSending(true);
+    setTestResult(null);
+    try {
+      const response = await fetchStaffApi('/api/line/notify', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ isTest: true, title: 'ทดสอบระบบแจ้งเตือน Chantakorn Property', slug: 'test-property', price: 3890000, status: 'sale', district: 'หาดใหญ่', subdistrict: 'คอหงส์' }),
+      });
+      const result = await response.json();
+      const success = response.ok && result.isRealSent === true;
+      setTestResult({ success, message: success ? 'LINE รับคำขอส่งแล้ว กรุณาตรวจข้อความในบัญชีเจ้าหน้าที่' : result.error || result.message || 'ส่งข้อความทดสอบไม่สำเร็จ' });
+    } catch (error) {
+      setTestResult({ success: false, message: error instanceof Error ? error.message : 'ส่งข้อความทดสอบไม่สำเร็จ' });
+    } finally { setSending(false); setTestConfirmation(false); }
+  }
 
   return (
-    <div className="max-w-4xl space-y-6 pb-20 animate-in fade-in duration-300">
-      {/* Page Title */}
-      <div className="rounded-2xl border border-surface-border bg-white p-6 shadow-sm">
-        <h1 className="text-2xl font-extrabold text-navy-950">ตั้งค่าระบบและการเชื่อมต่อ LINE OA & Messaging API Webhook</h1>
-        <p className="mt-2 text-sm text-brand-muted">
-          กำหนดค่าการเชื่อมโยง LINE Official Account (<a href="https://lin.ee/NMSe28T3" target="_blank" rel="noreferrer" className="text-[#06C755] font-bold underline">https://lin.ee/NMSe28T3</a>) และติดตั้ง Webhook เพื่อให้บอทโต้ตอบ ตอบคำถามลูกค้า และส่งการแจ้งเตือนอัตโนมัติ
-        </p>
+    <div className="mx-auto max-w-5xl space-y-6">
+      <header className="flex flex-wrap items-start justify-between gap-4">
+        <div><p className="mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-gold-700">การเชื่อมต่อและการแจ้งเตือน</p><h1 className="text-2xl font-bold text-navy-950 sm:text-3xl">ตั้งค่าระบบ</h1><p className="mt-2 text-sm text-slate-500">ดูสถานะ LINE และเลือกการแจ้งเตือนที่ทีมต้องการ</p></div>
+        <a href={oaUrl} target="_blank" rel="noreferrer" className="admin-secondary"><MessageCircle className="h-4 w-4 text-emerald-600" />เปิด LINE OA <ArrowUpRight className="h-4 w-4" /></a>
+      </header>
+
+      <section className="overflow-hidden rounded-3xl border border-navy-800 bg-navy-950 text-white">
+        <div className="flex flex-wrap items-center justify-between gap-4 p-5 sm:p-7">
+          <div className="flex items-center gap-4"><div className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-emerald-500/15 text-emerald-400"><MessageCircle className="h-6 w-6" /></div><div><h2 className="text-lg font-semibold">Chantakorn Property</h2><p className="mt-1 text-sm text-slate-400">LINE OA · @930xzcyi</p></div></div>
+          <button type="button" onClick={checkConnection} disabled={checking} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-gold-500 px-4 text-sm font-semibold text-navy-950 disabled:opacity-50">{checking ? <Loader2 className="h-4 w-4 animate-spin" /> : <ShieldCheck className="h-4 w-4" />}{checking ? 'กำลังตรวจ...' : 'ตรวจการเชื่อมต่อ'}</button>
+        </div>
+        <div className="grid gap-px border-t border-white/10 bg-white/10 sm:grid-cols-2">
+          {[['การส่งข้อความ', config?.isChannelTokenConfigured], ['ผู้รับแจ้งเตือนในทีม', config?.isRecipientConfigured]].map(([label, configured]) => <div key={String(label)} className="bg-navy-950 px-5 py-4 sm:px-7"><p className="text-xs text-slate-400">{label}</p><p className="mt-1 text-sm font-medium">{loading ? 'กำลังโหลด...' : configError ? 'ตรวจสถานะไม่สำเร็จ' : configured ? 'มีการตั้งค่าแล้ว' : 'ยังไม่ได้ตั้งค่า'}</p></div>)}
+        </div>
+      </section>
+      {configError && <div role="alert" className="flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-red-50 p-4 text-sm text-red-700"><span>{configError}</span><button type="button" onClick={loadConfig} disabled={loading} className="inline-flex items-center gap-2 font-semibold"><RefreshCw className="h-4 w-4" />ลองใหม่</button></div>}
+      {connection && <div role="status" className={`rounded-2xl border p-5 text-sm ${connection.ready ? 'border-emerald-200 bg-emerald-50 text-emerald-900' : 'border-amber-200 bg-amber-50 text-amber-900'}`}><p className="font-semibold">{connection.message}</p><ul className="mt-3 space-y-2">{connection.checks.map(item => <li key={item.name}>{item.ok ? '✓' : '•'} {item.message}</li>)}</ul><p className="mt-4 text-xs">ยืนยันการตอบกลับจริงโดยส่ง “ดูทรัพย์” จาก LINE ของลูกค้า แล้วตรวจว่าได้รับการ์ดทรัพย์</p></div>}
+
+      <div className="grid items-start gap-6 lg:grid-cols-[1.2fr_1fr]">
+        <section className="admin-panel">
+          <h2 className="text-lg font-semibold text-navy-950">แจ้งเตือนทีมงาน</h2><p className="mt-2 text-sm leading-relaxed text-slate-500">ส่งถึงบัญชีเจ้าหน้าที่ที่กำหนดไว้ เพื่อให้ทีมติดตามงานใหม่ได้ทันที</p>
+          <form onSubmit={save} className="mt-5 space-y-4">
+            {[{ key: 'autoNotifyNewProperty' as const, title: 'เมื่อเพิ่มทรัพย์ใหม่', description: 'แจ้งทีมเมื่อมีประกาศใหม่ในระบบ' }, { key: 'autoNotifyConsignment' as const, title: 'เมื่อมีลูกค้าติดต่อหรือฝากขาย', description: 'แจ้งทีมเมื่อได้รับข้อมูลจากลูกค้า' }].map(item => <label key={item.key} className="flex cursor-pointer items-start justify-between gap-4 rounded-2xl border border-slate-200 p-4"><span><span className="block text-sm font-medium text-navy-950">{item.title}</span><span className="mt-1 block text-xs leading-relaxed text-slate-500">{item.description}</span></span><input type="checkbox" checked={preferences[item.key]} disabled={!config || loading || saving || Boolean(configError)} onChange={event => { setPreferences(previous => ({ ...previous, [item.key]: event.target.checked })); setSaveMessage(''); }} className="mt-1 h-5 w-5 shrink-0 rounded border-slate-300 text-navy-950 focus:ring-gold-500" /></label>)}
+            <button type="submit" disabled={!dirty || saving || loading || Boolean(configError)} className="admin-primary w-full">{saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}{saving ? 'กำลังบันทึก...' : dirty ? 'บันทึกการเปลี่ยนแปลง' : 'บันทึกการแจ้งเตือน'}</button>
+            {saveMessage && <p role="status" className="text-sm text-emerald-700">{saveMessage}</p>}{saveError && <p role="alert" className="text-sm text-red-700">{saveError}</p>}
+          </form>
+        </section>
+        <section className="admin-panel">
+          <h2 className="text-lg font-semibold text-navy-950">ส่งทรัพย์ให้ลูกค้า</h2><p className="mt-2 text-sm leading-relaxed text-slate-500">เปิดรายการทรัพย์ แล้วกด “ส่ง LINE” เพื่อส่งถึงผู้ติดตาม OA ทั้งหมด คุณจะได้ตรวจการ์ดก่อนยืนยันส่ง</p>
+          <Link href="/admin/properties" className="admin-secondary mt-5 w-full">ไปหน้าจัดการทรัพย์<ArrowUpRight className="h-4 w-4" /></Link>
+          <div className="mt-5 border-t border-slate-100 pt-5"><p className="text-sm font-medium text-navy-950">ทดสอบแจ้งเตือนทีม</p><p className="mt-1 text-xs leading-relaxed text-slate-500">การทดสอบนี้จะส่งข้อความจริงถึงเจ้าหน้าที่ที่กำหนดไว้</p>{!testConfirmation ? <button type="button" disabled={loading || Boolean(configError) || !config?.isChannelTokenConfigured || !config.isRecipientConfigured} onClick={() => { setTestConfirmation(true); setTestResult(null); }} className="admin-secondary mt-3 w-full"><Send className="h-4 w-4" />ทดสอบส่งถึงเจ้าหน้าที่</button> : <div className="mt-3 space-y-3 rounded-xl bg-slate-50 p-3"><p className="text-xs text-slate-600">ยืนยันส่งข้อความทดสอบ 1 ครั้งถึงบัญชีเจ้าหน้าที่?</p><div className="flex flex-wrap gap-2"><button type="button" disabled={sending} onClick={sendTest} className="admin-primary">{sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}ยืนยันส่ง</button><button type="button" disabled={sending} onClick={() => setTestConfirmation(false)} className="admin-secondary">ยกเลิก</button></div></div>}{testResult && <p role={testResult.success ? 'status' : 'alert'} className={`mt-3 text-sm ${testResult.success ? 'text-emerald-700' : 'text-red-700'}`}>{testResult.message}</p>}</div>
+        </section>
       </div>
 
-      {/* 1. Webhook Endpoint Configuration Banner */}
-      <section className="space-y-4 rounded-2xl border-2 border-emerald-400 bg-emerald-50/50 p-6 shadow-sm relative overflow-hidden">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-3 border-b border-emerald-200">
-          <div className="flex items-center space-x-3">
-            <div className="w-10 h-10 rounded-xl bg-[#06C755] text-white flex items-center justify-center font-bold text-lg shadow-sm">
-              <Globe className="w-5 h-5 text-white" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h2 className="text-base font-extrabold text-navy-950">LINE Messaging API Webhook URL</h2>
-                <span className="px-2 py-0.5 rounded-full text-[10px] bg-emerald-200 text-emerald-900 font-bold">
-                  ต้องยืนยันการรับข้อความใน LINE
-                </span>
-              </div>
-              <p className="text-xs text-emerald-900 mt-0.5">
-                ปลายทางสำหรับรับ Event จาก LINE Platform (ค้นหาทรัพย์, ฝากขาย, ติดต่อนายหน้า, เพิ่มเพื่อน)
-              </p>
-            </div>
-          </div>
+      <details className="admin-panel group">
+        <summary className="flex cursor-pointer list-none items-center justify-between gap-3 font-semibold text-navy-950">การเชื่อมต่อขั้นสูงและทดสอบคำสั่ง<ChevronDown className="h-5 w-5 shrink-0 transition-transform group-open:rotate-180" /></summary>
+        <div className="mt-6 space-y-6">
+          <div><label htmlFor="line-webhook-url" className="text-sm font-medium text-navy-950">Webhook URL</label><div className="mt-2 flex flex-wrap gap-2"><input id="line-webhook-url" readOnly value={webhookUrl} className="min-w-0 flex-1 rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 text-xs" /><button type="button" disabled={!webhookUrl} onClick={copyWebhook} className="admin-secondary"><Copy className="h-4 w-4" />{copied ? 'คัดลอกแล้ว' : 'คัดลอก'}</button></div>{copyError && <p role="alert" className="mt-2 text-sm text-red-700">{copyError}</p>}<p className="mt-3 text-xs leading-relaxed text-slate-500">นำ URL ไปตั้งใน <a href="https://developers.line.biz/console/" target="_blank" rel="noreferrer" className="font-medium text-navy-950 underline">LINE Developers</a> ที่ Messaging API → Webhook settings แล้วเปิด Use webhook และกด Verify</p></div>
+          <div className="border-t border-slate-100 pt-5"><h3 className="text-sm font-semibold text-navy-950">ทดสอบคำสั่งแบบจำลอง</h3><p className="mt-1 text-xs text-slate-500">ตรวจการประมวลผลคำสั่ง โดยไม่ส่งข้อความจริงและไม่บันทึกผู้ติดต่อ</p><div className="mt-3 flex flex-wrap gap-2">{['ดูทรัพย์', 'สวัสดี', 'ฝากขาย', 'ติดต่อ'].map(text => <button type="button" key={text} aria-pressed={keyword === text} onClick={() => setKeyword(text)} className={`rounded-lg border px-3 py-2 text-xs ${keyword === text ? 'border-navy-950 bg-navy-950 text-white' : 'border-slate-200 text-slate-600'}`}>{text}</button>)}</div><label htmlFor="line-simulation-keyword" className="mt-4 block text-xs font-medium text-slate-600">ข้อความที่ต้องการทดสอบ</label><div className="mt-2 flex flex-wrap gap-2"><input id="line-simulation-keyword" value={keyword} onChange={event => setKeyword(event.target.value)} className="min-w-0 flex-1 rounded-xl border border-slate-200 px-3 py-3 text-sm" /><button type="button" disabled={simulating || !keyword.trim()} onClick={simulate} className="admin-secondary">{simulating && <Loader2 className="h-4 w-4 animate-spin" />}ทดสอบคำสั่ง</button></div>{simulation && <div role="status" className="mt-4 rounded-xl bg-slate-50 p-4 text-sm"><p className="font-medium text-navy-950">{simulation.success && !simulation.unavailableSearches ? 'ประมวลผลคำสั่งจำลองแล้ว' : 'ยังประมวลผลคำสั่งได้ไม่ครบ'}</p><p className="mt-1 text-slate-500">จำลองการตอบ {simulation.simulatedReplies || 0} ข้อความ</p>{simulation.error && <p className="mt-2 text-red-700">{simulation.error}</p>}{Boolean(simulation.unavailableSearches) && <p className="mt-2 text-amber-700">ยังโหลดรายการทรัพย์ไม่ได้ กรุณาตรวจการเชื่อมต่อข้อมูล</p>}<details className="mt-3"><summary className="cursor-pointer text-xs text-slate-500">รายละเอียดผลทดสอบ</summary><pre className="mt-2 whitespace-pre-wrap break-all text-xs text-slate-600">{JSON.stringify(simulation, null, 2)}</pre></details></div>}</div>
+          <div className="rounded-2xl bg-slate-50 p-4 text-xs leading-relaxed text-slate-500">ค่าเชื่อมต่อและผู้รับอยู่บนเซิร์ฟเวอร์ หากต้องเปลี่ยนบัญชี ให้ผู้ดูแลปรับค่าที่ระบบโฮสต์</div>
         </div>
-
-        {/* Webhook URL Input & Copy button */}
-        <div className="space-y-2">
-          <label className="block text-xs font-bold text-navy-950">
-            URL ปลายทางสำหรับตั้งค่าใน LINE Developers Console:
-          </label>
-          <div className="flex items-center gap-2">
-            <div className="flex-1 bg-white border-2 border-emerald-300 rounded-xl px-3.5 py-2.5 text-xs text-navy-950 font-mono font-bold select-all overflow-x-auto shadow-xs">
-              {webhookUrl || '/api/line/webhook'}
-            </div>
-            <button
-              type="button"
-              onClick={handleCopyWebhookUrl}
-              className="px-4 py-2.5 bg-[#06C755] hover:bg-[#05b34c] text-white font-bold text-xs rounded-xl flex items-center gap-1.5 shadow-sm transition-all cursor-pointer active:scale-95 flex-shrink-0"
-            >
-              {copiedWebhook ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
-              <span>{copiedWebhook ? 'คัดลอกแล้ว!' : 'คัดลอก URL'}</span>
-            </button>
-          </div>
-        </div>
-
-        {/* Setup Steps Guide */}
-        <div className="space-y-3 rounded-xl border border-emerald-200 bg-white p-4">
-          <p className="text-xs text-gray-700">ตรวจบัญชีบอต การเปิดรับข้อความ และรายการทรัพย์จากการเชื่อมต่อจริง</p>
-          <button
-            type="button"
-            disabled={checkingConnection}
-            onClick={handleCheckConnection}
-            className="flex items-center gap-2 rounded-lg bg-[#06C755] px-4 py-2 text-xs font-bold text-white disabled:opacity-50"
-          >
-            {checkingConnection ? <Loader2 className="h-4 w-4 animate-spin" /> : <ShieldCheck className="h-4 w-4" />}
-            {checkingConnection ? 'กำลังตรวจการเชื่อมต่อ...' : 'ตรวจการเชื่อมต่อ LINE OA'}
-          </button>
-          {connectionResult && (
-            <div role="status" className="space-y-2 text-xs">
-              <p className={connectionResult.ready ? 'font-bold text-emerald-700' : 'font-bold text-red-700'}>{connectionResult.message}</p>
-              <ul className="space-y-1">
-                {connectionResult.checks.map((check) => (
-                  <li key={check.name} className={check.ok ? 'text-emerald-800' : 'text-red-800'}>
-                    {check.ok ? '✓' : '•'} {check.message}
-                  </li>
-                ))}
-              </ul>
-              <p className="text-gray-600">หลังตรวจผ่าน ให้ส่ง “ดูทรัพย์” จาก LINE ของลูกค้าและตรวจว่าได้รับการ์ดจริง</p>
-            </div>
-          )}
-        </div>
-        <div className="bg-white/90 border border-emerald-200 rounded-xl p-4 text-xs text-gray-800 space-y-2">
-          <p className="font-bold text-navy-950 flex items-center gap-1.5">
-            <Info className="w-4 h-4 text-[#06C755]" />
-            <span>ขั้นตอนการนำ Webhook URL ไปเปิดใช้งานใน LINE Developers:</span>
-          </p>
-          <ol className="list-decimal list-inside space-y-1 text-gray-700 pl-1 leading-relaxed text-[11px]">
-            <li>เข้าสู่ <a href="https://developers.line.biz" target="_blank" rel="noreferrer" className="text-[#06C755] font-bold underline">LINE Developers Console</a> แล้วเลือก Messaging API Channel ของ <strong>@930xzcyi</strong></li>
-            <li>ไปที่แท็บ <strong>&quot;Messaging API&quot;</strong> แล้วเลื่อนลงมาที่ส่วน <strong>&quot;Webhook settings&quot;</strong></li>
-            <li>วาง URL ด้านบนลงในช่อง <strong>&quot;Webhook URL&quot;</strong> แล้วกดปุ่ม <strong>&quot;Update&quot;</strong></li>
-            <li>เปิดใช้งานสวิตช์ <strong>&quot;Use webhook&quot;</strong> ให้เป็น <strong>&quot;Enabled&quot;</strong></li>
-            <li>กดปุ่ม <strong>&quot;Verify&quot;</strong> และตรวจว่าได้ <strong>Success</strong></li>
-            <li>ส่ง <strong>ดูทรัพย์</strong> จากบัญชี LINE ผู้ใช้ แล้วตรวจว่าได้รับการ์ดทรัพย์และเปิดรายละเอียดได้</li>
-          </ol>
-        </div>
-      </section>
-
-      {/* 2. Webhook Simulator / Test Console */}
-      <section className="space-y-4 rounded-2xl border border-surface-border bg-white p-6 shadow-sm">
-        <div className="flex items-center justify-between pb-3 border-b border-gray-100">
-          <div className="flex items-center gap-2">
-            <Terminal className="w-5 h-5 text-gold-600" />
-            <h2 className="text-base font-bold text-navy-950">ทดสอบจำลองส่งคำสั่ง Webhook (Event Simulator)</h2>
-          </div>
-          <span className="text-xs text-gray-500 font-medium">จำลองการพิมพ์ข้อความจากลูกค้า LINE OA</span>
-        </div>
-
-        <div className="space-y-3">
-          <p className="text-xs text-gray-600">
-            เลือกหรือพิมพ์ข้อความเพื่อทดสอบการประมวลผลเท่านั้น การจำลองไม่ส่งข้อความเข้า LINE และไม่บันทึกข้อมูลลงกล่องข้อความลูกค้า:
-          </p>
-
-          <div className="flex flex-wrap items-center gap-2">
-            {['ดูทรัพย์', 'สวัสดี', 'บ้านเดี่ยว หาดใหญ่', 'ที่ดิน สิงหนคร', 'ฝากขายบ้าน', 'ติดต่อแอดมิน', 'ประเมินราคา'].map((keyword) => (
-              <button
-                key={keyword}
-                type="button"
-                onClick={() => setWebhookSimKeyword(keyword)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
-                  webhookSimKeyword === keyword
-                    ? 'bg-navy-950 text-gold-400 font-bold shadow-xs'
-                    : 'bg-gray-100 hover:bg-gray-200 text-gray-700'
-                }`}
-              >
-                {keyword}
-              </button>
-            ))}
-          </div>
-
-          <div className="flex items-center gap-2">
-            <input
-              type="text"
-              value={webhookSimKeyword}
-              onChange={(e) => setWebhookSimKeyword(e.target.value)}
-              placeholder="พิมพ์ข้อความที่ต้องการทดสอบ..."
-              className="flex-1 bg-gray-50 border border-gray-200 rounded-xl p-2.5 text-xs text-navy-950 focus:bg-white focus:ring-2 focus:ring-[#06C755] outline-none"
-            />
-            <button
-              type="button"
-              disabled={testWebhookRunning}
-              onClick={handleTestWebhookSimulator}
-              className="px-5 py-2.5 bg-navy-950 hover:bg-navy-900 text-gold-400 font-bold text-xs rounded-xl flex items-center gap-1.5 shadow-sm transition-all cursor-pointer disabled:opacity-50 flex-shrink-0"
-            >
-              {testWebhookRunning ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
-              <span>{testWebhookRunning ? 'กำลังประมวลผล...' : 'ทดสอบ Webhook'}</span>
-            </button>
-          </div>
-
-          {webhookTestResult && (
-            <div className="mt-3 p-3.5 bg-gray-900 text-emerald-400 rounded-xl font-mono text-[11px] space-y-1.5 overflow-x-auto shadow-inner">
-              <div className="flex items-center justify-between text-gray-400 border-b border-gray-800 pb-1">
-                <span>ผลการทดสอบ Webhook (เวลา {webhookTestResult.timestamp})</span>
-                <span className={webhookTestResult.success ? 'text-emerald-400 font-bold' : 'text-red-400 font-bold'}>
-                  Status: {webhookTestResult.status} ({webhookTestResult.success ? 'จำลองสำเร็จ' : 'ไม่สำเร็จ'})
-                </span>
-              </div>
-              <pre className="whitespace-pre-wrap">{JSON.stringify(webhookTestResult.data || { error: webhookTestResult.error }, null, 2)}</pre>
-            </div>
-          )}
-        </div>
-      </section>
-
-      {/* 3. LINE Credentials Form */}
-      <section className="space-y-5 rounded-2xl border border-surface-border bg-white p-6 shadow-sm relative overflow-hidden">
-        {/* LINE OA Header Badge */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-gray-100">
-          <div className="flex items-center space-x-3.5">
-            <div className="w-12 h-12 rounded-2xl bg-[#06C755] text-white flex items-center justify-center font-bold text-2xl shadow-md flex-shrink-0">
-              💬
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h2 className="text-lg font-bold text-navy-950">LINE Messaging API Credentials</h2>
-                <span className="px-2.5 py-0.5 rounded-full text-[11px] bg-gray-100 text-gray-800 border border-gray-300 font-extrabold flex items-center gap-1.5 shadow-xs">
-                  {loadingConfig ? 'กำลังตรวจการตั้งค่า' : configError ? 'ตรวจสถานะไม่สำเร็จ' : lineConfig?.isChannelTokenConfigured && lineConfig?.isRecipientConfigured ? 'ตั้งค่าการส่งครบ' : 'ยังไม่พร้อมส่งแจ้งเตือน'}
-                </span>
-              </div>
-              <p className="text-xs text-brand-muted mt-0.5">
-                LINE OA URL: <a href="https://lin.ee/NMSe28T3" target="_blank" rel="noreferrer" className="text-[#06C755] hover:underline font-bold">https://lin.ee/NMSe28T3</a> · LINE ID: <strong>@930xzcyi</strong>
-              </p>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <a 
-              href="https://lin.ee/NMSe28T3" 
-              target="_blank" 
-              rel="noreferrer"
-              className="px-4 py-2.5 bg-[#06C755] hover:bg-[#05b34c] text-white font-bold text-xs rounded-xl flex items-center justify-center gap-1.5 shadow-sm transition-all cursor-pointer active:scale-95"
-            >
-              <MessageCircle className="w-4 h-4 fill-current" />
-              <span>เปิดดู LINE OA (NMSe28T3)</span>
-              <ExternalLink className="w-3 h-3 ml-0.5" />
-            </a>
-          </div>
-        </div>
-
-        {/* LINE Notification Settings Form */}
-        <form onSubmit={handleSaveLineSettings} className="space-y-4 pt-1">
-          <p className="rounded-xl bg-emerald-50 p-3 text-sm text-emerald-900">
-            แจ้งเตือนถึงบัญชีเจ้าหน้าที่ที่ผู้ดูแลกำหนดไว้ กดทดสอบเพื่อส่งข้อความจริง หากต้องเปลี่ยนบัญชีหรือผู้รับ ให้ผู้ดูแลปรับค่าใน Vercel production
-          </p>
-          {configError && <p role="alert" className="text-sm text-red-700">{configError}</p>}
-          {lineConfig && !lineConfig.isChannelTokenConfigured && <p className="text-sm text-red-700">ยังไม่ได้ตั้ง access token สำหรับส่งข้อความ</p>}
-          {lineConfig && !lineConfig.isRecipientConfigured && <p className="text-sm text-red-700">ยังไม่ได้กำหนดผู้รับแจ้งเตือนที่ถูกต้อง ให้ผู้ดูแลตั้ง LINE_TARGET_USER_ID หรือ LINE_ADMIN_USER_IDS แล้ว Redeploy</p>}
-          {lineConfig?.isChannelTokenConfigured && lineConfig.isRecipientConfigured && <p className="text-xs text-gray-600">มีค่าตั้งไว้แล้ว ต้องกดทดสอบและตรวจว่าเจ้าหน้าที่ได้รับข้อความ จึงจะยืนยันการใช้งานได้</p>}
-
-          {/* Autonotify toggles */}
-          <div className="space-y-2 pt-2 border-t border-gray-100">
-            <label className="flex items-center space-x-2.5 cursor-pointer select-none">
-              <input
-                type="checkbox"
-                checked={autoNotify}
-                onChange={(e) => setAutoNotify(e.target.checked)}
-                className="w-4 h-4 rounded text-[#06C755] focus:ring-[#06C755] cursor-pointer"
-              />
-              <span className="text-xs font-semibold text-gray-800">
-                🔔 แจ้งเตือนเข้า LINE OA อัตโนมัติทันทีที่มีการ <strong>&quot;ลงประกาศทรัพย์ใหม่&quot;</strong> บนเว็บไซต์
-              </span>
-            </label>
-
-            <label className="flex items-center space-x-2.5 cursor-pointer select-none">
-              <input
-                type="checkbox"
-                checked={autoNotifyConsignment}
-                onChange={(e) => setAutoNotifyConsignment(e.target.checked)}
-                className="w-4 h-4 rounded text-[#06C755] focus:ring-[#06C755] cursor-pointer"
-              />
-              <span className="text-xs font-semibold text-gray-800">
-                📩 แจ้งเตือนเข้า LINE OA อัตโนมัติเมื่อมีลูกค้า <strong>&quot;ส่งข้อมูลฝากขาย/ติดต่อสอบถาม&quot;</strong> ทางหน้าเว็บ
-              </span>
-            </label>
-          </div>
-
-          {/* Action buttons */}
-          <div className="flex items-center gap-3 pt-3 border-t border-gray-100 flex-wrap">
-            <button
-              type="submit"
-              disabled={saving}
-              className="px-5 py-2.5 bg-navy-950 hover:bg-navy-900 text-gold-400 font-bold text-xs rounded-xl flex items-center gap-1.5 shadow-sm transition-all cursor-pointer disabled:opacity-50"
-            >
-              {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
-              <span>{saving ? 'กำลังบันทึก...' : 'บันทึกการตั้งค่า LINE'}</span>
-            </button>
-
-            <button
-              type="button"
-              disabled={testing}
-              onClick={handleSendTestMessage}
-              className="px-5 py-2.5 bg-[#06C755] hover:bg-[#05b34c] text-white font-bold text-xs rounded-xl flex items-center gap-1.5 shadow-sm transition-all cursor-pointer disabled:opacity-50"
-            >
-              {testing ? <Loader2 className="w-3.5 h-3.5 animate-spin text-white" /> : <Send className="w-3.5 h-3.5" />}
-              <span>ทดสอบส่งแจ้งเตือนเด้งเข้า LINE OA</span>
-            </button>
-
-            {saveSuccess && (
-              <span className="text-xs text-emerald-600 font-bold bg-emerald-50 border border-emerald-200 px-3 py-1.5 rounded-lg animate-in fade-in">
-                ✓ บันทึกสถานะการแจ้งเตือนแล้ว; LINE credentials ต้องตั้งใน Vercel production
-              </span>
-            )}
-          </div>
-        </form>
-
-        {/* Test Result Display */}
-        {testResult && (
-          <div className={`p-4 rounded-xl text-xs font-medium border leading-relaxed space-y-2 animate-in fade-in ${
-            testResult.success 
-              ? 'bg-emerald-50 border-emerald-200 text-emerald-900' 
-              : 'bg-red-50 border-red-200 text-red-900'
-          }`}>
-            <div className="flex items-center justify-between">
-              <span className="font-bold flex items-center gap-1.5">
-                {testResult.success ? '✅ ผลการทดสอบแจ้งเตือน:' : '❌ เกิดข้อผิดพลาด:'}
-              </span>
-              {testResult.isRealSent && (
-                <span className="px-2 py-0.5 bg-emerald-200 text-emerald-900 text-[10px] rounded-full font-bold">
-                  ส่งถึงเจ้าของบัญชี
-                </span>
-              )}
-            </div>
-            <p>{testResult.message}</p>
-
-            {testResult.shareUrl && (
-              <div className="pt-2 flex flex-wrap items-center gap-2">
-                <a
-                  href={testResult.shareUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="px-4 py-2 bg-[#06C755] hover:bg-[#05b34c] text-white font-bold rounded-lg flex items-center gap-1.5 shadow-xs"
-                >
-                  <MessageCircle className="w-3.5 h-3.5 fill-current" />
-                  <span>กดเพื่อเด้งแชร์เข้าห้องแชท LINE ทันที (1-Click)</span>
-                </a>
-
-                <a
-                  href={testResult.lineOaUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="px-4 py-2 bg-white hover:bg-gray-50 text-gray-800 font-bold rounded-lg border border-gray-200 flex items-center gap-1.5"
-                >
-                  <span>เปิดหน้า LINE Official Account</span>
-                  <ExternalLink className="w-3 h-3" />
-                </a>
-              </div>
-            )}
-          </div>
-        )}
-      </section>
-
-      {/* Database & System Info */}
-      <section className="space-y-4 rounded-2xl border border-surface-border bg-white p-6 shadow-sm">
-        <h2 className="flex items-center gap-2 text-base font-bold text-navy-950">
-          <Database className="h-5 w-5 text-gold-600 flex-shrink-0" />
-          <span>ระบบฐานข้อมูลและการบันทึกข้อมูล</span>
-        </h2>
-        <div className="flex items-center gap-2 text-sm">
-          <span className="text-gray-500">ฐานข้อมูลหลัก:</span>
-          <strong className="text-gray-700 font-bold uppercase">{dataBackend === 'supabase' ? 'Supabase' : 'Firebase Firestore (Cloud Production)'}</strong>
-        </div>
-        <p className="text-xs leading-relaxed text-gray-500">
-          เว็บไซต์เชื่อมต่อและบันทึกข้อมูลแบบเรียลไทม์ผ่านคลาวด์ ป้องกันการสูญหายของข้อมูล ประกาศอสังหาริมทรัพย์ กล่องข้อความผู้ติดต่อ และการตั้งค่า LINE Official Account จะถูกจัดเก็บอย่างปลอดภัย
-        </p>
-      </section>
-
-      {/* Business Details */}
-      <section className="space-y-3 rounded-2xl border border-surface-border bg-white p-6 shadow-sm">
-        <h2 className="text-base font-bold text-navy-950 flex items-center gap-1.5">
-          <ShieldCheck className="w-4 h-4 text-gold-600" />
-          <span>ข้อมูลหน่วยงานเจ้าของลิขสิทธิ์</span>
-        </h2>
-        <div className="text-xs space-y-1.5 text-gray-700">
-          <p><span className="text-gray-400 font-medium">ชื่อโครงการ:</span> <strong>CHANTAKORN PROPERTY (ฉันทากร พร็อพเพอร์ตี้ หาดใหญ่สงขลา)</strong></p>
-          <p><span className="text-gray-400 font-medium">โทรศัพท์ผู้บริหาร:</span> <strong>081-604-0097</strong></p>
-          <p><span className="text-gray-400 font-medium">ไลน์ออฟฟิเชียล:</span> <strong>@930xzcyi (<a href="https://lin.ee/NMSe28T3" target="_blank" rel="noreferrer" className="text-[#06C755] hover:underline">https://lin.ee/NMSe28T3</a>)</strong></p>
-        </div>
-        <p className="text-xs leading-relaxed text-gray-500 pt-1">
-          ระบบควบคุมความปลอดภัย (Access Control) ได้รับการเข้ารหัสและดูแลอย่างเข้มงวด สิทธิ์ผู้ใช้งานทั่วไปจะถูกบล็อกจากการเข้าถึงหน้าควบคุมหลังบ้านโดยอัตโนมัติ
-        </p>
-      </section>
+      </details>
+      <footer className="flex flex-wrap items-center gap-2 px-1 text-xs text-slate-400"><Database className="h-4 w-4" />ฐานข้อมูล: {dataBackend === 'firebase' ? 'Firebase Firestore' : dataBackend === 'supabase' ? 'Supabase' : 'โหมดข้อมูลในเครื่อง'}<span className="mx-1">·</span>CHANTAKORN PROPERTY</footer>
     </div>
   );
 }

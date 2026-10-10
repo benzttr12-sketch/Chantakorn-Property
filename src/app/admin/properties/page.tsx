@@ -1,65 +1,59 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, Suspense } from 'react';
+import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import Image from 'next/image';
-import { 
-  Building2, 
-  PlusCircle, 
-  Search, 
-  Trash2, 
-  Edit3, 
-  Eye, 
-  Star, 
-  Copy, 
-  CheckCircle2, 
-  Globe, 
+import dynamic from 'next/dynamic';
+import {
+  Building2,
+  PlusCircle,
+  Search,
   AlertCircle,
   Download,
-  Layers,
-  Home,
-  Building,
-  MapPin,
-  CopyPlus,
   CheckSquare,
   Square,
   ArrowUpDown,
-  Check,
   RotateCcw,
   Sparkles,
   Zap,
-  Wand2,
   X,
   ChevronDown,
-  ChevronRight,
   Loader2,
-  Tag,
-  History,
-  ClipboardCopy,
-  ClipboardCheck
 } from 'lucide-react';
-import QuickPropertyModal from '@/components/admin/QuickPropertyModal';
-import PropertyHistoryModal from '@/components/admin/PropertyHistoryModal';
-import AdminLandsMapsOverlayModal from '@/components/admin/AdminLandsMapsOverlayModal';
-import CollapsiblePropertyRow from '@/components/admin/CollapsiblePropertyRow';
 import CollapsiblePropertyCard from '@/components/admin/CollapsiblePropertyCard';
-import PropertyBroadcastModal from '@/components/admin/PropertyBroadcastModal';
-import { 
-  fetchAdminProperties, 
-  updateProperty, 
+import {
+  fetchAdminProperties,
+  updateProperty,
   deleteProperty,
-  createProperty 
+  createProperty,
 } from '@/lib/store/properties-store';
-import { Property, PropertyStatus, PropertyType } from '@/lib/types';
-import { 
-  formatPrice, 
-  propertyHref, 
-  formatThaiDate, 
+import { Property, PropertyStatus } from '@/lib/types';
+import {
+  parseAdminPrice,
+  toggleVisibleSelection,
+  runSelectedOperations,
+} from '@/lib/admin-operations';
+import {
+  propertyHref,
   getPropertyTypeName,
   formatPropertyCode,
   formatPropertySnippet,
-  DISTRICTS_LIST 
+  DISTRICTS_LIST,
 } from '@/lib/utils';
+
+const QuickPropertyModal = dynamic(() => import('@/components/admin/QuickPropertyModal'), {
+  ssr: false,
+});
+const PropertyHistoryModal = dynamic(() => import('@/components/admin/PropertyHistoryModal'), {
+  ssr: false,
+});
+const AdminLandsMapsOverlayModal = dynamic(
+  () => import('@/components/admin/AdminLandsMapsOverlayModal'),
+  { ssr: false },
+);
+const PropertyBroadcastModal = dynamic(() => import('@/components/admin/PropertyBroadcastModal'), {
+  ssr: false,
+});
 
 const getCompletionScore = (prop: Property) => {
   let score = 0;
@@ -70,25 +64,50 @@ const getCompletionScore = (prop: Property) => {
   if (prop.province && prop.district) score += 15;
   if (prop.cover_image && !prop.cover_image.includes('placeholder')) score += 15;
   if (prop.images && prop.images.length > 0) score += 10;
-  if ((prop.bedrooms !== undefined && prop.bedrooms > 0) || (prop.usable_area !== undefined && prop.usable_area > 0)) score += 15;
-  return Math.min(100, score);
+  if (
+    (prop.bedrooms !== undefined && prop.bedrooms > 0) ||
+    (prop.usable_area !== undefined && prop.usable_area > 0) ||
+    (prop.land_size !== undefined && prop.land_size > 0)
+  )
+    score += 15;
+  return Math.round((score / 110) * 100);
 };
 
-export default function AdminPropertiesPage() {
+type StatusFilter = 'all' | 'sale' | 'rent' | 'featured' | 'draft' | 'published';
+type SortOrder = 'newest' | 'oldest' | 'price_desc' | 'price_asc' | 'area_desc';
+const statusOptions: { id: StatusFilter; label: string }[] = [
+  { id: 'all', label: 'ทั้งหมด' },
+  { id: 'published', label: 'เผยแพร่แล้ว' },
+  { id: 'draft', label: 'แบบร่าง' },
+  { id: 'sale', label: 'ขาย' },
+  { id: 'rent', label: 'ให้เช่า' },
+  { id: 'featured', label: 'ทรัพย์เด่น' },
+];
+function readStatusFilter(value: string | null | undefined): StatusFilter {
+  return statusOptions.some((option) => option.id === value) ? (value as StatusFilter) : 'all';
+}
+
+function PropertiesContent() {
+  const searchParams = useSearchParams();
   const [properties, setProperties] = useState<Property[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [statusFilter, setStatusFilter] = useState<'all' | 'sale' | 'rent' | 'featured' | 'draft' | 'published'>('all');
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>(() =>
+    readStatusFilter(searchParams?.get('filter') || searchParams?.get('status')),
+  );
   const [districtFilter, setDistrictFilter] = useState<string>('all');
   const [typeFilter, setTypeFilter] = useState<string>('all');
-  const [sortBy, setSortBy] = useState<'newest' | 'oldest' | 'price_desc' | 'price_asc' | 'area_desc'>('newest');
-  
+  const [sortBy, setSortBy] = useState<SortOrder>('newest');
+  const [filtersOpen, setFiltersOpen] = useState(false);
+
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [copiedCodeId, setCopiedCodeId] = useState<string | null>(null);
   const [copiedSnippetId, setCopiedSnippetId] = useState<string | null>(null);
-  const [copySnippetToast, setCopySnippetToast] = useState<{ id: string; title: string } | null>(null);
+  const [copySnippetToast, setCopySnippetToast] = useState<{ id: string; title: string } | null>(
+    null,
+  );
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const [duplicateSuccessMessage, setDuplicateSuccessMessage] = useState<string | null>(null);
 
@@ -96,6 +115,45 @@ export default function AdminPropertiesPage() {
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [bulkConfirmDelete, setBulkConfirmDelete] = useState(false);
   const [quickModalOpen, setQuickModalOpen] = useState(false);
+  const confirmationRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!deleteConfirmId && !bulkConfirmDelete) return;
+    const previousFocus =
+      document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    confirmationRef.current?.querySelector<HTMLButtonElement>('button')?.focus();
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      if (previousFocus?.isConnected) previousFocus.focus();
+      else document.getElementById('admin-property-search')?.focus();
+    };
+  }, [deleteConfirmId, bulkConfirmDelete]);
+
+  const handleConfirmationKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    if (event.key === 'Escape' && !busy) {
+      setDeleteConfirmId(null);
+      setBulkConfirmDelete(false);
+    }
+    if (event.key !== 'Tab') return;
+    const controls = Array.from(
+      confirmationRef.current?.querySelectorAll<HTMLElement>('button:not(:disabled)') || [],
+    );
+    const first = controls[0];
+    const last = controls[controls.length - 1];
+    if (!first) {
+      event.preventDefault();
+      return;
+    }
+    if (event.shiftKey && document.activeElement === first) {
+      event.preventDefault();
+      last.focus();
+    } else if (!event.shiftKey && document.activeElement === last) {
+      event.preventDefault();
+      first.focus();
+    }
+  };
 
   // Property History Modal State
   const [historyModalProperty, setHistoryModalProperty] = useState<Property | null>(null);
@@ -129,30 +187,33 @@ export default function AdminPropertiesPage() {
   const [expandedRowIds, setExpandedRowIds] = useState<string[]>([]);
 
   const handleToggleExpand = (id: string) => {
-    setExpandedRowIds(prev => 
-      prev.includes(id) ? prev.filter(rowId => rowId !== id) : [...prev, id]
+    setExpandedRowIds((prev) =>
+      prev.includes(id) ? prev.filter((rowId) => rowId !== id) : [...prev, id],
     );
   };
 
-  const handleExpandAll = () => {
-    if (expandedRowIds.length === filteredProperties.length) {
-      setExpandedRowIds([]);
-    } else {
-      setExpandedRowIds(filteredProperties.map(p => p.id));
-    }
-  };
+  const handleExpandAll = () =>
+    setExpandedRowIds((previous) =>
+      toggleVisibleSelection(
+        previous,
+        filteredProperties.map((property) => property.id),
+      ),
+    );
 
   const handleUpdatePropertyNotes = async (propId: string, notes: string) => {
-    await updateProperty(propId, { internal_notes: notes });
-    setProperties(prev => prev.map(p => p.id === propId ? { ...p, internal_notes: notes } : p));
+    const saved = await updateProperty(propId, { internal_notes: notes });
+    if (!saved) throw new Error('ไม่พบทรัพย์ที่ต้องการบันทึก');
+    setProperties((prev) => prev.map((p) => (p.id === propId ? saved : p)));
   };
 
   // Inline Edit State
   const [editingPriceId, setEditingPriceId] = useState<string | null>(null);
   const [inlinePriceInput, setInlinePriceInput] = useState<string>('');
   const [inlineUpdatingId, setInlineUpdatingId] = useState<string | null>(null);
-  const [inlineSuccessToast, setInlineSuccessToast] = useState<{ id: string; message: string } | null>(null);
-  const [activeStatusDropdownId, setActiveStatusDropdownId] = useState<string | null>(null);
+  const [inlineSuccessToast, setInlineSuccessToast] = useState<{
+    id: string;
+    message: string;
+  } | null>(null);
   const [highlightedRowId, setHighlightedRowId] = useState<string | null>(null);
 
   const handleStartEditPrice = (prop: Property) => {
@@ -166,24 +227,27 @@ export default function AdminPropertiesPage() {
   };
 
   const handleSaveInlinePrice = async (propId: string) => {
-    const rawClean = inlinePriceInput.replace(/,/g, '').trim();
-    const numPrice = parseFloat(rawClean);
-    if (isNaN(numPrice) || numPrice < 0) {
-      setError('กรุณาระบุตัวเลขราคาที่ถูกต้อง');
+    if (inlineUpdatingId || busy) return;
+    const numPrice = parseAdminPrice(inlinePriceInput);
+    if (numPrice === null) {
+      setError('กรุณากรอกราคาเป็นตัวเลข เช่น 6,100,000 หรือ 6100000');
       return;
     }
 
     setInlineUpdatingId(propId);
     setError('');
     try {
-      await updateProperty(propId, { price: numPrice });
+      const saved = await updateProperty(propId, { price: numPrice });
+      if (!saved) throw new Error('ไม่พบทรัพย์ที่ต้องการแก้ไข');
+      setProperties((previous) =>
+        previous.map((property) => (property.id === propId ? saved : property)),
+      );
       setEditingPriceId(null);
       setInlinePriceInput('');
       setHighlightedRowId(propId);
       setTimeout(() => setHighlightedRowId(null), 3500);
       setInlineSuccessToast({ id: propId, message: 'บันทึกราคาใหม่สำเร็จ' });
       setTimeout(() => setInlineSuccessToast(null), 3000);
-      await loadData();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'ไม่สามารถบันทึกราคาได้');
     } finally {
@@ -192,19 +256,22 @@ export default function AdminPropertiesPage() {
   };
 
   const handleInlineUpdateStatus = async (propId: string, newStatus: PropertyStatus) => {
+    if (inlineUpdatingId || busy) return;
     setInlineUpdatingId(propId);
-    setActiveStatusDropdownId(null);
     setError('');
     try {
-      await updateProperty(propId, { status: newStatus });
+      const saved = await updateProperty(propId, { status: newStatus });
+      if (!saved) throw new Error('ไม่พบทรัพย์ที่ต้องการแก้ไข');
+      setProperties((previous) =>
+        previous.map((property) => (property.id === propId ? saved : property)),
+      );
       setHighlightedRowId(propId);
       setTimeout(() => setHighlightedRowId(null), 3500);
-      setInlineSuccessToast({ 
-        id: propId, 
-        message: `เปลี่ยนสถานะเป็น "${newStatus === 'rent' ? 'เช่า' : 'ขาย'}" เรียบร้อยแล้ว` 
+      setInlineSuccessToast({
+        id: propId,
+        message: `เปลี่ยนสถานะเป็น "${newStatus === 'rent' ? 'เช่า' : 'ขาย'}" เรียบร้อยแล้ว`,
       });
       setTimeout(() => setInlineSuccessToast(null), 3000);
-      await loadData();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'ไม่สามารถเปลี่ยนสถานะได้');
     } finally {
@@ -212,15 +279,19 @@ export default function AdminPropertiesPage() {
     }
   };
 
-  const loadData = async () => {
+  const loadData = async (clearError = true) => {
     setLoading(true);
+    if (clearError) setError('');
     try {
       const data = await fetchAdminProperties();
       setProperties(data);
-    } catch (err) { 
-      setError(err instanceof Error ? err.message : 'โหลดข้อมูลไม่สำเร็จ'); 
-    } finally { 
-      setLoading(false); 
+      setSelectedIds((previous) =>
+        previous.filter((id) => data.some((property) => property.id === id)),
+      );
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'โหลดข้อมูลไม่สำเร็จ');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -228,76 +299,89 @@ export default function AdminPropertiesPage() {
     loadData();
   }, []);
 
-  // Close active status dropdown on outside click
   useEffect(() => {
-    const handleDocumentClick = (e: MouseEvent) => {
-      const target = e.target as HTMLElement;
-      if (!target.closest('.inline-status-dropdown-container')) {
-        setActiveStatusDropdownId(null);
-      }
-    };
-    if (activeStatusDropdownId) {
-      document.addEventListener('click', handleDocumentClick);
-    }
-    return () => {
-      document.removeEventListener('click', handleDocumentClick);
-    };
-  }, [activeStatusDropdownId]);
+    setStatusFilter(readStatusFilter(searchParams?.get('filter') || searchParams?.get('status')));
+  }, [searchParams]);
 
   const handleToggleFeatured = async (prop: Property) => {
-    if (busy) return;
-    setBusy(true); setError('');
-    try { 
-      await updateProperty(prop.id, { featured: !prop.featured }); 
-      await loadData(); 
-    } catch (err) { 
-      setError(err instanceof Error ? err.message : 'บันทึกข้อมูลไม่สำเร็จ'); 
-    } finally { 
-      setBusy(false); 
+    if (busy || inlineUpdatingId) return;
+    setBusy(true);
+    setError('');
+    try {
+      const saved = await updateProperty(prop.id, { featured: !prop.featured });
+      if (!saved) throw new Error('ไม่พบทรัพย์ที่ต้องการแก้ไข');
+      setProperties((previous) =>
+        previous.map((property) => (property.id === prop.id ? saved : property)),
+      );
+      setInlineSuccessToast({
+        id: prop.id,
+        message: saved.featured ? 'ตั้งเป็นทรัพย์เด่นแล้ว' : 'ยกเลิกทรัพย์เด่นแล้ว',
+      });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'บันทึกข้อมูลไม่สำเร็จ');
+    } finally {
+      setBusy(false);
     }
   };
 
   const handleTogglePublished = async (prop: Property) => {
-    if (busy) return;
-    setBusy(true); setError('');
-    try { 
-      await updateProperty(prop.id, { published: !prop.published }); 
-      await loadData(); 
-    } catch (err) { 
-      setError(err instanceof Error ? err.message : 'บันทึกสถานะไม่สำเร็จ'); 
-    } finally { 
-      setBusy(false); 
+    if (busy || inlineUpdatingId) return;
+    setBusy(true);
+    setError('');
+    try {
+      const saved = await updateProperty(prop.id, { published: !prop.published });
+      if (!saved) throw new Error('ไม่พบทรัพย์ที่ต้องการแก้ไข');
+      setProperties((previous) =>
+        previous.map((property) => (property.id === prop.id ? saved : property)),
+      );
+      setInlineSuccessToast({
+        id: prop.id,
+        message: saved.published ? 'เผยแพร่ทรัพย์แล้ว' : 'เปลี่ยนเป็นแบบร่างแล้ว',
+      });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'บันทึกสถานะไม่สำเร็จ');
+    } finally {
+      setBusy(false);
     }
   };
 
-  const handleCopyLink = (prop: Property) => {
+  const handleCopyLink = async (prop: Property) => {
     const origin = typeof window !== 'undefined' ? window.location.origin : '';
     const fullUrl = `${origin}${propertyHref(prop.slug)}`;
-    if (navigator.clipboard) {
-      navigator.clipboard.writeText(fullUrl);
+    try {
+      if (!navigator.clipboard) throw new Error('ไม่สามารถคัดลอกได้ กรุณาใช้เบราว์เซอร์ที่รองรับ');
+      await navigator.clipboard.writeText(fullUrl);
       setCopiedId(prop.id);
       setTimeout(() => setCopiedId(null), 2000);
+    } catch {
+      setError('คัดลอกลิงก์ไม่สำเร็จ กรุณาอนุญาตการคัดลอกในเบราว์เซอร์แล้วลองอีกครั้ง');
     }
   };
 
-  const handleCopyCode = (id: string) => {
+  const handleCopyCode = async (id: string) => {
     const code = formatPropertyCode(id);
-    if (navigator.clipboard) {
-      navigator.clipboard.writeText(code);
+    try {
+      if (!navigator.clipboard) throw new Error('Clipboard unavailable');
+      await navigator.clipboard.writeText(code);
       setCopiedCodeId(id);
       setTimeout(() => setCopiedCodeId(null), 2000);
+    } catch {
+      setError('คัดลอกรหัสไม่สำเร็จ กรุณาลองอีกครั้ง');
     }
   };
 
-  const handleCopySnippet = (prop: Property) => {
+  const handleCopySnippet = async (prop: Property) => {
     const origin = typeof window !== 'undefined' ? window.location.origin : '';
     const snippet = formatPropertySnippet(prop, { origin });
-    if (typeof navigator !== 'undefined' && navigator.clipboard) {
-      navigator.clipboard.writeText(snippet);
+    try {
+      if (!navigator.clipboard) throw new Error('Clipboard unavailable');
+      await navigator.clipboard.writeText(snippet);
       setCopiedSnippetId(prop.id);
       setCopySnippetToast({ id: prop.id, title: prop.title });
       setTimeout(() => setCopiedSnippetId(null), 2500);
-      setTimeout(() => setCopySnippetToast(prev => prev?.id === prop.id ? null : prev), 4500);
+      setTimeout(() => setCopySnippetToast((prev) => (prev?.id === prop.id ? null : prev)), 4500);
+    } catch {
+      setError('คัดลอกข้อมูลไม่สำเร็จ กรุณาอนุญาตการคัดลอกในเบราว์เซอร์แล้วลองอีกครั้ง');
     }
   };
 
@@ -330,46 +414,60 @@ export default function AdminPropertiesPage() {
 
   const handleDelete = async (id: string) => {
     if (busy) return;
-    setBusy(true); setError('');
-    try { 
-      await deleteProperty(id); 
-      setDeleteConfirmId(null); 
-      setSelectedIds(prev => prev.filter(item => item !== id));
-      await loadData(); 
-    } catch (err) { 
-      setError(err instanceof Error ? err.message : 'ลบรายการไม่สำเร็จ'); 
-      setDeleteConfirmId(null); 
-    } finally { 
-      setBusy(false); 
+    setBusy(true);
+    setError('');
+    try {
+      const removed = await deleteProperty(id);
+      if (!removed) throw new Error('ไม่พบทรัพย์หรือไม่สามารถลบรายการนี้ได้');
+      setDeleteConfirmId(null);
+      setSelectedIds((prev) => prev.filter((item) => item !== id));
+      await loadData();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'ลบรายการไม่สำเร็จ');
+      setDeleteConfirmId(null);
+    } finally {
+      setBusy(false);
     }
   };
 
   // Bulk Actions Handlers
   const handleSelectAll = () => {
-    if (selectedIds.length === filteredProperties.length) {
-      setSelectedIds([]);
-    } else {
-      setSelectedIds(filteredProperties.map(p => p.id));
-    }
+    if (busy || inlineUpdatingId) return;
+    setSelectedIds((previous) =>
+      toggleVisibleSelection(
+        previous,
+        filteredProperties.map((property) => property.id),
+      ),
+    );
   };
 
   const handleToggleSelect = (id: string) => {
-    setSelectedIds(prev => 
-      prev.includes(id) ? prev.filter(item => item !== id) : [...prev, id]
+    if (busy || inlineUpdatingId) return;
+    setSelectedIds((prev) =>
+      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id],
     );
   };
 
   const handleBulkPublish = async (publishStatus: boolean) => {
-    if (selectedIds.length === 0 || busy) return;
+    if (selectedIds.length === 0 || busy || inlineUpdatingId) return;
     const count = selectedIds.length;
     setBusy(true);
     setError('');
     try {
-      await Promise.all(selectedIds.map(id => updateProperty(id, { published: publishStatus })));
-      setSelectedIds([]);
-      setDuplicateSuccessMessage(`🎉 ${publishStatus ? 'เผยแพร่' : 'เปลี่ยนเป็นแบบร่าง'} อสังหาริมทรัพย์ที่เลือก ${count} รายการเรียบร้อยแล้ว!`);
+      const result = await runSelectedOperations(selectedIds, (id) =>
+        updateProperty(id, { published: publishStatus }),
+      );
+      setSelectedIds(result.failed);
+      if (result.succeeded.length > 0)
+        setDuplicateSuccessMessage(
+          `${publishStatus ? 'เผยแพร่' : 'เปลี่ยนเป็นแบบร่าง'} เรียบร้อย ${result.succeeded.length} จาก ${count} รายการ`,
+        );
+      if (result.failed.length > 0)
+        setError(
+          `บันทึกไม่สำเร็จ ${result.failed.length} รายการ กรุณาตรวจรายการที่ยังไม่สำเร็จและลองใหม่`,
+        );
       setTimeout(() => setDuplicateSuccessMessage(null), 5000);
-      await loadData();
+      await loadData(false);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'ไม่สามารถแก้ไขสถานะรายการที่เลือกได้');
     } finally {
@@ -378,17 +476,22 @@ export default function AdminPropertiesPage() {
   };
 
   const handleBulkDelete = async () => {
-    if (selectedIds.length === 0 || busy) return;
+    if (selectedIds.length === 0 || busy || inlineUpdatingId) return;
     const count = selectedIds.length;
     setBusy(true);
     setError('');
     try {
-      await Promise.all(selectedIds.map(id => deleteProperty(id)));
-      setSelectedIds([]);
+      const result = await runSelectedOperations(selectedIds, (id) => deleteProperty(id));
+      setSelectedIds(result.failed);
       setBulkConfirmDelete(false);
-      setDuplicateSuccessMessage(`🗑️ ลบอสังหาริมทรัพย์ที่เลือกทั้งหมด ${count} รายการเรียบร้อยแล้ว!`);
+      if (result.succeeded.length > 0)
+        setDuplicateSuccessMessage(`ลบเรียบร้อย ${result.succeeded.length} จาก ${count} รายการ`);
+      if (result.failed.length > 0)
+        setError(
+          `ลบไม่สำเร็จ ${result.failed.length} รายการ กรุณาตรวจรายการที่ยังไม่สำเร็จและลองใหม่`,
+        );
       setTimeout(() => setDuplicateSuccessMessage(null), 5000);
-      await loadData();
+      await loadData(false);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'ไม่สามารถลบรายการที่เลือกได้');
     } finally {
@@ -404,10 +507,10 @@ export default function AdminPropertiesPage() {
     if (statusFilter === 'published' && p.published === false) return false;
     if (districtFilter !== 'all' && p.district !== districtFilter) return false;
     if (typeFilter !== 'all' && p.property_type !== typeFilter) return false;
-    if (searchQuery) {
-      const q = searchQuery.toLowerCase();
+    if (searchQuery.trim()) {
+      const q = searchQuery.trim().toLowerCase();
       return (
-        p.title.toLowerCase().includes(q) || 
+        p.title.toLowerCase().includes(q) ||
         p.district.toLowerCase().includes(q) ||
         p.id.toLowerCase().includes(q) ||
         formatPropertyCode(p.id).toLowerCase().includes(q)
@@ -457,7 +560,7 @@ export default function AdminPropertiesPage() {
       'ทรัพย์เด่น (Featured)',
       'สถานะการเผยแพร่ (Published)',
       'วันที่ลงประกาศ (Created At)',
-      'ลิงก์ (Slug)'
+      'ลิงก์ (Slug)',
     ];
 
     const escapeCSV = (value: unknown) => {
@@ -485,403 +588,423 @@ export default function AdminPropertiesPage() {
       escapeCSV(p.featured ? 'ใช่ (Yes)' : 'ไม่ใช่ (No)'),
       escapeCSV(p.published !== false ? 'เผยแพร่ (Published)' : 'แบบร่าง (Draft)'),
       escapeCSV(p.created_at || ''),
-      escapeCSV(p.slug || '')
+      escapeCSV(p.slug || ''),
     ]);
 
-    const csvContent = '\uFEFF' + [
-      headers.join(','),
-      ...rows.map((row) => row.join(','))
-    ].join('\r\n');
+    const csvContent =
+      '\uFEFF' + [headers.join(','), ...rows.map((row) => row.join(','))].join('\r\n');
 
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.setAttribute('href', url);
-    link.setAttribute('download', `chantakorn_properties_${new Date().toISOString().split('T')[0]}.csv`);
+    link.setAttribute(
+      'download',
+      `chantakorn_properties_${new Date().toISOString().split('T')[0]}.csv`,
+    );
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
   };
 
+  const allVisibleSelected =
+    filteredProperties.length > 0 &&
+    filteredProperties.every((property) => selectedIds.includes(property.id));
+  const allVisibleExpanded =
+    filteredProperties.length > 0 &&
+    filteredProperties.every((property) => expandedRowIds.includes(property.id));
+  const activeFilterCount = Number(districtFilter !== 'all') + Number(typeFilter !== 'all');
+  const hasFilters = searchQuery.trim() !== '' || statusFilter !== 'all' || activeFilterCount > 0;
+  const resetFilters = () => {
+    setSearchQuery('');
+    setStatusFilter('all');
+    setDistrictFilter('all');
+    setTypeFilter('all');
+  };
+  const statusCount = (id: StatusFilter) =>
+    properties.filter(
+      (property) =>
+        id === 'all' ||
+        (id === 'draft'
+          ? !property.published
+          : id === 'published'
+            ? property.published
+            : id === 'featured'
+              ? property.featured
+              : property.status === id),
+    ).length;
+
   return (
-    <div className="space-y-6 pb-24">
+    <div className="space-y-5 pb-8">
+      <header className="flex flex-col justify-between gap-4 sm:flex-row sm:items-start">
+        <div>
+          <p className="mb-1 text-xs font-semibold uppercase tracking-[0.16em] text-gold-700">
+            PROPERTY WORKSPACE
+          </p>
+          <h1 className="text-2xl font-bold tracking-tight text-navy-950 sm:text-3xl">
+            จัดการทรัพย์
+          </h1>
+          <p className="mt-2 text-sm leading-relaxed text-slate-500">
+            แก้ไขประกาศ ดูบันทึกทีม และส่งทรัพย์ให้ผู้ติดตาม LINE OA
+          </p>
+        </div>
+        <Link
+          id="add-new-property-btn"
+          href="/admin/properties/new"
+          className="inline-flex min-h-11 shrink-0 items-center justify-center gap-2 rounded-xl bg-navy-950 px-5 text-sm font-semibold text-white shadow-sm hover:bg-navy-900"
+        >
+          <PlusCircle className="h-4 w-4 text-gold-400" />
+          เพิ่มทรัพย์ใหม่
+        </Link>
+      </header>
+
       {error && (
-        <p role="alert" className="rounded-xl bg-red-50 p-4 text-xs font-semibold text-red-700 border border-red-200">
-          {error}
+        <div
+          role="alert"
+          className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700"
+        >
+          <span>{error}</span>
+          <button
+            type="button"
+            onClick={() => loadData()}
+            disabled={loading}
+            className="min-h-10 rounded-lg bg-white px-3 font-semibold disabled:opacity-50"
+          >
+            โหลดข้อมูลใหม่
+          </button>
+        </div>
+      )}
+      {duplicateSuccessMessage && (
+        <div
+          role="status"
+          className="flex items-start justify-between gap-3 rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800"
+        >
+          <span>{duplicateSuccessMessage}</span>
+          <button
+            type="button"
+            onClick={() => setDuplicateSuccessMessage(null)}
+            aria-label="ปิดข้อความสำเร็จ"
+            className="rounded-lg p-1"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+      )}
+      {inlineSuccessToast && (
+        <p
+          role="status"
+          className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800"
+        >
+          {inlineSuccessToast.message}
+        </p>
+      )}
+      {copySnippetToast && (
+        <p
+          role="status"
+          className="rounded-2xl border border-gold-200 bg-gold-50 p-4 text-sm text-navy-950"
+        >
+          คัดลอกข้อมูล “{copySnippetToast.title}” พร้อมนำไปโพสต์หรือส่งลูกค้าแล้ว
         </p>
       )}
 
-      {duplicateSuccessMessage && (
-        <div className="bg-emerald-50 border border-emerald-200 text-emerald-800 px-4 py-3 rounded-2xl flex items-center justify-between text-xs font-bold animate-in fade-in">
-          <div className="flex items-center space-x-2">
-            <Sparkles className="w-4 h-4 text-emerald-600" />
-            <span>{duplicateSuccessMessage}</span>
-          </div>
-          <button 
-            onClick={() => setDuplicateSuccessMessage(null)}
-            className="text-emerald-600 hover:text-emerald-800"
-          >
-            ✕
-          </button>
-        </div>
-      )}
-
-      {copySnippetToast && (
-        <div className="bg-gradient-to-r from-amber-50 via-gold-50 to-amber-50 border border-gold-300 text-navy-950 px-4 py-3 rounded-2xl flex items-center justify-between text-xs font-bold shadow-xs animate-in slide-in-from-top-2 duration-300">
-          <div className="flex items-center space-x-2.5">
-            <div className="w-6 h-6 rounded-lg bg-gold-400 text-navy-950 flex items-center justify-center font-bold">
-              <ClipboardCheck className="w-3.5 h-3.5 text-navy-950" />
-            </div>
-            <div>
-              <span>คัดลอกข้อมูลสรุปทรัพย์ <strong>&quot;{copySnippetToast.title}&quot;</strong> เรียบร้อยแล้ว!</span>
-              <span className="hidden sm:inline ml-1.5 text-[11px] text-amber-800 font-semibold">(ฟอร์แมต High-Converting พร้อมส่งต่อลูกค้า/โพสต์โซเชียล)</span>
-            </div>
-          </div>
-          <button 
-            onClick={() => setCopySnippetToast(null)}
-            className="text-gray-400 hover:text-navy-950 ml-2"
-          >
-            ✕
-          </button>
-        </div>
-      )}
-      
-      {/* KPI Stats Cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
-        <button
-          type="button"
-          onClick={() => setStatusFilter('all')}
-          className={`p-3.5 sm:p-4 rounded-2xl border text-left transition-all cursor-pointer ${
-            statusFilter === 'all' 
-              ? 'bg-navy-950 text-white border-navy-900 shadow-md ring-2 ring-gold-400/40' 
-              : 'bg-white text-navy-950 border-surface-border shadow-xs hover:border-gray-300'
-          }`}
-        >
-          <div className="flex items-center space-x-2.5 mb-1.5">
-            <div className={`w-8 h-8 rounded-lg flex items-center justify-center font-bold ${
-              statusFilter === 'all' ? 'bg-navy-900 text-gold-400' : 'bg-navy-50 text-navy-800'
-            }`}>
-              <Layers className="w-4 h-4" />
-            </div>
-            <div className={`text-[11px] font-medium ${statusFilter === 'all' ? 'text-gray-300' : 'text-gray-500'}`}>
-              ทั้งหมด
-            </div>
-          </div>
-          <div className="text-xl font-black">{properties.length}</div>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => setStatusFilter('sale')}
-          className={`p-3.5 sm:p-4 rounded-2xl border text-left transition-all cursor-pointer ${
-            statusFilter === 'sale' 
-              ? 'bg-gold-500 text-navy-950 border-gold-600 shadow-md ring-2 ring-navy-950/20' 
-              : 'bg-white text-navy-950 border-surface-border shadow-xs hover:border-gray-300'
-          }`}
-        >
-          <div className="flex items-center space-x-2.5 mb-1.5">
-            <div className={`w-8 h-8 rounded-lg flex items-center justify-center font-bold ${
-              statusFilter === 'sale' ? 'bg-gold-600 text-navy-950' : 'bg-gold-50 text-gold-700'
-            }`}>
-              <Home className="w-4 h-4" />
-            </div>
-            <div className={`text-[11px] font-medium ${statusFilter === 'sale' ? 'text-navy-900 font-bold' : 'text-gray-500'}`}>
-              เปิดขาย
-            </div>
-          </div>
-          <div className="text-xl font-black">
-            {properties.filter((p) => p.status === 'sale').length}
-          </div>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => setStatusFilter('rent')}
-          className={`p-3.5 sm:p-4 rounded-2xl border text-left transition-all cursor-pointer ${
-            statusFilter === 'rent' 
-              ? 'bg-emerald-600 text-white border-emerald-700 shadow-md ring-2 ring-emerald-400/40' 
-              : 'bg-white text-navy-950 border-surface-border shadow-xs hover:border-gray-300'
-          }`}
-        >
-          <div className="flex items-center space-x-2.5 mb-1.5">
-            <div className={`w-8 h-8 rounded-lg flex items-center justify-center font-bold ${
-              statusFilter === 'rent' ? 'bg-emerald-700 text-white' : 'bg-emerald-50 text-emerald-700'
-            }`}>
-              <Building className="w-4 h-4" />
-            </div>
-            <div className={`text-[11px] font-medium ${statusFilter === 'rent' ? 'text-emerald-100' : 'text-gray-500'}`}>
-              ปล่อยเช่า
-            </div>
-          </div>
-          <div className="text-xl font-black">
-            {properties.filter((p) => p.status === 'rent').length}
-          </div>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => setStatusFilter('featured')}
-          className={`p-3.5 sm:p-4 rounded-2xl border text-left transition-all cursor-pointer ${
-            statusFilter === 'featured' 
-              ? 'bg-amber-500 text-navy-950 border-amber-600 shadow-md ring-2 ring-amber-300' 
-              : 'bg-white text-navy-950 border-surface-border shadow-xs hover:border-gray-300'
-          }`}
-        >
-          <div className="flex items-center space-x-2.5 mb-1.5">
-            <div className={`w-8 h-8 rounded-lg flex items-center justify-center font-bold ${
-              statusFilter === 'featured' ? 'bg-amber-600 text-white' : 'bg-amber-50 text-amber-600'
-            }`}>
-              <Star className="w-4 h-4 fill-current" />
-            </div>
-            <div className={`text-[11px] font-medium ${statusFilter === 'featured' ? 'text-navy-950 font-bold' : 'text-gray-500'}`}>
-              ทรัพย์เด่น
-            </div>
-          </div>
-          <div className="text-xl font-black">
-            {properties.filter((p) => p.featured).length}
-          </div>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => setStatusFilter('draft')}
-          className={`p-3.5 sm:p-4 rounded-2xl border text-left transition-all cursor-pointer col-span-2 sm:col-span-1 ${
-            statusFilter === 'draft' 
-              ? 'bg-gray-800 text-white border-gray-900 shadow-md' 
-              : 'bg-white text-navy-950 border-surface-border shadow-xs hover:border-gray-300'
-          }`}
-        >
-          <div className="flex items-center space-x-2.5 mb-1.5">
-            <div className={`w-8 h-8 rounded-lg flex items-center justify-center font-bold ${
-              statusFilter === 'draft' ? 'bg-gray-700 text-white' : 'bg-gray-100 text-gray-700'
-            }`}>
-              <Globe className="w-4 h-4" />
-            </div>
-            <div className={`text-[11px] font-medium ${statusFilter === 'draft' ? 'text-gray-300' : 'text-gray-500'}`}>
-              แบบร่าง
-            </div>
-          </div>
-          <div className="text-xl font-black">
-            {properties.filter((p) => p.published === false).length}
-          </div>
-        </button>
-      </div>
-
-      {/* Header with Actions */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-5 sm:p-6 rounded-2xl border border-surface-border shadow-xs">
-        <div>
-          <h1 className="text-xl sm:text-2xl font-extrabold text-navy-950">จัดการอสังหาริมทรัพย์</h1>
-          <p className="text-xs text-brand-muted mt-0.5">
-            ค้นหา คัดลอก แก้ไข และเผยแพร่ทรัพย์ในเขตหาดใหญ่–สงขลา ({filteredProperties.length} จาก {properties.length} รายการ)
-          </p>
-        </div>
-
-        <div className="flex flex-wrap items-center gap-2">
-          <button
-            type="button"
-            onClick={loadData}
-            disabled={loading}
-            className="p-2.5 bg-gray-50 hover:bg-gray-100 text-gray-700 rounded-xl border border-gray-200 transition-colors cursor-pointer"
-            title="รีเฟรชข้อมูล"
-          >
-            <RotateCcw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-          </button>
-
-          <button
-            id="export-csv-btn"
-            type="button"
-            onClick={handleExportCSV}
-            disabled={filteredProperties.length === 0}
-            title="ดาวน์โหลดรายการทรัพย์ที่กรองแล้วเป็นไฟล์ CSV"
-            className="px-3.5 py-2 bg-white hover:bg-gray-50 text-navy-950 border border-gray-300 font-semibold text-xs rounded-xl shadow-xs flex items-center space-x-1.5 transition-all disabled:opacity-50 cursor-pointer"
-          >
-            <Download className="w-4 h-4 text-navy-700" />
-            <span>Export CSV</span>
-          </button>
-
-          <Link
-            href="/admin/automation"
-            className="px-3.5 py-2 bg-gradient-to-r from-navy-950 to-blue-900 hover:from-navy-900 hover:to-blue-800 text-gold-300 border border-gold-500/30 font-bold text-xs rounded-xl shadow-md flex items-center space-x-1.5 transition-all cursor-pointer"
-            title="เข้าสู่ศูนย์ระบบอัตโนมัติ AI (สร้างโพสต์/จับคู่ลูกค้า/ร่างสัญญา/วิเคราะห์ Yield)"
-          >
-            <Sparkles className="w-4 h-4 text-gold-400" />
-            <span>ระบบอัตโนมัติ AI</span>
-          </Link>
-
-          <button
-            type="button"
-            onClick={() => setQuickModalOpen(true)}
-            className="px-4 py-2 bg-gradient-to-r from-amber-500 to-gold-500 hover:from-amber-400 hover:to-gold-400 text-navy-950 font-black text-xs rounded-xl shadow-md flex items-center space-x-1.5 transition-all cursor-pointer active:scale-95 border border-gold-300"
-            title="วางข้อความจาก LINE หรือ Facebook เพื่อลงทรัพย์ได้ทันที 1-Click"
-          >
-            <Zap className="w-4 h-4 text-navy-950 fill-navy-950" />
-            <span>⚡ ลงทรัพย์ด่วน 1-Click</span>
-          </button>
-
-          <Link
-            id="add-new-property-btn"
-            href="/admin/properties/new"
-            className="px-4 py-2 bg-navy-950 hover:bg-navy-900 text-gold-400 font-black text-xs rounded-xl shadow-md flex items-center space-x-1.5 transition-all cursor-pointer active:scale-95"
-          >
-            <PlusCircle className="w-4 h-4 text-gold-400" />
-            <span>+ ฟอร์มเต็ม</span>
-          </Link>
-        </div>
-      </div>
-
-      {/* Filter and Search Bar */}
-      <div className="bg-white p-4 rounded-2xl border border-surface-border shadow-xs space-y-3">
-        <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3">
-          {/* Search Field */}
+      <section
+        aria-label="ค้นหาและกรองทรัพย์"
+        className="space-y-4 rounded-3xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5"
+      >
+        <div className="flex flex-col gap-3 sm:flex-row">
           <div className="relative flex-1">
+            <label htmlFor="admin-property-search" className="sr-only">
+              ค้นหาชื่อทรัพย์ อำเภอ หรือรหัสทรัพย์
+            </label>
             <input
-              type="text"
-              placeholder="ค้นหาชื่อทรัพย์, อำเภอ หรือรหัส เช่น CK-01..."
+              id="admin-property-search"
+              type="search"
+              placeholder="ค้นหาชื่อทรัพย์ อำเภอ หรือรหัส CK…"
               value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full bg-gray-50 border border-gray-200 rounded-xl pl-9 pr-8 py-2.5 text-xs text-navy-950 focus:outline-none focus:ring-2 focus:ring-gold-500 font-medium"
+              onChange={(event) => setSearchQuery(event.target.value)}
+              className="min-h-12 w-full rounded-xl border border-slate-200 bg-slate-50 pl-10 pr-3 text-base text-navy-950 focus:outline-none focus:ring-2 focus:ring-gold-400"
             />
-            <Search className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
-            {searchQuery && (
-              <button
-                type="button"
-                onClick={() => setSearchQuery('')}
-                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 font-bold text-xs"
-              >
-                ✕
-              </button>
-            )}
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
           </div>
-
-          {/* Quick Filter Selectors & Sort */}
-          <div className="flex flex-wrap items-center gap-2">
-            {/* District Dropdown */}
-            <select
-              value={districtFilter}
-              onChange={(e) => setDistrictFilter(e.target.value)}
-              className="bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 text-xs text-navy-950 font-medium focus:outline-none focus:ring-1 focus:ring-gold-500 cursor-pointer"
-            >
-              <option value="all">📍 ทุกอำเภอในสงขลา</option>
-              {DISTRICTS_LIST.map((dist) => (
-                <option key={dist} value={dist}>
-                  {dist}
-                </option>
-              ))}
-            </select>
-
-            {/* Property Type Dropdown */}
-            <select
-              value={typeFilter}
-              onChange={(e) => setTypeFilter(e.target.value)}
-              className="bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 text-xs text-navy-950 font-medium focus:outline-none focus:ring-1 focus:ring-gold-500 cursor-pointer"
-            >
-              <option value="all">🏢 ทุกประเภทอสังหาฯ</option>
-              <option value="house">บ้าน / ทาวน์โฮม</option>
-              <option value="land">ที่ดิน</option>
-              <option value="condo">คอนโดมิเนียม</option>
-              <option value="commercial">อาคารพาณิชย์</option>
-              <option value="investment">เพื่อการลงทุน</option>
-              <option value="consignment">ขายฝาก / จำนอง</option>
-            </select>
-
-            {/* Sort Selector */}
-            <div className="flex items-center space-x-1 bg-gray-50 border border-gray-200 rounded-xl px-2 py-1">
-              <ArrowUpDown className="w-3.5 h-3.5 text-gray-400 ml-1" />
-              <select
-                value={sortBy}
-                onChange={(e) => setSortBy(e.target.value as any)}
-                className="bg-transparent text-xs text-navy-950 font-semibold focus:outline-none cursor-pointer py-1 pr-1"
-              >
-                <option value="newest">ล่าสุด ➔ เก่าสุด</option>
-                <option value="oldest">เก่าสุด ➔ ล่าสุด</option>
-                <option value="price_desc">ราคา: สูง ➔ ต่ำ</option>
-                <option value="price_asc">ราคา: ต่ำ ➔ สูง</option>
-                <option value="area_desc">พื้นที่: มาก ➔ น้อย</option>
-              </select>
-            </div>
-
-            {(districtFilter !== 'all' || typeFilter !== 'all' || searchQuery || statusFilter !== 'all') && (
-              <button
-                type="button"
-                onClick={() => {
-                  setDistrictFilter('all');
-                  setTypeFilter('all');
-                  setSearchQuery('');
-                  setStatusFilter('all');
-                }}
-                className="text-xs text-red-600 hover:text-red-700 font-bold px-2 py-1.5 hover:underline cursor-pointer"
-              >
-                ล้างตัวกรอง
-              </button>
+          <button
+            type="button"
+            aria-expanded={filtersOpen}
+            aria-controls="property-extra-filters"
+            onClick={() => setFiltersOpen((value) => !value)}
+            className={`inline-flex min-h-12 items-center justify-center gap-2 rounded-xl border px-4 text-sm font-semibold ${filtersOpen || activeFilterCount ? 'border-gold-300 bg-gold-50 text-navy-950' : 'border-slate-200 text-slate-600'}`}
+          >
+            <ArrowUpDown className="h-4 w-4" />
+            ตัวกรองเพิ่มเติม
+            {activeFilterCount > 0 && (
+              <span className="rounded-full bg-navy-950 px-1.5 text-xs text-white">
+                {activeFilterCount}
+              </span>
             )}
-          </div>
+            <ChevronDown
+              className={`h-4 w-4 transition-transform ${filtersOpen ? 'rotate-180' : ''}`}
+            />
+          </button>
         </div>
-
-        {/* Quick Filter Status Chips */}
-        <div className="flex flex-wrap items-center gap-1.5 pt-1 border-t border-gray-100">
-          <span className="text-[11px] font-bold text-gray-400 mr-1">สถานะ:</span>
-          {[
-            { id: 'all', label: 'ทั้งหมด' },
-            { id: 'sale', label: '🏷️ ขาย' },
-            { id: 'rent', label: '🔑 เช่า' },
-            { id: 'featured', label: '🌟 ทรัพย์เด่น' },
-            { id: 'published', label: '🌐 เผยแพร่อยู่' },
-            { id: 'draft', label: '📝 แบบร่าง' },
-          ].map((tab) => (
+        <div className="flex flex-wrap gap-2" aria-label="สถานะทรัพย์">
+          {statusOptions.map((option) => (
             <button
-              key={tab.id}
+              key={option.id}
               type="button"
-              onClick={() => setStatusFilter(tab.id as any)}
-              className={`px-3 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
-                statusFilter === tab.id
-                  ? 'bg-navy-950 text-gold-400 shadow-xs'
-                  : 'bg-gray-100/80 text-gray-600 hover:bg-gray-200/80 hover:text-navy-950'
-              }`}
+              aria-pressed={statusFilter === option.id}
+              onClick={() => setStatusFilter(option.id)}
+              className={`inline-flex min-h-10 items-center gap-2 rounded-xl px-3 text-sm font-medium transition ${statusFilter === option.id ? 'bg-navy-950 text-white' : 'bg-slate-50 text-slate-600 hover:bg-slate-100'}`}
             >
-              {tab.label}
+              {option.label}
+              <span
+                className={`rounded-full px-1.5 text-xs ${statusFilter === option.id ? 'bg-white/15 text-gold-200' : 'bg-white text-slate-500'}`}
+              >
+                {loading ? '—' : statusCount(option.id)}
+              </span>
             </button>
           ))}
         </div>
-      </div>
-
-      {/* Mobile Selection Tool */}
-      <div className="md:hidden flex items-center justify-between bg-white px-4 py-3 rounded-2xl border border-surface-border shadow-xs">
-        <button
-          type="button"
-          onClick={handleSelectAll}
-          className="flex items-center space-x-2 text-xs font-bold text-navy-950 cursor-pointer"
-        >
-          {selectedIds.length > 0 && selectedIds.length === filteredProperties.length ? (
-            <CheckSquare className="w-4 h-4 text-gold-600" />
-          ) : (
-            <Square className="w-4 h-4 text-gray-400" />
+        {filtersOpen && (
+          <div
+            id="property-extra-filters"
+            className="grid gap-3 border-t border-slate-100 pt-4 sm:grid-cols-3"
+          >
+            <label className="space-y-1.5 text-xs font-semibold text-slate-500">
+              อำเภอ
+              <select
+                value={districtFilter}
+                onChange={(event) => setDistrictFilter(event.target.value)}
+                className="block min-h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-navy-950"
+              >
+                <option value="all">ทุกอำเภอ</option>
+                {DISTRICTS_LIST.map((district) => (
+                  <option key={district} value={district}>
+                    {district}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="space-y-1.5 text-xs font-semibold text-slate-500">
+              ประเภททรัพย์
+              <select
+                value={typeFilter}
+                onChange={(event) => setTypeFilter(event.target.value)}
+                className="block min-h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-navy-950"
+              >
+                <option value="all">ทุกประเภท</option>
+                <option value="house">บ้าน / ทาวน์โฮม</option>
+                <option value="land">ที่ดิน</option>
+                <option value="condo">คอนโดมิเนียม</option>
+                <option value="commercial">อาคารพาณิชย์</option>
+                <option value="investment">เพื่อการลงทุน</option>
+                <option value="consignment">ขายฝาก / จำนอง</option>
+              </select>
+            </label>
+            <label className="space-y-1.5 text-xs font-semibold text-slate-500">
+              เรียงตาม
+              <select
+                value={sortBy}
+                onChange={(event) => setSortBy(event.target.value as SortOrder)}
+                className="block min-h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-navy-950"
+              >
+                <option value="newest">วันที่ล่าสุด</option>
+                <option value="oldest">วันที่เก่าสุด</option>
+                <option value="price_desc">ราคาสูงไปต่ำ</option>
+                <option value="price_asc">ราคาต่ำไปสูง</option>
+                <option value="area_desc">พื้นที่ใช้สอยมากไปน้อย</option>
+              </select>
+            </label>
+          </div>
+        )}
+        <div className="flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 pt-3">
+          <p aria-live="polite" className="text-sm text-slate-500">
+            {loading
+              ? 'กำลังโหลดข้อมูล…'
+              : `แสดง ${filteredProperties.length} จาก ${properties.length} รายการ`}
+          </p>
+          {hasFilters && (
+            <button
+              type="button"
+              onClick={resetFilters}
+              className="min-h-9 rounded-lg px-2 text-sm font-semibold text-navy-950 underline underline-offset-4"
+            >
+              ล้างตัวกรอง
+            </button>
           )}
-          <span>{selectedIds.length > 0 && selectedIds.length === filteredProperties.length ? 'ยกเลิกการเลือกทั้งหมด' : `เลือกทั้งหมด (${filteredProperties.length} รายการ)`}</span>
-        </button>
-        {selectedIds.length > 0 && (
+        </div>
+      </section>
+
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="flex flex-wrap items-center gap-2">
           <button
             type="button"
-            onClick={() => setSelectedIds([])}
-            className="text-xs font-bold text-red-600 cursor-pointer"
+            disabled={
+              loading || busy || inlineUpdatingId !== null || filteredProperties.length === 0
+            }
+            onClick={handleSelectAll}
+            aria-pressed={allVisibleSelected}
+            className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 text-sm font-medium text-navy-950 disabled:opacity-50"
           >
-            ล้างการเลือก
+            {allVisibleSelected ? (
+              <CheckSquare className="h-4 w-4 text-gold-600" />
+            ) : (
+              <Square className="h-4 w-4 text-slate-400" />
+            )}
+            {allVisibleSelected ? 'ยกเลิกการเลือกที่แสดง' : 'เลือกที่แสดงทั้งหมด'}
           </button>
-        )}
+          <button
+            type="button"
+            disabled={
+              loading || busy || inlineUpdatingId !== null || filteredProperties.length === 0
+            }
+            onClick={handleExpandAll}
+            className="min-h-11 rounded-xl px-3 text-sm font-medium text-slate-600 hover:bg-white disabled:opacity-50"
+          >
+            {allVisibleExpanded ? 'ย่อเครื่องมือทั้งหมด' : 'เปิดเครื่องมือทั้งหมด'}
+          </button>
+        </div>
+        <details className="group rounded-2xl border border-slate-200 bg-white">
+          <summary className="min-h-11 cursor-pointer px-4 py-3 text-sm font-semibold text-navy-950">
+            เครื่องมือจัดการ
+          </summary>
+          <div className="grid gap-1 border-t border-slate-100 p-2 sm:grid-cols-2">
+            <button
+              type="button"
+              onClick={() => loadData()}
+              disabled={loading}
+              className="flex min-h-11 items-center gap-2 rounded-xl px-3 text-sm text-slate-600 hover:bg-slate-50 disabled:opacity-50"
+            >
+              <RotateCcw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+              โหลดข้อมูลใหม่
+            </button>
+            <button
+              id="export-csv-btn"
+              type="button"
+              onClick={handleExportCSV}
+              disabled={
+                loading || busy || inlineUpdatingId !== null || filteredProperties.length === 0
+              }
+              className="flex min-h-11 items-center gap-2 rounded-xl px-3 text-sm text-slate-600 hover:bg-slate-50 disabled:opacity-50"
+            >
+              <Download className="h-4 w-4" />
+              ส่งออก CSV
+            </button>
+            <button
+              type="button"
+              onClick={() => setQuickModalOpen(true)}
+              className="flex min-h-11 items-center gap-2 rounded-xl px-3 text-sm text-slate-600 hover:bg-slate-50"
+            >
+              <Zap className="h-4 w-4 text-gold-600" />
+              เพิ่มจากข้อความ
+            </button>
+            <Link
+              href="/admin/automation"
+              className="flex min-h-11 items-center gap-2 rounded-xl px-3 text-sm text-slate-600 hover:bg-slate-50"
+            >
+              <Sparkles className="h-4 w-4 text-gold-600" />
+              เครื่องมือ AI
+            </Link>
+          </div>
+        </details>
       </div>
 
-      {/* Mobile Card View (Screens < md) */}
-      <div className="md:hidden space-y-3">
-        {loading ? (
-          <div className="bg-white rounded-2xl p-8 text-center text-gray-400 border border-gray-200">
-            กำลังโหลดข้อมูล...
+      {selectedIds.length > 0 && (
+        <section
+          aria-label="จัดการทรัพย์ที่เลือก"
+          className="space-y-3 rounded-2xl bg-navy-950 p-4 text-white"
+        >
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <p className="text-sm font-semibold">
+              เลือกไว้ {selectedIds.length} รายการ
+              {selectedIds.some(
+                (id) => !filteredProperties.some((property) => property.id === id),
+              ) && <span className="ml-1 font-normal text-slate-300">(รวมรายการนอกตัวกรอง)</span>}
+            </p>
+            <button
+              type="button"
+              onClick={() => setSelectedIds([])}
+              disabled={busy}
+              className="min-h-9 px-2 text-sm text-slate-300 underline underline-offset-4 disabled:opacity-50"
+            >
+              ยกเลิกการเลือก
+            </button>
           </div>
-        ) : sortedProperties.length === 0 ? (
-          <div className="bg-white rounded-2xl p-8 text-center text-gray-500 border border-gray-200">
-            ไม่พบข้อมูลอสังหาริมทรัพย์ที่ค้นหา
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              disabled={busy || loading || inlineUpdatingId !== null}
+              onClick={() => handleBulkPublish(true)}
+              className="min-h-11 rounded-xl bg-gold-400 px-4 text-sm font-semibold text-navy-950 disabled:opacity-50"
+            >
+              เผยแพร่ที่เลือก
+            </button>
+            <button
+              type="button"
+              disabled={busy || loading || inlineUpdatingId !== null}
+              onClick={() => handleBulkPublish(false)}
+              className="min-h-11 rounded-xl border border-white/20 px-4 text-sm font-semibold disabled:opacity-50"
+            >
+              เปลี่ยนเป็นแบบร่าง
+            </button>
+            <button
+              type="button"
+              disabled={busy || loading || inlineUpdatingId !== null}
+              onClick={() => setBulkConfirmDelete(true)}
+              className="min-h-11 rounded-xl px-4 text-sm font-semibold text-red-200 hover:bg-red-500/10 disabled:opacity-50"
+            >
+              ลบที่เลือก
+            </button>
+            {busy && (
+              <span
+                role="status"
+                className="inline-flex items-center gap-2 px-2 text-sm text-slate-300"
+              >
+                <Loader2 className="h-4 w-4 animate-spin" />
+                กำลังบันทึก…
+              </span>
+            )}
           </div>
-        ) : (
-          sortedProperties.map((prop) => (
+        </section>
+      )}
+
+      {loading ? (
+        <div
+          role="status"
+          className="flex items-center justify-center gap-3 rounded-3xl border border-slate-200 bg-white p-12 text-sm text-slate-500"
+        >
+          <Loader2 className="h-5 w-5 animate-spin text-gold-600" />
+          กำลังโหลดรายการทรัพย์…
+        </div>
+      ) : sortedProperties.length === 0 ? (
+        <div className="space-y-3 rounded-3xl border border-dashed border-slate-300 bg-white p-8 text-center sm:p-12">
+          <Building2 className="mx-auto h-10 w-10 text-slate-300" />
+          <h2 className="text-lg font-semibold text-navy-950">
+            {error
+              ? 'ยังแสดงรายการทรัพย์ไม่ได้'
+              : hasFilters
+                ? 'ไม่พบทรัพย์ตามเงื่อนไข'
+                : 'ยังไม่มีทรัพย์ในระบบ'}
+          </h2>
+          <p className="text-sm text-slate-500">
+            {error
+              ? 'ลองโหลดข้อมูลใหม่อีกครั้ง'
+              : hasFilters
+                ? 'ลองใช้คำค้นอื่น หรือล้างตัวกรองเพื่อดูรายการทั้งหมด'
+                : 'เริ่มเพิ่มทรัพย์แรก พร้อมรูป ราคา และข้อมูลติดต่อ'}
+          </p>
+          {hasFilters && !error && (
+            <button
+              type="button"
+              onClick={resetFilters}
+              className="min-h-11 rounded-xl border border-slate-200 px-4 text-sm font-semibold text-navy-950"
+            >
+              ล้างตัวกรอง
+            </button>
+          )}
+        </div>
+      ) : (
+        <div className="grid items-start gap-5 lg:grid-cols-2 2xl:grid-cols-3">
+          {sortedProperties.map((prop) => (
             <CollapsiblePropertyCard
               key={prop.id}
               property={prop}
@@ -910,190 +1033,48 @@ export default function AdminPropertiesPage() {
               onOpenHistoryModal={handleOpenHistory}
               onOpenLineModal={handleOpenLineModal}
               onDuplicate={handleDuplicate}
-              onDeleteConfirm={(id) => setDeleteConfirmId(id)}
+              onDeleteConfirm={setDeleteConfirmId}
               onUpdateNotes={handleUpdatePropertyNotes}
               completionScore={getCompletionScore(prop)}
               busy={busy}
             />
-          ))
-        )}
-      </div>
-
-      {/* Desktop Property Table (Screens >= md) */}
-      <div className="hidden md:block bg-white rounded-2xl border border-surface-border shadow-xs overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs">
-            <thead>
-              <tr className="bg-gray-50/80 text-gray-600 border-b border-gray-200">
-                <th className="p-3 text-center w-14">
-                  <div className="flex items-center justify-center space-x-1">
-                    <button
-                      type="button"
-                      onClick={handleExpandAll}
-                      className="text-gray-400 hover:text-gold-600 cursor-pointer p-0.5"
-                      title={expandedRowIds.length === filteredProperties.length && filteredProperties.length > 0 ? "ย่อรายละเอียดทุกแถว" : "ขยายดูบันทึกและประวัติทุกแถว"}
-                    >
-                      {expandedRowIds.length > 0 && expandedRowIds.length === filteredProperties.length ? (
-                        <ChevronDown className="w-3.5 h-3.5 text-gold-600" />
-                      ) : (
-                        <ChevronRight className="w-3.5 h-3.5 text-gray-400" />
-                      )}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={handleSelectAll}
-                      className="text-gray-400 hover:text-navy-950 cursor-pointer"
-                      title="เลือกทั้งหมด"
-                    >
-                      {selectedIds.length > 0 && selectedIds.length === filteredProperties.length ? (
-                        <CheckSquare className="w-4 h-4 text-gold-600" />
-                      ) : (
-                        <Square className="w-4 h-4" />
-                      )}
-                    </button>
-                  </div>
-                </th>
-                <th className="p-3.5 font-semibold">ภาพ</th>
-                <th className="p-3.5 font-semibold">ชื่อทรัพย์ & รหัส</th>
-                <th className="p-3.5 font-semibold">ประเภท</th>
-                <th className="p-3.5 font-semibold">ราคา</th>
-                <th className="p-3.5 font-semibold">ทำเล</th>
-                <th className="p-3.5 font-semibold">สถานะ</th>
-                <th className="p-3.5 font-semibold">นายหน้าผู้ดูแล</th>
-                <th className="p-3.5 font-semibold text-center">เผยแพร่</th>
-                <th className="p-3.5 font-semibold text-center">ทรัพย์เด่น</th>
-                <th className="p-3.5 font-semibold">วันที่ลง</th>
-                <th className="p-3.5 font-semibold text-right">การจัดการ</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {loading ? (
-                <tr>
-                  <td colSpan={12} className="p-8 text-center text-gray-400">
-                    กำลังโหลดข้อมูล...
-                  </td>
-                </tr>
-              ) : sortedProperties.length === 0 ? (
-                <tr>
-                  <td colSpan={12} className="p-8 text-center text-gray-500">
-                    ไม่พบข้อมูลอสังหาริมทรัพย์ที่ค้นหา
-                  </td>
-                </tr>
-              ) : (
-                sortedProperties.map((prop) => (
-                  <CollapsiblePropertyRow
-                    key={prop.id}
-                    property={prop}
-                    isSelected={selectedIds.includes(prop.id)}
-                    isExpanded={expandedRowIds.includes(prop.id)}
-                    isHighlighted={highlightedRowId === prop.id}
-                    onToggleSelect={handleToggleSelect}
-                    onToggleExpand={handleToggleExpand}
-                    onStartEditPrice={handleStartEditPrice}
-                    onSaveInlinePrice={handleSaveInlinePrice}
-                    editingPriceId={editingPriceId}
-                    inlinePriceInput={inlinePriceInput}
-                    setInlinePriceInput={setInlinePriceInput}
-                    onCancelEditPrice={handleCancelEditPrice}
-                    inlineUpdatingId={inlineUpdatingId}
-                    onInlineUpdateStatus={handleInlineUpdateStatus}
-                    onTogglePublished={handleTogglePublished}
-                    onToggleFeatured={handleToggleFeatured}
-                    onCopyCode={handleCopyCode}
-                    copiedCodeId={copiedCodeId}
-                    onCopyLink={handleCopyLink}
-                    copiedId={copiedId}
-                    onCopySnippet={handleCopySnippet}
-                    copiedSnippetId={copiedSnippetId}
-                    onOpenLandsMaps={handleOpenLandsMapsOverlay}
-                    onOpenHistoryModal={handleOpenHistory}
-                    onOpenLineModal={handleOpenLineModal}
-                    onDuplicate={handleDuplicate}
-                    onDeleteConfirm={(id) => setDeleteConfirmId(id)}
-                    onUpdateNotes={handleUpdatePropertyNotes}
-                    completionScore={getCompletionScore(prop)}
-                    busy={busy}
-                  />
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      {/* Floating Bulk Action Bar (When items are selected) */}
-      {selectedIds.length > 0 && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 bg-navy-950 text-white px-5 py-3 rounded-2xl shadow-2xl border border-navy-800 flex flex-wrap items-center gap-3 animate-in slide-in-from-bottom-6">
-          <div className="flex items-center space-x-2 text-xs">
-            <span className="w-2 h-2 rounded-full bg-gold-400"></span>
-            <span>เลือกอยู่ <strong>{selectedIds.length}</strong> รายการ</span>
-          </div>
-
-          <div className="h-4 w-[1px] bg-navy-800 hidden sm:block"></div>
-
-          <div className="flex items-center space-x-2">
-            <button
-              type="button"
-              disabled={busy}
-              onClick={() => handleBulkPublish(true)}
-              className="px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center space-x-1"
-            >
-              <Globe className="w-3.5 h-3.5" />
-              <span>เผยแพร่</span>
-            </button>
-
-            <button
-              type="button"
-              disabled={busy}
-              onClick={() => handleBulkPublish(false)}
-              className="px-3 py-1.5 bg-navy-800 hover:bg-navy-700 text-gray-200 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center space-x-1"
-            >
-              <span>ปรับเป็นแบบร่าง</span>
-            </button>
-
-            <button
-              type="button"
-              disabled={busy}
-              onClick={() => setBulkConfirmDelete(true)}
-              className="px-3 py-1.5 bg-red-600 hover:bg-red-500 text-white rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center space-x-1"
-            >
-              <Trash2 className="w-3.5 h-3.5" />
-              <span>ลบ</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setSelectedIds([])}
-              className="px-2.5 py-1.5 text-gray-400 hover:text-white text-xs font-semibold"
-            >
-              ✕ ยกเลิก
-            </button>
-          </div>
+          ))}
         </div>
       )}
-
       {/* Delete Single Confirmation Dialog */}
       {deleteConfirmId && (
         <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl p-6 max-w-sm w-full shadow-2xl border border-surface-border text-center space-y-4">
+          <div
+            ref={confirmationRef}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="delete-property-title"
+            onKeyDown={handleConfirmationKeyDown}
+            className="bg-white rounded-2xl p-6 max-w-sm w-full shadow-2xl border border-surface-border text-center space-y-4"
+          >
             <div className="w-12 h-12 rounded-full bg-red-100 text-red-600 flex items-center justify-center mx-auto">
               <AlertCircle className="w-6 h-6" />
             </div>
-            <h3 className="font-bold text-navy-950 text-base">ต้องการลบอสังหาริมทรัพย์นี้?</h3>
+            <h3 id="delete-property-title" className="font-bold text-navy-950 text-base">
+              ลบทรัพย์ {formatPropertyCode(deleteConfirmId)}?
+            </h3>
             <p className="text-xs text-gray-500">
               การลบรายการนี้จะไม่สามารถกู้คืนได้ คุณแน่ใจหรือไม่?
             </p>
             <div className="flex items-center space-x-2 pt-2">
               <button
+                type="button"
+                disabled={busy}
                 onClick={() => setDeleteConfirmId(null)}
-                className="flex-1 py-2 rounded-xl text-xs font-semibold bg-gray-100 text-gray-700 hover:bg-gray-200 cursor-pointer"
+                className="flex-1 min-h-11 rounded-xl text-sm font-semibold bg-gray-100 text-gray-700 hover:bg-gray-200 disabled:opacity-50"
               >
                 ยกเลิก
               </button>
               <button
-                disabled={busy} 
+                type="button"
+                disabled={busy}
                 onClick={() => handleDelete(deleteConfirmId)}
-                className="flex-1 py-2 rounded-xl text-xs font-semibold bg-red-600 text-white hover:bg-red-700 cursor-pointer"
+                className="flex-1 min-h-11 rounded-xl text-sm font-semibold bg-red-600 text-white hover:bg-red-700 disabled:opacity-50"
               >
                 ยืนยันการลบ
               </button>
@@ -1105,25 +1086,37 @@ export default function AdminPropertiesPage() {
       {/* Bulk Delete Confirmation Dialog */}
       {bulkConfirmDelete && (
         <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl p-6 max-w-sm w-full shadow-2xl border border-surface-border text-center space-y-4">
+          <div
+            ref={confirmationRef}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="delete-properties-title"
+            onKeyDown={handleConfirmationKeyDown}
+            className="bg-white rounded-2xl p-6 max-w-sm w-full shadow-2xl border border-surface-border text-center space-y-4"
+          >
             <div className="w-12 h-12 rounded-full bg-red-100 text-red-600 flex items-center justify-center mx-auto">
               <AlertCircle className="w-6 h-6" />
             </div>
-            <h3 className="font-bold text-navy-950 text-base">ต้องการลบ {selectedIds.length} รายการที่เลือก?</h3>
+            <h3 id="delete-properties-title" className="font-bold text-navy-950 text-base">
+              ต้องการลบ {selectedIds.length} รายการที่เลือก?
+            </h3>
             <p className="text-xs text-gray-500">
               อสังหาริมทรัพย์ทั้งหมดที่เลือกจะถูกลบออกจากระบบอย่างถาวร
             </p>
             <div className="flex items-center space-x-2 pt-2">
               <button
+                type="button"
+                disabled={busy}
                 onClick={() => setBulkConfirmDelete(false)}
-                className="flex-1 py-2 rounded-xl text-xs font-semibold bg-gray-100 text-gray-700 hover:bg-gray-200 cursor-pointer"
+                className="flex-1 min-h-11 rounded-xl text-sm font-semibold bg-gray-100 text-gray-700 hover:bg-gray-200 disabled:opacity-50"
               >
                 ยกเลิก
               </button>
               <button
-                disabled={busy} 
+                type="button"
+                disabled={busy}
                 onClick={handleBulkDelete}
-                className="flex-1 py-2 rounded-xl text-xs font-semibold bg-red-600 text-white hover:bg-red-700 cursor-pointer"
+                className="flex-1 min-h-11 rounded-xl text-sm font-semibold bg-red-600 text-white hover:bg-red-700 disabled:opacity-50"
               >
                 ยืนยันลบทั้งหมด
               </button>
@@ -1132,32 +1125,38 @@ export default function AdminPropertiesPage() {
         </div>
       )}
       {/* Quick Add Modal */}
-      <QuickPropertyModal
-        isOpen={quickModalOpen}
-        onClose={() => setQuickModalOpen(false)}
-        onSuccess={(newProp) => {
-          setDuplicateSuccessMessage(`🎉 ลงทรัพย์ "${newProp.title}" เรียบร้อยแล้ว!`);
-          setTimeout(() => setDuplicateSuccessMessage(null), 5000);
-          loadData();
-        }}
-      />
+      {quickModalOpen && (
+        <QuickPropertyModal
+          isOpen={quickModalOpen}
+          onClose={() => setQuickModalOpen(false)}
+          onSuccess={(newProp) => {
+            setDuplicateSuccessMessage(`🎉 ลงทรัพย์ "${newProp.title}" เรียบร้อยแล้ว!`);
+            setTimeout(() => setDuplicateSuccessMessage(null), 5000);
+            loadData();
+          }}
+        />
+      )}
 
       {/* Property History & Audit Trail Modal */}
-      <PropertyHistoryModal
-        isOpen={isHistoryModalOpen}
-        onClose={() => setIsHistoryModalOpen(false)}
-        property={historyModalProperty}
-        onRefreshProperty={loadData}
-      />
+      {isHistoryModalOpen && (
+        <PropertyHistoryModal
+          isOpen={isHistoryModalOpen}
+          onClose={() => setIsHistoryModalOpen(false)}
+          property={historyModalProperty}
+          onRefreshProperty={loadData}
+        />
+      )}
 
       {/* DOL LandsMaps Integration Overlay Modal */}
-      <AdminLandsMapsOverlayModal
-        isOpen={isLandsMapsModalOpen}
-        onClose={() => setIsLandsMapsModalOpen(false)}
-        property={landsMapsModalProperty}
-        allProperties={properties}
-        onPropertyUpdated={loadData}
-      />
+      {isLandsMapsModalOpen && (
+        <AdminLandsMapsOverlayModal
+          isOpen={isLandsMapsModalOpen}
+          onClose={() => setIsLandsMapsModalOpen(false)}
+          property={landsMapsModalProperty}
+          allProperties={properties}
+          onPropertyUpdated={loadData}
+        />
+      )}
 
       {/* Review the property before broadcasting to OA followers. */}
       {lineModalProperty && (
@@ -1170,42 +1169,20 @@ export default function AdminPropertiesPage() {
           propertyId={lineModalProperty.id}
         />
       )}
-
-      {/* Inline Update Success Toast Notification */}
-      {inlineSuccessToast && (
-        <div className="fixed bottom-6 right-6 z-50 bg-navy-950 text-gold-300 px-4 py-3 rounded-2xl shadow-2xl border border-gold-500/40 flex items-center space-x-2.5 animate-in slide-in-from-bottom-3 duration-200">
-          <div className="w-6 h-6 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center flex-shrink-0">
-            <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-          </div>
-          <div className="text-xs font-bold text-white">
-            {inlineSuccessToast.message}
-          </div>
-        </div>
-      )}
-
-      {/* Floating Copy Snippet Success Toast */}
-      {copySnippetToast && !inlineSuccessToast && (
-        <div className="fixed bottom-6 right-6 z-50 bg-navy-950 text-white px-5 py-3.5 rounded-2xl shadow-2xl border border-gold-400/50 flex items-center space-x-3 animate-in slide-in-from-bottom-3 duration-300 max-w-sm sm:max-w-md">
-          <div className="w-8 h-8 rounded-xl bg-gold-400 text-navy-950 flex items-center justify-center shrink-0 font-bold shadow-xs">
-            <ClipboardCheck className="w-4 h-4 text-navy-950" />
-          </div>
-          <div className="flex-1 min-w-0">
-            <div className="text-xs font-black text-gold-300 flex items-center gap-1.5">
-              <span>คัดลอกข้อมูลสรุปทรัพย์แล้ว!</span>
-              <span className="text-[10px] bg-emerald-500/20 text-emerald-300 px-1.5 py-0.2 rounded font-normal">High-Converting</span>
-            </div>
-            <div className="text-[11px] text-gray-200 truncate mt-0.5">
-              {copySnippetToast.title}
-            </div>
-          </div>
-          <button
-            onClick={() => setCopySnippetToast(null)}
-            className="text-gray-400 hover:text-white p-1 ml-1 cursor-pointer"
-          >
-            ✕
-          </button>
-        </div>
-      )}
     </div>
+  );
+}
+
+export default function AdminPropertiesPage() {
+  return (
+    <Suspense
+      fallback={
+        <p role="status" className="p-8 text-center text-sm text-slate-500">
+          กำลังโหลดรายการทรัพย์…
+        </p>
+      }
+    >
+      <PropertiesContent />
+    </Suspense>
   );
 }

@@ -3,51 +3,65 @@
 import React, { useState, useEffect, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { 
-  MessageSquare, 
-  Phone, 
-  MessageCircle, 
-  Clock, 
-  User,
+import {
+  MessageSquare,
+  Phone,
+  MessageCircle,
+  Clock,
   Search,
-  CheckCircle2,
   Copy,
   Check,
   RotateCcw,
-  AlertCircle,
-  ExternalLink,
-  ChevronRight,
-  ShieldCheck,
   Sparkles,
-  Layers
+  Layers,
+  Loader2,
+  ChevronDown,
+  UserRound,
 } from 'lucide-react';
 import { fetchInquiries, updateInquiryStatus } from '@/lib/store/properties-store';
 import { logSystemActivity } from '@/lib/store/activity-store';
 import { Inquiry } from '@/lib/types';
 import { formatThaiDate, formatPropertyCode } from '@/lib/utils';
 
+type InquiryFilter = 'all' | Inquiry['status'];
+const statusOptions: { id: InquiryFilter; label: string }[] = [
+  { id: 'all', label: 'ทั้งหมด' },
+  { id: 'new', label: 'รอติดต่อ' },
+  { id: 'contacted', label: 'ติดต่อแล้ว' },
+  { id: 'scheduled', label: 'นัดหมายแล้ว' },
+  { id: 'closed', label: 'ปิดงาน' },
+];
+const typeLabels: Record<Inquiry['inquiry_type'], string> = {
+  viewing: 'ขอนัดชมทรัพย์',
+  consignment_sell: 'ฝากขายทรัพย์',
+  inquiry: 'สอบถามทรัพย์',
+};
+function readInquiryFilter(value: string | null | undefined): InquiryFilter {
+  return statusOptions.some((option) => option.id === value) ? (value as InquiryFilter) : 'all';
+}
+
 function InquiriesContent() {
   const searchParams = useSearchParams();
-  const initialFilter = searchParams?.get('filter') || 'all';
-
   const [inquiries, setInquiries] = useState<Inquiry[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [busyId, setBusyId] = useState<string | null>(null);
-  const [statusFilter, setStatusFilter] = useState<'all' | 'new' | 'contacted' | 'closed'>(
-    ['all', 'new', 'contacted', 'closed'].includes(initialFilter) ? (initialFilter as any) : 'all'
+  const [statusFilter, setStatusFilter] = useState<InquiryFilter>(() =>
+    readInquiryFilter(searchParams?.get('filter')),
   );
+  const [typeFilter, setTypeFilter] = useState<'all' | Inquiry['inquiry_type']>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [copiedPhoneId, setCopiedPhoneId] = useState<string | null>(null);
+  const [feedback, setFeedback] = useState('');
+  const [filtersOpen, setFiltersOpen] = useState(false);
 
   const loadInquiries = async () => {
     setLoading(true);
     setError('');
     try {
-      const list = await fetchInquiries();
-      setInquiries(list);
+      setInquiries(await fetchInquiries());
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'โหลดข้อมูลไม่สำเร็จ');
+      setError(err instanceof Error ? err.message : 'โหลดรายการลูกค้าไม่สำเร็จ');
     } finally {
       setLoading(false);
     }
@@ -56,35 +70,27 @@ function InquiriesContent() {
   useEffect(() => {
     loadInquiries();
   }, []);
-
-  // Sync with searchParams if filter changes in URL
   useEffect(() => {
-    const urlFilter = searchParams?.get('filter');
-    if (urlFilter && ['all', 'new', 'contacted', 'closed'].includes(urlFilter)) {
-      setStatusFilter(urlFilter as any);
-    }
+    setStatusFilter(readInquiryFilter(searchParams?.get('filter')));
   }, [searchParams]);
 
   const handleUpdateStatus = async (id: string, newStatus: Inquiry['status']) => {
     if (busyId) return;
     setBusyId(id);
     setError('');
+    setFeedback('');
     try {
       const saved = await updateInquiryStatus(id, newStatus);
       if (!saved) throw new Error('ไม่พบรายการผู้ติดต่อนี้');
-      setInquiries(current => current.map(inquiry => inquiry.id === id ? saved : inquiry));
-
-      const statusLabels: Record<string, string> = {
-        new: 'ยังไม่ติดต่อ',
-        contacted: 'ติดต่อแล้ว',
-        closed: 'ปิดการขาย/เสร็จสิ้น'
-      };
-
+      setInquiries((current) => current.map((inquiry) => (inquiry.id === id ? saved : inquiry)));
+      const statusLabel =
+        statusOptions.find((option) => option.id === saved.status)?.label || saved.status;
+      setFeedback(`บันทึกสถานะ “${statusLabel}” ของ ${saved.name} เรียบร้อยแล้ว`);
       logSystemActivity({
         category: 'inquiry',
         action: 'inquiry_status_updated',
         title: 'อัปเดตสถานะผู้ติดต่อ/ฝากขาย',
-        description: `เปลี่ยนสถานะลูกค้า "${saved.name}" เป็น [${statusLabels[newStatus] || newStatus}]`,
+        description: `เปลี่ยนสถานะลูกค้า "${saved.name}" เป็น [${statusLabel}]`,
         target_id: saved.id,
         target_name: saved.name,
         actor_name: 'ผู้ดูแลระบบ',
@@ -96,398 +102,402 @@ function InquiriesContent() {
     }
   };
 
-  const handleCopyPhone = (id: string, phone: string) => {
-    if (navigator.clipboard) {
-      navigator.clipboard.writeText(phone);
+  const handleCopyPhone = async (id: string, phone: string) => {
+    setFeedback('');
+    try {
+      if (!navigator.clipboard) throw new Error('Clipboard unavailable');
+      await navigator.clipboard.writeText(phone);
       setCopiedPhoneId(id);
-      setTimeout(() => setCopiedPhoneId(null), 2000);
+      setFeedback('คัดลอกเบอร์โทรศัพท์แล้ว');
+      setTimeout(() => setCopiedPhoneId((current) => (current === id ? null : current)), 2000);
+    } catch {
+      setError('คัดลอกเบอร์โทรไม่สำเร็จ กรุณาอนุญาตการคัดลอกในเบราว์เซอร์แล้วลองอีกครั้ง');
     }
   };
 
-  const totalCount = inquiries.length;
-  const newCount = inquiries.filter(i => i.status === 'new').length;
-  const contactedCount = inquiries.filter(i => i.status === 'contacted').length;
-  const closedCount = inquiries.filter(i => i.status === 'closed').length;
-
-  const filtered = inquiries.filter((inq) => {
-    if (statusFilter !== 'all' && inq.status !== statusFilter) return false;
-    if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase();
-      const code = inq.property_id ? formatPropertyCode(inq.property_id).toLowerCase() : '';
-      return (
-        inq.name.toLowerCase().includes(q) ||
-        inq.phone.toLowerCase().includes(q) ||
-        (inq.line_id && inq.line_id.toLowerCase().includes(q)) ||
-        (inq.property_title && inq.property_title.toLowerCase().includes(q)) ||
-        (inq.message && inq.message.toLowerCase().includes(q)) ||
-        code.includes(q)
-      );
-    }
-    return true;
-  });
+  const filtered = inquiries
+    .filter((inquiry) => {
+      if (statusFilter !== 'all' && inquiry.status !== statusFilter) return false;
+      if (typeFilter !== 'all' && inquiry.inquiry_type !== typeFilter) return false;
+      const query = searchQuery.trim().toLowerCase();
+      if (!query) return true;
+      return [
+        inquiry.name,
+        inquiry.phone,
+        inquiry.line_id,
+        inquiry.property_title,
+        inquiry.message,
+        inquiry.property_id ? formatPropertyCode(inquiry.property_id) : '',
+      ].some((value) => value?.toLowerCase().includes(query));
+    })
+    .sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''));
+  const hasFilters = statusFilter !== 'all' || typeFilter !== 'all' || searchQuery.trim() !== '';
+  const resetFilters = () => {
+    setStatusFilter('all');
+    setTypeFilter('all');
+    setSearchQuery('');
+  };
 
   return (
-    <div className="space-y-6 pb-20">
+    <div className="space-y-5 pb-8">
+      <header className="flex flex-col justify-between gap-4 sm:flex-row sm:items-start">
+        <div>
+          <p className="mb-1 text-xs font-semibold uppercase tracking-[0.16em] text-gold-700">
+            CUSTOMER WORKSPACE
+          </p>
+          <h1 className="text-2xl font-bold tracking-tight text-navy-950 sm:text-3xl">
+            ลูกค้าและนัดชม
+          </h1>
+          <p className="mt-2 text-sm leading-relaxed text-slate-500">
+            ติดตามผู้สนใจซื้อ เช่า และฝากขาย พร้อมช่องทางติดต่อในที่เดียว
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={loadInquiries}
+          disabled={loading || busyId !== null}
+          className="inline-flex min-h-11 shrink-0 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-navy-950 hover:bg-slate-50 disabled:opacity-50"
+        >
+          <RotateCcw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+          โหลดข้อมูลใหม่
+        </button>
+      </header>
       {error && (
-        <p role="alert" className="rounded-xl bg-red-50 p-4 text-xs font-semibold text-red-700 border border-red-200">
+        <p
+          role="alert"
+          className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700"
+        >
           {error}
         </p>
       )}
-
-      {/* KPI Lead Summary Tiles */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <button
-          type="button"
-          onClick={() => setStatusFilter('all')}
-          className={`p-4 rounded-2xl border text-left transition-all cursor-pointer ${
-            statusFilter === 'all'
-              ? 'bg-navy-950 text-white border-navy-900 shadow-md ring-2 ring-gold-400/40'
-              : 'bg-white text-navy-950 border-surface-border shadow-xs hover:border-gray-300'
-          }`}
+      {feedback && (
+        <p
+          role="status"
+          className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800"
         >
-          <div className="flex items-center space-x-2 mb-1">
-            <div className={`w-7 h-7 rounded-lg flex items-center justify-center ${
-              statusFilter === 'all' ? 'bg-navy-900 text-gold-400' : 'bg-gray-100 text-navy-900'
-            }`}>
-              <MessageSquare className="w-3.5 h-3.5" />
-            </div>
-            <span className={`text-[11px] font-semibold ${statusFilter === 'all' ? 'text-gray-300' : 'text-gray-500'}`}>
-              ทั้งหมด
-            </span>
-          </div>
-          <div className="text-2xl font-black">{totalCount}</div>
-        </button>
+          {feedback}
+        </p>
+      )}
 
-        <button
-          type="button"
-          onClick={() => setStatusFilter('new')}
-          className={`p-4 rounded-2xl border text-left transition-all cursor-pointer ${
-            statusFilter === 'new'
-              ? 'bg-amber-500 text-navy-950 border-amber-600 shadow-md ring-2 ring-amber-300'
-              : 'bg-white text-navy-950 border-surface-border shadow-xs hover:border-gray-300'
-          }`}
-        >
-          <div className="flex items-center space-x-2 mb-1">
-            <div className={`w-7 h-7 rounded-lg flex items-center justify-center font-black text-xs ${
-              statusFilter === 'new' ? 'bg-amber-600 text-white' : 'bg-amber-100 text-amber-800'
-            }`}>
-              !
-            </div>
-            <span className={`text-[11px] font-bold ${statusFilter === 'new' ? 'text-navy-950' : 'text-amber-700'}`}>
-              รอดำเนินการ (ใหม่)
-            </span>
+      <section
+        aria-label="ค้นหาและกรองลูกค้า"
+        className="space-y-4 rounded-3xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5"
+      >
+        <div className="flex flex-col gap-3 sm:flex-row">
+          <div className="relative flex-1">
+            <label htmlFor="admin-inquiry-search" className="sr-only">
+              ค้นหาลูกค้า เบอร์โทร LINE หรือรหัสทรัพย์
+            </label>
+            <input
+              id="admin-inquiry-search"
+              type="search"
+              placeholder="ค้นหาลูกค้า เบอร์โทร LINE หรือรหัสทรัพย์"
+              value={searchQuery}
+              onChange={(event) => setSearchQuery(event.target.value)}
+              className="min-h-12 w-full rounded-xl border border-slate-200 bg-slate-50 pl-10 pr-3 text-base text-navy-950 focus:outline-none focus:ring-2 focus:ring-gold-400"
+            />
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
           </div>
-          <div className="text-2xl font-black">{newCount}</div>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => setStatusFilter('contacted')}
-          className={`p-4 rounded-2xl border text-left transition-all cursor-pointer ${
-            statusFilter === 'contacted'
-              ? 'bg-emerald-600 text-white border-emerald-700 shadow-md ring-2 ring-emerald-400/40'
-              : 'bg-white text-navy-950 border-surface-border shadow-xs hover:border-gray-300'
-          }`}
-        >
-          <div className="flex items-center space-x-2 mb-1">
-            <div className={`w-7 h-7 rounded-lg flex items-center justify-center ${
-              statusFilter === 'contacted' ? 'bg-emerald-700 text-white' : 'bg-emerald-100 text-emerald-800'
-            }`}>
-              <CheckCircle2 className="w-3.5 h-3.5" />
-            </div>
-            <span className={`text-[11px] font-semibold ${statusFilter === 'contacted' ? 'text-emerald-100' : 'text-gray-500'}`}>
-              ติดต่อลูกค้าแล้ว
-            </span>
-          </div>
-          <div className="text-2xl font-black">{contactedCount}</div>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => setStatusFilter('closed')}
-          className={`p-4 rounded-2xl border text-left transition-all cursor-pointer ${
-            statusFilter === 'closed'
-              ? 'bg-purple-600 text-white border-purple-700 shadow-md ring-2 ring-purple-400/40'
-              : 'bg-white text-navy-950 border-surface-border shadow-xs hover:border-gray-300'
-          }`}
-        >
-          <div className="flex items-center space-x-2 mb-1">
-            <div className={`w-7 h-7 rounded-lg flex items-center justify-center ${
-              statusFilter === 'closed' ? 'bg-purple-700 text-white' : 'bg-purple-100 text-purple-800'
-            }`}>
-              <ShieldCheck className="w-3.5 h-3.5" />
-            </div>
-            <span className={`text-[11px] font-semibold ${statusFilter === 'closed' ? 'text-purple-100' : 'text-gray-500'}`}>
-              ปิดงานเรียบร้อย
-            </span>
-          </div>
-          <div className="text-2xl font-black">{closedCount}</div>
-        </button>
-      </div>
-
-      {/* Header with Search and Actions */}
-      <div className="bg-white p-5 sm:p-6 rounded-2xl border border-surface-border shadow-xs space-y-4">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div>
-            <h1 className="text-xl sm:text-2xl font-extrabold text-navy-950">รายการผู้ติดต่อ & ฝากขายทรัพย์</h1>
-            <p className="text-xs text-brand-muted mt-0.5">
-              ติดตามลูกค้าผู้สนใจซื้อ เช่า หรือฝากขาย พร้อมโทรและทัก LINE ได้ทันที ({filtered.length} จาก {inquiries.length} รายการ)
-            </p>
-          </div>
-
           <button
             type="button"
-            onClick={loadInquiries}
-            disabled={loading}
-            className="self-start sm:self-auto px-3.5 py-2 bg-gray-50 hover:bg-gray-100 text-gray-700 rounded-xl border border-gray-200 text-xs font-semibold flex items-center space-x-1.5 transition-colors cursor-pointer"
+            aria-expanded={filtersOpen}
+            aria-controls="inquiry-type-filter"
+            onClick={() => setFiltersOpen((value) => !value)}
+            className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl border border-slate-200 px-4 text-sm font-semibold text-slate-600"
           >
-            <RotateCcw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
-            <span>รีเฟรชข้อมูล</span>
+            ประเภทคำขอ
+            {typeFilter !== 'all' && (
+              <span className="rounded-full bg-navy-950 px-1.5 text-xs text-white">1</span>
+            )}
+            <ChevronDown
+              className={`h-4 w-4 transition-transform ${filtersOpen ? 'rotate-180' : ''}`}
+            />
           </button>
         </div>
-
-        {/* Search Bar */}
-        <div className="relative">
-          <input
-            type="text"
-            placeholder="ค้นหาชื่อลูกค้า, เบอร์โทรศัพท์, LINE ID, ชื่อทรัพย์ หรือรหัส CK..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full bg-gray-50 border border-gray-200 rounded-xl pl-9 pr-8 py-2.5 text-xs text-navy-950 focus:outline-none focus:ring-2 focus:ring-gold-500 font-medium"
-          />
-          <Search className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
-          {searchQuery && (
+        <div className="flex flex-wrap gap-2" aria-label="สถานะลูกค้า">
+          {statusOptions.map((option) => (
+            <button
+              key={option.id}
+              type="button"
+              aria-pressed={statusFilter === option.id}
+              onClick={() => setStatusFilter(option.id)}
+              className={`inline-flex min-h-10 items-center gap-2 rounded-xl px-3 text-sm font-medium transition ${statusFilter === option.id ? 'bg-navy-950 text-white' : 'bg-slate-50 text-slate-600 hover:bg-slate-100'}`}
+            >
+              {option.label}
+              <span
+                className={`rounded-full px-1.5 text-xs ${statusFilter === option.id ? 'bg-white/15 text-gold-200' : 'bg-white text-slate-500'}`}
+              >
+                {loading
+                  ? '—'
+                  : inquiries.filter(
+                      (inquiry) => option.id === 'all' || inquiry.status === option.id,
+                    ).length}
+              </span>
+            </button>
+          ))}
+        </div>
+        {filtersOpen && (
+          <label
+            id="inquiry-type-filter"
+            className="block space-y-1.5 border-t border-slate-100 pt-4 text-xs font-semibold text-slate-500"
+          >
+            ประเภทคำขอ
+            <select
+              value={typeFilter}
+              onChange={(event) => setTypeFilter(event.target.value as typeof typeFilter)}
+              className="block min-h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-navy-950 sm:max-w-sm"
+            >
+              <option value="all">ทุกประเภทคำขอ</option>
+              {Object.entries(typeLabels).map(([value, label]) => (
+                <option key={value} value={value}>
+                  {label}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
+        <div className="flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 pt-3">
+          <p aria-live="polite" className="text-sm text-slate-500">
+            {loading
+              ? 'กำลังโหลดข้อมูล…'
+              : `แสดง ${filtered.length} จาก ${inquiries.length} รายการ · ล่าสุดก่อน`}
+          </p>
+          {hasFilters && (
             <button
               type="button"
-              onClick={() => setSearchQuery('')}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 font-bold text-xs"
+              onClick={resetFilters}
+              className="min-h-9 rounded-lg px-2 text-sm font-semibold text-navy-950 underline underline-offset-4"
             >
-              ✕
+              ล้างตัวกรอง
             </button>
           )}
         </div>
-      </div>
+      </section>
 
-      {/* Inquiries Cards List */}
-      <div className="space-y-4">
-        {loading ? (
-          <div className="bg-white rounded-2xl p-12 text-center text-gray-400 border border-surface-border">
-            กำลังโหลดรายการผู้ติดต่อ...
-          </div>
-        ) : filtered.length === 0 ? (
-          <div className="bg-white rounded-2xl p-12 text-center border border-surface-border space-y-2">
-            <MessageSquare className="w-10 h-10 text-gray-300 mx-auto" />
-            <h3 className="font-bold text-navy-950 text-base">ไม่พบรายการผู้ติดต่อในเงื่อนไขนี้</h3>
-            <p className="text-xs text-gray-400">ลองล้างตัวกรองหรือค้นหาด้วยคำใหม่อีกครั้ง</p>
-          </div>
-        ) : (
-          filtered.map((inq) => (
-            <div
-              key={inq.id}
-              className={`bg-white rounded-2xl p-5 sm:p-6 border transition-all flex flex-col md:flex-row justify-between gap-5 ${
-                inq.status === 'new' 
-                  ? 'border-amber-200 shadow-sm bg-gradient-to-r from-amber-50/20 to-white' 
-                  : 'border-surface-border shadow-xs hover:shadow-md'
-              }`}
+      {loading ? (
+        <div
+          role="status"
+          className="flex items-center justify-center gap-3 rounded-3xl border border-slate-200 bg-white p-12 text-sm text-slate-500"
+        >
+          <Loader2 className="h-5 w-5 animate-spin text-gold-600" />
+          กำลังโหลดรายการลูกค้า…
+        </div>
+      ) : filtered.length === 0 ? (
+        <div className="space-y-3 rounded-3xl border border-dashed border-slate-300 bg-white p-8 text-center sm:p-12">
+          <MessageSquare className="mx-auto h-10 w-10 text-slate-300" />
+          <h2 className="text-lg font-semibold text-navy-950">
+            {error
+              ? 'ยังแสดงรายการลูกค้าไม่ได้'
+              : hasFilters
+                ? 'ไม่พบลูกค้าตามเงื่อนไข'
+                : 'ยังไม่มีคำขอจากลูกค้า'}
+          </h2>
+          <p className="text-sm text-slate-500">
+            {error
+              ? 'ลองโหลดข้อมูลใหม่อีกครั้ง'
+              : hasFilters
+                ? 'ลองใช้คำค้นอื่น หรือล้างตัวกรองเพื่อดูรายการทั้งหมด'
+                : 'เมื่อมีคนสอบถาม นัดชม หรือฝากขายผ่านเว็บไซต์ จะแสดงรายการที่นี่'}
+          </p>
+          {hasFilters && !error && (
+            <button
+              type="button"
+              onClick={resetFilters}
+              className="min-h-11 rounded-xl border border-slate-200 px-4 text-sm font-semibold text-navy-950"
             >
-              {/* Left Details */}
-              <div className="space-y-3 flex-grow max-w-2xl">
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
-                    inq.status === 'new'
-                      ? 'bg-amber-100 text-amber-900 border border-amber-300 animate-pulse'
-                      : inq.status === 'contacted'
-                      ? 'bg-emerald-100 text-emerald-900 border border-emerald-300'
-                      : 'bg-purple-100 text-purple-900 border border-purple-300'
-                  }`}>
-                    {{ 
-                      new: '• รอดำเนินการ (ใหม่)', 
-                      contacted: '✓ ติดต่อลูกค้าแล้ว', 
-                      scheduled: 'นัดหมายแล้ว', 
-                      closed: 'ปิดรายการแล้ว' 
-                    }[inq.status]}
-                  </span>
-
-                  <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-gray-100 text-gray-700">
-                    {inq.inquiry_type === 'viewing'
-                      ? '📍 ขอนัดชมสถานที่จริง'
-                      : inq.inquiry_type === 'consignment_sell'
-                      ? '🏠 ฝากขายบ้าน / ที่ดิน'
-                      : '💬 สอบถามรายละเอียดทรัพย์'}
-                  </span>
-
-                  <span className="text-[11px] text-gray-400 ml-auto flex items-center">
-                    <Clock className="w-3 h-3 mr-1" />
-                    {formatThaiDate(inq.created_at)}
-                  </span>
-                </div>
-
-                <div>
-                  <h3 className="text-base font-bold text-navy-950 flex items-center space-x-2">
-                    <User className="w-4 h-4 text-gold-600" />
-                    <span>{inq.name}</span>
-                  </h3>
-                  {inq.property_title && (
-                    <div className="text-xs text-gold-700 font-semibold mt-1 flex items-center gap-1.5 flex-wrap">
-                      <span>ทรัพย์ที่สนใจ: <strong>{inq.property_title}</strong></span>
-                      {inq.property_id && (
-                        <span className="font-mono text-[10px] bg-gold-100/80 text-navy-950 px-1.5 py-0.2 rounded font-bold border border-gold-300/60">
-                          รหัส: {formatPropertyCode(inq.property_id)}
-                        </span>
-                      )}
-                    </div>
+              ล้างตัวกรอง
+            </button>
+          )}
+        </div>
+      ) : (
+        <div className="space-y-4">
+          {filtered.map((inquiry) => (
+            <article
+              key={inquiry.id}
+              className="min-w-0 overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm"
+            >
+              <div className="grid gap-5 p-4 sm:p-6 xl:grid-cols-[minmax(0,1fr)_260px]">
+                <div className="min-w-0 space-y-4">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span
+                      className={`rounded-full px-3 py-1.5 text-xs font-semibold ${inquiry.status === 'new' ? 'bg-gold-100 text-gold-900' : inquiry.status === 'closed' ? 'bg-slate-100 text-slate-600' : 'bg-emerald-50 text-emerald-800'}`}
+                    >
+                      {statusOptions.find((option) => option.id === inquiry.status)?.label ||
+                        inquiry.status}
+                    </span>
+                    <span className="rounded-full bg-slate-50 px-3 py-1.5 text-xs font-medium text-slate-500">
+                      {typeLabels[inquiry.inquiry_type]}
+                    </span>
+                    <span className="inline-flex items-center gap-1 text-xs text-slate-400 sm:ml-auto">
+                      <Clock className="h-3.5 w-3.5" />
+                      {formatThaiDate(inquiry.created_at)}
+                    </span>
+                  </div>
+                  <div>
+                    <h2 className="flex items-start gap-2 text-lg font-bold text-navy-950">
+                      <UserRound className="mt-1 h-4 w-4 shrink-0 text-gold-600" />
+                      <span className="break-words">{inquiry.name}</span>
+                    </h2>
+                    {inquiry.property_title && (
+                      <p className="mt-2 break-words text-sm leading-relaxed text-slate-600">
+                        สนใจ:{' '}
+                        <strong className="font-semibold text-navy-950">
+                          {inquiry.property_title}
+                        </strong>
+                        {inquiry.property_id && (
+                          <span className="ml-2 inline-block rounded-lg bg-slate-50 px-2 py-1 font-mono text-xs text-slate-500">
+                            {formatPropertyCode(inquiry.property_id)}
+                          </span>
+                        )}
+                      </p>
+                    )}
+                  </div>
+                  <p className="whitespace-pre-line break-words rounded-2xl bg-slate-50 p-4 text-sm leading-relaxed text-navy-950">
+                    {inquiry.message || 'ไม่ได้ระบุข้อความเพิ่มเติม'}
+                  </p>
+                  {inquiry.consignment_details && (
+                    <dl className="grid grid-cols-2 gap-4 rounded-2xl border border-gold-100 bg-gold-50/50 p-4 text-sm">
+                      <div>
+                        <dt className="mb-1 text-xs text-slate-500">ประเภททรัพย์</dt>
+                        <dd className="break-words font-medium text-navy-950">
+                          {inquiry.consignment_details.property_type}
+                        </dd>
+                      </div>
+                      <div>
+                        <dt className="mb-1 text-xs text-slate-500">ทำเล</dt>
+                        <dd className="break-words font-medium text-navy-950">
+                          {inquiry.consignment_details.district} ·{' '}
+                          {inquiry.consignment_details.province}
+                        </dd>
+                      </div>
+                      <div>
+                        <dt className="mb-1 text-xs text-slate-500">ราคาเสนอ</dt>
+                        <dd className="font-semibold text-navy-950">
+                          ฿
+                          {new Intl.NumberFormat('th-TH').format(
+                            inquiry.consignment_details.expected_price,
+                          )}
+                        </dd>
+                      </div>
+                      <div>
+                        <dt className="mb-1 text-xs text-slate-500">รูปที่แนบ</dt>
+                        <dd className="font-medium text-navy-950">
+                          {inquiry.consignment_details.photos_count || 0} ภาพ
+                        </dd>
+                      </div>
+                    </dl>
                   )}
                 </div>
-
-                <div className="p-3.5 bg-gray-50 rounded-xl text-xs text-gray-800 leading-relaxed whitespace-pre-line border border-gray-100">
-                  {inq.message}
-                </div>
-
-                {inq.consignment_details && (
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-2 text-[11px] text-gray-600 bg-gold-50/60 p-3 rounded-xl border border-gold-200">
-                    <div>
-                      <span className="text-gray-400 block">ประเภททรัพย์:</span>
-                      <strong className="text-navy-950">{inq.consignment_details.property_type}</strong>
+                <div className="min-w-0 space-y-4 border-t border-slate-100 pt-4 xl:border-l xl:border-t-0 xl:pl-5 xl:pt-0">
+                  <div className="space-y-2">
+                    <h3 className="text-xs font-semibold text-slate-500">ติดต่อลูกค้า</h3>
+                    <div className="flex gap-2">
+                      <a
+                        href={`tel:${inquiry.phone}`}
+                        className="flex min-h-11 min-w-0 flex-1 items-center justify-center gap-2 rounded-xl bg-navy-950 px-3 text-sm font-semibold text-white hover:bg-navy-900"
+                      >
+                        <Phone className="h-4 w-4 shrink-0 text-gold-400" />
+                        <span className="break-all">{inquiry.phone}</span>
+                      </a>
+                      <button
+                        type="button"
+                        onClick={() => handleCopyPhone(inquiry.id, inquiry.phone)}
+                        aria-label={`คัดลอกเบอร์โทรของ ${inquiry.name}`}
+                        className="flex min-h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-slate-200 text-slate-500 hover:bg-slate-50"
+                      >
+                        {copiedPhoneId === inquiry.id ? (
+                          <Check className="h-4 w-4 text-emerald-600" />
+                        ) : (
+                          <Copy className="h-4 w-4" />
+                        )}
+                      </button>
                     </div>
-                    <div>
-                      <span className="text-gray-400 block">ทำเลที่ตั้ง:</span>
-                      <strong className="text-navy-950">{inq.consignment_details.district}, {inq.consignment_details.province}</strong>
-                    </div>
-                    <div>
-                      <span className="text-gray-400 block">ราคาเสนอ:</span>
-                      <strong className="text-gold-700">฿{new Intl.NumberFormat('th-TH').format(inq.consignment_details.expected_price)}</strong>
-                    </div>
-                    <div>
-                      <span className="text-gray-400 block">รูปถ่ายที่แนบ:</span>
-                      <strong className="text-navy-950">{inq.consignment_details.photos_count || 0} ภาพ</strong>
-                    </div>
+                    {inquiry.line_id && (
+                      <a
+                        href={`https://line.me/R/ti/p/${encodeURIComponent(inquiry.line_id)}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="flex min-h-11 items-center justify-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-800 hover:bg-emerald-100"
+                      >
+                        <MessageCircle className="h-4 w-4 shrink-0" />
+                        <span className="break-all">LINE: {inquiry.line_id}</span>
+                      </a>
+                    )}
                   </div>
-                )}
-              </div>
-
-              {/* Right Action Buttons */}
-              <div className="flex flex-col justify-between border-t md:border-t-0 md:border-l border-gray-100 pt-4 md:pt-0 md:pl-6 space-y-3 flex-shrink-0 md:w-56">
-                <div className="space-y-2">
-                  <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wider block">
-                    ช่องทางติดต่อด่วน
-                  </span>
-
-                  <div className="flex items-center gap-1.5">
-                    <a
-                      href={`tel:${inq.phone}`}
-                      className="flex-1 py-2 px-3 bg-navy-950 hover:bg-navy-900 text-gold-400 rounded-xl text-xs font-bold flex items-center justify-center space-x-1.5 shadow-xs transition-colors"
-                      title="กดโทรออกทันที"
+                  <div>
+                    <label
+                      htmlFor={`inquiry-status-${inquiry.id}`}
+                      className="mb-2 block text-xs font-semibold text-slate-500"
                     >
-                      <Phone className="w-3.5 h-3.5" />
-                      <span>โทร: {inq.phone}</span>
-                    </a>
-                    
-                    <button
-                      type="button"
-                      onClick={() => handleCopyPhone(inq.id, inq.phone)}
-                      className="p-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl text-xs transition-colors cursor-pointer"
-                      title="คัดลอกเบอร์โทร"
+                      สถานะการติดตาม
+                    </label>
+                    <select
+                      id={`inquiry-status-${inquiry.id}`}
+                      value={inquiry.status}
+                      disabled={busyId !== null}
+                      onChange={(event) =>
+                        handleUpdateStatus(inquiry.id, event.target.value as Inquiry['status'])
+                      }
+                      className="min-h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-navy-950 disabled:opacity-50"
                     >
-                      {copiedPhoneId === inq.id ? (
-                        <Check className="w-3.5 h-3.5 text-emerald-600" />
-                      ) : (
-                        <Copy className="w-3.5 h-3.5 text-gray-500" />
-                      )}
-                    </button>
+                      {statusOptions
+                        .filter((option) => option.id !== 'all')
+                        .map((option) => (
+                          <option key={option.id} value={option.id}>
+                            {option.label}
+                          </option>
+                        ))}
+                    </select>
+                    {busyId === inquiry.id && (
+                      <p
+                        role="status"
+                        className="mt-2 inline-flex items-center gap-2 text-xs text-slate-500"
+                      >
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        กำลังบันทึกสถานะ…
+                      </p>
+                    )}
                   </div>
-
-                  {inq.line_id && (
-                    <a
-                      href={`https://line.me/R/ti/p/${inq.line_id}`}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="w-full py-2 px-3 bg-[#06C755] hover:bg-[#05b34c] text-white rounded-xl text-xs font-bold flex items-center justify-center space-x-1.5 shadow-xs transition-colors"
-                      title="เปิด LINE คุยกับลูกค้า"
-                    >
-                      <MessageCircle className="w-3.5 h-3.5 fill-current" />
-                      <span>LINE: {inq.line_id}</span>
-                    </a>
-                  )}
-
-                  <Link
-                    href={`/admin/automation?tab=leads&inquiryId=${encodeURIComponent(inq.id)}`}
-                    className="w-full py-2 px-3 bg-gradient-to-r from-navy-950 to-blue-900 hover:from-navy-900 hover:to-blue-800 text-gold-300 font-bold text-xs rounded-xl flex items-center justify-center space-x-1.5 shadow-xs transition-all border border-gold-500/20"
-                    title="ให้ AI ค้นหาและจับคู่ทรัพย์ที่ตรงกับความต้องการของลูกค้ารายนี้"
-                  >
-                    <Sparkles className="w-3.5 h-3.5 text-gold-400" />
-                    <span>🎯 จับคู่ทรัพย์ AI</span>
-                  </Link>
-
-                  <Link
-                    href="/admin/work-phases"
-                    className="w-full py-2 px-3 bg-navy-950 hover:bg-navy-900 text-white font-bold text-xs rounded-xl flex items-center justify-center space-x-1.5 shadow-xs transition-all border border-navy-800"
-                    title="ติดตามเฟสงานฝากขายแบบละเอียด 7 เฟส"
-                  >
-                    <Layers className="w-3.5 h-3.5 text-gold-400" />
-                    <span>📋 ติดตามเฟสงาน</span>
-                  </Link>
-                </div>
-
-                <div className="pt-2">
-                  <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wider block mb-1.5">
-                    เปลี่ยนสถานะใน 1 คลิก
-                  </span>
-                  <div className="grid grid-cols-3 gap-1">
-                    <button
-                      type="button"
-                      disabled={busyId !== null}
-                      onClick={() => handleUpdateStatus(inq.id, 'new')}
-                      className={`py-1 px-1.5 rounded-lg text-[10px] font-bold transition-all cursor-pointer ${
-                        inq.status === 'new'
-                          ? 'bg-amber-500 text-navy-950 font-black shadow-xs'
-                          : 'bg-gray-100 text-gray-600 hover:bg-amber-100 hover:text-amber-900'
-                      }`}
-                      title="ตั้งเป็นรอดำเนินการ"
-                    >
-                      ใหม่
-                    </button>
-
-                    <button
-                      type="button"
-                      disabled={busyId !== null}
-                      onClick={() => handleUpdateStatus(inq.id, 'contacted')}
-                      className={`py-1 px-1.5 rounded-lg text-[10px] font-bold transition-all cursor-pointer ${
-                        inq.status === 'contacted'
-                          ? 'bg-emerald-600 text-white font-black shadow-xs'
-                          : 'bg-gray-100 text-gray-600 hover:bg-emerald-100 hover:text-emerald-900'
-                      }`}
-                      title="ตั้งเป็นติดต่อแล้ว"
-                    >
-                      ติดต่อแล้ว
-                    </button>
-
-                    <button
-                      type="button"
-                      disabled={busyId !== null}
-                      onClick={() => handleUpdateStatus(inq.id, 'closed')}
-                      className={`py-1 px-1.5 rounded-lg text-[10px] font-bold transition-all cursor-pointer ${
-                        inq.status === 'closed'
-                          ? 'bg-purple-600 text-white font-black shadow-xs'
-                          : 'bg-gray-100 text-gray-600 hover:bg-purple-100 hover:text-purple-900'
-                      }`}
-                      title="ตั้งเป็นปิดงาน"
-                    >
-                      ปิดงาน
-                    </button>
-                  </div>
+                  <details className="rounded-xl border border-slate-100">
+                    <summary className="min-h-11 cursor-pointer px-3 py-3 text-sm font-medium text-slate-600">
+                      เครื่องมือเพิ่มเติม
+                    </summary>
+                    <div className="space-y-1 border-t border-slate-100 p-2">
+                      <Link
+                        href={`/admin/automation?tab=leads&inquiryId=${encodeURIComponent(inquiry.id)}`}
+                        className="flex min-h-11 items-center gap-2 rounded-lg px-2 text-sm text-navy-950 hover:bg-slate-50"
+                      >
+                        <Sparkles className="h-4 w-4 shrink-0 text-gold-600" />
+                        จับคู่ทรัพย์ด้วย AI
+                      </Link>
+                      <Link
+                        href="/admin/work-phases"
+                        className="flex min-h-11 items-center gap-2 rounded-lg px-2 text-sm text-navy-950 hover:bg-slate-50"
+                      >
+                        <Layers className="h-4 w-4 shrink-0 text-gold-600" />
+                        ติดตามเฟสงาน
+                      </Link>
+                    </div>
+                  </details>
                 </div>
               </div>
-            </div>
-          ))
-        )}
-      </div>
+            </article>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
 
 export default function AdminInquiriesPage() {
   return (
-    <Suspense fallback={<div className="p-8 text-center text-xs text-gray-400">กำลังโหลด...</div>}>
+    <Suspense
+      fallback={
+        <p role="status" className="p-8 text-center text-sm text-slate-500">
+          กำลังโหลดรายการลูกค้า…
+        </p>
+      }
+    >
       <InquiriesContent />
     </Suspense>
   );

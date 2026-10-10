@@ -1,11 +1,7 @@
 import type { Metadata } from 'next';
 import { Prompt } from 'next/font/google';
 import './globals.css';
-import Header from '@/components/layout/Header';
-import Footer from '@/components/layout/Footer';
-import MobileBottomNav from '@/components/layout/MobileBottomNav';
-import FloatingLineButton from '@/components/layout/FloatingLineButton';
-import CompareBar from '@/components/compare/CompareBar';
+import SiteChrome from '@/components/layout/SiteChrome';
 
 const promptFont = Prompt({
   weight: ['300', '400', '500', '600', '700', '800'],
@@ -58,14 +54,7 @@ export default function RootLayout({
   return (
     <html lang="th" data-scroll-behavior="smooth">
       <body className={`${promptFont.className} bg-surface-bg text-brand-text flex flex-col min-h-screen antialiased`}>
-        <Header />
-        <main className="flex-grow">
-          {children}
-        </main>
-        <Footer />
-        <CompareBar />
-        <MobileBottomNav />
-        <FloatingLineButton />
+        <SiteChrome>{children}</SiteChrome>
       </body>
     </html>
   );

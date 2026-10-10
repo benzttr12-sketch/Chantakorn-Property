@@ -3,47 +3,36 @@
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { 
-  Building2, 
-  Trash2, 
-  Edit3, 
-  Eye, 
-  Copy, 
-  CheckCircle2, 
-  CopyPlus, 
-  CheckSquare, 
-  Square, 
-  Check, 
-  Sparkles, 
-  ChevronDown, 
-  ChevronRight,
-  Loader2, 
+import {
+  Building2,
+  Trash2,
+  Edit3,
+  Eye,
+  Copy,
+  CopyPlus,
+  Check,
+  Sparkles,
+  ChevronDown,
+  Loader2,
   History,
   Lock,
   FileText,
-  Clock,
-  DollarSign,
-  Tag,
-  UserCheck,
-  Globe,
   Star,
   MapPin,
-  Save,
-  ShieldCheck,
-  AlertCircle,
   MessageCircle,
-  ExternalLink,
   ClipboardCopy,
-  ClipboardCheck
+  CalendarDays,
+  UserRound,
+  Tag,
 } from 'lucide-react';
-import { Property, PropertyStatus, PropertyHistoryLog, PropertyHistoryChangeType } from '@/lib/types';
+import { Property, PropertyStatus, PropertyHistoryLog } from '@/lib/types';
 import { fetchPropertyHistory } from '@/lib/store/property-history-store';
-import { 
-  formatPrice, 
-  propertyHref, 
-  formatThaiDate, 
+import {
+  formatPrice,
+  propertyHref,
+  formatThaiDate,
   formatPropertyCode,
-  formatPropertySnippet
+  getPropertyTypeName,
 } from '@/lib/utils';
 
 interface CollapsiblePropertyCardProps {
@@ -67,7 +56,7 @@ interface CollapsiblePropertyCardProps {
   copiedCodeId: string | null;
   onCopyLink: (property: Property) => void;
   copiedId: string | null;
-  onCopySnippet?: (property: Property) => void;
+  onCopySnippet: (property: Property) => void;
   copiedSnippetId?: string | null;
   onOpenLandsMaps: (property: Property) => void;
   onOpenHistoryModal: (property: Property) => void;
@@ -78,6 +67,9 @@ interface CollapsiblePropertyCardProps {
   completionScore: number;
   busy: boolean;
 }
+
+const toolClass =
+  'flex min-h-11 min-w-0 items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-left text-sm font-medium text-navy-950 transition hover:border-gold-300 hover:bg-gold-50 disabled:cursor-not-allowed disabled:opacity-50';
 
 export default function CollapsiblePropertyCard({
   property,
@@ -109,84 +101,54 @@ export default function CollapsiblePropertyCard({
   onDeleteConfirm,
   onUpdateNotes,
   completionScore,
-  busy
+  busy,
 }: CollapsiblePropertyCardProps) {
   const [historyLogs, setHistoryLogs] = useState<PropertyHistoryLog[]>([]);
   const [loadingHistory, setLoadingHistory] = useState(false);
-  const [hasLoadedHistory, setHasLoadedHistory] = useState(false);
-
-  // In-card Copy Snippet local state
-  const [localCopiedSnippet, setLocalCopiedSnippet] = useState(false);
-
-  const handleCopySnippet = (e?: React.MouseEvent) => {
-    if (e) e.stopPropagation();
-    if (onCopySnippet) {
-      onCopySnippet(property);
-    } else {
-      const origin = typeof window !== 'undefined' ? window.location.origin : '';
-      const snippet = formatPropertySnippet(property, { origin });
-      if (typeof navigator !== 'undefined' && navigator.clipboard) {
-        navigator.clipboard.writeText(snippet);
-      }
-    }
-    setLocalCopiedSnippet(true);
-    setTimeout(() => setLocalCopiedSnippet(false), 2500);
-  };
-
-  const isSnippetCopied = copiedSnippetId === property.id || localCopiedSnippet;
-
+  const [historyError, setHistoryError] = useState('');
+  const [historyReload, setHistoryReload] = useState(0);
   const [isEditingNotes, setIsEditingNotes] = useState(false);
   const [notesInput, setNotesInput] = useState(property.internal_notes || '');
   const [savingNotes, setSavingNotes] = useState(false);
   const [notesSuccess, setNotesSuccess] = useState(false);
   const [notesError, setNotesError] = useState('');
+  const updating = busy || inlineUpdatingId !== null;
+  const detailId = `property-tools-${property.id}`;
 
   useEffect(() => {
-    setNotesInput(property.internal_notes || '');
-  }, [property.internal_notes]);
+    if (!isEditingNotes) setNotesInput(property.internal_notes || '');
+  }, [property.internal_notes, isEditingNotes]);
 
   useEffect(() => {
-    let isMounted = true;
-    if (isExpanded && !hasLoadedHistory) {
-      setLoadingHistory(true);
-      fetchPropertyHistory(property)
-        .then((logs) => {
-          if (isMounted) {
-            setHistoryLogs(logs);
-            setHasLoadedHistory(true);
-          }
-        })
-        .catch((err) => {
-          console.error('Failed to load history for mobile property', property.id, err);
-        })
-        .finally(() => {
-          if (isMounted) setLoadingHistory(false);
-        });
-    }
+    if (!isExpanded) return;
+    let active = true;
+    setLoadingHistory(true);
+    setHistoryError('');
+    fetchPropertyHistory(property)
+      .then((logs) => {
+        if (active) setHistoryLogs(logs);
+      })
+      .catch(() => {
+        if (active) setHistoryError('โหลดประวัติไม่สำเร็จ ลองเปิดประวัติฉบับเต็มหรือโหลดใหม่');
+      })
+      .finally(() => {
+        if (active) setLoadingHistory(false);
+      });
     return () => {
-      isMounted = false;
+      active = false;
     };
-  }, [isExpanded, hasLoadedHistory, property]);
-
-  const handleCardClick = (e: React.MouseEvent<HTMLDivElement>) => {
-    const target = e.target as HTMLElement;
-    if (target.closest('button, a, input, select, textarea, [data-no-expand="true"]')) {
-      return;
-    }
-    onToggleExpand(property.id);
-  };
+  }, [isExpanded, property, historyReload]);
 
   const handleSaveNotes = async () => {
-    if (!onUpdateNotes) return;
+    if (!onUpdateNotes || savingNotes) return;
     setSavingNotes(true);
     setNotesError('');
+    setNotesSuccess(false);
     try {
       await onUpdateNotes(property.id, notesInput.trim());
       setIsEditingNotes(false);
       setNotesSuccess(true);
-      setTimeout(() => setNotesSuccess(false), 3000);
-      const updatedLogs = await fetchPropertyHistory(property);
-      setHistoryLogs(updatedLogs);
+      setHistoryReload((value) => value + 1);
     } catch (err) {
       setNotesError(err instanceof Error ? err.message : 'ไม่สามารถบันทึกข้อมูลได้');
     } finally {
@@ -194,51 +156,12 @@ export default function CollapsiblePropertyCard({
     }
   };
 
-  const getLogIcon = (type: PropertyHistoryChangeType) => {
-    switch (type) {
-      case 'price_change': return <DollarSign className="w-3 h-3 text-amber-500" />;
-      case 'status_change': return <Tag className="w-3 h-3 text-emerald-500" />;
-      case 'agent_change': return <UserCheck className="w-3 h-3 text-blue-500" />;
-      case 'published_change': return <Globe className="w-3 h-3 text-indigo-500" />;
-      case 'featured_change': return <Star className="w-3 h-3 text-amber-400 fill-amber-400" />;
-      case 'created': return <Sparkles className="w-3 h-3 text-gold-500" />;
-      case 'manual_note': return <FileText className="w-3 h-3 text-teal-500" />;
-      default: return <Clock className="w-3 h-3 text-gray-500" />;
-    }
-  };
-
   return (
-    <div 
-      onClick={handleCardClick}
-      className={`rounded-2xl border space-y-3 transition-all duration-300 ease-in-out cursor-pointer ${
-        isHighlighted 
-          ? 'animate-inline-success-mobile z-10 relative p-4' 
-          : isExpanded
-            ? 'border-gold-400 bg-amber-50/30 ring-1 ring-gold-400/50 shadow-md p-4'
-            : isSelected 
-              ? 'border-gold-500 bg-gold-50/20 shadow-xs p-4' 
-              : 'bg-white border-gray-200 shadow-xs hover:border-gray-300 p-4'
-      }`}
+    <article
+      className={`min-w-0 overflow-hidden rounded-3xl border bg-white shadow-sm transition ${isSelected ? 'border-gold-500 ring-2 ring-gold-400/20' : isHighlighted ? 'border-emerald-400 ring-2 ring-emerald-100' : 'border-slate-200'}`}
     >
-      {/* Primary Details Row on Mobile */}
-      <div className="flex items-start gap-3">
-        <button
-          type="button"
-          onClick={(e) => {
-            e.stopPropagation();
-            onToggleSelect(property.id);
-          }}
-          className="mt-1 text-gray-400 hover:text-navy-950 cursor-pointer"
-        >
-          {isSelected ? (
-            <CheckSquare className="w-5 h-5 text-gold-600" />
-          ) : (
-            <Square className="w-5 h-5 text-gray-300" />
-          )}
-        </button>
-
-        {/* Thumbnail with Status Tag */}
-        <div className="relative w-20 h-20 rounded-xl overflow-hidden bg-gray-100 flex-shrink-0 border border-gray-200">
+      <div className="relative aspect-[16/9] bg-slate-100">
+        {property.cover_image ? (
           <Image
             src={property.cover_image}
             alt={property.title}
@@ -246,428 +169,460 @@ export default function CollapsiblePropertyCard({
             unoptimized
             referrerPolicy="no-referrer"
             className="object-cover"
+            sizes="(max-width: 767px) 100vw, 50vw"
           />
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              onInlineUpdateStatus(property.id, property.status === 'rent' ? 'sale' : 'rent');
-            }}
-            disabled={inlineUpdatingId === property.id}
-            className={`absolute top-1 left-1 px-1.5 py-0.5 rounded-full text-[9px] font-extrabold shadow-xs flex items-center gap-0.5 cursor-pointer border transition-all active:scale-95 ${
-              property.status === 'rent' ? 'bg-emerald-600 text-white border-emerald-700' : 'bg-gold-500 text-navy-950 border-gold-600'
-            }`}
-            title="แตะสลับสถานะ ขาย/เช่า ทันที"
-          >
-            {inlineUpdatingId === property.id ? (
-              <Loader2 className="w-2.5 h-2.5 animate-spin" />
-            ) : (
-              <span>{property.status === 'rent' ? '🔑 เช่า' : '🏷️ ขาย'}</span>
+        ) : (
+          <div className="flex h-full items-center justify-center gap-2 text-sm text-slate-500">
+            <Building2 className="h-6 w-6" />
+            ยังไม่มีรูปทรัพย์
+          </div>
+        )}
+        <div className="absolute inset-x-0 top-0 flex items-start justify-between gap-3 p-4">
+          <label className="flex min-h-11 cursor-pointer items-center gap-2 rounded-xl bg-white/95 px-3 text-sm font-semibold text-navy-950 shadow-sm">
+            <input
+              type="checkbox"
+              checked={isSelected}
+              disabled={updating}
+              onChange={() => onToggleSelect(property.id)}
+              aria-label={`เลือกทรัพย์ ${formatPropertyCode(property.id)}`}
+              className="h-4 w-4 accent-navy-950"
+            />
+            เลือก
+          </label>
+          <div className="flex flex-wrap justify-end gap-2">
+            <span
+              className={`rounded-full px-3 py-1.5 text-xs font-semibold ${property.published ? 'bg-white/95 text-navy-950' : 'bg-navy-950 text-white'}`}
+            >
+              {property.published ? 'เผยแพร่แล้ว' : 'แบบร่าง'}
+            </span>
+            {property.featured && (
+              <span className="flex items-center gap-1 rounded-full bg-gold-400 px-3 py-1.5 text-xs font-semibold text-navy-950">
+                <Star className="h-3.5 w-3.5 fill-current" />
+                ทรัพย์เด่น
+              </span>
             )}
-          </button>
+          </div>
         </div>
-
-        {/* Title, Completion Bar, Price */}
-        <div className="flex-1 min-w-0">
-          <div className="flex items-start justify-between gap-1">
-            <div className="flex-1 min-w-0">
-              <Link
-                href={propertyHref(property.slug)}
-                target="_blank"
-                onClick={(e) => e.stopPropagation()}
-                className="font-bold text-navy-950 hover:text-gold-600 line-clamp-2 text-xs leading-snug"
-              >
-                {property.title}
-              </Link>
-              {/* Visual Progress Bar */}
-              <div className="mt-1 flex items-center space-x-1.5 text-[9px] text-gray-500 font-medium">
-                <span>ความสมบูรณ์:</span>
-                <div className="w-12 bg-gray-100 rounded-full h-1 overflow-hidden">
-                  <div 
-                    className={`h-full rounded-full transition-all duration-500 ${
-                      completionScore >= 90 ? 'bg-emerald-500' : completionScore >= 60 ? 'bg-amber-500' : 'bg-rose-500'
-                    }`}
-                    style={{ width: `${completionScore}%` }}
-                  />
-                </div>
-                <span className="font-mono font-bold text-gray-700 tabular-nums">{completionScore}%</span>
-              </div>
-            </div>
-
-            {/* Quick Expand Toggle Chevron on top right */}
+      </div>
+      <div className="space-y-4 p-4 sm:p-5">
+        <div>
+          <div className="mb-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs font-medium text-slate-500">
+            <span>
+              {getPropertyTypeName(property.property_type)} ·{' '}
+              {property.status === 'rent' ? 'ให้เช่า' : 'ขาย'}
+            </span>
             <button
               type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                onToggleExpand(property.id);
-              }}
-              className="p-1 text-gray-400 hover:text-gold-600 transition-colors"
-              title={isExpanded ? 'ย่อรายละเอียด' : 'ขยายดูบันทึกและประวัติ'}
+              onClick={() => onCopyCode(property.id)}
+              className="inline-flex min-h-8 items-center gap-1 rounded-lg bg-slate-50 px-2 font-mono text-navy-950"
+              aria-label={`คัดลอกรหัส ${formatPropertyCode(property.id)}`}
             >
-              {isExpanded ? (
-                <ChevronDown className="w-4 h-4 text-gold-600" />
+              {formatPropertyCode(property.id)}
+              {copiedCodeId === property.id ? (
+                <Check className="h-3.5 w-3.5 text-emerald-600" />
               ) : (
-                <ChevronRight className="w-4 h-4 text-gray-400" />
+                <Copy className="h-3 w-3 text-slate-400" />
               )}
             </button>
           </div>
-
-          {/* Price inline on Mobile */}
-          {editingPriceId === property.id ? (
-            <div className="mt-1.5 p-2 bg-amber-50 rounded-lg border border-gold-300" onClick={(e) => e.stopPropagation()}>
-              <input
-                type="text"
-                autoFocus
-                value={inlinePriceInput}
-                onChange={(e) => setInlinePriceInput(e.target.value)}
-                className="w-full text-xs font-bold p-1 bg-white border border-gray-300 rounded"
-              />
-              <div className="flex gap-1 mt-1 justify-end">
-                <button 
-                  type="button" 
-                  onClick={onCancelEditPrice} 
-                  className="px-2 py-0.5 text-[10px] text-gray-600 bg-white border rounded"
+          <h2 className="text-lg font-bold leading-snug text-navy-950">
+            <Link
+              href={propertyHref(property.slug)}
+              target="_blank"
+              rel="noreferrer"
+              className="break-words hover:text-gold-700"
+            >
+              {property.title}
+            </Link>
+          </h2>
+          <p className="mt-2 flex items-start gap-1.5 text-sm text-slate-500">
+            <MapPin className="mt-0.5 h-4 w-4 shrink-0" />
+            <span className="break-words">
+              {[property.subdistrict, property.district, property.province]
+                .filter(Boolean)
+                .join(' · ')}
+            </span>
+          </p>
+        </div>
+        {editingPriceId === property.id ? (
+          <div className="rounded-2xl border border-gold-200 bg-gold-50 p-3">
+            <label
+              htmlFor={`price-${property.id}`}
+              className="mb-2 block text-sm font-semibold text-navy-950"
+            >
+              ราคา (บาท)
+            </label>
+            <input
+              id={`price-${property.id}`}
+              type="text"
+              inputMode="decimal"
+              autoFocus
+              value={inlinePriceInput}
+              onChange={(event) => setInlinePriceInput(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter') onSaveInlinePrice(property.id);
+                if (event.key === 'Escape' && inlineUpdatingId === null) onCancelEditPrice();
+              }}
+              disabled={inlineUpdatingId !== null}
+              className="min-h-11 w-full rounded-xl border border-gold-300 bg-white px-3 text-base font-semibold text-navy-950 focus:outline-none focus:ring-2 focus:ring-gold-400"
+            />
+            <div className="mt-2 flex flex-wrap gap-2">
+              {[
+                { value: -100000, label: '−100,000' },
+                { value: 100000, label: '+100,000' },
+                { value: 500000, label: '+500,000' },
+              ].map((adjustment) => (
+                <button
+                  key={adjustment.value}
+                  type="button"
+                  disabled={inlineUpdatingId !== null}
+                  onClick={() => {
+                    const current = Number(inlinePriceInput.replace(/,/g, '').trim());
+                    if (Number.isFinite(current))
+                      setInlinePriceInput(String(Math.max(0, current + adjustment.value)));
+                  }}
+                  className="min-h-9 rounded-lg border border-gold-200 bg-white px-2.5 text-xs font-medium text-navy-950 disabled:opacity-50"
                 >
-                  ยกเลิก
+                  {adjustment.label}
                 </button>
-                <button 
-                  type="button" 
-                  onClick={() => onSaveInlinePrice(property.id)} 
-                  className="px-2 py-0.5 text-[10px] font-bold text-navy-950 bg-gold-400 rounded"
-                >
-                  บันทึก
-                </button>
-              </div>
+              ))}
             </div>
-          ) : (
-            <div className="flex items-center gap-1.5 mt-1">
-              <div className="text-sm font-black text-navy-950 tabular-nums">
-                {formatPrice(property.price, property.status)}
-              </div>
+            <div className="mt-3 flex gap-2">
               <button
                 type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onStartEditPrice(property);
-                }}
-                className="p-1 text-gray-400 hover:text-navy-950 hover:bg-gold-50 rounded"
-                title="แก้ไขราคาด่วน"
+                onClick={() => onSaveInlinePrice(property.id)}
+                disabled={inlineUpdatingId !== null}
+                className="flex min-h-11 flex-1 items-center justify-center gap-2 rounded-xl bg-navy-950 px-3 text-sm font-semibold text-white disabled:opacity-50"
               >
-                <Edit3 className="w-3 h-3 text-gold-600" />
+                {inlineUpdatingId === property.id && <Loader2 className="h-4 w-4 animate-spin" />}
+                บันทึกราคา
+              </button>
+              <button
+                type="button"
+                onClick={onCancelEditPrice}
+                disabled={inlineUpdatingId !== null}
+                className="min-h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-600 disabled:opacity-50"
+              >
+                ยกเลิก
               </button>
             </div>
-          )}
-
-          {/* Location & Code */}
-          <div className="text-[11px] text-gray-500 flex items-center justify-between mt-0.5">
-            <span className="flex items-center truncate">
-              <MapPin className="w-3 h-3 mr-1 text-gray-400 shrink-0" />
-              <span className="truncate">{property.district}</span>
-            </span>
+          </div>
+        ) : (
+          <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl bg-slate-50 p-3">
+            <p className="text-xl font-bold tracking-tight text-navy-950">
+              {formatPrice(property.price, property.status)}
+            </p>
             <button
               type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                onCopyCode(property.id);
-              }}
-              className="font-mono text-gray-600 text-[10px] font-semibold bg-gray-100 hover:bg-gray-200 px-1.5 py-0.5 rounded border border-gray-200 flex items-center gap-1"
+              disabled={updating}
+              onClick={() => onStartEditPrice(property)}
+              className="inline-flex min-h-10 items-center gap-1.5 rounded-xl bg-white px-3 text-xs font-semibold text-navy-950 shadow-sm disabled:opacity-50"
             >
-              <span>{formatPropertyCode(property.id)}</span>
-              {copiedCodeId === property.id && <Check className="w-2.5 h-2.5 text-emerald-600" />}
+              <Edit3 className="h-3.5 w-3.5" />
+              แก้ราคา
             </button>
           </div>
+        )}
+        <div className="grid grid-cols-2 gap-2">
+          <Link
+            href={`/admin/properties/new?id=${encodeURIComponent(property.id)}`}
+            className="flex min-h-11 items-center justify-center gap-2 rounded-xl bg-navy-950 px-2 text-sm font-semibold text-white hover:bg-navy-900"
+          >
+            <Edit3 className="h-4 w-4 shrink-0" />
+            แก้ไขทรัพย์
+          </Link>
+          <button
+            type="button"
+            disabled={updating || !property.published || !onOpenLineModal}
+            onClick={() => onOpenLineModal?.(property)}
+            title={
+              property.published
+                ? 'ตรวจข้อมูลก่อนส่งถึงผู้ติดตาม OA ทั้งหมด'
+                : 'เผยแพร่ทรัพย์ก่อนส่ง LINE'
+            }
+            className="flex min-h-11 items-center justify-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-2 text-sm font-semibold text-emerald-800 hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            <MessageCircle className="h-4 w-4 shrink-0" />
+            ส่ง LINE
+          </button>
         </div>
-      </div>
-
-      {/* Accordion Trigger Strip on Mobile */}
-      <div 
-        onClick={() => onToggleExpand(property.id)}
-        className="px-3 py-1.5 bg-gray-50 hover:bg-amber-50/60 rounded-xl border border-gray-100 flex items-center justify-between text-[11px] font-semibold text-gray-600 transition-colors"
-      >
-        <span className="flex items-center gap-1.5">
-          <FileText className="w-3.5 h-3.5 text-gold-600" />
-          <span>บันทึกนายหน้า & ประวัติไทม์ไลน์</span>
-          {property.internal_notes && (
-            <span className="w-1.5 h-1.5 rounded-full bg-amber-500" title="มีบันทึกข้อความ" />
-          )}
-        </span>
-        <span className="text-[10px] text-gold-700 font-bold flex items-center gap-0.5">
-          {isExpanded ? 'ซ่อน' : 'เปิดดู'}
-          {isExpanded ? <ChevronDown className="w-3 h-3 rotate-180" /> : <ChevronDown className="w-3 h-3" />}
-        </span>
-      </div>
-
-      {/* Expanded Collapsible Section for Mobile */}
-      {isExpanded && (
-        <div className="pt-2 border-t border-gold-200 space-y-3 animate-in fade-in duration-200">
-          
-          {/* Quick Copy Snippet Banner in Mobile Expanded */}
-          <div className="flex items-center justify-between bg-amber-50/80 p-2.5 rounded-xl border border-amber-200">
-            <span className="text-[11px] font-bold text-navy-950 flex items-center gap-1.5">
-              <ClipboardCopy className="w-3.5 h-3.5 text-amber-700" />
-              <span>สรุปข้อมูลทรัพย์ High-Converting</span>
-            </span>
-            <button
-              type="button"
-              onClick={handleCopySnippet}
-              className={`px-2.5 py-1 text-[11px] font-bold rounded-lg border flex items-center gap-1 cursor-pointer transition-all ${
-                isSnippetCopied
-                  ? 'bg-emerald-600 text-white border-emerald-700 shadow-xs'
-                  : 'bg-white text-navy-950 border-amber-300 hover:bg-amber-100'
-              }`}
-            >
-              {isSnippetCopied ? (
-                <>
-                  <ClipboardCheck className="w-3 h-3 text-white" />
-                  <span>คัดลอกแล้ว!</span>
-                </>
-              ) : (
-                <span>คัดลอกข้อมูลสรุป</span>
-              )}
-            </button>
-          </div>
-
-          {/* Agent Notes */}
-          <div className="bg-amber-50/50 p-3 rounded-xl border border-amber-200 text-xs">
-            <div className="flex items-center justify-between mb-1.5">
-              <span className="font-extrabold text-navy-950 flex items-center gap-1 text-[11px]">
-                <Lock className="w-3 h-3 text-amber-700" />
-                <span>บันทึกภายในสำหรับนายหน้า (ซ่อน)</span>
-              </span>
-              {!isEditingNotes && (
+        <button
+          type="button"
+          onClick={() => onToggleExpand(property.id)}
+          aria-expanded={isExpanded}
+          aria-controls={detailId}
+          className="flex min-h-11 w-full items-center justify-between gap-2 rounded-xl px-2 text-sm font-medium text-slate-600 hover:bg-slate-50"
+        >
+          <span className="flex items-center gap-2">
+            <FileText className="h-4 w-4 shrink-0" />
+            เครื่องมือ บันทึก และประวัติ
+            {property.internal_notes && (
+              <span className="h-1.5 w-1.5 rounded-full bg-gold-500" aria-label="มีบันทึกภายใน" />
+            )}
+          </span>
+          <ChevronDown
+            className={`h-4 w-4 shrink-0 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
+          />
+        </button>
+        {isExpanded && (
+          <div id={detailId} className="space-y-5 border-t border-slate-100 pt-4">
+            <div className="space-y-3">
+              <h3 className="text-sm font-bold text-navy-950">สถานะประกาศ</h3>
+              <label
+                htmlFor={`status-${property.id}`}
+                className="flex flex-wrap items-center justify-between gap-2 text-sm text-slate-600"
+              >
+                ประเภทการขาย
+                <select
+                  id={`status-${property.id}`}
+                  value={property.status}
+                  disabled={updating}
+                  onChange={(event) =>
+                    onInlineUpdateStatus(property.id, event.target.value as PropertyStatus)
+                  }
+                  className="min-h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-navy-950 disabled:opacity-50"
+                >
+                  <option value="sale">ขาย</option>
+                  <option value="rent">ให้เช่า</option>
+                </select>
+              </label>
+              <div className="grid grid-cols-2 gap-2">
                 <button
                   type="button"
-                  onClick={() => setIsEditingNotes(true)}
-                  className="text-[10px] font-bold text-gold-700 hover:underline"
+                  disabled={updating}
+                  onClick={() => onTogglePublished(property)}
+                  className={toolClass}
                 >
-                  {property.internal_notes ? 'แก้ไข' : '+ เพิ่ม'}
+                  <Tag className="h-4 w-4 shrink-0 text-slate-400" />
+                  <span>{property.published ? 'เปลี่ยนเป็นแบบร่าง' : 'เผยแพร่ทรัพย์'}</span>
                 </button>
-              )}
-            </div>
-
-            {isEditingNotes ? (
-              <div className="space-y-1.5 mt-2">
-                <textarea
-                  rows={3}
-                  value={notesInput}
-                  onChange={(e) => setNotesInput(e.target.value)}
-                  placeholder="เพิ่มบันทึกสำหรับทีมงาน เช่น เบอร์โทรลับเจ้าของทรัพย์ หรือค่าคอมมิชชัน..."
-                  className="w-full text-xs p-2 bg-white border border-amber-300 rounded-lg focus:outline-none"
-                />
-                <div className="flex justify-end gap-1.5">
-                  <button
-                    type="button"
-                    onClick={() => setIsEditingNotes(false)}
-                    className="px-2 py-1 text-[10px] text-gray-600 bg-white border rounded"
-                  >
-                    ยกเลิก
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleSaveNotes}
-                    disabled={savingNotes}
-                    className="px-2.5 py-1 text-[10px] font-bold text-navy-950 bg-gold-400 rounded flex items-center gap-1"
-                  >
-                    {savingNotes && <Loader2 className="w-2.5 h-2.5 animate-spin" />}
-                    <span>บันทึก</span>
-                  </button>
-                </div>
+                <button
+                  type="button"
+                  disabled={updating}
+                  aria-pressed={property.featured}
+                  onClick={() => onToggleFeatured(property)}
+                  className={toolClass}
+                >
+                  <Star
+                    className={`h-4 w-4 shrink-0 ${property.featured ? 'fill-gold-400 text-gold-600' : 'text-slate-400'}`}
+                  />
+                  <span>{property.featured ? 'ยกเลิกทรัพย์เด่น' : 'ตั้งเป็นทรัพย์เด่น'}</span>
+                </button>
               </div>
-            ) : property.internal_notes ? (
-              <p className="text-navy-950 whitespace-pre-line text-[11px] leading-relaxed">
-                {property.internal_notes}
-              </p>
-            ) : (
-              <p className="text-gray-400 text-[10px] italic">ไม่มีบันทึกข้อมูลลับภายใน</p>
-            )}
-          </div>
-
-          {/* History Timeline Logs */}
-          <div className="bg-gray-50 p-3 rounded-xl border border-gray-200 text-xs">
-            <div className="flex items-center justify-between mb-2">
-              <span className="font-extrabold text-navy-950 flex items-center gap-1 text-[11px]">
-                <History className="w-3 h-3 text-blue-600" />
-                <span>ประวัติไทม์ไลน์ล่าสุด</span>
-              </span>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <button type="button" onClick={() => onCopyLink(property)} className={toolClass}>
+                {copiedId === property.id ? (
+                  <Check className="h-4 w-4 shrink-0 text-emerald-600" />
+                ) : (
+                  <Copy className="h-4 w-4 shrink-0 text-slate-400" />
+                )}
+                <span>{copiedId === property.id ? 'คัดลอกลิงก์แล้ว' : 'คัดลอกลิงก์'}</span>
+              </button>
+              <button type="button" onClick={() => onCopySnippet(property)} className={toolClass}>
+                {copiedSnippetId === property.id ? (
+                  <Check className="h-4 w-4 shrink-0 text-emerald-600" />
+                ) : (
+                  <ClipboardCopy className="h-4 w-4 shrink-0 text-slate-400" />
+                )}
+                <span>
+                  {copiedSnippetId === property.id ? 'คัดลอกข้อมูลแล้ว' : 'คัดลอกข้อมูลโพสต์'}
+                </span>
+              </button>
+              <button type="button" onClick={() => onOpenLandsMaps(property)} className={toolClass}>
+                <MapPin className="h-4 w-4 shrink-0 text-slate-400" />
+                <span>แผนที่ / โฉนด</span>
+              </button>
               <button
                 type="button"
                 onClick={() => onOpenHistoryModal(property)}
-                className="text-[10px] font-bold text-blue-600 hover:underline"
+                className={toolClass}
               >
-                ดูฉบับเต็ม
+                <History className="h-4 w-4 shrink-0 text-slate-400" />
+                <span>ประวัติฉบับเต็ม</span>
+              </button>
+              <button
+                type="button"
+                disabled={updating}
+                onClick={() => onDuplicate(property)}
+                className={toolClass}
+              >
+                <CopyPlus className="h-4 w-4 shrink-0 text-slate-400" />
+                <span>คัดลอกเป็นแบบร่าง</span>
+              </button>
+              <Link
+                href={`/admin/automation?propertyId=${encodeURIComponent(property.id)}`}
+                className={toolClass}
+              >
+                <Sparkles className="h-4 w-4 shrink-0 text-gold-600" />
+                <span>เครื่องมือ AI</span>
+              </Link>
+              <Link
+                href={propertyHref(property.slug)}
+                target="_blank"
+                rel="noreferrer"
+                className={toolClass}
+              >
+                <Eye className="h-4 w-4 shrink-0 text-slate-400" />
+                <span>ดูหน้าเว็บ</span>
+              </Link>
+              <button
+                type="button"
+                disabled={updating}
+                onClick={() => onDeleteConfirm(property.id)}
+                className={`${toolClass} !border-red-100 !text-red-600 hover:!bg-red-50`}
+              >
+                <Trash2 className="h-4 w-4 shrink-0" />
+                <span>ลบทรัพย์</span>
               </button>
             </div>
-
-            {loadingHistory ? (
-              <div className="py-3 text-center text-gray-400 flex items-center justify-center gap-1 text-[11px]">
-                <Loader2 className="w-3 h-3 animate-spin text-gold-600" />
-                <span>กำลังโหลดประวัติ...</span>
+            <dl className="space-y-2 rounded-2xl bg-slate-50 p-3 text-xs text-slate-500">
+              <div className="flex items-start justify-between gap-2">
+                <dt className="flex items-center gap-1.5">
+                  <UserRound className="h-3.5 w-3.5" />
+                  ผู้ดูแล
+                </dt>
+                <dd className="break-words text-right font-medium text-navy-950">
+                  {property.agent?.name || 'ยังไม่ได้ระบุ'}
+                </dd>
               </div>
-            ) : historyLogs.length === 0 ? (
-              <p className="text-gray-400 text-[10px]">ยังไม่มีประวัติการปรับปรุง</p>
-            ) : (
-              <div className="space-y-1.5">
-                {historyLogs.slice(0, 3).map((log) => (
-                  <div key={log.id} className="text-[10px] bg-white p-1.5 rounded border border-gray-100 flex items-start gap-1.5">
-                    <span className="shrink-0 mt-0.5">{getLogIcon(log.change_type)}</span>
-                    <div className="flex-1 min-w-0">
-                      <p className="font-bold text-navy-950 truncate">{log.diff_summary}</p>
-                      <p className="text-gray-400 text-[9px]">{new Date(log.timestamp).toLocaleDateString('th-TH')}</p>
-                    </div>
+              <div className="flex items-center justify-between gap-2">
+                <dt className="flex items-center gap-1.5">
+                  <CalendarDays className="h-3.5 w-3.5" />
+                  วันที่ลง
+                </dt>
+                <dd>{formatThaiDate(property.created_at)}</dd>
+              </div>
+              {property.facing_direction && (
+                <div className="flex justify-between gap-2">
+                  <dt>ทิศทาง</dt>
+                  <dd>{property.facing_direction}</dd>
+                </div>
+              )}
+              <div className="flex items-center justify-between gap-2">
+                <dt>ความครบถ้วนของข้อมูล</dt>
+                <dd className="font-semibold text-navy-950">{completionScore}%</dd>
+              </div>
+              <div className="h-1.5 overflow-hidden rounded-full bg-slate-200">
+                <div
+                  className="h-full rounded-full bg-gold-400"
+                  style={{ width: `${completionScore}%` }}
+                />
+              </div>
+            </dl>
+            <section className="rounded-2xl border border-gold-200 bg-gold-50/50 p-3">
+              <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                <h3 className="flex items-center gap-1.5 text-sm font-semibold text-navy-950">
+                  <Lock className="h-4 w-4 text-gold-700" />
+                  บันทึกภายในทีม
+                </h3>
+                {!isEditingNotes && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsEditingNotes(true);
+                      setNotesSuccess(false);
+                      setNotesError('');
+                    }}
+                    className="min-h-10 rounded-lg bg-white px-3 text-xs font-semibold text-navy-950"
+                  >
+                    {property.internal_notes ? 'แก้ไขบันทึก' : 'เพิ่มบันทึก'}
+                  </button>
+                )}
+              </div>
+              <p className="mb-3 text-xs text-slate-500">แสดงเฉพาะทีมงานในหลังบ้าน</p>
+              {notesSuccess && (
+                <p role="status" className="mb-2 text-sm text-emerald-700">
+                  บันทึกเรียบร้อยแล้ว
+                </p>
+              )}
+              {notesError && (
+                <p role="alert" className="mb-2 text-sm text-red-600">
+                  {notesError}
+                </p>
+              )}
+              {isEditingNotes ? (
+                <div className="space-y-2">
+                  <label htmlFor={`notes-${property.id}`} className="sr-only">
+                    บันทึกภายในทีม
+                  </label>
+                  <textarea
+                    id={`notes-${property.id}`}
+                    rows={4}
+                    autoFocus
+                    value={notesInput}
+                    onChange={(event) => setNotesInput(event.target.value)}
+                    disabled={savingNotes}
+                    placeholder="ข้อตกลงเจ้าของทรัพย์หรือข้อมูลที่ทีมต้องทราบ"
+                    className="w-full rounded-xl border border-gold-200 bg-white p-3 text-sm text-navy-950 focus:outline-none focus:ring-2 focus:ring-gold-400"
+                  />
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={handleSaveNotes}
+                      disabled={savingNotes}
+                      className="flex min-h-11 flex-1 items-center justify-center gap-2 rounded-xl bg-navy-950 px-3 text-sm font-semibold text-white disabled:opacity-50"
+                    >
+                      {savingNotes && <Loader2 className="h-4 w-4 animate-spin" />}บันทึก
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsEditingNotes(false);
+                        setNotesError('');
+                      }}
+                      disabled={savingNotes}
+                      className="min-h-11 rounded-xl bg-white px-3 text-sm text-slate-600"
+                    >
+                      ยกเลิก
+                    </button>
                   </div>
-                ))}
-              </div>
-            )}
+                </div>
+              ) : (
+                <p className="whitespace-pre-line break-words text-sm leading-relaxed text-navy-950">
+                  {property.internal_notes || 'ยังไม่มีบันทึกภายใน'}
+                </p>
+              )}
+            </section>
+            <section>
+              <h3 className="mb-3 flex items-center gap-2 text-sm font-semibold text-navy-950">
+                <History className="h-4 w-4 text-slate-400" />
+                ประวัติล่าสุด
+              </h3>
+              {loadingHistory ? (
+                <p role="status" className="flex items-center gap-2 text-sm text-slate-500">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  กำลังโหลดประวัติ…
+                </p>
+              ) : historyError ? (
+                <div role="alert" className="text-sm text-red-600">
+                  {historyError}
+                  <button
+                    type="button"
+                    onClick={() => setHistoryReload((value) => value + 1)}
+                    className="ml-2 min-h-10 font-semibold underline"
+                  >
+                    โหลดใหม่
+                  </button>
+                </div>
+              ) : historyLogs.length === 0 ? (
+                <p className="text-sm text-slate-500">ยังไม่มีประวัติการปรับปรุง</p>
+              ) : (
+                <ol className="space-y-3 border-l border-slate-200 pl-3">
+                  {historyLogs.slice(0, 3).map((log) => (
+                    <li key={log.id}>
+                      <p className="break-words text-sm text-navy-950">{log.diff_summary}</p>
+                      <p className="mt-1 text-xs text-slate-500">
+                        {log.actor_name} · {formatThaiDate(log.timestamp)}
+                      </p>
+                    </li>
+                  ))}
+                </ol>
+              )}
+            </section>
           </div>
-
-        </div>
-      )}
-
-      {/* Bottom Action Strip on Mobile */}
-      <div className="pt-2 border-t border-gray-100 flex items-center justify-between gap-1.5" data-no-expand="true">
-        <button
-          type="button"
-          disabled={busy}
-          onClick={(e) => {
-            e.stopPropagation();
-            onTogglePublished(property);
-          }}
-          className={`px-2.5 py-1 rounded-lg text-[10px] font-bold flex items-center space-x-1 ${
-            property.published !== false
-              ? 'bg-blue-50 text-blue-700'
-              : 'bg-gray-100 text-gray-600'
-          }`}
-        >
-          <span>{property.published !== false ? '🌐 ออนไลน์' : '📝 แบบร่าง'}</span>
-        </button>
-
-        <div className="flex items-center space-x-1">
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              onCopyLink(property);
-            }}
-            className="p-1.5 text-navy-700 hover:bg-gray-100 rounded-lg text-[11px] border border-gray-200"
-            title="คัดลอกลิงก์ส่งต่อลูกค้า"
-          >
-            {copiedId === property.id ? (
-              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-            ) : (
-              <Copy className="w-3.5 h-3.5 text-gray-500" />
-            )}
-          </button>
-
-          <button
-            type="button"
-            onClick={handleCopySnippet}
-            className={`p-1.5 rounded-lg text-[11px] border transition-all ${
-              isSnippetCopied
-                ? 'bg-emerald-100 text-emerald-800 border-emerald-300 ring-1 ring-emerald-300 shadow-xs'
-                : 'text-amber-700 hover:text-amber-950 hover:bg-amber-100/80 border-amber-200'
-            }`}
-            title="คัดลอกข้อมูลสรุปทรัพย์สำหรับโพสต์/ส่งลูกค้า (Copy Property Details)"
-          >
-            {isSnippetCopied ? (
-              <ClipboardCheck className="w-3.5 h-3.5 text-emerald-600 animate-in zoom-in-50" />
-            ) : (
-              <ClipboardCopy className="w-3.5 h-3.5 text-amber-700" />
-            )}
-          </button>
-
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              onOpenLandsMaps(property);
-            }}
-            className="p-1.5 text-navy-800 hover:bg-emerald-50 hover:text-emerald-700 rounded-lg border border-emerald-200"
-            title="ตรวจสอบระวาง & โฉนดกรมที่ดิน (DOL LandsMaps Overlay)"
-          >
-            <Building2 className="w-3.5 h-3.5 text-emerald-600" />
-          </button>
-
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              onOpenHistoryModal(property);
-            }}
-            className="p-1.5 text-navy-800 hover:bg-gold-50 hover:text-gold-700 rounded-lg border border-gold-200"
-            title="ดูประวัติการแก้ไขและปรับราคา (Property History)"
-          >
-            <History className="w-3.5 h-3.5 text-gold-600" />
-          </button>
-
-          <button
-            type="button"
-            disabled={busy}
-            onClick={(e) => {
-              e.stopPropagation();
-              onDuplicate(property);
-            }}
-            className="p-1.5 text-navy-700 hover:bg-navy-50 rounded-lg border border-gray-200"
-            title="คัดลอกเป็นทรัพย์ใหม่ (Clone)"
-          >
-            <CopyPlus className="w-3.5 h-3.5 text-navy-800" />
-          </button>
-
-          <button
-            type="button"
-            disabled={busy || !property.published || !onOpenLineModal}
-            onClick={(e) => {
-              e.stopPropagation();
-              if (property.published) onOpenLineModal?.(property);
-            }}
-            className="p-1.5 text-[#06C755] hover:bg-emerald-50 rounded-lg border border-emerald-200 flex items-center gap-1 disabled:opacity-40 disabled:cursor-not-allowed"
-            title={property.published ? 'ส่งทรัพย์ให้ผู้ติดตาม LINE OA ทั้งหมด' : 'เผยแพร่ทรัพย์ก่อนส่งให้ลูกค้า'}
-            aria-label="ส่งทรัพย์ให้ลูกค้าทาง LINE"
-          >
-            <MessageCircle className="w-3.5 h-3.5 fill-current text-[#06C755]" />
-            <span className="text-[11px] font-bold">ส่งลูกค้า</span>
-          </button>
-
-          <Link
-            href={`/admin/automation?propertyId=${encodeURIComponent(property.id)}`}
-            onClick={(e) => e.stopPropagation()}
-            className="p-1.5 text-gold-600 hover:text-gold-700 hover:bg-gold-50 rounded-lg border border-gold-200"
-            title="ระบบอัตโนมัติ AI"
-          >
-            <Sparkles className="w-3.5 h-3.5" />
-          </Link>
-          <Link
-            href={propertyHref(property.slug)}
-            target="_blank"
-            onClick={(e) => e.stopPropagation()}
-            className="p-1.5 text-gray-600 hover:text-navy-950 hover:bg-gray-100 rounded-lg border border-gray-200"
-            title="ดูหน้าเว็บ"
-          >
-            <Eye className="w-3.5 h-3.5" />
-          </Link>
-
-          <Link
-            href={`/admin/properties/new?id=${encodeURIComponent(property.id)}`}
-            onClick={(e) => e.stopPropagation()}
-            className="p-1.5 text-gray-600 hover:bg-gray-100 rounded-lg border border-gray-200"
-            title="แก้ไข"
-          >
-            <Edit3 className="w-3.5 h-3.5" />
-          </Link>
-
-          <button
-            type="button"
-            disabled={busy}
-            onClick={(e) => {
-              e.stopPropagation();
-              onDeleteConfirm(property.id);
-            }}
-            className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg border border-red-100"
-            title="ลบ"
-          >
-            <Trash2 className="w-3.5 h-3.5" />
-          </button>
-        </div>
+        )}
       </div>
-    </div>
+    </article>
   );
 }

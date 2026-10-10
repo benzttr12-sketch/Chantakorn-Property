@@ -274,15 +274,15 @@ async function triggerLineNotification(property: Property) {
       body: JSON.stringify({ ...property, notifyCustomers: true }),
     });
     const data = await res.json();
-    if (data.success) {
+    if (res.ok && data.isRealSent === true) {
       const customerNotice = typeof data.customerRecipients === 'number' && data.customerRecipients > 0
         ? ` (แจ้งเตือนลูกค้าผู้ติดตาม OA แล้ว ${data.customerDelivered}/${data.customerRecipients} คน)`
         : '';
       logSystemActivity({
         category: 'system',
         action: 'system_notification',
-        title: 'แจ้งเตือน LINE OA อัตโนมัติ',
-        description: `ระบบได้ส่งข้อมูลประกาศอสังหาฯ ใหม่ "${property.title}" เข้าไลน์ออฟฟิเชียลแอคเคานต์ https://lin.ee/NMSe28T3${customerNotice} ${data.simulated ? '(โหมดทดสอบจำลอง)' : '(ส่งแจ้งเตือนจริง)'} เรียบร้อยแล้ว`,
+        title: 'LINE รับคำขอแจ้งเตือนทีม',
+        description: `LINE รับคำขอส่งข้อมูลทรัพย์ "${property.title}" ถึงบัญชีเจ้าหน้าที่ที่กำหนดไว้แล้ว${customerNotice} กรุณาตรวจการได้รับข้อความที่บัญชีผู้รับ`,
         target_id: property.id,
         target_name: property.title,
         actor_name: 'ระบบอัตโนมัติ',
@@ -632,56 +632,20 @@ export function saveLocalUsers(users: UserProfile[]) {
 
 export async function fetchUsers(): Promise<UserProfile[]> {
   requireStaffBackend();
-  let usersList: UserProfile[] = [];
-  const firestore: Firestore | null = db;
-  if (dataBackend === 'supabase' && supabase) {
+  let usersList: UserProfile[];
+  if (dataBackend === 'supabase') {
+    if (!supabase) throw new Error('ระบบฐานข้อมูล Supabase ยังไม่ได้ตั้งค่า');
     const { data, error } = await supabase.from('profiles').select('*').order('full_name');
     if (error) throw error;
     usersList = (data || []) as UserProfile[];
-  } else if (dataBackend === 'firebase' && firestore) {
-    const snap = await getDocs(collection(firestore, 'profiles'));
-    if (!snap.empty) {
-      usersList = snap.docs.map(d => ({ ...d.data(), id: d.id } as UserProfile));
-    } else {
-      const defaultUsers: UserProfile[] = [
-        { 
-          id: 'user-benz', 
-          full_name: 'คุณเบนซ์ (ผู้บริหาร & แอดมิน)', 
-          email: 'benzttr12@gmail.com', 
-          role: 'ADMIN',
-          phone: '081-604-0097',
-          line_id: '@930xzcyi',
-          facebook: 'https://www.facebook.com/chantakornproperty',
-          avatar_url: 'https://images.unsplash.com/photo-1560250097-0b93528c311a?auto=format&fit=crop&w=600&q=80',
-          bio: 'ผู้ก่อตั้งและผู้บริหาร Chantakorn Property ยินดีให้คำปรึกษาอสังหาริมทรัพย์ระดับมืออาชีพในหาดใหญ่และสงขลา'
-        },
-        { 
-          id: 'user-pim', 
-          full_name: 'คุณพิมลภัส รัตนวิจิตร', 
-          email: 'agent@chantakornproperty.com', 
-          role: 'AGENT',
-          phone: '082-456-7890',
-          line_id: 'pim_realty',
-          facebook: 'https://www.facebook.com/chantakornproperty',
-          avatar_url: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&w=600&q=80',
-          bio: 'เชี่ยวชาญคอนโดและบ้านเดี่ยวโซน ม.อ. – คอหงส์ ประสบการณ์กว่า 4 ปี'
-        },
-      ];
-      try {
-        const promises = defaultUsers.map(u => 
-          setDoc(doc(firestore, 'profiles', u.id), JSON.parse(JSON.stringify(u)))
-        );
-        await Promise.all(promises);
-      } catch (seedErr) {
-        console.warn('Seed profiles to Firestore warning:', seedErr);
-      }
-      usersList = defaultUsers;
-    }
+  } else if (dataBackend === 'firebase') {
+    if (!db) throw new Error('ระบบฐานข้อมูล Firebase ยังไม่ได้ตั้งค่า');
+    const snapshot = await getDocs(collection(db, 'profiles'));
+    usersList = snapshot.docs.map(item => ({ ...item.data(), id: item.id } as UserProfile));
   } else {
     usersList = getLocalUsers();
   }
-
-  // Automatically sync to agents store
+  // A view projection only: fetching profiles never creates cloud agents or profiles.
   syncAgentsFromUsers(usersList);
   return usersList;
 }

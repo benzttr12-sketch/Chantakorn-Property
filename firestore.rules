@@ -69,6 +69,29 @@ service cloud.firestore {
       allow write: if isStaff();
     }
 
+    function isValidReview(data, reviewId) {
+      return data.keys().hasAll(['id', 'customerName', 'customerRole', 'propertyTitleOrZone', 'agentName', 'rating', 'comment', 'date', 'verifiedBuyer', 'serviceType', 'published'])
+        && data.keys().hasOnly(['id', 'customerName', 'customerRole', 'propertyTitleOrZone', 'agentName', 'rating', 'comment', 'date', 'avatarUrl', 'verifiedBuyer', 'serviceType', 'published'])
+        && data.id is string && data.id == reviewId && data.id.size() <= 120
+        && data.customerName is string && data.customerName.size() > 0 && data.customerName.size() <= 120
+        && data.customerRole is string && data.customerRole.size() <= 250
+        && data.propertyTitleOrZone is string && data.propertyTitleOrZone.size() <= 250
+        && data.agentName is string && data.agentName.size() <= 150
+        && data.rating is number && data.rating >= 1 && data.rating <= 5
+        && data.comment is string && data.comment.size() > 0 && data.comment.size() <= 4000
+        && data.date is string && data.date.size() > 0 && data.date.size() <= 40
+        && (!('avatarUrl' in data) || (data.avatarUrl is string && data.avatarUrl.size() <= 2000 && (data.avatarUrl == '' || data.avatarUrl.matches('https://.*'))))
+        && data.verifiedBuyer is bool && data.published is bool
+        && data.serviceType in ['buy', 'sell', 'rent', 'consignment'];
+    }
+
+    // Public queries must include published == true; drafts are staff-only.
+    match /reviews/{reviewId} {
+      allow read: if isStaff() || resource.data.published == true;
+      allow create, update: if isStaff() && isValidReview(request.resource.data, reviewId);
+      allow delete: if isStaff();
+    }
+
     // 6. Property history audit logs
     match /property_history/{logId} {
       allow read, create: if isStaff();

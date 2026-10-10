@@ -176,7 +176,9 @@ test('security-sensitive Firebase paths have regression guards', () => {
   assert.match(rules, /allow delete:\s*if false/);
   assert.doesNotMatch(authHelpers, /ADMIN_EMAILS|endsWith\(['"]@chantakornproperty\.com/);
   assert.doesNotMatch(adminLayout, /localStorage/);
-  assert.match(adminLayout, /getDocFromServer/);
+  assert.match(adminLayout, /await getCurrentUserProfile\(\)/);
+  assert.match(authHelpers, /await getDocFromServer\(userDocRef\)/);
+  assert.doesNotMatch(adminLayout, /getStoredUser|\bgetDoc\(/);
 });
 
 test('unrelated Firebase edits never turn missing coordinates into a real parcel pin', async () => {

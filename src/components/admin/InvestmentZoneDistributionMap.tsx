@@ -179,6 +179,13 @@ interface InvestmentZoneDistributionMapProps {
 type MetricType = 'valuation' | 'pricePerSqm' | 'avgPrice' | 'rentalYield';
 type VisualMode = 'density' | 'clusters' | 'voronoi';
 
+export function hasPropertyMapCoordinates(property: Pick<Property, 'latitude' | 'longitude' | 'coordinates_available'>): boolean {
+  if (property.coordinates_available === false || property.latitude == null || property.longitude == null || String(property.latitude).trim() === '' || String(property.longitude).trim() === '') return false;
+  const latitude = Number(property.latitude);
+  const longitude = Number(property.longitude);
+  return Number.isFinite(latitude) && Math.abs(latitude) <= 90 && Number.isFinite(longitude) && Math.abs(longitude) <= 180 && (latitude !== 0 || longitude !== 0);
+}
+
 export default function InvestmentZoneDistributionMap({
   properties,
   onSelectProperty,
@@ -205,6 +212,7 @@ export default function InvestmentZoneDistributionMap({
       return p.property_type === selectedType;
     });
   }, [properties, selectedType]);
+  const mappedProperties = useMemo(() => filteredProperties.filter(hasPropertyMapCoordinates), [filteredProperties]);
 
   // Aggregate stats by district and investment zone
   const zoneStats = useMemo(() => {
@@ -213,7 +221,7 @@ export default function InvestmentZoneDistributionMap({
       const matchingProps = filteredProperties.filter((p) => {
         const lat = Number(p.latitude);
         const lng = Number(p.longitude);
-        if (Number.isNaN(lat) || Number.isNaN(lng)) {
+        if (!hasPropertyMapCoordinates(p)) {
           return p.district.includes(zone.district);
         }
         // Approximate distance calculation in degrees
@@ -448,10 +456,10 @@ export default function InvestmentZoneDistributionMap({
     });
 
     // Map Coordinates of All Properties
-    const pointsData = filteredProperties.map(p => {
-      const lat = Number(p.latitude) || 7.0084;
-      const lng = Number(p.longitude) || 100.4705;
-      const [x, y] = projection([lng, lat]) || [0, 0];
+    const pointsData = mappedProperties.map(p => {
+      const point = projection([Number(p.longitude), Number(p.latitude)]);
+      if (!point) return null;
+      const [x, y] = point;
       return {
         property: p,
         x,
@@ -459,7 +467,7 @@ export default function InvestmentZoneDistributionMap({
         price: p.price || 0,
         area: p.usable_area || p.land_size || 50,
       };
-    }).filter(d => Number.isFinite(d.x) && Number.isFinite(d.y));
+    }).filter((point): point is NonNullable<typeof point> => point !== null && Number.isFinite(point.x) && Number.isFinite(point.y));
 
     // MODE 1: 2D Spatial Density Surface (D3 Contour Density)
     if (visualMode === 'density' && pointsData.length > 2) {
@@ -704,7 +712,7 @@ export default function InvestmentZoneDistributionMap({
         .text('★ ศูนย์กลางเศรษฐกิจหาดใหญ่');
     }
 
-  }, [filteredProperties, zoneStats, selectedMetric, visualMode, onSelectProperty]);
+  }, [mappedProperties, zoneStats, selectedMetric, visualMode, onSelectProperty]);
 
   // Render D3 Price Distribution Histogram in Secondary Card
   useEffect(() => {
@@ -870,7 +878,7 @@ export default function InvestmentZoneDistributionMap({
         {/* Interactive Controls Bar */}
         <div className="mt-6 pt-5 border-t border-white/10 flex flex-wrap items-center justify-between gap-3">
           {/* Visual Mode Selector */}
-          <div className="flex items-center space-x-1 bg-navy-950 p-1 rounded-xl border border-white/15">
+          <div className="flex max-w-full flex-wrap items-center gap-1 bg-navy-950 p-1 rounded-xl border border-white/15">
             <span className="text-[11px] font-bold text-gray-400 px-2 flex items-center gap-1">
               <Layers className="w-3.5 h-3.5 text-gold-400" />
               <span>การแสดงผล:</span>
@@ -902,7 +910,7 @@ export default function InvestmentZoneDistributionMap({
           </div>
 
           {/* Property Type Filter */}
-          <div className="flex items-center space-x-1.5 overflow-x-auto pb-1">
+          <div className="flex max-w-full items-center space-x-1.5 overflow-x-auto pb-1">
             {[
               { id: 'all', label: 'ทุกประเภท' },
               { id: 'house', label: 'บ้านเดี่ยว' },
@@ -927,6 +935,7 @@ export default function InvestmentZoneDistributionMap({
         </div>
       </div>
 
+      <p className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-xs leading-relaxed text-slate-600" role="status">แสดงพิกัดจริง {mappedProperties.length} จาก {filteredProperties.length} รายการ{mappedProperties.length < filteredProperties.length ? ` · อีก ${filteredProperties.length - mappedProperties.length} รายการยังไม่มีพิกัดที่ใช้งานได้ สามารถเพิ่มพิกัดจากหน้าแก้ไขทรัพย์` : ''}</p>
       {/* Main Grid: D3 Map (Left 8 Cols) + Zone Rankings & D3 Histogram (Right 4 Cols) */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         {/* LEFT: Interactive D3 Geospatial Canvas (8 Cols) */}
@@ -936,7 +945,7 @@ export default function InvestmentZoneDistributionMap({
             <div className="flex items-center space-x-2">
               <span className="w-2.5 h-2.5 rounded-full bg-gold-400 animate-pulse" />
               <span className="text-xs font-bold text-white">
-                พิกัดอสังหาริมทรัพย์และฮับการลงทุนสงขลา ({filteredProperties.length} หมุด)
+                พิกัดอสังหาริมทรัพย์และฮับการลงทุนสงขลา ({mappedProperties.length} หมุดทรัพย์)
               </span>
             </div>
 

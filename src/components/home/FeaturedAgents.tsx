@@ -14,8 +14,7 @@ import {
   ChevronRight
 } from 'lucide-react';
 import { ExtendedAgent } from '@/data/agents';
-import { getAgents, fetchAgents } from '@/lib/store/agents-store';
-import { fetchUsers } from '@/lib/store/properties-store';
+import { fetchAgents } from '@/lib/store/agents-store';
 import { formatFacebookUrl, formatLineUrl } from '@/lib/utils';
 
 interface FeaturedAgentsProps {
@@ -24,19 +23,15 @@ interface FeaturedAgentsProps {
 
 export default function FeaturedAgents({ onSelectAgentForBooking }: FeaturedAgentsProps) {
   const [agents, setAgents] = useState<ExtendedAgent[]>([]);
+  const [error, setError] = useState(false);
+  const [loading, setLoading] = useState(true);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [canScrollLeft, setCanScrollLeft] = useState(false);
   const [canScrollRight, setCanScrollRight] = useState(true);
   const [activeIndex, setActiveIndex] = useState(0);
 
   useEffect(() => {
-    fetchAgents().then(list => {
-      if (list && list.length > 0) setAgents(list);
-    }).catch(() => {});
-
-    fetchUsers().then(() => {
-      setAgents(getAgents());
-    }).catch(() => {});
+    fetchAgents().then(setAgents).catch(() => setError(true)).finally(() => setLoading(false));
 
     const handleUpdate = (e: any) => {
       if (e.detail && Array.isArray(e.detail)) setAgents(e.detail);
@@ -140,6 +135,9 @@ export default function FeaturedAgents({ onSelectAgentForBooking }: FeaturedAgen
           </div>
         </div>
 
+        {loading && <p role="status" className="mb-4 text-sm text-slate-500">กำลังโหลดข้อมูลทีมงาน…</p>}
+        {error && <p role="alert" className="mb-4 text-sm text-slate-600">ยังโหลดข้อมูลทีมงานไม่ได้ กรุณาลองใหม่ภายหลัง</p>}
+        {!loading && !error && agents.length === 0 && <p className="mb-4 text-sm text-slate-500">ข้อมูลทีมที่ปรึกษาจะปรากฏเมื่อผู้ดูแลเพิ่มข้อมูลแล้ว</p>}
         {/* Compact Horizontal Slider / Carousel */}
         <div
           ref={scrollContainerRef}
@@ -156,14 +154,14 @@ export default function FeaturedAgents({ onSelectAgentForBooking }: FeaturedAgen
                 <div className="flex items-center space-x-3">
                   {/* Avatar */}
                   <div className="relative w-14 h-14 rounded-full overflow-hidden shrink-0 border-2 border-gold-300/80 shadow-xs">
-                    <Image
-                      src={agent.photo_url || 'https://images.unsplash.com/photo-1560250097-0b93528c311a?auto=format&fit=crop&w=600&q=80'}
+                    {agent.photo_url ? <Image
+                      src={agent.photo_url}
                       alt={agent.name}
                       fill
                       sizes="56px"
                       className="object-cover group-hover:scale-105 transition-transform duration-300"
                       referrerPolicy="no-referrer"
-                    />
+                    /> : <span className="flex h-full items-center justify-center bg-navy-900 text-2xl font-bold text-gold-300">{agent.name.slice(0, 1)}</span>}
                   </div>
 
                   {/* Name & Title */}
@@ -174,7 +172,7 @@ export default function FeaturedAgents({ onSelectAgentForBooking }: FeaturedAgen
                       </span>
                       <div className="flex items-center text-amber-500 text-[11px] font-bold font-mono">
                         <Star className="w-3 h-3 fill-amber-400 mr-0.5" />
-                        <span>{agent.rating ? agent.rating.toFixed(1) : '5.0'}</span>
+                        <span>{agent.rating ? agent.rating.toFixed(1) : 'ยังไม่มีคะแนน'}</span>
                       </div>
                     </div>
                     <h3 className="text-sm font-black text-navy-950 truncate group-hover:text-gold-600 transition-colors">
@@ -201,11 +199,11 @@ export default function FeaturedAgents({ onSelectAgentForBooking }: FeaturedAgen
                 <div className="grid grid-cols-2 gap-1.5 text-center text-[10px] text-slate-600">
                   <div className="bg-slate-50/80 py-1 px-1.5 rounded-lg border border-slate-100">
                     <span className="text-slate-400 block text-[9px]">ปิดการขาย</span>
-                    <strong className="text-navy-950 font-bold font-mono">{agent.closedDeals || 10}+ เคส</strong>
+                    <strong className="text-navy-950 font-bold font-mono">{agent.closedDeals ?? 0}+ เคส</strong>
                   </div>
                   <div className="bg-slate-50/80 py-1 px-1.5 rounded-lg border border-slate-100">
                     <span className="text-slate-400 block text-[9px]">ประสบการณ์</span>
-                    <strong className="text-navy-950 font-bold font-mono">{agent.experienceYears || 3} ปี</strong>
+                    <strong className="text-navy-950 font-bold font-mono">{agent.experienceYears ?? 0} ปี</strong>
                   </div>
                 </div>
               </div>
@@ -213,16 +211,16 @@ export default function FeaturedAgents({ onSelectAgentForBooking }: FeaturedAgen
               {/* Compact Footer Actions */}
               <div className="p-3 bg-slate-50/60 border-t border-slate-100 space-y-2">
                 <div className="grid grid-cols-3 gap-1.5">
-                  <a
-                    href={`tel:${(agent.phone || '0816040097').replace(/[^0-9]/g, '')}`}
+                  {agent.phone ? <a
+                    href={`tel:${agent.phone.replace(/[^0-9]/g, '')}`}
                     className="flex items-center justify-center space-x-1 py-1.5 px-1.5 rounded-lg bg-white hover:bg-slate-100 text-slate-800 text-[11px] font-bold border border-slate-200 transition-colors shadow-2xs"
-                    title={`โทร: ${agent.phone || '081-604-0097'}`}
+                    title={`โทร: ${agent.phone}`}
                   >
                     <Phone className="w-3 h-3 text-navy-900 shrink-0" />
                     <span className="truncate">โทร</span>
-                  </a>
+                  </a> : null}
 
-                  <a
+                  {agent.line_id ? <a
                     href={formatLineUrl(agent.line_id)}
                     target="_blank"
                     rel="noopener noreferrer"
@@ -231,9 +229,9 @@ export default function FeaturedAgents({ onSelectAgentForBooking }: FeaturedAgen
                   >
                     <MessageSquare className="w-3 h-3 shrink-0" />
                     <span className="truncate">LINE</span>
-                  </a>
+                  </a> : null}
 
-                  <a
+                  {agent.facebook ? <a
                     href={formatFacebookUrl(agent.facebook)}
                     target="_blank"
                     rel="noopener noreferrer"
@@ -242,7 +240,7 @@ export default function FeaturedAgents({ onSelectAgentForBooking }: FeaturedAgen
                   >
                     <Facebook className="w-3 h-3 shrink-0 fill-current" />
                     <span className="truncate">Facebook</span>
-                  </a>
+                  </a> : null}
                 </div>
 
                 <button
