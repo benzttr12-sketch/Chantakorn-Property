@@ -73,7 +73,7 @@ npm run preview:pages
 
 ## เชื่อมระบบใช้งานจริงด้วย Supabase
 
-1. สร้าง Supabase project แล้วรัน `supabase/schema.sql` ตามด้วย `supabase/seed.sql` ใน SQL Editor (seed เพิ่มตัวแทน 2 คนสำหรับฟอร์ม ไม่เพิ่มรายการทรัพย์หรือลูกค้าปลอม)
+1. สร้าง Supabase project แล้วรัน `supabase/schema.sql`, `supabase/agent-metadata.sql` และ `supabase/reviews.sql` ตามลำดับใน SQL Editor ของเจ้าของ project ไฟล์เหล่านี้ใช้เมื่อเลือก Supabase เท่านั้น ไม่รันอัตโนมัติระหว่างเผยแพร่เว็บ และไม่ต้องรันในระบบ Firebase
 2. ตั้ง `.env.local`:
 
 ```dotenv
