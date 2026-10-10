@@ -2526,13 +2526,13 @@ function PropertyEditor() {
           </div>
 
           {/* URL Input */}
-          <div className="flex space-x-2">
+          <div className="flex flex-col gap-2 sm:flex-row">
             <input
               type="url"
-              placeholder="หรือวางลิงก์รูปภาพ https://images.unsplash.com/..."
+              placeholder="วางลิงก์รูปทรัพย์ https://…"
               value={imageUrlInput}
               onChange={(e) => setImageUrlInput(e.target.value)}
-              className="flex-grow bg-gray-50 border border-gray-200 rounded-xl p-2.5 text-xs text-gray-900 focus:ring-2 focus:ring-gold-500 outline-none"
+              className="min-w-0 flex-1 bg-gray-50 border border-gray-200 rounded-xl p-2.5 text-sm text-gray-900 focus:ring-2 focus:ring-gold-500 outline-none"
             />
             <button
               type="button"
