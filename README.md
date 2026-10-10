@@ -6,6 +6,8 @@
 
 ใช้ Node.js 22 ขึ้นไป (แนะนำ Node.js 22 LTS) และ npm
 
+ใช้ `package-lock.json` เป็น lockfile เดียวของโครงการ ทั้ง GitHub Actions และ Vercel ติดตั้งด้วย `npm ci` เมื่อแก้ dependency ใน `package.json` ให้รัน `npm install` และ commit `package-lock.json` ที่อัปเดตพร้อมกัน
+
 ```sh
 npm ci
 ```
