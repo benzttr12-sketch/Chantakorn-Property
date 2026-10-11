@@ -5,7 +5,7 @@ import AboutTeam from '@/components/about/AboutTeam';
 import { DEFAULT_OFFICIAL_LINE_URL, DEFAULT_OFFICIAL_PHONE } from '@/lib/utils';
 
 export const metadata: Metadata = {
-  title: 'เกี่ยวกับเรา | Chantakorn Property',
+  title: 'เกี่ยวกับเรา',
   description: 'รู้จัก Chantakorn Property ทีมที่ปรึกษาและบริการซื้อ ขาย เช่าอสังหาริมทรัพย์ในหาดใหญ่–สงขลา พร้อมช่องทางติดต่อทีมงาน',
 };
 
