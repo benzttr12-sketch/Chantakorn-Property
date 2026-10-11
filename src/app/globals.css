@@ -320,10 +320,25 @@
 }
 
 /* Homepage discovery keeps every section readable before hydration. */
-.home-hero-grid {
-  background-image: linear-gradient(rgba(197, 160, 89, 0.35) 1px, transparent 1px), linear-gradient(90deg, rgba(197, 160, 89, 0.35) 1px, transparent 1px);
-  background-size: 72px 72px;
-  mask-image: linear-gradient(to bottom, black, transparent);
+.home-hero-background {
+  height: min(880px, 100%);
+}
+
+.home-hero-backdrop {
+  object-position: 64% center;
+  opacity: 0.88;
+}
+
+.home-hero-shade {
+  background: linear-gradient(180deg, rgba(2, 8, 18, 0.7) 0%, rgba(2, 8, 18, 0.76) 36%, rgba(2, 8, 18, 0.93) 78%, #020812 100%);
+}
+
+@media (min-width: 1024px) {
+  .home-hero-background { height: 100%; }
+  .home-hero-backdrop { object-position: center; }
+  .home-hero-shade {
+    background: linear-gradient(90deg, rgba(2, 8, 18, 0.94) 0%, rgba(2, 8, 18, 0.84) 44%, rgba(2, 8, 18, 0.6) 100%), linear-gradient(0deg, #020812 0%, transparent 55%);
+  }
 }
 
 .home-mood-option, .home-explore-link { transition: background-color 180ms ease, color 180ms ease, border-color 180ms ease; }

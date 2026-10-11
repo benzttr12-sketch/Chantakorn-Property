@@ -11,6 +11,11 @@ const promptFont = Prompt({
 });
 
 const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
+const rawIconBasePath = (process.env.NEXT_PUBLIC_BASE_PATH || '').trim();
+const iconBasePath = !rawIconBasePath || rawIconBasePath === '51895189zaza' || rawIconBasePath.includes('YOUR_') || rawIconBasePath.includes('your-')
+  ? ''
+  : (rawIconBasePath.startsWith('/') ? rawIconBasePath : `/${rawIconBasePath}`).replace(/\/+$/, '');
+const brandIconUrl = (filename: string) => `${iconBasePath}/${filename}`;
 
 export const metadata: Metadata = {
   title: {
@@ -30,6 +35,16 @@ export const metadata: Metadata = {
     'ฉันทากร พร็อพเพอร์ตี้'
   ],
   authors: [{ name: 'CHANTAKORN PROPERTY' }],
+  icons: {
+    icon: [
+      { url: brandIconUrl('favicon.ico'), type: 'image/x-icon', sizes: '16x16 32x32 48x48' },
+      { url: brandIconUrl('favicon-16x16.png'), type: 'image/png', sizes: '16x16' },
+      { url: brandIconUrl('favicon-32x32.png'), type: 'image/png', sizes: '32x32' },
+      { url: brandIconUrl('favicon.svg'), type: 'image/svg+xml', sizes: 'any' },
+    ],
+    shortcut: brandIconUrl('favicon.ico'),
+    apple: { url: brandIconUrl('apple-touch-icon.png'), type: 'image/png', sizes: '180x180' },
+  },
   metadataBase: new URL(siteUrl),
   openGraph: {
     title: 'CHANTAKORN PROPERTY | นายหน้าอสังหาริมทรัพย์ หาดใหญ่–สงขลา',

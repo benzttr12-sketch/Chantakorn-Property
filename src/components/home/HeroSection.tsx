@@ -7,13 +7,10 @@ import { hatyaiModernHouseHero } from '@/assets/images';
 
 export default function HeroSection() {
   return (
-    <section className="relative overflow-hidden bg-navy-950 pb-10 pt-12 sm:pb-14 sm:pt-16 lg:pt-20">
-      <div className="pointer-events-none absolute inset-0" aria-hidden="true">
-        <Image src={hatyaiModernHouseHero} alt="" fill priority placeholder="blur" sizes="100vw" className="object-cover object-center opacity-30" />
-        <div className="absolute inset-0 bg-gradient-to-r from-navy-950 via-navy-950/90 to-navy-950/50" />
-        <div className="home-hero-grid absolute inset-0 opacity-15" />
-        <div className="absolute -left-40 top-0 h-[480px] w-[480px] rounded-full bg-gold-500/10 blur-[100px]" />
-        <div className="absolute bottom-0 right-0 h-[400px] w-[400px] rounded-full bg-gold-500/10 blur-[100px]" />
+    <section className="home-hero relative overflow-hidden bg-navy-950 pb-10 pt-12 sm:pb-14 sm:pt-16 lg:pt-20">
+      <div className="home-hero-background pointer-events-none absolute inset-x-0 top-0" aria-hidden="true">
+        <Image src={hatyaiModernHouseHero} alt="" fill priority placeholder="blur" sizes="100vw" className="home-hero-backdrop object-cover" />
+        <div className="home-hero-shade absolute inset-0" />
       </div>
       <div className="relative mx-auto grid w-full max-w-7xl items-center gap-10 px-4 sm:px-6 lg:grid-cols-[1.1fr_0.9fr] lg:gap-14 lg:px-8">
         <div className="min-w-0">
