@@ -16,26 +16,15 @@ function loadPropertyImageHelper() {
 }
 
 function load({ staff = false, env = {}, firestore = {}, fetch = async () => { throw Error('Unexpected LINE request'); } } = {}) {
-  const module = { exports: {} };
-  const source = ts.transpileModule(fs.readFileSync(path.join(__dirname, '../src/app/api/line/notify/route.ts'), 'utf8'), {
-    compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
-  }).outputText;
-  vm.runInNewContext(source, {
-    module, exports: module.exports, Request, Response, URL, Headers, fetch,
-    process: { env }, console: { warn() {}, error() {} },
-    require(name) {
-      if (name === '@/lib/api-response') return { jsonResponse: (body, init) => Response.json(body, init) };
-      if (name === '@/lib/server-auth') return { requireStaff: async () => staff ? null : Response.json({ error: 'Unauthorized' }, { status: 401 }) };
-      if (name === '@/lib/line-property-image') return loadPropertyImageHelper();
-      if (name === '@/lib/format-code') return { formatPropertyCode: (id) => id ? 'CK-' + String(id).replace(/[^a-zA-Z0-9]/g, '').slice(0, 6).toUpperCase() : '-' };
-      if (name === '@/lib/firestore-rest') return {
-        getFirestoreDocument: firestore.getFirestoreDocument || (async () => Response.json({}, { status: 404 })),
-        patchFirestoreDocument: firestore.patchFirestoreDocument || (async () => { throw Error('Unexpected settings write'); }),
-      };
-      throw Error(name);
+  const loader = require('./load-ts.cjs')({
+    '@/lib/server-auth': { requireStaff: async () => staff ? null : Response.json({ error: 'Unauthorized' }, { status: 401 }) },
+    '@/lib/firestore-rest': {
+      getFirestoreDocument: firestore.getFirestoreDocument || (async () => Response.json({}, { status: 404 })),
+      patchFirestoreDocument: firestore.patchFirestoreDocument || (async () => { throw Error('Unexpected settings write'); }),
+      listFirestoreDocuments: firestore.listFirestoreDocuments || (async () => []),
     },
-  });
-  return module.exports;
+  }, { fetch, process: { env }, console: { warn() {}, error() {} } });
+  return loader('app/api/line/notify/route.ts');
 }
 
 const owner = 'U' + '1'.repeat(32);
@@ -75,10 +64,10 @@ test('staff settings response never exposes server token or secret', async () =>
   assert.equal(body.includes('private-secret'), false);
 });
 
-test('notifications use only unique configured staff recipients and ignore customer user IDs', async () => {
+test('staff notifications use only unique configured recipients and ignore customer user IDs', async () => {
   const sends = [];
   const api = load({
-    env: { LINE_CHANNEL_ACCESS_TOKEN: 'test-token', LINE_TARGET_USER_ID: owner, LINE_ADMIN_USER_IDS: `${owner}, ${second}` },
+    staff: true, env: { LINE_CHANNEL_ACCESS_TOKEN: 'test-token', LINE_TARGET_USER_ID: owner, LINE_ADMIN_USER_IDS: `${owner}, ${second}` },
     fetch: async (_url, init) => { sends.push(JSON.parse(init.body)); return Response.json({}); },
   });
   const result = await (await api.POST(request({ inquiry_type: 'inquiry', name: 'Test', userId: customer }))).json();
@@ -90,13 +79,13 @@ test('notifications use only unique configured staff recipients and ignore custo
 
 test('public inquiries cannot override credentials or save settings', async () => {
   const api = load();
-  assert.equal((await api.POST(request({ inquiry_type: 'inquiry', overrideToken: 'attacker' }))).status, 400);
-  assert.equal((await api.POST(request({ inquiry_type: 'inquiry', action: 'save_settings' }))).status, 400);
+  assert.equal((await api.POST(request({ inquiry_type: 'inquiry', overrideToken: 'attacker' }))).status, 401);
+  assert.equal((await api.POST(request({ inquiry_type: 'inquiry', action: 'save_settings' }))).status, 401);
 });
 
 test('a rejected LINE push is never reported as successful delivery', async () => {
   const api = load({
-    env: { LINE_CHANNEL_ACCESS_TOKEN: 'expired-token', LINE_TARGET_USER_ID: owner },
+    staff: true, env: { LINE_CHANNEL_ACCESS_TOKEN: 'expired-token', LINE_TARGET_USER_ID: owner },
     fetch: async () => Response.json({ message: 'Invalid token' }, { status: 401 }),
   });
   const response = await api.POST(request({ inquiry_type: 'inquiry' }));
@@ -172,8 +161,7 @@ test('public callers cannot use manual or test flags to bypass disabled inquiry 
   const api = load({ firestore: { getFirestoreDocument: async () => Response.json({ fields: { auto_notify_consignment: { booleanValue: false } } }) } });
   for (const intent of [{ manualSend: true }, { isTest: true }]) {
     const result = await (await api.POST(request({ inquiry_type: 'inquiry', ...intent }))).json();
-    assert.equal(result.isRealSent, false);
-    assert.equal(result.simulated, true);
+    assert.equal(result.error, 'Unauthorized');
   }
   assert.equal((await api.POST(request({ title: 'Home', manualSend: true }))).status, 401);
 });
@@ -266,7 +254,7 @@ test('uploaded notification cover uses the API origin while detail links use the
   }, { NEXT_PUBLIC_SITE_URL: 'https://static.example.test/property-site/' });
   const hero = payload.messages[1].contents.hero;
   assert.equal(hero.url, uploadedImageUrl('home one', photo));
-  assert.equal(hero.action.uri, 'https://static.example.test/property-site/properties/CK-HOMEON');
+  assert.equal(hero.action.uri, 'https://static.example.test/property-site/properties/CK-HOME%20ONE');
   assert.equal(JSON.stringify(payload).includes('data:image/'), false);
 });
 

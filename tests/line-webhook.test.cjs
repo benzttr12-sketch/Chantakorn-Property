@@ -628,16 +628,10 @@ test('legacy image URL serves the selected gallery photo as JPEG and defaults to
 });
 
 test('Firestore property search constrains results to published documents', async () => {
-  let query;
-  const api = load('lib/firestore-rest.ts', {
-    fetch: async (_url, init) => {
-      query = JSON.parse(init.body).structuredQuery;
-      return Response.json([{ document: { name: 'projects/test-project/databases/(default)/documents/properties/home', fields: { published: { booleanValue: true } } } }]);
-    },
-  });
+  let filter;
+  const reference = { where: (...args) => { filter=args; return reference; }, limit: value => { assert.equal(value,20);return reference; }, get: async()=>({docs:[{id:'home',data:()=>({published:true})}]}) };
+  const api = require('./load-ts.cjs')({ './server-firestore': {serverFirestore:()=>({collection:name=>{assert.equal(name,'properties');return reference;}})} })('lib/firestore-rest.ts');
   const results = await api.listFirestoreDocuments('properties', 20, { publishedOnly: true });
-  assert.equal(query.where.fieldFilter.field.fieldPath, 'published');
-  assert.equal(query.where.fieldFilter.op, 'EQUAL');
-  assert.equal(query.where.fieldFilter.value.booleanValue, true);
+  assert.deepEqual(filter, ['published', '==', true]);
   assert.equal(results[0].published, true);
 });

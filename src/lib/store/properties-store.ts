@@ -7,6 +7,9 @@ import { supabase } from '@/lib/supabase/client';
 import { db } from '@/lib/firebase/client';
 import { dataBackend } from '@/lib/backend';
 import { fetchStaffApi } from '@/lib/staff-api';
+import { apiUrl } from '@/lib/api-url';
+import { preparePropertyMedia, removeUnusedPropertyMedia } from '@/lib/property-media';
+import { submitFirebaseInquiry } from '@/lib/inquiry-submit';
 import { 
   collection, 
   getDocs, 
@@ -201,6 +204,12 @@ async function loadProperties(includeUnpublished: boolean): Promise<Property[]> 
   const firestore: Firestore | null = db;
   if (dataBackend === 'firebase') {
     if (firestore) {
+      if (!includeUnpublished) {
+        const response = await fetch(apiUrl('/api/properties'));
+        const body = await response.json();
+        if (!response.ok || !Array.isArray(body.properties)) throw new Error(body.error || 'โหลดรายการทรัพย์ไม่สำเร็จ');
+        return body.properties.map((row: PropertyRow) => rowToProperty(row));
+      }
       const q = includeUnpublished
         ? query(collection(firestore, 'properties'))
         : query(collection(firestore, 'properties'), where('published', '==', true));
@@ -266,6 +275,7 @@ function generateShortPropertyId(): string {
 }
 
 async function triggerLineNotification(property: Property) {
+  if (!property.published) return;
   if (typeof window === 'undefined' || typeof fetch === 'undefined') return;
   try {
     const res = await fetchStaffApi('/api/line/notify', {
@@ -318,7 +328,11 @@ export async function createProperty(property: Omit<Property, 'id' | 'created_at
       id: newId,
       created_at: new Date().toISOString()
     };
-    await setDoc(doc(firestore, 'properties', newId), JSON.parse(JSON.stringify(newProperty)));
+    const media = await preparePropertyMedia(firestore, newId, newProperty.images, newProperty.cover_image);
+    newProperty.images = media.images;
+    newProperty.cover_image = media.cover_image;
+    try { await setDoc(doc(firestore, 'properties', newId), JSON.parse(JSON.stringify(newProperty))); }
+    catch (error) { await media.cleanup(); throw error; }
     recordPropertyHistory({
       property_id: newProperty.id,
       property_title: newProperty.title,
@@ -382,7 +396,13 @@ export async function updateProperty(id: string, updates: Partial<Property>): Pr
       ...(images ? { images } : {}),
       ...(agent ? { agent } : {})
     };
-    await setDoc(doc(firestore, 'properties', id), JSON.parse(JSON.stringify(updated)), { merge: true });
+    const previousPhotos = [...current.images, current.cover_image];
+    const media = await preparePropertyMedia(firestore, id, updated.images, updated.cover_image, previousPhotos.filter(photo => photo.startsWith('data:')));
+    updated.images = media.images;
+    updated.cover_image = media.cover_image;
+    try { await setDoc(doc(firestore, 'properties', id), JSON.parse(JSON.stringify(updated)), { merge: true }); }
+    catch (error) { await media.cleanup(); throw error; }
+    await removeUnusedPropertyMedia(firestore, id, previousPhotos, [...updated.images, updated.cover_image]);
     logPropertyChanges(current, updates).catch(() => undefined);
     return updated;
   }
@@ -410,6 +430,12 @@ export async function deleteProperty(id: string): Promise<boolean> {
   const firestore: Firestore | null = db;
   if (dataBackend === 'firebase' && firestore) {
     await deleteDoc(doc(firestore, 'properties', id));
+    // Remove private media only after the parent deletion succeeds.
+    // If cleanup is interrupted, the published-parent image check still denies access.
+    try {
+      const photos = await getDocs(query(collection(firestore, 'property_media'), where('property_id', '==', id)));
+      await Promise.allSettled(photos.docs.map(photo => deleteDoc(doc(firestore, 'property_media', photo.id))));
+    } catch { console.warn('Property deleted; media cleanup could not finish'); }
     return true;
   }
   const properties = getLocalProperties();
@@ -527,28 +553,12 @@ export async function submitInquiry(inquiry: Omit<Inquiry, 'id' | 'created_at'>)
   const result: Inquiry = { ...inquiry, id: crypto.randomUUID(), status: 'new', created_at: new Date().toISOString() };
   const firestore: Firestore | null = db;
   if (dataBackend === 'firebase' && firestore) {
-    // Firestore rejects undefined optional fields. JSON also strips them recursively.
-    await setDoc(doc(firestore, 'inquiries', result.id), JSON.parse(JSON.stringify(result)));
-    if (typeof window !== 'undefined' && typeof fetch !== 'undefined') {
-      fetch('/api/line/notify', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(result),
-      }).catch(() => undefined);
-    }
-    return result;
+    return submitFirebaseInquiry(inquiry);
   }
   if (dataBackend === 'supabase' && supabase) {
     // Anonymous visitors may insert inquiries but may never read the private inbox.
     const { error } = await supabase.from('inquiries').insert(result);
     if (error) throw error;
-    if (typeof window !== 'undefined' && typeof fetch !== 'undefined') {
-      fetch('/api/line/notify', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(result),
-      }).catch(() => undefined);
-    }
     return result;
   }
   throw new Error('ไม่สามารถเชื่อมต่อระบบรับข้อความ กรุณาติดต่อทางโทรศัพท์หรือ LINE');

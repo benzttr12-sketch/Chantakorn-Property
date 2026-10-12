@@ -23,6 +23,7 @@ import {
 } from 'lucide-react';
 import { PropertyType, PropertyStatus } from '@/lib/types';
 import { useSpeechRecognition } from '@/lib/use-speech-recognition';
+import { fetchStaffApi } from '@/lib/staff-api';
 
 export interface PropertySpecsForAI {
   title?: string;
@@ -114,7 +115,7 @@ export default function SmartDescriptionGeneratorModal({
     setError('');
 
     try {
-      const res = await fetch('/api/ai/generate-property-description', {
+      const res = await fetchStaffApi('/api/ai/generate-property-description', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

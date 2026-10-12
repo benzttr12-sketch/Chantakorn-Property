@@ -31,6 +31,12 @@ jobs:
       - run: npm run lint
       - run: npm run typecheck
       - run: npm test
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: Verify private Firestore boundaries
+        run: npm run test:rules
       - name: Configure Pages
         id: pages
         if: github.event_name != 'pull_request'

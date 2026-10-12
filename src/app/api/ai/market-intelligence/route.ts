@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getGeminiClient } from '@/lib/gemini';
+import { readJsonBody } from '@/lib/server-request';
+import { enforceRequestBudget } from '@/lib/server-budget';
 
 export interface GroundingSource {
   title: string;
@@ -25,22 +27,58 @@ interface CachedInsight {
 }
 
 const CACHE_TTL_MS = 60 * 60 * 1000; // 1 hour TTL
+const CACHE_MAX_ENTRIES = 64;
+const CACHE_MAX_ENTRY_BYTES = 128 * 1024;
 const insightCache = new Map<string, CachedInsight>();
+
+function pruneExpiredInsights(now: number) {
+  for (const [key, cached] of insightCache) {
+    if (now - cached.cachedAt >= CACHE_TTL_MS) insightCache.delete(key);
+  }
+}
+
+function cacheInsight(key: string, data: CachedInsight['data']) {
+  const now = Date.now();
+  pruneExpiredInsights(now);
+  insightCache.delete(key);
+  // Provider output may be larger than a normal insight; keep the cache bounded in bytes as well as entries.
+  if (Buffer.byteLength(JSON.stringify(data), 'utf8') > CACHE_MAX_ENTRY_BYTES) return;
+  while (insightCache.size >= CACHE_MAX_ENTRIES) {
+    const oldest = insightCache.keys().next().value;
+    if (oldest === undefined) break;
+    insightCache.delete(oldest);
+  }
+  insightCache.set(key, { data, cachedAt: now });
+}
 
 export async function POST(req: NextRequest) {
   let query = '';
   let category = '';
 
   try {
-    const body = await req.json().catch(() => ({}));
-    query = (body.query || '').trim();
-    category = (body.category || '').trim();
+    const parsedBody = await readJsonBody(req, 8 * 1024);
+    if (parsedBody.error) return parsedBody.error;
+    const body = parsedBody.data;
+    if (!body || typeof body !== 'object' || Array.isArray(body)) {
+      return NextResponse.json({ error: 'ข้อมูลคำถามไม่ถูกต้อง' }, { status: 400 });
+    }
+    const fields = body as Record<string, unknown>;
+    if (Object.keys(fields).some(key => key !== 'query' && key !== 'category') ||
+      (fields.query !== undefined && (typeof fields.query !== 'string' || fields.query.length > 1000)) ||
+      (fields.category !== undefined && (typeof fields.category !== 'string' || fields.category.length > 200))) {
+      return NextResponse.json({ error: 'ข้อมูลคำถามไม่ถูกต้องหรือยาวเกินกำหนด' }, { status: 400 });
+    }
+    query = typeof fields.query === 'string' ? fields.query.trim() : '';
+    category = typeof fields.category === 'string' ? fields.category.trim() : '';
 
     const cacheKey = (query || category || 'default').toLowerCase().replace(/\s+/g, ' ');
 
     // Check in-memory cache first to save quota
+    pruneExpiredInsights(Date.now());
     const cached = insightCache.get(cacheKey);
-    if (cached && Date.now() - cached.cachedAt < CACHE_TTL_MS) {
+    if (cached) {
+      insightCache.delete(cacheKey);
+      insightCache.set(cacheKey, cached);
       return NextResponse.json({
         success: true,
         ...cached.data,
@@ -48,7 +86,14 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    const ai = getGeminiClient();
+    let ai = getGeminiClient();
+    if (ai) {
+      const limited = await enforceRequestBudget(req, 'market-intelligence', { perMinute: 5, perDay: 100 });
+      if (limited) {
+        if (process.env.NEXT_PUBLIC_DATA_BACKEND === 'local' && limited.status === 503) ai = null;
+        else return limited;
+      }
+    }
 
     if (!ai) {
       const fallbackResult = {
@@ -57,7 +102,7 @@ export async function POST(req: NextRequest) {
         searchQueries: ['ราคาประเมินที่ดิน หาดใหญ่ ล่าสุด', 'โครงการมอเตอร์เวย์ หาดใหญ่ สะเดา', 'แนวโน้มอสังหา สงขลา'],
         timestamp: new Date().toISOString(),
       };
-      insightCache.set(cacheKey, { data: fallbackResult, cachedAt: Date.now() });
+      cacheInsight(cacheKey, fallbackResult);
 
       return NextResponse.json({
         success: true,
@@ -86,6 +131,7 @@ export async function POST(req: NextRequest) {
         model: 'gemini-3.8-flash',
         contents: prompt,
         config: {
+          maxOutputTokens: 4096,
           tools: [{ googleSearch: {} }],
         },
       });
@@ -132,7 +178,7 @@ export async function POST(req: NextRequest) {
     };
 
     // Store in cache to minimize future API calls
-    insightCache.set(cacheKey, { data: finalResult, cachedAt: Date.now() });
+    cacheInsight(cacheKey, finalResult);
 
     return NextResponse.json({
       success: true,

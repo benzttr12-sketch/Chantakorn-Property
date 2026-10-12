@@ -10,10 +10,17 @@ function loadStore({ backend = 'local', supabase = null, firebase = false, fireb
   const sourceRoot = path.resolve(__dirname, '../src');
   const cache = new Map();
   const storage = new Map();
+  const mediaDocuments = [], deletions = [];
   const context = vm.createContext({
-    console, crypto: webcrypto, Event,
+    console, crypto: webcrypto, Event, atob, URL, Headers, TextEncoder,
+    fetch: async (url) => {
+      if (firebaseError) throw firebaseError;
+      if (url === '/api/properties') return Response.json({ properties: firebaseDocuments.filter(row => row.published) });
+      throw new Error('Unexpected API request');
+    },
     process: { env: { NEXT_PUBLIC_DATA_BACKEND: backend, NEXT_PUBLIC_ENABLE_DEMO_AUTH: String(demoAuth) } },
     window: {
+      location: { origin: 'https://example.com' },
       localStorage: {
         getItem: key => storage.get(key) ?? null,
         setItem: (key, value) => storage.set(key, value),
@@ -46,16 +53,19 @@ function loadStore({ backend = 'local', supabase = null, firebase = false, fireb
         getApp: () => ({}),
       };
       if (name === 'firebase/firestore') return {
-        collection: () => ({}), query: () => ({}), where: () => ({}), doc: (_db, collection, id) => ({ collection, id }),
-        getDocs: async () => { if (firebaseError) throw firebaseError; return { docs: firebaseDocuments.map(item => ({ id: item.id, data: () => ({ ...item }) })) }; },
+        collection: (_db, collection) => ({ collection }), query: (ref,...constraints) => ({ ...ref,constraints }), where: (field,op,value) => ({field,op,value}), doc: (_db, collection, id) => ({ collection, id }),
+        getDocs: async (reference) => { if (firebaseError) throw firebaseError; const rows=reference?.collection==='property_media'?mediaDocuments.filter(item=>item.property_id===reference.constraints?.[0]?.value):firebaseDocuments; return { docs: rows.map(item => ({ id: item.id, data: () => ({ ...item }) })) }; },
         getDocFromServer: async () => ({ exists: () => false, data: () => ({}) }),
         setDoc: async (reference, value) => {
           if (firebaseError) throw firebaseError;
           if (reference.collection === 'properties') {
             const index = firebaseDocuments.findIndex(item => item.id === reference.id);
             if (index >= 0) firebaseDocuments[index] = value;
+            else firebaseDocuments.push(value);
           }
+          if(reference.collection === 'property_media') mediaDocuments.push({...value,id:reference.id});
         },
+        deleteDoc: async reference => { if(firebaseError)throw firebaseError; deletions.push(reference); },
         getFirestore: () => ({}),
       };
       if (!name.startsWith('.') && !name.startsWith('@/')) {
@@ -69,7 +79,7 @@ function loadStore({ backend = 'local', supabase = null, firebase = false, fireb
     vm.runInContext(`(function(require,module,exports){${compiled}\n})`, context)(requireModule, module, module.exports);
     return module.exports;
   }
-  return { store: load(path.join(sourceRoot, 'lib/store/properties-store.ts')), flags: load(path.join(sourceRoot, 'lib/backend.ts')), storage };
+  return { store: load(path.join(sourceRoot, 'lib/store/properties-store.ts')), flags: load(path.join(sourceRoot, 'lib/backend.ts')), storage, deletions, mediaDocuments };
 }
 
 function queryResult(result) {
@@ -194,4 +204,15 @@ test('unrelated Firebase edits never turn missing coordinates into a real parcel
   assert.equal(result.coordinates_available, true);
   assert.equal(result.latitude, 7.21);
   assert.equal(result.longitude, 100.56);
+});
+test('deleting a Firebase listing cleans its individually saved photos only after the parent succeeds', async () => {
+  const sample=loadStore().store.getLocalProperties()[0];
+  const h=loadStore({backend:'firebase',firebase:true});
+  const photo=`data:image/jpeg;base64,${Buffer.alloc(450000,5).toString('base64')}`;
+  const created=await h.store.createProperty({...sample,published:false,images:[photo],cover_image:photo});
+  assert.equal(h.mediaDocuments.length,1);
+  await h.store.deleteProperty(created.id);
+  assert.equal(h.deletions[0].collection,'properties');
+  assert.equal(h.deletions[1].collection,'property_media');
+  assert.equal(h.deletions[1].id,h.mediaDocuments[0].id);
 });

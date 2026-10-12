@@ -43,6 +43,8 @@ function load({ backend = 'firebase', configured = true, supabase = null, rows =
       if (name === '@/lib/store/activity-store') return { logSystemActivity: async () => {} };
       if (name === '@/lib/format-code') return { formatPropertyCode: value => value };
       if (name === '@/lib/staff-api') return {};
+      if (name === '@/lib/api-url') return { apiUrl: value => value };
+      if (name === '@/lib/property-media' || name === '@/lib/inquiry-submit') return {};
       throw Error(name);
     }
     vm.runInContext(`(function(require,module,exports){${compiled}\n})`, context)(requireModule, module, module.exports);

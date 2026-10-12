@@ -28,10 +28,26 @@ export async function GET(request: Request): Promise<Response> {
     if (fields?.published?.booleanValue !== true) return notFound();
 
     const images = fields.images?.arrayValue?.values?.map((value: { stringValue?: string }) => value.stringValue);
-    const image = selectPropertyImage({
+    let image = selectPropertyImage({
       cover_image: index === null ? fields.cover_image?.stringValue : images?.[Number(index)],
       images: index === null ? images : [fields.cover_image?.stringValue],
     });
+    const mediaId = params.get('media');
+    if (mediaId) {
+      if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(mediaId)) return notFound();
+      const attached = [fields.cover_image?.stringValue, ...(images || [])].some(value => {
+        try {
+          const url = new URL(value);
+          return url.pathname === `/api/properties/${encodeURIComponent(id)}/image` && url.searchParams.get('media') === mediaId;
+        } catch { return false; }
+      });
+      if (!attached) return notFound();
+      const media = await getFirestoreDocument('property_media', mediaId);
+      if (!media.ok) return notFound();
+      const mediaFields = (await media.json()).fields;
+      if (mediaFields?.property_id?.stringValue !== id) return notFound();
+      image = selectPropertyImage({ cover_image: mediaFields?.data_url?.stringValue });
+    }
     if (!image) return notFound();
     if (!image.startsWith('data:')) {
       return new Response(null, { status: 307, headers: { ...headers, Location: image } });

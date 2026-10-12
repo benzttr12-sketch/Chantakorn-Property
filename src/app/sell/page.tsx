@@ -130,26 +130,6 @@ export default function SellPage() {
       };
       setSubmittedData(dataSnapshot);
 
-      // Send alert to LINE Official Account
-      fetch('/api/line/notify', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          inquiry_type: 'consignment_sell',
-          name: name.trim(),
-          phone: phone.trim(),
-          line_id: lineId,
-          message: `ฝากขายทรัพย์ประเภท ${propertyType} ใน ${district} จ.${province} ราคาที่ต้องการ ${expectedPrice} บาท\nรายละเอียด: ${description}`,
-          consignment_details: {
-            property_type: propertyType,
-            province,
-            district,
-            subdistrict,
-            expected_price: Number(expectedPrice),
-          }
-        })
-      }).catch(() => undefined);
-
       setSubmitted(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'ส่งข้อมูลไม่สำเร็จ กรุณาลองอีกครั้ง หรือติดต่อโทร 081-604-0097');
@@ -545,7 +525,7 @@ export default function SellPage() {
               <div>
                 <div className="flex items-center space-x-2 text-navy-950 font-bold text-base pb-3 border-b border-gray-100 mb-4">
                   <Upload className="w-4 h-4 text-gold-600" />
-                  <span>3. แนบรูปถ่ายทรัพย์และเอกสารประกอบ (ถ้ามี)</span>
+                  <span>3. แนบรูปถ่ายทรัพย์ (ถ้ามี)</span>
                 </div>
 
                 {/* Dropzone */}
@@ -553,7 +533,7 @@ export default function SellPage() {
                   <input
                     type="file"
                     multiple
-                    accept="image/*,.pdf"
+                    accept="image/*"
                     onChange={handlePhotoUpload} disabled={uploading}
                     className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
                   />
@@ -562,7 +542,7 @@ export default function SellPage() {
                     {uploading ? 'กำลังเตรียมรูปภาพ...' : 'คลิกเพื่อเลือกรูปภาพ'}
                   </div>
                   <p className="text-xs text-gray-500 mt-1">
-                    รองรับ JPG, PNG และ WebP สูงสุด 5 รูป รูปละไม่เกิน 5 MB (ส่งรูปเพิ่มเติมทาง LINE ได้)
+                    รองรับ JPG, PNG และ WebP สูงสุด 15 รูป รูปละไม่เกิน 50 MB (ส่งรูปเพิ่มเติมทาง LINE ได้)
                   </p>
                 </div>
 
