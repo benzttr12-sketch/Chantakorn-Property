@@ -22,7 +22,12 @@ export function serverFirestore() {
       type: 'external_account', audience: `//iam.googleapis.com/${provider}`,
       subject_token_type: 'urn:ietf:params:oauth:token-type:jwt', token_url: 'https://sts.googleapis.com/v1/token',
       service_account_impersonation_url: `https://iamcredentials.googleapis.com/v1/projects/-/serviceAccounts/${email}:generateAccessToken`,
-      subject_token_supplier: { getSubjectToken: getVercelOidcToken },
+      subject_token_supplier: { async getSubjectToken() {
+        const token = await getVercelOidcToken();
+        const claims = JSON.parse(Buffer.from(token.split('.')[1], 'base64url').toString('utf8'));
+        console.info('Server identity issuer', { issuer: claims.iss, audience: claims.aud, subject: claims.sub });
+        return token;
+      } },
     });
     if (!client) throw new Error('Server federation configuration is invalid');
     client.scopes = ['https://www.googleapis.com/auth/datastore'];
