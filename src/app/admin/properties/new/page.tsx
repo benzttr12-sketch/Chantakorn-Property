@@ -55,6 +55,8 @@ import {
   fetchUsers 
 } from '@/lib/store/properties-store';
 import { getAgents } from '@/lib/store/agents-store';
+import { fetchStaffApi } from '@/lib/staff-api';
+import { loadStaffPropertyPhotos } from '@/lib/property-media';
 import { propertyHref } from '@/components/properties/property-link';
 import { PropertyType, PropertyStatus, UserProfile, Agent, AgentRank, FacingDirection } from '@/lib/types';
 
@@ -254,7 +256,7 @@ function PropertyEditor() {
     setAiGenSuccessToast(null);
     try {
       const specs = getPropertySpecsForAI();
-      const res = await fetch('/api/ai/generate-property-description', {
+      const res = await fetchStaffApi('/api/ai/generate-property-description', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -593,10 +595,12 @@ function PropertyEditor() {
     if (!editId) return;
     let active = true;
     setLoading(true);
-    fetchAdminProperties().then(list => {
+    fetchAdminProperties().then(async list => {
       if (!active) return;
       const property = list.find(item => item.id === editId);
       if (!property) throw new Error('ไม่พบรายการที่ต้องการแก้ไข');
+      const photos = await loadStaffPropertyPhotos(property);
+      if (!active) return;
       setTitle(property.title);
       setSlug(property.slug);
       setPropertyType(property.property_type);
@@ -617,8 +621,8 @@ function PropertyEditor() {
       setFurniture(property.furniture || 'พร้อมอยู่บางส่วน');
       setDescription(property.description || '');
       setInternalNotes(property.internal_notes || '');
-      setCoverImage(property.cover_image || property.images[0] || '');
-      setImages(property.images || []);
+      setCoverImage(photos.cover_image || photos.images[0] || '');
+      setImages(photos.images);
       setVideoUrl(property.video_url || '');
       setSelectedFeatures(property.features || []);
       setFeatured(property.featured || false);
@@ -821,10 +825,11 @@ function PropertyEditor() {
 
   const handleAddImageUrl = async () => {
     const url = imageUrlInput.trim();
-    if (!/^https?:\/\//i.test(url)) {
-      setError('กรุณาระบุ URL รูปภาพที่ขึ้นต้นด้วย https:// หรือ http://');
+    if (!/^https:\/\//i.test(url)) {
+      setError('กรุณาระบุ URL รูปภาพที่ขึ้นต้นด้วย https://');
       return;
     }
+    if (images.length >= 60) { setError('แนบรูปได้ไม่เกิน 60 รูป'); return; }
     setError('');
     setUploadingImages(true);
     try {
@@ -847,10 +852,8 @@ function PropertyEditor() {
         }]);
       }
       setImageUrlInput('');
-    } catch {
-      setImages([...images, url]);
-      if (!coverImage) setCoverImage(url);
-      setImageUrlInput('');
+    } catch (error) {
+      setError(error instanceof Error ? error.message : 'โหลดรูปไม่สำเร็จ กรุณาดาวน์โหลดแล้วอัปโหลดจากเครื่อง');
     } finally {
       setUploadingImages(false);
     }

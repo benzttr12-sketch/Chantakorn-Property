@@ -1,6 +1,9 @@
 ﻿import { NextRequest, NextResponse } from 'next/server';
 import { GoogleGenAI, Type } from '@google/genai';
 import { PropertyType, PropertyStatus } from '@/lib/types';
+import { requireStaff } from '@/lib/server-auth';
+import { readJsonBody } from '@/lib/server-request';
+import { enforceRequestBudget } from '@/lib/server-budget';
 
 interface GenerateDescriptionRequest {
   title?: string;
@@ -27,9 +30,51 @@ interface GenerateDescriptionRequest {
   customHighlights?: string;
 }
 
+function isDescriptionRequest(value: unknown): value is GenerateDescriptionRequest {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  const body = value as Record<string, unknown>;
+  const textLimits: Record<string, number> = {
+    title: 500, district: 200, subdistrict: 200, address: 1000,
+    furniture: 500, facingDirection: 100, agentName: 200, agentPhone: 100,
+    agentLine: 200, agentFacebook: 1000, customHighlights: 4000,
+  };
+  const numericFields = ['price', 'bedrooms', 'bathrooms', 'parking', 'landSize', 'usableArea'];
+  const enums: Record<string, string[]> = {
+    propertyType: ['house', 'condo', 'land', 'commercial', 'investment', 'consignment'],
+    status: ['sale', 'rent'],
+    tone: ['luxury', 'high_converting', 'social_media', 'investor'],
+  };
+  for (const [key, field] of Object.entries(body)) {
+    if (Object.hasOwn(textLimits, key)) {
+      if (typeof field !== 'string' || field.length > textLimits[key]) return false;
+    } else if (numericFields.includes(key)) {
+      if (field === '') continue;
+      if (typeof field !== 'number' && typeof field !== 'string') return false;
+      if (typeof field === 'string' && (field.length > 32 || !/^(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?$/.test(field))) return false;
+      const numeric = Number(field);
+      if (!Number.isFinite(numeric) || numeric < 0 || numeric > 1e14) return false;
+    } else if (key === 'features' || key === 'landmarks') {
+      if (!Array.isArray(field) || field.length > 32 || field.some(item => typeof item !== 'string' || item.length > 200)) return false;
+    } else if (Object.hasOwn(enums, key)) {
+      if (typeof field !== 'string' || !enums[key].includes(field)) return false;
+    } else {
+      return false;
+    }
+  }
+  return true;
+}
+
 export async function POST(req: NextRequest) {
+  const denied = await requireStaff(req);
+  if (denied) return denied;
+
   try {
-    const body: GenerateDescriptionRequest = await req.json();
+    const parsedBody = await readJsonBody(req, 32 * 1024);
+    if (parsedBody.error) return parsedBody.error;
+    if (!isDescriptionRequest(parsedBody.data)) {
+      return NextResponse.json({ success: false, error: 'ข้อมูลรายละเอียดทรัพย์ไม่ถูกต้องหรือยาวเกินกำหนด' }, { status: 400 });
+    }
+    const body = parsedBody.data;
 
     const {
       title = '',
@@ -81,7 +126,15 @@ export async function POST(req: NextRequest) {
     // Check if Gemini API key exists
     const apiKey = process.env.GEMINI_API_KEY;
 
+    let providerEnabled = Boolean(apiKey);
     if (apiKey) {
+      const limited = await enforceRequestBudget(req, 'property-description', { perMinute: 10, perDay: 200 });
+      if (limited) {
+        if (process.env.NEXT_PUBLIC_DATA_BACKEND === 'local' && limited.status === 503) providerEnabled = false;
+        else return limited;
+      }
+    }
+    if (providerEnabled && apiKey) {
       try {
         const ai = new GoogleGenAI({
           apiKey,
@@ -132,6 +185,7 @@ export async function POST(req: NextRequest) {
           model: 'gemini-3.8-flash',
           contents: prompt,
           config: {
+            maxOutputTokens: 4096,
             systemInstruction:
               'คุณคือผู้เชี่ยวชาญการเขียนประกาศอสังหาริมทรัพย์ระดับพรีเมียมในจังหวัดสงขลาและหาดใหญ่ ตอบกลับเป็น JSON ตามสคีมาที่กำหนดเท่านั้น',
             responseMimeType: 'application/json',

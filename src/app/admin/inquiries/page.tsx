@@ -21,6 +21,7 @@ import {
 import { fetchInquiries, updateInquiryStatus } from '@/lib/store/properties-store';
 import { logSystemActivity } from '@/lib/store/activity-store';
 import { Inquiry } from '@/lib/types';
+import InquiryPhotos from '@/components/admin/InquiryPhotos';
 import { formatThaiDate, formatPropertyCode } from '@/lib/utils';
 
 type InquiryFilter = 'all' | Inquiry['status'];
@@ -387,6 +388,7 @@ function InquiriesContent() {
                       </div>
                     </dl>
                   )}
+                  <InquiryPhotos inquiryId={inquiry.id} photos={inquiry.consignment_details?.photos || []} />
                 </div>
                 <div className="min-w-0 space-y-4 border-t border-slate-100 pt-4 xl:border-l xl:border-t-0 xl:pl-5 xl:pt-0">
                   <div className="space-y-2">

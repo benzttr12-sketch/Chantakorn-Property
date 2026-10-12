@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import Image from 'next/image';
+import StaffPropertyImage from '@/components/admin/StaffPropertyImage';
 import { 
   X, 
   History, 
@@ -214,12 +214,9 @@ export default function PropertyHistoryModal({
         <div className="p-4 sm:p-5 bg-gradient-to-r from-navy-950 to-blue-950 text-white flex items-start justify-between gap-3 border-b border-navy-800">
           <div className="flex items-start gap-3 min-w-0">
             <div className="relative w-14 h-14 rounded-xl overflow-hidden bg-navy-900 border border-gold-500/40 flex-shrink-0">
-              <Image
-                src={property.cover_image}
+              <StaffPropertyImage
+                src={property.cover_image} propertyId={property.id}
                 alt={property.title}
-                fill
-                unoptimized
-                referrerPolicy="no-referrer"
                 className="object-cover"
               />
               <span className={`absolute top-0.5 left-0.5 px-1 py-0.2 rounded text-[8px] font-bold ${

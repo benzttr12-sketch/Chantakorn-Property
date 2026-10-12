@@ -36,6 +36,7 @@ import { getStoredUser } from '@/lib/auth-helpers';
 import { parseVideoUrl } from '@/lib/image-compressor';
 import SmartDescriptionGeneratorModal, { PropertySpecsForAI } from '@/components/admin/SmartDescriptionGeneratorModal';
 import VoiceDictationBar from '@/components/admin/VoiceDictationBar';
+import { fetchStaffApi } from '@/lib/staff-api';
 
 interface QuickPropertyModalProps {
   isOpen: boolean;
@@ -94,7 +95,7 @@ export default function QuickPropertyModal({ isOpen, onClose, onSuccess }: Quick
     setQuickAiGenerating(true);
     try {
       const currentUser = getStoredUser();
-      const res = await fetch('/api/ai/generate-property-description', {
+      const res = await fetchStaffApi('/api/ai/generate-property-description', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

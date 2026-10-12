@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import Image from 'next/image';
+import StaffPropertyImage from '@/components/admin/StaffPropertyImage';
 import {
   Building2,
   Trash2,
@@ -162,14 +162,10 @@ export default function CollapsiblePropertyCard({
     >
       <div className="relative aspect-[16/9] bg-slate-100">
         {property.cover_image ? (
-          <Image
-            src={property.cover_image}
+          <StaffPropertyImage
+            src={property.cover_image} propertyId={property.id}
             alt={property.title}
-            fill
-            unoptimized
-            referrerPolicy="no-referrer"
             className="object-cover"
-            sizes="(max-width: 767px) 100vw, 50vw"
           />
         ) : (
           <div className="flex h-full items-center justify-center gap-2 text-sm text-slate-500">

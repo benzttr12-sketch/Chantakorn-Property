@@ -36,13 +36,13 @@ service cloud.firestore {
 
     // 2. Properties collection
     match /properties/{propertyId} {
-      allow read: if true;
+      allow read: if isStaff();
       allow create, update, delete: if isStaff();
     }
 
     // 3. Inquiries (Customer contacts/submissions)
     match /inquiries/{inquiryId} {
-      allow create: if true; // anyone can submit an inquiry
+      allow create: if isStaff(); // Public forms use the validated server submission API.
       allow read, update, delete: if isStaff(); // confidential inbox
     }
 
@@ -117,9 +117,24 @@ service cloud.firestore {
       allow read, write: if isStaff();
     }
 
-    // 10. LINE OA follower registry (webhook upserts anonymously; staff read/manage)
+    // Server media and public-form staging are private. Only staff can view customer photos.
+    match /inquiry_media/{mediaId} {
+      allow read: if isStaff();
+    }
+    match /property_media/{mediaId} {
+      allow read, delete: if isStaff();
+      allow create: if isStaff()
+        && request.resource.data.keys().hasOnly(['property_id', 'data_url', 'created_at'])
+        && request.resource.data.property_id is string && request.resource.data.property_id.size() <= 256
+        && request.resource.data.data_url is string && request.resource.data.data_url.size() <= 1013400
+        && request.resource.data.data_url.matches('data:image/(jpeg|png|webp);base64,.*')
+        && request.resource.data.created_at is string;
+      allow update: if false;
+    }
+
+    // Only the signature-verified webhook may register followers through its server identity.
     match /line_followers/{followerId} {
-      allow create, update: if true;
+      allow create, update: if false;
       allow read, delete: if isStaff();
     }
   }

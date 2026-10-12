@@ -1,4 +1,5 @@
 import appletConfig from '../../firebase-applet-config.json';
+import { serverFirestore } from './server-firestore';
 
 type FirestoreValue =
   | { stringValue: string }
@@ -8,11 +9,6 @@ type FirestoreValue =
   | { nullValue: null }
   | { arrayValue: { values?: FirestoreValue[] } }
   | { mapValue: { fields?: Record<string, FirestoreValue> } };
-
-type FirestoreDocument = {
-  name?: string;
-  fields?: Record<string, FirestoreValue>;
-};
 
 const projectId = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || appletConfig.projectId;
 const databaseId = appletConfig.firestoreDatabaseId || '(default)';
@@ -43,22 +39,15 @@ function toFirestoreValue(value: unknown): FirestoreValue {
   return { stringValue: String(value) };
 }
 
-function fromFirestoreValue(value: FirestoreValue): unknown {
-  if ('stringValue' in value) return value.stringValue;
-  if ('integerValue' in value) return Number(value.integerValue);
-  if ('doubleValue' in value) return value.doubleValue;
-  if ('booleanValue' in value) return value.booleanValue;
-  if ('nullValue' in value) return null;
-  if ('arrayValue' in value) return (value.arrayValue.values || []).map(fromFirestoreValue);
-  if ('mapValue' in value) return fromFirestoreFields(value.mapValue.fields || {});
-  return null;
-}
-
-function fromFirestoreFields(fields: Record<string, FirestoreValue> = {}): Record<string, unknown> {
-  return Object.fromEntries(Object.entries(fields).map(([key, value]) => [key, fromFirestoreValue(value)]));
-}
-
 export async function getFirestoreDocument(collection: string, id: string, token?: string) {
+  if (!token) {
+    try {
+      const snapshot = await serverFirestore().collection(collection).doc(id).get();
+      if (!snapshot.exists) return Response.json({}, { status: 404 });
+      const fields = Object.fromEntries(Object.entries(snapshot.data() || {}).map(([key, value]) => [key, toFirestoreValue(value)]));
+      return Response.json({ name: snapshot.ref.path, fields });
+    } catch { return Response.json({}, { status: 503 }); }
+  }
   const headers = new Headers();
   if (token) headers.set('Authorization', `Bearer ${token}`);
   return fetch(withApiKey(`${documentsUrl}/${encodeURIComponent(collection)}/${encodeURIComponent(id)}`), {
@@ -68,6 +57,12 @@ export async function getFirestoreDocument(collection: string, id: string, token
 }
 
 export async function patchFirestoreDocument(collection: string, id: string, fields: Record<string, unknown>, token?: string) {
+  if (!token) {
+    try {
+      await serverFirestore().collection(collection).doc(id).set(fields, { merge: true });
+      return Response.json({});
+    } catch { return Response.json({}, { status: 503 }); }
+  }
   const url = new URL(withApiKey(`${documentsUrl}/${encodeURIComponent(collection)}/${encodeURIComponent(id)}`));
   for (const field of Object.keys(fields)) url.searchParams.append('updateMask.fieldPaths', field);
   const firestoreFields: Record<string, FirestoreValue> = {};
@@ -83,42 +78,17 @@ export async function patchFirestoreDocument(collection: string, id: string, fie
 }
 
 export async function createFirestoreDocument(collection: string, fields: Record<string, unknown>) {
-  const firestoreFields: Record<string, FirestoreValue> = {};
-  for (const [key, value] of Object.entries(fields)) firestoreFields[key] = toFirestoreValue(value);
-  return fetch(withApiKey(`${documentsUrl}/${encodeURIComponent(collection)}`), {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ fields: firestoreFields }),
-    signal: AbortSignal.timeout(10000),
-  });
+  try {
+    const result = await serverFirestore().collection(collection).add(fields);
+    return Response.json({ name: result.path });
+  } catch { return Response.json({}, { status: 503 }); }
 }
 
+/* User-authorized requests use REST; webhook and public projection queries use the server identity. */
 export async function listFirestoreDocuments(collection: string, limit: number, options: { publishedOnly?: boolean } = {}) {
-  const url = withApiKey(`${documentsUrl}:runQuery`);
-  const structuredQuery = {
-    from: [{ collectionId: collection }],
-    limit,
-    ...(options.publishedOnly ? {
-      where: {
-        fieldFilter: {
-          field: { fieldPath: 'published' },
-          op: 'EQUAL',
-          value: { booleanValue: true },
-        },
-      },
-    } : {}),
-  };
-  const response = await fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ structuredQuery }),
-    signal: AbortSignal.timeout(10000),
-  });
-  if (!response.ok) throw new Error(`Firestore query failed with status ${response.status}`);
-  const rows = (await response.json()) as Array<{ document?: FirestoreDocument }>;
-  return rows.flatMap((row) => {
-    if (!row.document?.name) return [];
-    const id = row.document.name.split('/').pop() || '';
-    return [{ id, ...fromFirestoreFields(row.document.fields) }];
-  });
+  const db = serverFirestore();
+  const reference = db.collection(collection);
+  const request = options.publishedOnly ? reference.where('published', '==', true) : reference;
+  const result = await request.limit(Math.min(Math.max(limit, 1), 1000)).get();
+  return result.docs.map(snapshot => ({ ...snapshot.data(), id: snapshot.id }));
 }
