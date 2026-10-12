@@ -140,7 +140,7 @@ export async function sendLineNotification(req: Request, body: Record<string, an
 
     if (isConsignment || isGeneralInquiry) {
       const { name, phone, line_id, message, consignment_details } = body;
-      const priceText = consignment_details?.expected_price 
+      const priceText = consignment_details?.expected_price
         ? new Intl.NumberFormat('th-TH', { style: 'currency', currency: 'THB', maximumFractionDigits: 0 }).format(consignment_details.expected_price)
         : 'ตามตกลง';
 
@@ -251,7 +251,7 @@ LINE Official Account: ${OFFICIAL_LINE_OA_URL}`;
 
       const propertyKey = (id ? formatPropertyCode(id) : '') || slug;
       propertyUrl = propertyKey ? `${hostOrigin}/properties/${encodeURIComponent(propertyKey)}` : `${hostOrigin}/properties/`;
-      const priceFormatted = price 
+      const priceFormatted = price
         ? new Intl.NumberFormat('th-TH', { style: 'currency', currency: 'THB', maximumFractionDigits: 0 }).format(price)
         : 'ราคาพิเศษ';
       const actionText = status === 'rent' ? 'ปล่อยเช่า' : 'เสนอขาย';
