@@ -132,8 +132,8 @@ function LoginForm() {
     <div className="bg-white py-8 px-6 sm:px-10 rounded-3xl border border-surface-border shadow-xl">
       {/* Reason notice if redirected from admin or protected route */}
       {reason === 'auth_required' && (
-        <div className="mb-5 p-3.5 bg-amber-50/80 border border-amber-200/80 rounded-2xl flex items-center space-x-3 text-xs text-amber-900 shadow-sm">
-          <ShieldAlert className="w-5 h-5 text-amber-600 flex-shrink-0" />
+        <div className="mb-5 p-3.5 bg-amber-50/80 border border-amber-200/80 rounded-2xl flex items-center space-x-3 text-xs text-amber-900 shadow-xs">
+          <ShieldAlert className="w-5 h-5 text-amber-600 shrink-0" />
           <span>
             <strong>ต้องเข้าสู่ระบบก่อน:</strong> กรุณาเข้าสู่ระบบด้วยบัญชีของคุณเพื่อเข้าถึงหน้านี้
           </span>
@@ -141,8 +141,8 @@ function LoginForm() {
       )}
 
       {reason === 'admin_required' && (
-        <div className="mb-5 p-3.5 bg-amber-50/80 border border-amber-200/80 rounded-2xl flex items-center space-x-3 text-xs text-amber-900 shadow-sm">
-          <ShieldAlert className="w-5 h-5 text-amber-600 flex-shrink-0" />
+        <div className="mb-5 p-3.5 bg-amber-50/80 border border-amber-200/80 rounded-2xl flex items-center space-x-3 text-xs text-amber-900 shadow-xs">
+          <ShieldAlert className="w-5 h-5 text-amber-600 shrink-0" />
           <span>
             <strong>สิทธิ์ผู้ดูแลระบบ:</strong> บัญชีนี้ยังไม่มีสิทธิ์เข้าถึงระบบหลังบ้าน กรุณาเข้าสู่ระบบด้วยอีเมลที่เป็นผู้ดูแลระบบ
           </span>
@@ -151,15 +151,15 @@ function LoginForm() {
 
       {error && !isUnauthorizedDomain && (
         <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-xl text-xs text-red-600 flex items-center space-x-2">
-          <AlertCircle className="w-4 h-4 flex-shrink-0" />
+          <AlertCircle className="w-4 h-4 shrink-0" />
           <span>{error}</span>
         </div>
       )}
 
       {isUnauthorizedDomain && (
-        <div className="mb-5 p-4 bg-amber-50/90 border border-amber-300 rounded-2xl text-xs text-amber-950 space-y-3 shadow-sm animate-in fade-in">
+        <div className="mb-5 p-4 bg-amber-50/90 border border-amber-300 rounded-2xl text-xs text-amber-950 space-y-3 shadow-xs animate-in fade-in">
           <div className="flex items-start space-x-2.5">
-            <Info className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
+            <Info className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
             <div className="space-y-1 flex-1">
               <h4 className="font-extrabold text-amber-900 text-xs">
                 โดเมนนี้ยังไม่ได้รับอนุญาตสำหรับ Google Sign-In ใน Firebase Console
@@ -177,7 +177,7 @@ function LoginForm() {
             <button
               type="button"
               onClick={handleCopyCurrentDomain}
-              className="ml-2 px-3 py-1 bg-amber-500 hover:bg-amber-600 text-navy-950 rounded-lg text-[11px] font-bold flex items-center space-x-1 flex-shrink-0 transition-colors cursor-pointer"
+              className="ml-2 px-3 py-1 bg-amber-500 hover:bg-amber-600 text-navy-950 rounded-lg text-[11px] font-bold flex items-center space-x-1 shrink-0 transition-colors cursor-pointer"
             >
               {copiedDomain ? (
                 <>
@@ -207,7 +207,7 @@ function LoginForm() {
         type="button"
         onClick={handleGoogleLogin}
         disabled={loading}
-        className="w-full flex items-center justify-center space-x-3 py-3 px-4 border border-gray-300 rounded-xl shadow-sm bg-white hover:bg-gray-50 text-xs sm:text-sm font-bold text-gray-700 transition-all cursor-pointer disabled:opacity-50"
+        className="w-full flex items-center justify-center space-x-3 py-3 px-4 border border-gray-300 rounded-xl shadow-xs bg-white hover:bg-gray-50 text-xs sm:text-sm font-bold text-gray-700 transition-all cursor-pointer disabled:opacity-50"
       >
         <svg className="w-5 h-5" viewBox="0 0 24 24">
           <path
@@ -251,7 +251,7 @@ function LoginForm() {
               required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="w-full bg-gray-50 border border-gray-200 rounded-xl pl-10 pr-4 py-2.5 text-xs sm:text-sm text-gray-900 focus:bg-white focus:ring-2 focus:ring-gold-500 outline-none transition-all"
+              className="w-full bg-gray-50 border border-gray-200 rounded-xl pl-10 pr-4 py-2.5 text-xs sm:text-sm text-gray-900 focus:bg-white focus:ring-2 focus:ring-gold-500 outline-hidden transition-all"
               placeholder="admin@chantakornproperty.com"
             />
             <Mail className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
@@ -277,7 +277,7 @@ function LoginForm() {
               required
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="w-full bg-gray-50 border border-gray-200 rounded-xl pl-10 pr-4 py-2.5 text-xs sm:text-sm text-gray-900 focus:bg-white focus:ring-2 focus:ring-gold-500 outline-none transition-all"
+              className="w-full bg-gray-50 border border-gray-200 rounded-xl pl-10 pr-4 py-2.5 text-xs sm:text-sm text-gray-900 focus:bg-white focus:ring-2 focus:ring-gold-500 outline-hidden transition-all"
               placeholder="••••••••"
             />
             <Lock className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
@@ -312,7 +312,7 @@ export default function LoginPage() {
     <div className="min-h-[60vh] bg-surface-bg flex flex-col justify-center py-12 sm:px-6 lg:px-8">
       <div className="sm:mx-auto sm:w-full sm:max-w-md text-center">
         <Link href="/" className="inline-flex items-center space-x-3 group">
-          <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-gold-400 to-gold-600 flex items-center justify-center text-navy-950 font-bold shadow-md">
+          <div className="w-11 h-11 rounded-xl bg-linear-to-br/srgb from-gold-400 to-gold-600 flex items-center justify-center text-navy-950 font-bold shadow-md">
             <Building2 className="w-7 h-7 text-navy-950" />
           </div>
           <div className="text-left">

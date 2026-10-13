@@ -32,7 +32,7 @@ export default function PropertyVideoTour({
       {/* Section Header */}
       <div className="flex flex-wrap items-center justify-between gap-3 pb-4 border-b border-gray-100">
         <div className="flex items-center space-x-3">
-          <div className="w-10 h-10 rounded-2xl bg-red-50 text-red-600 flex items-center justify-center border border-red-200/60 shadow-sm">
+          <div className="w-10 h-10 rounded-2xl bg-red-50 text-red-600 flex items-center justify-center border border-red-200/60 shadow-xs">
             <Film className="w-5 h-5" />
           </div>
           <div>
@@ -64,7 +64,7 @@ export default function PropertyVideoTour({
       </div>
 
       {/* Video Player Container (16:9) */}
-      <div className="relative w-full aspect-video rounded-2xl overflow-hidden bg-navy-950 border border-navy-900 shadow-inner group">
+      <div className="relative w-full aspect-video rounded-2xl overflow-hidden bg-navy-950 border border-navy-900 inset-shadow-sm group">
         {parsed.type === 'youtube' && parsed.embedUrl && (
           <iframe
             src={parsed.embedUrl}
@@ -88,7 +88,7 @@ export default function PropertyVideoTour({
         )}
 
         {(parsed.type === 'tiktok' || parsed.type === 'facebook' || parsed.type === 'other') && (
-          <div className="w-full h-full flex flex-col items-center justify-center p-6 text-center text-white bg-gradient-to-br from-navy-950 via-slate-900 to-navy-900 space-y-4">
+          <div className="w-full h-full flex flex-col items-center justify-center p-6 text-center text-white bg-linear-to-br/srgb from-navy-950 via-slate-900 to-navy-900 space-y-4">
             <div className="w-16 h-16 rounded-full bg-white/10 backdrop-blur-md flex items-center justify-center text-gold-400 border border-white/20">
               <Video className="w-8 h-8" />
             </div>
@@ -104,7 +104,7 @@ export default function PropertyVideoTour({
               href={parsed.url}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center space-x-2 px-6 py-3 bg-gradient-to-r from-gold-500 to-gold-600 hover:from-gold-600 hover:to-gold-700 text-navy-950 font-bold text-xs rounded-xl shadow-lg hover:scale-105 active:scale-95 transition-all"
+              className="inline-flex items-center space-x-2 px-6 py-3 bg-linear-to-r/srgb from-gold-500 to-gold-600 hover:from-gold-600 hover:to-gold-700 text-navy-950 font-bold text-xs rounded-xl shadow-lg hover:scale-105 active:scale-95 transition-all"
             >
               <Play className="w-4 h-4 fill-navy-950" />
               <span>เปิดรับชมวิดีโอทันที</span>
@@ -115,7 +115,7 @@ export default function PropertyVideoTour({
 
       {/* Feature notice */}
       <div className="flex items-center space-x-2 text-[11px] text-gray-500 bg-gray-50 p-3 rounded-xl border border-gray-100">
-        <Sparkles className="w-4 h-4 text-gold-600 flex-shrink-0" />
+        <Sparkles className="w-4 h-4 text-gold-600 shrink-0" />
         <span>
           หากต้องการนัดหมายเข้าชมสถานที่จริงร่วมกับนายหน้าผู้ดูแล สามารถส่งข้อความหรือโทรติดต่อได้ที่กล่องด้านข้าง
         </span>

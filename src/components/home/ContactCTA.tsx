@@ -6,7 +6,7 @@ export default function ContactCTA() {
   return (
     <section className="py-20 bg-navy-950 text-white relative overflow-hidden">
       {/* Decorative Gradient Background */}
-      <div className="absolute inset-0 bg-gradient-to-b from-navy-900 via-navy-950 to-navy-950" />
+      <div className="absolute inset-0 bg-linear-to-b/srgb from-navy-900 via-navy-950 to-navy-950" />
       <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-gold-500/10 rounded-full blur-3xl pointer-events-none" />
 
       <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 text-center relative z-10">
@@ -26,7 +26,7 @@ export default function ContactCTA() {
         <div className="flex flex-wrap items-center justify-center gap-4">
           <Link
             href="/properties"
-            className="px-8 py-3.5 bg-gradient-to-r from-gold-400 to-gold-500 hover:from-gold-300 hover:to-gold-400 text-navy-950 font-bold text-sm sm:text-base rounded-xl shadow-lg hover:shadow-gold-500/25 transition-all transform hover:-translate-y-0.5 flex items-center space-x-2"
+            className="px-8 py-3.5 bg-linear-to-r/srgb from-gold-400 to-gold-500 hover:from-gold-300 hover:to-gold-400 text-navy-950 font-bold text-sm sm:text-base rounded-xl shadow-lg hover:shadow-gold-500/25 transition-all transform hover:-translate-y-0.5 flex items-center space-x-2"
           >
             <Search className="w-4 h-4" />
             <span>ค้นหาทรัพย์ที่สนใจ</span>

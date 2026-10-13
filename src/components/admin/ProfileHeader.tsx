@@ -206,7 +206,7 @@ export default function ProfileHeader({ onProfileUpdated, className = '' }: Prof
     <>
       <header 
         id="admin-profile-header"
-        className={`bg-white rounded-2xl p-5 border border-surface-border shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 ${className}`}
+        className={`bg-white rounded-2xl p-5 border border-surface-border shadow-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 ${className}`}
       >
         {/* Left: Avatar & Info */}
         <div className="flex items-center space-x-4">
@@ -275,7 +275,7 @@ export default function ProfileHeader({ onProfileUpdated, className = '' }: Prof
           <button
             onClick={openEditModal}
             id="btn-edit-admin-profile"
-            className="flex items-center space-x-1.5 px-4 py-2 bg-navy-900 hover:bg-navy-800 text-white rounded-xl text-xs font-semibold shadow-sm transition-all active:scale-95 border border-navy-700/60"
+            className="flex items-center space-x-1.5 px-4 py-2 bg-navy-900 hover:bg-navy-800 text-white rounded-xl text-xs font-semibold shadow-xs transition-all active:scale-95 border border-navy-700/60"
           >
             <Edit3 className="w-3.5 h-3.5 text-gold-400" />
             <span>แก้ไขชื่อและรูปภาพโปรไฟล์</span>
@@ -285,7 +285,7 @@ export default function ProfileHeader({ onProfileUpdated, className = '' }: Prof
 
       {/* Edit Profile Modal */}
       {editModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-200">
           <div 
             className="bg-white rounded-3xl max-w-lg w-full p-6 sm:p-7 shadow-2xl border border-surface-border space-y-5 max-h-[90vh] overflow-y-auto"
             onClick={(e) => e.stopPropagation()}
@@ -317,9 +317,9 @@ export default function ProfileHeader({ onProfileUpdated, className = '' }: Prof
                   : 'bg-red-50 text-red-800 border border-red-200'
               }`}>
                 {feedback.type === 'success' ? (
-                  <CheckCircle2 className="w-4 h-4 text-emerald-600 flex-shrink-0" />
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
                 ) : (
-                  <AlertCircle className="w-4 h-4 text-red-600 flex-shrink-0" />
+                  <AlertCircle className="w-4 h-4 text-red-600 shrink-0" />
                 )}
                 <span>{feedback.message}</span>
               </div>
@@ -331,7 +331,7 @@ export default function ProfileHeader({ onProfileUpdated, className = '' }: Prof
                 <label className="text-xs font-bold text-navy-900 block">รูปโปรไฟล์ (Avatar)</label>
                 
                 <div className="flex items-center space-x-4">
-                  <div className="relative w-20 h-20 rounded-2xl overflow-hidden border-2 border-gold-400 bg-gray-100 flex-shrink-0 shadow-inner">
+                  <div className="relative w-20 h-20 rounded-2xl overflow-hidden border-2 border-gold-400 bg-gray-100 shrink-0 inset-shadow-sm">
                     {photoUrl ? (
                       <Image
                         src={photoUrl}
@@ -348,7 +348,7 @@ export default function ProfileHeader({ onProfileUpdated, className = '' }: Prof
                     )}
                   </div>
 
-                  <div className="flex-grow space-y-2">
+                  <div className="grow space-y-2">
                     {/* Drag & drop or upload */}
                     <div
                       onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
@@ -385,7 +385,7 @@ export default function ProfileHeader({ onProfileUpdated, className = '' }: Prof
                         key={idx}
                         type="button"
                         onClick={() => setPhotoUrl(preset.url)}
-                        className={`relative w-11 h-11 rounded-xl overflow-hidden border-2 transition-all flex-shrink-0 ${
+                        className={`relative w-11 h-11 rounded-xl overflow-hidden border-2 transition-all shrink-0 ${
                           photoUrl === preset.url ? 'border-gold-500 scale-105 shadow-md ring-2 ring-gold-300' : 'border-gray-200 opacity-70 hover:opacity-100'
                         }`}
                         title={preset.name}
@@ -409,7 +409,7 @@ export default function ProfileHeader({ onProfileUpdated, className = '' }: Prof
                     value={photoUrl}
                     onChange={(e) => setPhotoUrl(e.target.value)}
                     placeholder="หรือวางลิงก์รูปภาพ (https://...)"
-                    className="w-full text-xs px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-gold-400 text-gray-700"
+                    className="w-full text-xs px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl focus:outline-hidden focus:ring-2 focus:ring-gold-400 text-gray-700"
                   />
                 </div>
               </div>
@@ -423,7 +423,7 @@ export default function ProfileHeader({ onProfileUpdated, className = '' }: Prof
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   placeholder="เช่น คุณฉันทากร นวลจันทร์ (เบนซ์)"
-                  className="w-full text-xs sm:text-sm px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-gold-400 font-medium text-navy-950"
+                  className="w-full text-xs sm:text-sm px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:outline-hidden focus:ring-2 focus:ring-gold-400 font-medium text-navy-950"
                 />
               </div>
 
@@ -436,7 +436,7 @@ export default function ProfileHeader({ onProfileUpdated, className = '' }: Prof
                     value={phone}
                     onChange={(e) => setPhone(e.target.value)}
                     placeholder="เช่น 081-604-0097"
-                    className="w-full text-xs sm:text-sm px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-gold-400 text-navy-950"
+                    className="w-full text-xs sm:text-sm px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:outline-hidden focus:ring-2 focus:ring-gold-400 text-navy-950"
                   />
                 </div>
 
@@ -447,7 +447,7 @@ export default function ProfileHeader({ onProfileUpdated, className = '' }: Prof
                     value={lineId}
                     onChange={(e) => setLineId(e.target.value)}
                     placeholder="เช่น @930xzcyi"
-                    className="w-full text-xs sm:text-sm px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-gold-400 text-navy-950"
+                    className="w-full text-xs sm:text-sm px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:outline-hidden focus:ring-2 focus:ring-gold-400 text-navy-950"
                   />
                 </div>
               </div>

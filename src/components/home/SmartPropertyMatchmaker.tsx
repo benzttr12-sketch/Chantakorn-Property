@@ -127,7 +127,7 @@ export default function SmartPropertyMatchmaker() {
   };
 
   return (
-    <div className="bg-gradient-to-br from-navy-950 via-[#0B192C] to-navy-950 rounded-3xl p-6 sm:p-10 lg:p-12 text-white border border-gold-500/20 shadow-2xl relative overflow-hidden">
+    <div className="bg-linear-to-br/srgb from-navy-950 via-[#0B192C] to-navy-950 rounded-3xl p-6 sm:p-10 lg:p-12 text-white border border-gold-500/20 shadow-2xl relative overflow-hidden">
       {/* Decorative Glow */}
       <div className="absolute top-0 right-0 w-80 h-80 bg-gold-500/10 rounded-full blur-3xl pointer-events-none" />
       <div className="absolute bottom-0 left-0 w-80 h-80 bg-navy-800/30 rounded-full blur-3xl pointer-events-none" />
@@ -326,7 +326,7 @@ export default function SmartPropertyMatchmaker() {
             <button
               type="button"
               onClick={handleFinish}
-              className="px-8 py-3.5 bg-gradient-to-r from-gold-400 to-amber-500 hover:from-gold-300 hover:to-gold-400 text-navy-950 font-black text-sm rounded-xl shadow-lg flex items-center space-x-2 transition-all transform hover:-translate-y-0.5 cursor-pointer"
+              className="px-8 py-3.5 bg-linear-to-r/srgb from-gold-400 to-amber-500 hover:from-gold-300 hover:to-gold-400 text-navy-950 font-black text-sm rounded-xl shadow-lg flex items-center space-x-2 transition-all transform hover:-translate-y-0.5 cursor-pointer"
             >
               <span>ดูรายการทรัพย์ที่ตรงกับผลลัพธ์</span>
               <ArrowRight className="w-4 h-4 text-navy-950 stroke-[2.5]" />

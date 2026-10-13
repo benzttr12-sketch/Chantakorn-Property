@@ -81,7 +81,7 @@ export default function AgentCard({ agent = DEFAULT_AGENT, property }: AgentCard
       <div className="bg-white rounded-2xl p-6 border border-surface-border shadow-card space-y-5">
         {/* Agent Info Header */}
         <div className="flex items-center space-x-4">
-          <div className="relative w-16 h-16 rounded-full overflow-hidden border-2 border-gold-400 flex-shrink-0 bg-gray-100 shadow-sm">
+          <div className="relative w-16 h-16 rounded-full overflow-hidden border-2 border-gold-400 shrink-0 bg-gray-100 shadow-xs">
             <Image
               src={agent.photo_url}
               alt={agent.name}
@@ -92,7 +92,7 @@ export default function AgentCard({ agent = DEFAULT_AGENT, property }: AgentCard
             />
           </div>
 
-          <div className="min-w-0 flex-grow">
+          <div className="min-w-0 grow">
             <div className="text-[11px] font-bold text-gold-600 uppercase tracking-wider">
               CHANTAKORN PROPERTY
             </div>
@@ -116,7 +116,7 @@ export default function AgentCard({ agent = DEFAULT_AGENT, property }: AgentCard
         {/* Trust Statement */}
         <div className="p-3.5 bg-navy-50 rounded-xl border border-navy-100/80">
           <div className="flex items-start space-x-2">
-            <ShieldCheck className="w-4 h-4 text-gold-600 flex-shrink-0 mt-0.5" />
+            <ShieldCheck className="w-4 h-4 text-gold-600 shrink-0 mt-0.5" />
             <p className="text-xs text-navy-900 leading-relaxed font-medium">
               &ldquo;สนใจทรัพย์นี้ ติดต่อเราได้เลย เราช่วยดูแลตั้งแต่การนัดชมทรัพย์ เจรจา ไปจนถึงขั้นตอนการโอนกรรมสิทธิ์&rdquo;
             </p>
@@ -144,7 +144,7 @@ export default function AgentCard({ agent = DEFAULT_AGENT, property }: AgentCard
         <div className="grid grid-cols-3 gap-2">
           <a
             href={`tel:${agent.phone || '0816040097'}`}
-            className="py-2.5 px-3 bg-navy-950 hover:bg-navy-900 text-white rounded-xl text-xs font-semibold flex items-center justify-center space-x-1.5 shadow-sm transition-all"
+            className="py-2.5 px-3 bg-navy-950 hover:bg-navy-900 text-white rounded-xl text-xs font-semibold flex items-center justify-center space-x-1.5 shadow-xs transition-all"
             title={`โทรหานายหน้า: ${agent.phone}`}
           >
             <Phone className="w-3.5 h-3.5 text-gold-400" />
@@ -155,7 +155,7 @@ export default function AgentCard({ agent = DEFAULT_AGENT, property }: AgentCard
             href={lineTargetUrl}
             target="_blank"
             rel="noreferrer"
-            className="py-2.5 px-3 bg-[#06C755] hover:bg-[#05b34c] text-white rounded-xl text-xs font-semibold flex items-center justify-center space-x-1.5 shadow-sm transition-all"
+            className="py-2.5 px-3 bg-[#06C755] hover:bg-[#05b34c] text-white rounded-xl text-xs font-semibold flex items-center justify-center space-x-1.5 shadow-xs transition-all"
             title={`ทัก LINE นายหน้า: ${agent.line_id}`}
           >
             <MessageCircle className="w-3.5 h-3.5 fill-current" />
@@ -166,7 +166,7 @@ export default function AgentCard({ agent = DEFAULT_AGENT, property }: AgentCard
             href={fbTargetUrl}
             target="_blank"
             rel="noreferrer"
-            className="py-2.5 px-3 bg-[#1877F2] hover:bg-[#166fe5] text-white rounded-xl text-xs font-semibold flex items-center justify-center space-x-1.5 shadow-sm transition-all"
+            className="py-2.5 px-3 bg-[#1877F2] hover:bg-[#166fe5] text-white rounded-xl text-xs font-semibold flex items-center justify-center space-x-1.5 shadow-xs transition-all"
             title="เปิด Facebook นายหน้า"
           >
             <Facebook className="w-3.5 h-3.5 fill-current" />
@@ -178,7 +178,7 @@ export default function AgentCard({ agent = DEFAULT_AGENT, property }: AgentCard
         <div className="bg-gray-50/90 rounded-xl p-3 border border-gray-200 text-xs space-y-2">
           <div className="text-[11px] font-bold text-gray-500 uppercase tracking-wider flex items-center justify-between">
             <span>ช่องทางติดต่อตรงของนายหน้า</span>
-            <span className="text-[10px] text-emerald-600 font-semibold bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
+            <span className="text-[10px] text-emerald-600 font-semibold bg-emerald-50 px-1.5 py-0.5 rounded-sm border border-emerald-200">
               ติดต่อสะดวก
             </span>
           </div>
@@ -212,7 +212,7 @@ export default function AgentCard({ agent = DEFAULT_AGENT, property }: AgentCard
                   <button
                     type="button"
                     onClick={handleCopyLine}
-                    className="p-1 rounded bg-white hover:bg-gray-100 border border-gray-200 text-gray-500 hover:text-navy-950 text-[10px]"
+                    className="p-1 rounded-sm bg-white hover:bg-gray-100 border border-gray-200 text-gray-500 hover:text-navy-950 text-[10px]"
                     title="คัดลอก LINE ID"
                   >
                     {copiedLine ? (
@@ -246,7 +246,7 @@ export default function AgentCard({ agent = DEFAULT_AGENT, property }: AgentCard
                 className="inline-flex items-center gap-1 font-semibold text-[#1877F2] hover:underline max-w-[150px] truncate text-xs"
               >
                 <span className="truncate">{agent.facebook ? 'โปรไฟล์/เพจนายหน้า' : 'Chantakorn Property'}</span>
-                <ExternalLink className="w-3 h-3 flex-shrink-0" />
+                <ExternalLink className="w-3 h-3 shrink-0" />
               </a>
             </div>
           </div>
@@ -255,7 +255,7 @@ export default function AgentCard({ agent = DEFAULT_AGENT, property }: AgentCard
         {/* Primary CTA: นัดหมายเข้าชม */}
         <button
           onClick={() => setScheduleModalOpen(true)}
-          className="w-full py-3 px-4 bg-gradient-to-r from-gold-400 to-gold-500 hover:from-gold-300 hover:to-gold-400 text-navy-950 font-bold text-sm rounded-xl shadow-md hover:shadow-gold-500/20 flex items-center justify-center space-x-2 transition-all transform hover:-translate-y-0.5"
+          className="w-full py-3 px-4 bg-linear-to-r/srgb from-gold-400 to-gold-500 hover:from-gold-300 hover:to-gold-400 text-navy-950 font-bold text-sm rounded-xl shadow-md hover:shadow-gold-500/20 flex items-center justify-center space-x-2 transition-all transform hover:-translate-y-0.5"
         >
           <Calendar className="w-4 h-4 text-navy-950" />
           <span>นัดหมายเข้าชมทรัพย์</span>
@@ -264,7 +264,7 @@ export default function AgentCard({ agent = DEFAULT_AGENT, property }: AgentCard
 
       {/* Appointment Scheduler Modal */}
       {scheduleModalOpen && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-surface-border relative animate-fadeIn">
             <button
               onClick={() => setScheduleModalOpen(false)}
@@ -308,7 +308,7 @@ export default function AgentCard({ agent = DEFAULT_AGENT, property }: AgentCard
                     placeholder="เช่น คุณสมชาย ใจดี"
                     value={visitorName}
                     onChange={(e) => setVisitorName(e.target.value)}
-                    className="w-full bg-gray-50 border border-gray-200 rounded-lg p-2.5 text-xs text-gray-800 focus:ring-2 focus:ring-gold-500 outline-none"
+                    className="w-full bg-gray-50 border border-gray-200 rounded-lg p-2.5 text-xs text-gray-800 focus:ring-2 focus:ring-gold-500 outline-hidden"
                   />
                 </div>
 
@@ -322,7 +322,7 @@ export default function AgentCard({ agent = DEFAULT_AGENT, property }: AgentCard
                     placeholder="เช่น 081-xxx-xxxx"
                     value={visitorPhone}
                     onChange={(e) => setVisitorPhone(e.target.value)}
-                    className="w-full bg-gray-50 border border-gray-200 rounded-lg p-2.5 text-xs text-gray-800 focus:ring-2 focus:ring-gold-500 outline-none"
+                    className="w-full bg-gray-50 border border-gray-200 rounded-lg p-2.5 text-xs text-gray-800 focus:ring-2 focus:ring-gold-500 outline-hidden"
                   />
                 </div>
 
@@ -335,7 +335,7 @@ export default function AgentCard({ agent = DEFAULT_AGENT, property }: AgentCard
                       type="date"
                       value={viewDate}
                       onChange={(e) => setViewDate(e.target.value)}
-                      className="w-full bg-gray-50 border border-gray-200 rounded-lg p-2.5 text-xs text-gray-800 focus:ring-2 focus:ring-gold-500 outline-none"
+                      className="w-full bg-gray-50 border border-gray-200 rounded-lg p-2.5 text-xs text-gray-800 focus:ring-2 focus:ring-gold-500 outline-hidden"
                     />
                   </div>
                   <div>
@@ -345,7 +345,7 @@ export default function AgentCard({ agent = DEFAULT_AGENT, property }: AgentCard
                     <select
                       value={viewTime}
                       onChange={(e) => setViewTime(e.target.value)}
-                      className="w-full bg-gray-50 border border-gray-200 rounded-lg p-2.5 text-xs text-gray-800 focus:ring-2 focus:ring-gold-500 outline-none"
+                      className="w-full bg-gray-50 border border-gray-200 rounded-lg p-2.5 text-xs text-gray-800 focus:ring-2 focus:ring-gold-500 outline-hidden"
                     >
                       <option value="10:00">10:00 น.</option>
                       <option value="11:30">11:30 น.</option>

@@ -173,7 +173,7 @@ export default function SellPage() {
           <div className="mt-8 flex justify-center">
             <a
               href="#consignment-form"
-              className="px-8 py-3.5 bg-gradient-to-r from-gold-400 to-gold-500 hover:from-gold-300 hover:to-gold-400 text-navy-950 font-bold text-sm sm:text-base rounded-xl shadow-lg transition-all"
+              className="px-8 py-3.5 bg-linear-to-r/srgb from-gold-400 to-gold-500 hover:from-gold-300 hover:to-gold-400 text-navy-950 font-bold text-sm sm:text-base rounded-xl shadow-lg transition-all"
             >
               เริ่มต้นฝากทรัพย์กับเรา
             </a>
@@ -186,7 +186,7 @@ export default function SellPage() {
         <div className="bg-white rounded-3xl p-6 sm:p-10 border border-surface-border shadow-xl">
           {submitted ? (
             <div className="text-center py-8 space-y-6 max-w-2xl mx-auto">
-              <div className="w-20 h-20 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto shadow-inner">
+              <div className="w-20 h-20 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto inset-shadow-sm">
                 <CheckCircle2 className="w-12 h-12" />
               </div>
               
@@ -202,7 +202,7 @@ export default function SellPage() {
               </div>
 
               {/* Direct LINE OA Action Card */}
-              <div className="bg-gradient-to-br from-emerald-50 via-teal-50 to-emerald-50 rounded-2xl p-5 border-2 border-emerald-300 shadow-md text-left space-y-4">
+              <div className="bg-linear-to-br/srgb from-emerald-50 via-teal-50 to-emerald-50 rounded-2xl p-5 border-2 border-emerald-300 shadow-md text-left space-y-4">
                 <div className="flex items-center justify-between border-b border-emerald-200 pb-3">
                   <div className="flex items-center gap-2">
                     <span className="w-3 h-3 rounded-full bg-[#06C755] animate-ping" />
@@ -215,7 +215,7 @@ export default function SellPage() {
                 </div>
 
                 {submittedData && (
-                  <div className="bg-white/90 rounded-xl p-3.5 border border-emerald-200 text-xs text-navy-950 space-y-1.5 shadow-inner">
+                  <div className="bg-white/90 rounded-xl p-3.5 border border-emerald-200 text-xs text-navy-950 space-y-1.5 inset-shadow-sm">
                     <div className="font-bold flex items-center justify-between">
                       <span>👤 ผู้ติดต่อ: {submittedData.name} ({submittedData.phone})</span>
                       <span className="text-[#059669] font-black">
@@ -235,7 +235,7 @@ export default function SellPage() {
                     target="_blank"
                     rel="noreferrer"
                     onClick={handleCopyConsignmentText}
-                    className="w-full py-4 px-6 bg-gradient-to-r from-emerald-600 via-[#06C755] to-emerald-500 hover:from-emerald-500 hover:to-[#05b34c] text-white font-black text-sm sm:text-base rounded-2xl shadow-lg hover:shadow-xl flex items-center justify-center gap-2 transition-all cursor-pointer active:scale-95 group"
+                    className="w-full py-4 px-6 bg-linear-to-r/srgb from-emerald-600 via-[#06C755] to-emerald-500 hover:from-emerald-500 hover:to-[#05b34c] text-white font-black text-sm sm:text-base rounded-2xl shadow-lg hover:shadow-xl flex items-center justify-center gap-2 transition-all cursor-pointer active:scale-95 group"
                   >
                     <MessageCircle className="w-5 h-5 fill-current group-hover:scale-110 transition-transform" />
                     <span>🚀 กดส่งข้อมูลทรัพย์เข้าห้องแชท LINE OA ทันที</span>
@@ -289,7 +289,7 @@ export default function SellPage() {
               {error && <p role="alert" className="rounded-xl bg-red-50 p-3 text-sm text-red-700">{error}</p>}
 
               {/* Real-time Progress Bar Banner */}
-              <div className="p-4 sm:p-5 bg-gradient-to-r from-navy-950 via-navy-900 to-navy-950 rounded-2xl text-white space-y-3 shadow-md border border-navy-800">
+              <div className="p-4 sm:p-5 bg-linear-to-r/srgb from-navy-950 via-navy-900 to-navy-950 rounded-2xl text-white space-y-3 shadow-md border border-navy-800">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center space-x-2">
                     <Sparkles className="w-4 h-4 text-gold-400" />
@@ -304,10 +304,10 @@ export default function SellPage() {
                   <div
                     className={`h-full rounded-full transition-all duration-500 ${
                       sellPercentage === 100
-                        ? 'bg-gradient-to-r from-emerald-500 to-teal-400'
+                        ? 'bg-linear-to-r/srgb from-emerald-500 to-teal-400'
                         : sellPercentage >= 60
-                        ? 'bg-gradient-to-r from-gold-500 to-emerald-400'
-                        : 'bg-gradient-to-r from-amber-500 to-gold-400'
+                        ? 'bg-linear-to-r/srgb from-gold-500 to-emerald-400'
+                        : 'bg-linear-to-r/srgb from-amber-500 to-gold-400'
                     }`}
                     style={{ width: `${sellPercentage}%` }}
                   />
@@ -353,7 +353,7 @@ export default function SellPage() {
                       placeholder="เช่น คุณสมชาย นวลศรี"
                       value={name}
                       onChange={(e) => setName(e.target.value)}
-                      className={`w-full border rounded-xl p-3 text-xs text-gray-900 outline-none transition-all ${
+                      className={`w-full border rounded-xl p-3 text-xs text-gray-900 outline-hidden transition-all ${
                         name.trim().length >= 2
                           ? 'bg-emerald-50/20 border-emerald-300 focus:bg-white focus:ring-2 focus:ring-emerald-400'
                           : 'bg-gray-50 border-gray-200 focus:bg-white focus:ring-2 focus:ring-gold-500'
@@ -376,7 +376,7 @@ export default function SellPage() {
                       placeholder="081-xxx-xxxx"
                       value={phone}
                       onChange={(e) => setPhone(e.target.value)}
-                      className={`w-full border rounded-xl p-3 text-xs text-gray-900 outline-none transition-all ${
+                      className={`w-full border rounded-xl p-3 text-xs text-gray-900 outline-hidden transition-all ${
                         phone.trim().length >= 9
                           ? 'bg-emerald-50/20 border-emerald-300 focus:bg-white focus:ring-2 focus:ring-emerald-400'
                           : 'bg-gray-50 border-gray-200 focus:bg-white focus:ring-2 focus:ring-gold-500'
@@ -393,7 +393,7 @@ export default function SellPage() {
                       placeholder="ไอดีไลน์สำหรับการติดต่อ"
                       value={lineId}
                       onChange={(e) => setLineId(e.target.value)}
-                      className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3 text-xs text-gray-900 focus:bg-white focus:ring-2 focus:ring-gold-500 outline-none"
+                      className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3 text-xs text-gray-900 focus:bg-white focus:ring-2 focus:ring-gold-500 outline-hidden"
                     />
                   </div>
                 </div>
@@ -414,7 +414,7 @@ export default function SellPage() {
                     <select
                       value={propertyType}
                       onChange={(e) => setPropertyType(e.target.value)}
-                      className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3 text-xs text-gray-900 font-medium cursor-pointer focus:bg-white focus:ring-2 focus:ring-gold-500 outline-none"
+                      className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3 text-xs text-gray-900 font-medium cursor-pointer focus:bg-white focus:ring-2 focus:ring-gold-500 outline-hidden"
                     >
                       <option value="house">บ้านเดี่ยว / ทาวน์โฮม</option>
                       <option value="land">ที่ดินเปล่า</option>
@@ -443,7 +443,7 @@ export default function SellPage() {
                     <select
                       value={district}
                       onChange={(e) => setDistrict(e.target.value)}
-                      className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3 text-xs text-gray-900 font-medium cursor-pointer focus:bg-white focus:ring-2 focus:ring-gold-500 outline-none"
+                      className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3 text-xs text-gray-900 font-medium cursor-pointer focus:bg-white focus:ring-2 focus:ring-gold-500 outline-hidden"
                     >
                       {DISTRICTS_LIST.map((dist) => (
                         <option key={dist} value={dist}>{dist}</option>
@@ -460,7 +460,7 @@ export default function SellPage() {
                       placeholder="เช่น ควนลัง, คลองแห..."
                       value={subdistrict}
                       onChange={(e) => setSubdistrict(e.target.value)}
-                      className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3 text-xs text-gray-900 focus:bg-white focus:ring-2 focus:ring-gold-500 outline-none"
+                      className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3 text-xs text-gray-900 focus:bg-white focus:ring-2 focus:ring-gold-500 outline-hidden"
                     />
                   </div>
                 </div>
@@ -476,7 +476,7 @@ export default function SellPage() {
                       placeholder="เช่น 4,500,000"
                       value={expectedPrice}
                       onChange={(e) => setExpectedPrice(e.target.value)}
-                      className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3 text-xs text-gray-900 focus:bg-white focus:ring-2 focus:ring-gold-500 outline-none font-semibold text-navy-950"
+                      className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3 text-xs text-gray-900 focus:bg-white focus:ring-2 focus:ring-gold-500 outline-hidden font-semibold text-navy-950"
                     />
                   </div>
 
@@ -489,7 +489,7 @@ export default function SellPage() {
                       placeholder="เช่น 52 ตร.ว. หรือ 2 ไร่"
                       value={landSize}
                       onChange={(e) => setLandSize(e.target.value)}
-                      className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3 text-xs text-gray-900 focus:bg-white focus:ring-2 focus:ring-gold-500 outline-none"
+                      className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3 text-xs text-gray-900 focus:bg-white focus:ring-2 focus:ring-gold-500 outline-hidden"
                     />
                   </div>
 
@@ -502,7 +502,7 @@ export default function SellPage() {
                       placeholder="เช่น 180 ตร.ม."
                       value={usableArea}
                       onChange={(e) => setUsableArea(e.target.value)}
-                      className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3 text-xs text-gray-900 focus:bg-white focus:ring-2 focus:ring-gold-500 outline-none"
+                      className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3 text-xs text-gray-900 focus:bg-white focus:ring-2 focus:ring-gold-500 outline-hidden"
                     />
                   </div>
                 </div>
@@ -516,7 +516,7 @@ export default function SellPage() {
                     placeholder="เช่น จำนวนห้องนอน ห้องน้ำ จุดเด่น สถานที่ใกล้เคียง และข้อมูลโฉนด..."
                     value={description}
                     onChange={(e) => setDescription(e.target.value)}
-                    className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3 text-xs text-gray-900 focus:bg-white focus:ring-2 focus:ring-gold-500 outline-none resize-none"
+                    className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3 text-xs text-gray-900 focus:bg-white focus:ring-2 focus:ring-gold-500 outline-hidden resize-none"
                   />
                 </div>
               </div>

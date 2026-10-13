@@ -827,7 +827,7 @@ export default function InvestmentZoneDistributionMap({
   return (
     <div className={`space-y-6 ${className}`}>
       {/* Top Header & Analytics Summary */}
-      <div className="bg-gradient-to-r from-[#071324] via-[#0B1F3A] to-[#071324] rounded-3xl p-6 sm:p-7 border border-gold-500/30 shadow-xl text-white">
+      <div className="bg-linear-to-r/srgb from-[#071324] via-[#0B1F3A] to-[#071324] rounded-3xl p-6 sm:p-7 border border-gold-500/30 shadow-xl text-white">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-5">
           <div>
             <div className="inline-flex items-center space-x-1.5 px-3 py-1 rounded-full bg-gold-500/20 border border-gold-500/40 text-gold-300 text-xs font-bold uppercase tracking-wider mb-2">
@@ -924,7 +924,7 @@ export default function InvestmentZoneDistributionMap({
                 onClick={() => setSelectedType(t.id)}
                 className={`px-3 py-1 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
                   selectedType === t.id
-                    ? 'bg-white text-navy-950 font-bold shadow-sm'
+                    ? 'bg-white text-navy-950 font-bold shadow-xs'
                     : 'bg-white/10 text-gray-300 hover:bg-white/20'
                 }`}
               >
@@ -979,7 +979,7 @@ export default function InvestmentZoneDistributionMap({
           </div>
 
           {/* D3 SVG Container */}
-          <div ref={containerRef} className="relative w-full flex-grow min-h-[480px] bg-[#020712] overflow-hidden select-none">
+          <div ref={containerRef} className="relative w-full grow min-h-[480px] bg-[#020712] overflow-hidden select-none">
             <svg ref={svgRef} className="w-full h-full cursor-grab active:cursor-grabbing" />
 
             {/* Floating D3 Tooltip */}
@@ -1085,7 +1085,7 @@ export default function InvestmentZoneDistributionMap({
                       <div className="min-w-0">
                         <div className="flex items-center gap-1.5">
                           <span
-                            className="px-1.5 py-0.2 rounded font-black text-[10px]"
+                            className="px-1.5 py-0.2 rounded-sm font-black text-[10px]"
                             style={{
                               backgroundColor: isSelected ? stat.zone.color : `${stat.zone.color}25`,
                               color: isSelected ? '#0B1F3A' : stat.zone.color
@@ -1102,7 +1102,7 @@ export default function InvestmentZoneDistributionMap({
                         </div>
                       </div>
 
-                      <div className="text-right flex-shrink-0">
+                      <div className="text-right shrink-0">
                         <div className={`text-xs font-black ${isSelected ? 'text-white' : 'text-gold-700'}`}>
                           ROI ~{stat.estimatedRoi}%
                         </div>
@@ -1133,7 +1133,7 @@ export default function InvestmentZoneDistributionMap({
 
                         <Link
                           href={`/admin/properties?district=${encodeURIComponent(stat.zone.district)}`}
-                          className="w-full py-1.5 bg-gold-500 hover:bg-gold-400 text-navy-950 font-black text-xs rounded-xl flex items-center justify-center space-x-1.5 transition-all shadow-sm cursor-pointer mt-2"
+                          className="w-full py-1.5 bg-gold-500 hover:bg-gold-400 text-navy-950 font-black text-xs rounded-xl flex items-center justify-center space-x-1.5 transition-all shadow-xs cursor-pointer mt-2"
                         >
                           <span>ดูทรัพย์ในโซน {stat.zone.district}</span>
                           <ArrowUpRight className="w-3.5 h-3.5" />

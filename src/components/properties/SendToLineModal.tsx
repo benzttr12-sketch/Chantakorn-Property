@@ -137,9 +137,9 @@ export default function SendToLineModal({ isOpen, onClose, property, autoSend = 
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="bg-gradient-to-r from-emerald-600 via-[#06C755] to-emerald-500 p-5 text-white flex items-start justify-between shrink-0">
+        <div className="bg-linear-to-r/srgb from-emerald-600 via-[#06C755] to-emerald-500 p-5 text-white flex items-start justify-between shrink-0">
           <div className="flex items-center space-x-3">
-            <div className="w-10 h-10 rounded-2xl bg-white/20 backdrop-blur-md flex items-center justify-center shadow-inner">
+            <div className="w-10 h-10 rounded-2xl bg-white/20 backdrop-blur-md flex items-center justify-center inset-shadow-sm">
               <MessageCircle className="w-6 h-6 text-white fill-current" />
             </div>
             <div>
@@ -197,7 +197,7 @@ export default function SendToLineModal({ isOpen, onClose, property, autoSend = 
               onClick={() => {
                 handleCopyText();
               }}
-              className="w-full py-4 px-4 bg-gradient-to-r from-emerald-600 via-[#06C755] to-emerald-500 hover:from-emerald-500 hover:to-[#05b34c] active:scale-[0.99] text-white rounded-2xl font-black text-sm sm:text-base shadow-lg hover:shadow-xl flex items-center justify-center space-x-2 transition-all cursor-pointer group"
+              className="w-full py-4 px-4 bg-linear-to-r/srgb from-emerald-600 via-[#06C755] to-emerald-500 hover:from-emerald-500 hover:to-[#05b34c] active:scale-[0.99] text-white rounded-2xl font-black text-sm sm:text-base shadow-lg hover:shadow-xl flex items-center justify-center space-x-2 transition-all cursor-pointer group"
             >
               <MessageCircle className="w-5 h-5 fill-current group-hover:scale-110 transition-transform" />
               <span>เปิด LINE พร้อมข้อความ แล้วกดส่งในแชท</span>
@@ -210,7 +210,7 @@ export default function SendToLineModal({ isOpen, onClose, property, autoSend = 
                 type="button"
                 onClick={handleDirectPushNotify}
                 disabled={pushing || pushSuccess}
-                className="py-2.5 px-3 bg-slate-900 hover:bg-slate-800 disabled:bg-emerald-900 text-white rounded-xl font-bold text-xs flex items-center justify-center space-x-1.5 transition-all cursor-pointer disabled:cursor-default shadow-sm"
+                className="py-2.5 px-3 bg-slate-900 hover:bg-slate-800 disabled:bg-emerald-900 text-white rounded-xl font-bold text-xs flex items-center justify-center space-x-1.5 transition-all cursor-pointer disabled:cursor-default shadow-xs"
               >
                 {pushing ? (
                   <>
@@ -274,7 +274,7 @@ export default function SendToLineModal({ isOpen, onClose, property, autoSend = 
               </button>
             </div>
 
-            <div className="relative bg-slate-50 border border-slate-200 rounded-2xl p-3.5 text-xs text-slate-800 font-sans leading-relaxed max-h-40 overflow-y-auto whitespace-pre-line shadow-inner">
+            <div className="relative bg-slate-50 border border-slate-200 rounded-2xl p-3.5 text-xs text-slate-800 font-sans leading-relaxed max-h-40 overflow-y-auto whitespace-pre-line inset-shadow-sm">
               {message}
             </div>
           </div>

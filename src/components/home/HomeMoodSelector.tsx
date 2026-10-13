@@ -17,14 +17,14 @@ export default function HomeMoodSelector() {
   const scene = SCENES[selected];
 
   return (
-    <div className="home-mood-card relative min-w-0 rounded-[2rem] border border-white/20 bg-white/5 p-3 shadow-2xl backdrop-blur-sm sm:p-4">
+    <div className="home-mood-card relative min-w-0 rounded-[2rem] border border-white/20 bg-white/5 p-3 shadow-2xl backdrop-blur-xs sm:p-4">
       <div className="flex items-center justify-between gap-3 px-2 pb-3 pt-1">
         <span className="text-xs font-medium tracking-wide text-white/80">เริ่มจากสิ่งที่คุณกำลังมองหา</span>
         <span aria-hidden="true" className="font-mono text-xs text-gold-300">0{selected + 1} / 03</span>
       </div>
       <div className="relative aspect-square overflow-hidden rounded-[1.5rem] bg-navy-900 sm:aspect-[6/5]">
         <Image key={scene.id} src={scene.image} alt={`ภาพประกอบการค้นหา${scene.label}ในหาดใหญ่–สงขลา`} fill priority={selected === 0} sizes="(max-width: 1023px) 90vw, 42vw" placeholder="blur" className="home-scene-enter object-cover" />
-        <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-navy-950 via-navy-950/15 to-transparent" />
+        <div className="pointer-events-none absolute inset-0 bg-linear-to-t/srgb from-navy-950 via-navy-950/15 to-transparent" />
         <div className="absolute left-4 top-4 inline-flex items-center gap-1.5 rounded-full border border-white/25 bg-navy-950/40 px-3 py-1.5 text-[11px] text-white backdrop-blur-md">
           <MapPin size={12} aria-hidden="true" className="text-gold-300" /> หาดใหญ่ · สงขลา
         </div>
@@ -34,7 +34,7 @@ export default function HomeMoodSelector() {
             <h2 className="text-xl font-semibold leading-snug text-white sm:text-2xl">{scene.title}</h2>
             <p className="mt-2 text-xs leading-relaxed text-slate-200">{scene.description}</p>
           </div>
-          <Link href={`/properties?type=${scene.id}`} className="mt-4 inline-flex min-h-11 items-center gap-3 rounded-full border border-white/30 bg-white/10 px-4 py-2 text-xs font-semibold text-white backdrop-blur-sm hover:bg-white/20 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-gold-300">
+          <Link href={`/properties?type=${scene.id}`} className="mt-4 inline-flex min-h-11 items-center gap-3 rounded-full border border-white/30 bg-white/10 px-4 py-2 text-xs font-semibold text-white backdrop-blur-xs hover:bg-white/20 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-gold-300">
             {scene.action}<ArrowUpRight size={16} aria-hidden="true" className="text-gold-300" />
           </Link>
         </div>

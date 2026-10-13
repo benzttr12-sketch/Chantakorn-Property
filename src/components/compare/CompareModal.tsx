@@ -40,7 +40,7 @@ export default function CompareModal({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-black/70 backdrop-blur-sm flex items-center justify-center p-3 sm:p-6 animate-in fade-in duration-200">
+    <div className="fixed inset-0 z-50 overflow-y-auto bg-black/70 backdrop-blur-xs flex items-center justify-center p-3 sm:p-6 animate-in fade-in duration-200">
       <div className="bg-white rounded-3xl max-w-6xl w-full max-h-[92vh] flex flex-col shadow-2xl border border-gray-100 overflow-hidden">
         {/* Modal Header */}
         <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between bg-navy-950 text-white">
@@ -109,7 +109,7 @@ export default function CompareModal({
                     <button
                       type="button"
                       onClick={() => onRemove(prop.id)}
-                      className="absolute top-2 right-2 z-10 w-6 h-6 rounded-full bg-black/60 text-white hover:bg-red-600 flex items-center justify-center text-xs transition-colors shadow"
+                      className="absolute top-2 right-2 z-10 w-6 h-6 rounded-full bg-black/60 text-white hover:bg-red-600 flex items-center justify-center text-xs transition-colors shadow-sm"
                       title="ลบออกจากการเปรียบเทียบ"
                     >
                       <X className="w-3 h-3" />
@@ -125,11 +125,11 @@ export default function CompareModal({
                           sizes="(max-width: 768px) 50vw, 25vw"
                           referrerPolicy="no-referrer"
                         />
-                        <div className="absolute top-2 left-2 bg-navy-950/80 text-gold-400 text-[10px] font-mono px-2 py-0.5 rounded font-bold">
+                        <div className="absolute top-2 left-2 bg-navy-950/80 text-gold-400 text-[10px] font-mono px-2 py-0.5 rounded-sm font-bold">
                           {formatPropertyCode(prop.id)}
                         </div>
                         {prop.video_url && (
-                          <div className="absolute bottom-2 left-2 bg-red-600 text-white text-[10px] font-bold px-1.5 py-0.5 rounded flex items-center space-x-1">
+                          <div className="absolute bottom-2 left-2 bg-red-600 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-sm flex items-center space-x-1">
                             <Video className="w-2.5 h-2.5" />
                             <span>มีวิดีโอ</span>
                           </div>

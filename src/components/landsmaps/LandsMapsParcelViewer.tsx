@@ -26,7 +26,7 @@ export default function LandsMapsParcelViewer({ property }: LandsMapsParcelViewe
     : null;
 
   return (
-    <section className="space-y-5 rounded-3xl border border-gold-500/30 bg-white p-5 shadow-sm sm:p-7" aria-labelledby="property-land-location-title">
+    <section className="space-y-5 rounded-3xl border border-gold-500/30 bg-white p-5 shadow-xs sm:p-7" aria-labelledby="property-land-location-title">
       <div className="flex items-start gap-3 border-b border-gray-100 pb-4">
         <MapPin className="mt-1 h-6 w-6 shrink-0 text-gold-600" aria-hidden="true" />
         <div>

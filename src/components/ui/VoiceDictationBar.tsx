@@ -62,7 +62,7 @@ export default function VoiceDictationBar({
   return (
     <div className={`rounded-2xl border transition-all ${
       isListening
-        ? 'bg-gradient-to-r from-navy-950 via-slate-900 to-navy-950 border-gold-500 shadow-lg shadow-gold-500/10 text-white'
+        ? 'bg-linear-to-r/srgb from-navy-950 via-slate-900 to-navy-950 border-gold-500 shadow-lg shadow-gold-500/10 text-white'
         : 'bg-slate-50/90 hover:bg-slate-100/90 border-slate-200/80 text-slate-700'
     } ${compact ? 'p-2' : 'p-3'} ${className}`}>
       <div className="flex flex-wrap items-center justify-between gap-2.5">
@@ -75,8 +75,8 @@ export default function VoiceDictationBar({
               compact ? 'w-8 h-8 text-xs' : 'px-3 py-2 text-xs space-x-2'
             } ${
               isListening
-                ? 'bg-gradient-to-r from-red-500 to-rose-600 text-white shadow-md animate-pulse ring-4 ring-rose-500/30'
-                : 'bg-gradient-to-r from-gold-400 to-amber-500 hover:from-gold-300 hover:to-gold-400 text-navy-950 shadow-xs active:scale-95'
+                ? 'bg-linear-to-r/srgb from-red-500 to-rose-600 text-white shadow-md animate-pulse ring-4 ring-rose-500/30'
+                : 'bg-linear-to-r/srgb from-gold-400 to-amber-500 hover:from-gold-300 hover:to-gold-400 text-navy-950 shadow-xs active:scale-95'
             }`}
             title={isListening ? 'กดเพื่อหยุดการพิมพ์ด้วยเสียง' : 'กดเพื่อเริ่มพูดพิมพ์ด้วยเสียง (Hands-free Voice Dictation)'}
           >
@@ -157,7 +157,7 @@ export default function VoiceDictationBar({
       {isListening && (
         <div className="mt-2.5 pt-2 border-t border-white/10 text-xs text-slate-200">
           <div className="flex items-start space-x-2">
-            <Volume2 className="w-4 h-4 text-gold-400 flex-shrink-0 mt-0.5 animate-pulse" />
+            <Volume2 className="w-4 h-4 text-gold-400 shrink-0 mt-0.5 animate-pulse" />
             <div className="min-w-0 flex-1">
               <p className="text-[11px] text-slate-400">เสียงที่ระบบกำลังตรวจจับได้แบบเรียลไทม์:</p>
               <p className="font-semibold text-white text-xs mt-0.5 bg-black/30 p-2 rounded-xl border border-white/10 min-h-[32px] flex items-center">
@@ -175,7 +175,7 @@ export default function VoiceDictationBar({
       {/* Error Message */}
       {errorMessage && (
         <div className="mt-2 p-2 bg-rose-500/20 border border-rose-500/40 text-rose-300 text-xs rounded-xl flex items-center space-x-1.5">
-          <AlertCircle className="w-4 h-4 text-rose-400 flex-shrink-0" />
+          <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />
           <span>{errorMessage}</span>
         </div>
       )}

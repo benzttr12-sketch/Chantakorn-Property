@@ -144,11 +144,11 @@ export default function WorkPhaseQuickTransitionModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/75 backdrop-blur-sm overflow-y-auto animate-in fade-in duration-200">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/75 backdrop-blur-xs overflow-y-auto animate-in fade-in duration-200">
       <div className="relative w-full max-w-3xl bg-white rounded-3xl shadow-2xl border border-surface-border overflow-hidden my-8">
         
         {/* Header Banner */}
-        <div className="bg-gradient-to-r from-navy-950 via-navy-900 to-navy-950 text-white p-6 sm:p-7 relative">
+        <div className="bg-linear-to-r/srgb from-navy-950 via-navy-900 to-navy-950 text-white p-6 sm:p-7 relative">
           <button
             type="button"
             onClick={onClose}
@@ -177,7 +177,7 @@ export default function WorkPhaseQuickTransitionModal({
               </span>
             )}
             {job.assigned_agent && (
-              <span className="flex items-center gap-1 bg-navy-900/80 px-2 py-0.5 rounded border border-navy-800">
+              <span className="flex items-center gap-1 bg-navy-900/80 px-2 py-0.5 rounded-sm border border-navy-800">
                 <span>ผู้รับผิดชอบ: {job.assigned_agent}</span>
               </span>
             )}
@@ -247,7 +247,7 @@ export default function WorkPhaseQuickTransitionModal({
           {step === 'summary' && (
             <div className="space-y-5 animate-in fade-in duration-200">
               <div className="p-4 rounded-2xl bg-amber-50/80 border border-amber-200/80 text-amber-900 flex items-start gap-3">
-                <div className="w-8 h-8 rounded-xl bg-amber-500 text-white flex items-center justify-center shrink-0 font-bold text-sm shadow-sm">
+                <div className="w-8 h-8 rounded-xl bg-amber-500 text-white flex items-center justify-center shrink-0 font-bold text-sm shadow-xs">
                   {currentPhaseNum}
                 </div>
                 <div className="space-y-1">
@@ -276,7 +276,7 @@ export default function WorkPhaseQuickTransitionModal({
                   onChange={(e) => setCompletedNotes(e.target.value)}
                   placeholder={`เช่น: ตรวจสอบเอกสารโฉนดเรียบร้อย ไม่พบภาระผูกพัน หรือ สำรวจแปลงที่ดินแล้วถ่ายภาพเรียบร้อย...`}
                   rows={3}
-                  className="w-full p-3.5 rounded-xl border border-gray-300 text-xs focus:ring-2 focus:ring-navy-950 focus:border-navy-950 outline-none transition-all"
+                  className="w-full p-3.5 rounded-xl border border-gray-300 text-xs focus:ring-2 focus:ring-navy-950 focus:border-navy-950 outline-hidden transition-all"
                 />
               </div>
 
@@ -292,7 +292,7 @@ export default function WorkPhaseQuickTransitionModal({
                     value={photoInput}
                     onChange={(e) => setPhotoInput(e.target.value)}
                     placeholder="https://example.com/photo.jpg"
-                    className="flex-1 p-2.5 rounded-xl border border-gray-300 text-xs focus:ring-2 focus:ring-navy-950 outline-none"
+                    className="flex-1 p-2.5 rounded-xl border border-gray-300 text-xs focus:ring-2 focus:ring-navy-950 outline-hidden"
                   />
                   <button
                     type="button"
@@ -340,7 +340,7 @@ export default function WorkPhaseQuickTransitionModal({
           {step === 'next_phase' && !isFinalPhase && nextPhaseInfo && (
             <div className="space-y-5 animate-in fade-in duration-200">
               <div className="p-4 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-900 flex items-start gap-3">
-                <div className="w-8 h-8 rounded-xl bg-emerald-600 text-white flex items-center justify-center shrink-0 font-bold text-sm shadow-sm">
+                <div className="w-8 h-8 rounded-xl bg-emerald-600 text-white flex items-center justify-center shrink-0 font-bold text-sm shadow-xs">
                   {currentPhaseNum + 1}
                 </div>
                 <div className="space-y-1">
@@ -368,7 +368,7 @@ export default function WorkPhaseQuickTransitionModal({
                   onChange={(e) => setNextPhaseNotes(e.target.value)}
                   placeholder={`เช่น: นัดหมายช่างภาพลงพื้นที่วันพฤหัสบดีเวลา 10:00 น. หรือ ร่างเอกสารสัญญาเตรียมส่งลูกค้า...`}
                   rows={3}
-                  className="w-full p-3.5 rounded-xl border border-gray-300 text-xs focus:ring-2 focus:ring-navy-950 focus:border-navy-950 outline-none transition-all"
+                  className="w-full p-3.5 rounded-xl border border-gray-300 text-xs focus:ring-2 focus:ring-navy-950 focus:border-navy-950 outline-hidden transition-all"
                 />
               </div>
 
@@ -383,7 +383,7 @@ export default function WorkPhaseQuickTransitionModal({
                     type="date"
                     value={nextPhaseTargetDate}
                     onChange={(e) => setNextPhaseTargetDate(e.target.value)}
-                    className="w-full p-2.5 rounded-xl border border-gray-300 text-xs outline-none focus:ring-2 focus:ring-navy-950"
+                    className="w-full p-2.5 rounded-xl border border-gray-300 text-xs outline-hidden focus:ring-2 focus:ring-navy-950"
                   />
                 </div>
 
@@ -395,7 +395,7 @@ export default function WorkPhaseQuickTransitionModal({
                   <select
                     value={nextPhaseAssignedAgent || job.assigned_agent || ''}
                     onChange={(e) => setNextPhaseAssignedAgent(e.target.value)}
-                    className="w-full p-2.5 rounded-xl border border-gray-300 text-xs outline-none focus:ring-2 focus:ring-navy-950"
+                    className="w-full p-2.5 rounded-xl border border-gray-300 text-xs outline-hidden focus:ring-2 focus:ring-navy-950"
                   >
                     {agentsList.map((ag) => (
                       <option key={ag} value={ag}>
@@ -414,7 +414,7 @@ export default function WorkPhaseQuickTransitionModal({
                       type="checkbox"
                       checked={showFacebookSection}
                       onChange={(e) => setShowFacebookSection(e.target.checked)}
-                      className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
+                      className="w-4 h-4 text-blue-600 rounded-sm focus:ring-blue-500"
                     />
                     <span>📲 โพสต์/แชร์อัปเดตความคืบหน้าเฟสงานลง Facebook เพจอัตโนมัติ</span>
                   </label>
@@ -429,7 +429,7 @@ export default function WorkPhaseQuickTransitionModal({
                       value={facebookPostContent}
                       onChange={(e) => setFacebookPostContent(e.target.value)}
                       rows={5}
-                      className="w-full p-3 rounded-xl border border-blue-200 text-xs bg-white text-navy-950 font-medium focus:ring-2 focus:ring-blue-600 outline-none leading-relaxed"
+                      className="w-full p-3 rounded-xl border border-blue-200 text-xs bg-white text-navy-950 font-medium focus:ring-2 focus:ring-blue-600 outline-hidden leading-relaxed"
                     />
 
                     <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
@@ -483,7 +483,7 @@ export default function WorkPhaseQuickTransitionModal({
               type="button"
               onClick={handleProceedToNextStep}
               disabled={submitting}
-              className="px-6 py-3 rounded-xl bg-gradient-to-r from-navy-950 via-navy-900 to-navy-950 hover:from-navy-900 hover:to-navy-800 text-white font-extrabold text-xs shadow-lg flex items-center gap-2 transition-all active:scale-95 disabled:opacity-50"
+              className="px-6 py-3 rounded-xl bg-linear-to-r/srgb from-navy-950 via-navy-900 to-navy-950 hover:from-navy-900 hover:to-navy-800 text-white font-extrabold text-xs shadow-lg flex items-center gap-2 transition-all active:scale-95 disabled:opacity-50"
             >
               <span>{isFinalPhase ? '🎉 บันทึกปิดงานสมบูรณ์ทุกเฟส' : `✅ บันทึกเฟส ${currentPhaseNum} เสร็จ & ไปเฟสถัดไป`}</span>
               <ArrowRight className="w-4 h-4 text-gold-400" />

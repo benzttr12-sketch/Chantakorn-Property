@@ -52,7 +52,7 @@ export default function CompareBar() {
         <div className="flex flex-wrap items-center justify-between gap-3">
           {/* Left: Info & Thumbnails */}
           <div className="flex items-center space-x-3 overflow-hidden">
-            <div className="w-10 h-10 rounded-2xl bg-gold-500 text-navy-950 font-black flex items-center justify-center flex-shrink-0 shadow-sm">
+            <div className="w-10 h-10 rounded-2xl bg-gold-500 text-navy-950 font-black flex items-center justify-center shrink-0 shadow-xs">
               <Scale className="w-5 h-5" />
             </div>
 
@@ -73,7 +73,7 @@ export default function CompareBar() {
               {selectedProperties.map((p) => (
                 <div
                   key={p.id}
-                  className="relative w-8 h-8 rounded-full border-2 border-navy-950 overflow-hidden bg-gray-700 shadow"
+                  className="relative w-8 h-8 rounded-full border-2 border-navy-950 overflow-hidden bg-gray-700 shadow-sm"
                   title={p.title}
                 >
                   <Image
@@ -103,7 +103,7 @@ export default function CompareBar() {
             <button
               type="button"
               onClick={() => setIsModalOpen(true)}
-              className="px-4 py-2.5 bg-gradient-to-r from-gold-500 to-gold-600 hover:from-gold-600 hover:to-gold-700 text-navy-950 font-black text-xs rounded-xl shadow-md flex items-center space-x-1.5 transition-all hover:scale-105 active:scale-95"
+              className="px-4 py-2.5 bg-linear-to-r/srgb from-gold-500 to-gold-600 hover:from-gold-600 hover:to-gold-700 text-navy-950 font-black text-xs rounded-xl shadow-md flex items-center space-x-1.5 transition-all hover:scale-105 active:scale-95"
             >
               <span>ดูตารางเปรียบเทียบ</span>
               <ArrowRight className="w-3.5 h-3.5" />

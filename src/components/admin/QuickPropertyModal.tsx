@@ -315,9 +315,9 @@ export default function QuickPropertyModal({ isOpen, onClose, onSuccess }: Quick
     <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto animate-in fade-in">
       <div className="bg-white rounded-3xl max-w-2xl w-full shadow-2xl border border-gold-200 overflow-hidden my-auto max-h-[92vh] flex flex-col">
         {/* Header */}
-        <div className="bg-gradient-to-r from-navy-950 via-navy-900 to-navy-950 text-white p-5 flex items-center justify-between border-b border-navy-800">
+        <div className="bg-linear-to-r/srgb from-navy-950 via-navy-900 to-navy-950 text-white p-5 flex items-center justify-between border-b border-navy-800">
           <div className="flex items-center space-x-3">
-            <div className="w-10 h-10 rounded-2xl bg-gold-500/20 border border-gold-400/40 text-gold-400 flex items-center justify-center font-bold text-lg shadow-sm">
+            <div className="w-10 h-10 rounded-2xl bg-gold-500/20 border border-gold-400/40 text-gold-400 flex items-center justify-center font-bold text-lg shadow-xs">
               ⚡
             </div>
             <div>
@@ -382,7 +382,7 @@ export default function QuickPropertyModal({ isOpen, onClose, onSuccess }: Quick
 3 ห้องนอน 2 ห้องน้ำ ที่จอดรถ 2 คัน
 54 ตรว. 165 ตรม. ราคา 3.89 ล้าน
 ใกล้สนามบินหาดใหญ่ ทิศใต้ แถมแอร์ 3 ตัว..."
-                  className="w-full bg-gray-50 border border-gray-200 rounded-2xl p-4 text-xs font-mono text-navy-950 focus:bg-white focus:ring-2 focus:ring-gold-500 outline-none leading-relaxed"
+                  className="w-full bg-gray-50 border border-gray-200 rounded-2xl p-4 text-xs font-mono text-navy-950 focus:bg-white focus:ring-2 focus:ring-gold-500 outline-hidden leading-relaxed"
                 />
               </div>
 
@@ -461,7 +461,7 @@ export default function QuickPropertyModal({ isOpen, onClose, onSuccess }: Quick
                     type="text"
                     value={title}
                     onChange={(e) => setTitle(e.target.value)}
-                    className="w-full bg-gray-50 border border-gray-200 rounded-xl p-2.5 text-xs font-semibold text-navy-950 focus:bg-white focus:ring-2 focus:ring-gold-500 outline-none"
+                    className="w-full bg-gray-50 border border-gray-200 rounded-xl p-2.5 text-xs font-semibold text-navy-950 focus:bg-white focus:ring-2 focus:ring-gold-500 outline-hidden"
                   />
                 </div>
                 <div>
@@ -472,7 +472,7 @@ export default function QuickPropertyModal({ isOpen, onClose, onSuccess }: Quick
                     type="number"
                     value={price}
                     onChange={(e) => setPrice(e.target.value)}
-                    className="w-full bg-gray-50 border border-gray-200 rounded-xl p-2.5 text-xs font-bold text-navy-950 focus:bg-white focus:ring-2 focus:ring-gold-500 outline-none"
+                    className="w-full bg-gray-50 border border-gray-200 rounded-xl p-2.5 text-xs font-bold text-navy-950 focus:bg-white focus:ring-2 focus:ring-gold-500 outline-hidden"
                   />
                   {Number(price) > 0 && (
                     <span className="text-[10px] text-gold-700 font-bold block mt-0.5">
@@ -489,7 +489,7 @@ export default function QuickPropertyModal({ isOpen, onClose, onSuccess }: Quick
                   <select
                     value={propertyType}
                     onChange={(e) => setPropertyType(e.target.value as PropertyType)}
-                    className="w-full bg-gray-50 border border-gray-200 rounded-xl p-2 text-xs font-medium text-navy-950 outline-none"
+                    className="w-full bg-gray-50 border border-gray-200 rounded-xl p-2 text-xs font-medium text-navy-950 outline-hidden"
                   >
                     <option value="house">บ้านเดี่ยว</option>
                     <option value="condo">คอนโด</option>
@@ -504,7 +504,7 @@ export default function QuickPropertyModal({ isOpen, onClose, onSuccess }: Quick
                   <select
                     value={status}
                     onChange={(e) => setStatus(e.target.value as PropertyStatus)}
-                    className="w-full bg-gray-50 border border-gray-200 rounded-xl p-2 text-xs font-medium text-navy-950 outline-none"
+                    className="w-full bg-gray-50 border border-gray-200 rounded-xl p-2 text-xs font-medium text-navy-950 outline-hidden"
                   >
                     <option value="sale">ขาย</option>
                     <option value="rent">เช่า</option>
@@ -520,7 +520,7 @@ export default function QuickPropertyModal({ isOpen, onClose, onSuccess }: Quick
                       const subs = getSongkhlaSubdistricts(e.target.value);
                       if (subs.length > 0) setSubdistrict(subs[0]);
                     }}
-                    className="w-full bg-gray-50 border border-gray-200 rounded-xl p-2 text-xs font-medium text-navy-950 outline-none"
+                    className="w-full bg-gray-50 border border-gray-200 rounded-xl p-2 text-xs font-medium text-navy-950 outline-hidden"
                   >
                     {DISTRICTS_LIST.map((d) => (
                       <option key={d} value={d}>{d}</option>
@@ -533,7 +533,7 @@ export default function QuickPropertyModal({ isOpen, onClose, onSuccess }: Quick
                   <select
                     value={subdistrict}
                     onChange={(e) => setSubdistrict(e.target.value)}
-                    className="w-full bg-gray-50 border border-gray-200 rounded-xl p-2 text-xs font-medium text-navy-950 outline-none"
+                    className="w-full bg-gray-50 border border-gray-200 rounded-xl p-2 text-xs font-medium text-navy-950 outline-hidden"
                   >
                     {subdistricts.map((s) => (
                       <option key={s} value={s}>{s}</option>
@@ -619,7 +619,7 @@ export default function QuickPropertyModal({ isOpen, onClose, onSuccess }: Quick
                       type="button"
                       onClick={handleQuickAiGenerate}
                       disabled={quickAiGenerating}
-                      className="px-2.5 py-1 bg-gradient-to-r from-gold-400 to-amber-500 hover:from-gold-300 hover:to-gold-400 text-navy-950 font-bold text-[10px] rounded-lg shadow-xs flex items-center space-x-1 transition-all cursor-pointer disabled:opacity-50"
+                      className="px-2.5 py-1 bg-linear-to-r/srgb from-gold-400 to-amber-500 hover:from-gold-300 hover:to-gold-400 text-navy-950 font-bold text-[10px] rounded-lg shadow-xs flex items-center space-x-1 transition-all cursor-pointer disabled:opacity-50"
                       title="ใช้ AI ร่างคำบรรยายจากสเปกทันที"
                     >
                       {quickAiGenerating ? (
@@ -657,7 +657,7 @@ export default function QuickPropertyModal({ isOpen, onClose, onSuccess }: Quick
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
                   placeholder="คำอธิบายรายละเอียดทรัพย์... หรือกดปุ่มไมโครโฟนเพื่อพูดบรรยาย"
-                  className="w-full bg-gray-50 border border-gray-200 rounded-xl p-2.5 text-xs text-navy-950 focus:bg-white focus:ring-2 focus:ring-gold-500 outline-none leading-relaxed font-sans"
+                  className="w-full bg-gray-50 border border-gray-200 rounded-xl p-2.5 text-xs text-navy-950 focus:bg-white focus:ring-2 focus:ring-gold-500 outline-hidden leading-relaxed font-sans"
                 />
               </div>
 
@@ -665,14 +665,14 @@ export default function QuickPropertyModal({ isOpen, onClose, onSuccess }: Quick
               <div className="space-y-1 bg-amber-50/80 p-3 rounded-2xl border border-amber-200">
                 <label className="block text-[11px] font-bold text-amber-950 flex items-center justify-between">
                   <span>🔒 บันทึกภายในสำหรับนายหน้า & แอดมิน (Agent Internal Notes - ไม่แสดงหน้าบ้าน)</span>
-                  <span className="text-[9px] bg-amber-200 text-amber-900 px-1.5 py-0.2 rounded font-extrabold">ความลับเฉพาะภายใน</span>
+                  <span className="text-[9px] bg-amber-200 text-amber-900 px-1.5 py-0.2 rounded-sm font-extrabold">ความลับเฉพาะภายใน</span>
                 </label>
                 <textarea
                   rows={2}
                   value={internalNotes}
                   onChange={(e) => setInternalNotes(e.target.value)}
                   placeholder="เช่น เบอร์โทรเจ้าของบ้านจริง, สัญญาหมดอายุ ธ.ค. 69, สภาพบ้านต้องซ่อมสี, ราคาสุดท้ายต่อรองไว้..."
-                  className="w-full bg-white border border-amber-300 rounded-xl p-2 text-xs font-medium text-navy-950 focus:ring-1 focus:ring-amber-500 outline-none"
+                  className="w-full bg-white border border-amber-300 rounded-xl p-2 text-xs font-medium text-navy-950 focus:ring-1 focus:ring-amber-500 outline-hidden"
                 />
               </div>
 
@@ -696,7 +696,7 @@ export default function QuickPropertyModal({ isOpen, onClose, onSuccess }: Quick
                       <button
                         type="button"
                         onClick={() => setVideoUrl('')}
-                        className="text-[10px] text-gray-500 hover:text-red-600 bg-white px-1.5 py-0.5 rounded border border-gray-200 transition-colors"
+                        className="text-[10px] text-gray-500 hover:text-red-600 bg-white px-1.5 py-0.5 rounded-sm border border-gray-200 transition-colors"
                       >
                         ลบวิดีโอ
                       </button>
@@ -709,7 +709,7 @@ export default function QuickPropertyModal({ isOpen, onClose, onSuccess }: Quick
                   value={videoUrl}
                   onChange={(e) => setVideoUrl(e.target.value)}
                   placeholder="วางลิงก์ YouTube, TikTok, Facebook หรือ MP4 (เว้นว่างไว้ได้หากไม่มี)"
-                  className="w-full bg-white border border-red-300 rounded-xl p-2 text-xs font-medium text-navy-950 focus:ring-1 focus:ring-red-500 outline-none"
+                  className="w-full bg-white border border-red-300 rounded-xl p-2 text-xs font-medium text-navy-950 focus:ring-1 focus:ring-red-500 outline-hidden"
                 />
 
                 {videoUrl && (
@@ -749,7 +749,7 @@ export default function QuickPropertyModal({ isOpen, onClose, onSuccess }: Quick
                 <span className="text-[11px] font-bold text-gray-700">รูปภาพปกและแกลเลอรี (จัดเตรียมให้อัตโนมัติ):</span>
                 <div className="flex items-center space-x-2 overflow-x-auto pb-1">
                   {images.map((img, idx) => (
-                    <div key={idx} className="relative w-20 h-16 rounded-xl overflow-hidden border border-gray-200 flex-shrink-0">
+                    <div key={idx} className="relative w-20 h-16 rounded-xl overflow-hidden border border-gray-200 shrink-0">
                       <Image
                         src={img}
                         alt="Property sample"
@@ -759,7 +759,7 @@ export default function QuickPropertyModal({ isOpen, onClose, onSuccess }: Quick
                         className="object-cover"
                       />
                       {idx === 0 && (
-                        <span className="absolute bottom-0.5 left-0.5 bg-gold-500 text-navy-950 text-[9px] font-black px-1.5 py-0.2 rounded">
+                        <span className="absolute bottom-0.5 left-0.5 bg-gold-500 text-navy-950 text-[9px] font-black px-1.5 py-0.2 rounded-sm">
                           รูปปก
                         </span>
                       )}
@@ -776,7 +776,7 @@ export default function QuickPropertyModal({ isOpen, onClose, onSuccess }: Quick
                     id="publishImmediate"
                     checked={publishImmediately}
                     onChange={(e) => setPublishImmediately(e.target.checked)}
-                    className="w-4 h-4 rounded text-gold-600 focus:ring-gold-500 cursor-pointer"
+                    className="w-4 h-4 rounded-sm text-gold-600 focus:ring-gold-500 cursor-pointer"
                   />
                   <label htmlFor="publishImmediate" className="text-xs font-semibold text-navy-950 cursor-pointer">
                     เผยแพร่ออนไลน์ทันที (หากไม่ติ๊กจะบันทึกเป็นแบบร่างเพื่อให้แอดมินตรวจก่อน)

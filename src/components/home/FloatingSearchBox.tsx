@@ -125,7 +125,7 @@ export default function FloatingSearchBox() {
               id="home-search-type"
               value={propertyType}
               onChange={(e) => setPropertyType(e.target.value)}
-              className="w-full bg-slate-50 hover:bg-white border border-slate-200 rounded-xl py-3 px-3.5 text-xs sm:text-sm text-slate-900 font-medium focus:outline-none focus:ring-2 focus:ring-gold-500 focus:bg-white transition-all cursor-pointer"
+              className="w-full bg-slate-50 hover:bg-white border border-slate-200 rounded-xl py-3 px-3.5 text-xs sm:text-sm text-slate-900 font-medium focus:outline-hidden focus:ring-2 focus:ring-gold-500 focus:bg-white transition-all cursor-pointer"
             >
               <option value="all">ทุกประเภททรัพย์</option>
               <option value="house">บ้านเดี่ยว / ทาวน์โฮม / พูลวิลล่า</option>
@@ -146,7 +146,7 @@ export default function FloatingSearchBox() {
               id="home-search-district"
               value={district}
               onChange={(e) => setDistrict(e.target.value)}
-              className="w-full bg-slate-50 hover:bg-white border border-slate-200 rounded-xl py-3 px-3.5 text-xs sm:text-sm text-slate-900 font-medium focus:outline-none focus:ring-2 focus:ring-gold-500 focus:bg-white transition-all cursor-pointer"
+              className="w-full bg-slate-50 hover:bg-white border border-slate-200 rounded-xl py-3 px-3.5 text-xs sm:text-sm text-slate-900 font-medium focus:outline-hidden focus:ring-2 focus:ring-gold-500 focus:bg-white transition-all cursor-pointer"
             >
               <option value="">ทุกทำเลในหาดใหญ่–สงขลา</option>
               {DISTRICTS_LIST.map((dist) => (
@@ -167,7 +167,7 @@ export default function FloatingSearchBox() {
               id="home-search-budget"
               value={maxPrice}
               onChange={(e) => setMaxPrice(e.target.value)}
-              className="w-full bg-slate-50 hover:bg-white border border-slate-200 rounded-xl py-3 px-3.5 text-xs sm:text-sm text-slate-900 font-medium focus:outline-none focus:ring-2 focus:ring-gold-500 focus:bg-white transition-all cursor-pointer"
+              className="w-full bg-slate-50 hover:bg-white border border-slate-200 rounded-xl py-3 px-3.5 text-xs sm:text-sm text-slate-900 font-medium focus:outline-hidden focus:ring-2 focus:ring-gold-500 focus:bg-white transition-all cursor-pointer"
             >
               <option value="">ทุกช่วงราคา</option>
               {tab === 'sale' ? (
@@ -193,7 +193,7 @@ export default function FloatingSearchBox() {
           <div>
             <button
               type="submit"
-              className="w-full py-3 px-5 bg-gradient-to-r from-gold-400 via-gold-500 to-amber-500 hover:from-gold-300 hover:to-gold-400 text-navy-950 font-black text-xs sm:text-sm rounded-xl shadow-lg hover:shadow-gold-500/25 flex items-center justify-center space-x-2 transition-all transform hover:-translate-y-0.5 active:translate-y-0 cursor-pointer"
+              className="w-full py-3 px-5 bg-linear-to-r/srgb from-gold-400 via-gold-500 to-amber-500 hover:from-gold-300 hover:to-gold-400 text-navy-950 font-black text-xs sm:text-sm rounded-xl shadow-lg hover:shadow-gold-500/25 flex items-center justify-center space-x-2 transition-all transform hover:-translate-y-0.5 active:translate-y-0 cursor-pointer"
             >
               <Search className="w-4 h-4 text-navy-950 stroke-[2.5]" />
               <span>ค้นหาอสังหาฯ</span>

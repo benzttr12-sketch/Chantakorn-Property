@@ -85,7 +85,7 @@ export default function SendToLineButton({
       <button
         type="button"
         onClick={handleClick}
-        className={`w-full py-3 px-4 bg-gradient-to-r from-emerald-600 via-[#06C755] to-emerald-500 hover:from-emerald-700 hover:to-emerald-600 text-white rounded-2xl text-xs sm:text-sm font-extrabold shadow-md hover:shadow-xl flex items-center justify-center space-x-2 transition-all cursor-pointer ${className}`}
+        className={`w-full py-3 px-4 bg-linear-to-r/srgb from-emerald-600 via-[#06C755] to-emerald-500 hover:from-emerald-700 hover:to-emerald-600 text-white rounded-2xl text-xs sm:text-sm font-extrabold shadow-md hover:shadow-xl flex items-center justify-center space-x-2 transition-all cursor-pointer ${className}`}
         title="สร้างข้อความสอบถามทรัพย์นี้แล้วเปิด LINE OA ทันที"
       >
         <MessageCircle className="w-4 h-4 fill-current" />

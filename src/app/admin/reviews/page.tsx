@@ -32,7 +32,7 @@ const serviceLabels: Record<Review['serviceType'], string> = {
   consignment: 'ขายฝาก',
 };
 const inputClass =
-  'min-h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-base text-navy-950 focus:outline-none focus:ring-2 focus:ring-gold-400 disabled:opacity-50';
+  'min-h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-base text-navy-950 focus:outline-hidden focus:ring-2 focus:ring-gold-400 disabled:opacity-50';
 
 function blankReview(): Review {
   return {
@@ -238,7 +238,7 @@ export default function AdminReviewsPage() {
           ref={editorRef}
           onSubmit={handleSave}
           aria-label={isCreating ? 'เพิ่มรีวิว' : 'แก้ไขรีวิว'}
-          className="scroll-mt-24 space-y-5 rounded-3xl border border-gold-200 bg-white p-4 shadow-sm sm:p-6"
+          className="scroll-mt-24 space-y-5 rounded-3xl border border-gold-200 bg-white p-4 shadow-xs sm:p-6"
         >
           <div className="flex items-start justify-between gap-3 border-b border-slate-100 pb-4">
             <div>
@@ -458,7 +458,7 @@ export default function AdminReviewsPage() {
 
       <section
         aria-label="ค้นหาและกรองรีวิว"
-        className="space-y-4 rounded-3xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5"
+        className="space-y-4 rounded-3xl border border-slate-200 bg-white p-4 shadow-xs sm:p-5"
       >
         <div className="flex items-center gap-3">
           <div className="relative flex-1">
@@ -548,7 +548,7 @@ export default function AdminReviewsPage() {
           {filteredReviews.map((review) => (
             <article
               key={review.id}
-              className="space-y-4 rounded-3xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5"
+              className="space-y-4 rounded-3xl border border-slate-200 bg-white p-4 shadow-xs sm:p-5"
             >
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <p className="flex items-center gap-1 text-sm font-semibold text-navy-950">

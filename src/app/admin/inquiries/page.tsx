@@ -182,7 +182,7 @@ function InquiriesContent() {
 
       <section
         aria-label="ค้นหาและกรองลูกค้า"
-        className="space-y-4 rounded-3xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5"
+        className="space-y-4 rounded-3xl border border-slate-200 bg-white p-4 shadow-xs sm:p-5"
       >
         <div className="flex flex-col gap-3 sm:flex-row">
           <div className="relative flex-1">
@@ -195,7 +195,7 @@ function InquiriesContent() {
               placeholder="ค้นหาลูกค้า เบอร์โทร LINE หรือรหัสทรัพย์"
               value={searchQuery}
               onChange={(event) => setSearchQuery(event.target.value)}
-              className="min-h-12 w-full rounded-xl border border-slate-200 bg-slate-50 pl-10 pr-3 text-base text-navy-950 focus:outline-none focus:ring-2 focus:ring-gold-400"
+              className="min-h-12 w-full rounded-xl border border-slate-200 bg-slate-50 pl-10 pr-3 text-base text-navy-950 focus:outline-hidden focus:ring-2 focus:ring-gold-400"
             />
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
           </div>
@@ -315,7 +315,7 @@ function InquiriesContent() {
           {filtered.map((inquiry) => (
             <article
               key={inquiry.id}
-              className="min-w-0 overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm"
+              className="min-w-0 overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-xs"
             >
               <div className="grid gap-5 p-4 sm:p-6 xl:grid-cols-[minmax(0,1fr)_260px]">
                 <div className="min-w-0 space-y-4">

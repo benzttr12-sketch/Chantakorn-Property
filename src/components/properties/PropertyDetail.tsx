@@ -155,7 +155,7 @@ export default function PropertyDetail({ slug, initialProperty = null }: { slug:
             {/* 1. Header Section */}
             <div>
               <div className="flex flex-wrap items-center gap-2 mb-3">
-                <span className={`px-3 py-1 rounded-full text-xs font-bold shadow-sm ${statusBadge.bgClass} ${statusBadge.textClass}`}>
+                <span className={`px-3 py-1 rounded-full text-xs font-bold shadow-xs ${statusBadge.bgClass} ${statusBadge.textClass}`}>
                   {statusBadge.text}
                 </span>
                 {property.featured && (
@@ -164,7 +164,7 @@ export default function PropertyDetail({ slug, initialProperty = null }: { slug:
                   </span>
                 )}
                 <div className="text-xs text-gray-600 flex items-center ml-auto bg-gray-50 hover:bg-gray-100 transition-colors px-2.5 py-1 rounded-lg border border-gray-200">
-                  <Compass className="w-3.5 h-3.5 mr-1.5 text-gold-600 flex-shrink-0" />
+                  <Compass className="w-3.5 h-3.5 mr-1.5 text-gold-600 shrink-0" />
                   <span>รหัสทรัพย์:</span>
                   <strong className="ml-1 text-navy-950 font-mono font-bold tracking-wide">
                     {formatPropertyCode(property.id)}
@@ -190,12 +190,12 @@ export default function PropertyDetail({ slug, initialProperty = null }: { slug:
               </h1>
 
               <div className="flex items-center text-brand-muted text-xs sm:text-sm mt-2">
-                <MapPin className="w-4 h-4 text-gold-600 mr-1.5 flex-shrink-0" />
+                <MapPin className="w-4 h-4 text-gold-600 mr-1.5 shrink-0" />
                 <span>{property.address || `${property.district}, ${property.province}`}</span>
               </div>
 
               {/* Price Banner */}
-              <div className="mt-4 p-4 sm:p-5 rounded-2xl bg-navy-950 text-white flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-sm border border-navy-800">
+              <div className="mt-4 p-4 sm:p-5 rounded-2xl bg-navy-950 text-white flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-xs border border-navy-800">
                 <div>
                   <span className="text-xs text-gray-400 uppercase tracking-wider block">
                     {property.status === 'rent' ? 'ค่าเช่าต่อเดือน' : 'ราคาเสนอขาย'}
@@ -298,7 +298,7 @@ export default function PropertyDetail({ slug, initialProperty = null }: { slug:
 
             {/* Agent Internal Notes (Confidential details visible only to Admins and Agents) */}
             {userProfile && (userProfile.role === 'ADMIN' || userProfile.role === 'AGENT') && (
-              <div className="bg-gradient-to-br from-amber-50 to-orange-50/40 border-2 border-amber-300 rounded-2xl p-6 shadow-sm space-y-4 animate-in fade-in">
+              <div className="bg-linear-to-br/srgb from-amber-50 to-orange-50/40 border-2 border-amber-300 rounded-2xl p-6 shadow-xs space-y-4 animate-in fade-in">
                 <div className="flex items-center justify-between pb-2 border-b border-amber-200">
                   <h3 className="text-sm font-black text-amber-950 flex items-center gap-2">
                     <span className="text-base">🔒</span>
@@ -313,7 +313,7 @@ export default function PropertyDetail({ slug, initialProperty = null }: { slug:
                   <p className="text-xs text-amber-900 font-bold">
                     📝 ประวัติการต่อรองราคา สภาพทรัพย์จริง และรายละเอียดเจ้าของทรัพย์ (ไม่แสดงต่อบุคคลทั่วไป):
                   </p>
-                  <div className="bg-white rounded-xl p-4 border border-amber-200 text-xs font-semibold text-navy-950 whitespace-pre-line leading-relaxed shadow-inner">
+                  <div className="bg-white rounded-xl p-4 border border-amber-200 text-xs font-semibold text-navy-950 whitespace-pre-line leading-relaxed inset-shadow-sm">
                     {property.internal_notes ? property.internal_notes : '(ไม่มีข้อมูลบันทึกข้อความภายใน)'}
                   </div>
                 </div>
@@ -340,7 +340,7 @@ export default function PropertyDetail({ slug, initialProperty = null }: { slug:
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   {property.features.map((feat, idx) => (
                     <div key={idx} className="flex items-center space-x-2.5 text-xs sm:text-sm text-gray-800">
-                      <div className="w-5 h-5 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center flex-shrink-0">
+                      <div className="w-5 h-5 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0">
                         <Check className="w-3.5 h-3.5 stroke-[3]" />
                       </div>
                       <span>{feat}</span>
@@ -363,7 +363,7 @@ export default function PropertyDetail({ slug, initialProperty = null }: { slug:
               </div>
 
               {/* Map View */}
-              <div className="h-80 sm:h-96 w-full rounded-2xl overflow-hidden mb-6 border border-gray-200 shadow-sm relative">
+              <div className="h-80 sm:h-96 w-full rounded-2xl overflow-hidden mb-6 border border-gray-200 shadow-xs relative">
                 <PropertyMap
                   properties={[property]}
                   selectedProperty={property}
@@ -389,14 +389,14 @@ export default function PropertyDetail({ slug, initialProperty = null }: { slug:
                       <div className="min-w-0 pr-2">
                         <div className="flex items-center space-x-1.5">
                           {item.categoryLabel && (
-                            <span className="text-[10px] font-bold px-1.5 py-0.2 rounded bg-navy-100 text-navy-800 flex-shrink-0">
+                            <span className="text-[10px] font-bold px-1.5 py-0.2 rounded-sm bg-navy-100 text-navy-800 shrink-0">
                               {item.categoryLabel}
                             </span>
                           )}
                           <span className="text-navy-950 font-medium truncate">{item.title}</span>
                         </div>
                       </div>
-                      <span className="text-gold-700 font-extrabold flex-shrink-0 text-[11px] bg-gold-50 px-2 py-0.5 rounded-md border border-gold-200">
+                      <span className="text-gold-700 font-extrabold shrink-0 text-[11px] bg-gold-50 px-2 py-0.5 rounded-md border border-gold-200">
                         {item.distance}
                       </span>
                     </div>
@@ -491,7 +491,7 @@ export default function PropertyDetail({ slug, initialProperty = null }: { slug:
 
         <a
           href="#inquiry"
-          className="flex-1 py-2.5 bg-gradient-to-r from-gold-400 to-gold-500 text-navy-950 rounded-xl text-xs font-bold flex items-center justify-center space-x-1 shadow-sm"
+          className="flex-1 py-2.5 bg-linear-to-r/srgb from-gold-400 to-gold-500 text-navy-950 rounded-xl text-xs font-bold flex items-center justify-center space-x-1 shadow-xs"
         >
           <Calendar className="w-3.5 h-3.5" />
           <span>นัดชม</span>

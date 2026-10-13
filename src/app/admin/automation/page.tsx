@@ -259,7 +259,7 @@ function AutomationContent() {
     <div className="space-y-6 animate-in fade-in duration-300">
       {error && <div role="alert" className="admin-panel border-rose-200 bg-rose-50 p-4 text-sm text-rose-800 flex items-start justify-between gap-3"><span>{error}</span><button type="button" onClick={() => setError('')} className="shrink-0 font-semibold">ปิดข้อความ</button></div>}
       {/* Hero Automation Header */}
-      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-navy-950 via-slate-900 to-navy-900 text-white p-6 sm:p-8 shadow-xl border border-navy-800">
+      <div className="relative overflow-hidden rounded-3xl bg-linear-to-br/srgb from-navy-950 via-slate-900 to-navy-900 text-white p-6 sm:p-8 shadow-xl border border-navy-800">
         <div className="absolute top-0 right-0 -mr-16 -mt-16 w-80 h-80 rounded-full bg-gold-500/10 blur-3xl pointer-events-none" />
         <div className="absolute bottom-0 right-1/4 -mb-20 w-60 h-60 rounded-full bg-blue-500/10 blur-2xl pointer-events-none" />
 
@@ -270,7 +270,7 @@ function AutomationContent() {
               <span>เครื่องมือธุรกิจ</span>
             </div>
             <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
-              เครื่องมือการขายและการตลาด <span className="text-transparent bg-clip-text bg-gradient-to-r from-gold-300 to-amber-500">Chantakorn AI</span>
+              เครื่องมือการขายและการตลาด <span className="text-transparent bg-clip-text bg-linear-to-r/srgb from-gold-300 to-amber-500">Chantakorn AI</span>
             </h1>
             <p className="text-xs sm:text-sm text-gray-300 leading-relaxed">
               เตรียมสื่อ จับคู่ลูกค้า และวางแผนการขายจากข้อมูลทรัพย์ในระบบ
@@ -297,15 +297,15 @@ function AutomationContent() {
         {/* Global Property Selector Bar */}
         <div className="mt-6 pt-5 border-t border-navy-800/80 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
           <div className="flex items-center space-x-2 text-xs text-gray-300">
-            <Building2 className="w-4 h-4 text-gold-400 flex-shrink-0" />
+            <Building2 className="w-4 h-4 text-gold-400 shrink-0" />
             <span className="font-semibold text-white whitespace-nowrap">เลือกทรัพย์ที่ต้องการทำงาน:</span>
           </div>
 
-          <div className="flex-grow max-w-xl">
+          <div className="grow max-w-xl">
             <select
               value={selectedPropertyId}
               onChange={(e) => setSelectedPropertyId(e.target.value)}
-              className="w-full bg-navy-900 border border-navy-700 rounded-xl px-3.5 py-2 text-xs font-semibold text-white focus:outline-none focus:ring-2 focus:ring-gold-500 shadow-inner"
+              className="w-full bg-navy-900 border border-navy-700 rounded-xl px-3.5 py-2 text-xs font-semibold text-white focus:outline-hidden focus:ring-2 focus:ring-gold-500 inset-shadow-sm"
             >
               {properties.map((p) => (
                 <option key={p.id} value={p.id}>
@@ -496,7 +496,7 @@ function AutomationContent() {
                 <div className="p-3 bg-gray-50 rounded-2xl border border-gray-200/80 space-y-2 text-xs">
                   <span className="font-bold text-gray-600 block">ทรัพย์ที่เลือก:</span>
                   <div className="flex items-center space-x-3">
-                    <div className="relative w-12 h-12 rounded-lg overflow-hidden bg-gray-200 flex-shrink-0">
+                    <div className="relative w-12 h-12 rounded-lg overflow-hidden bg-gray-200 shrink-0">
                       {selectedProperty.cover_image ? (
                         <Image
                           src={selectedProperty.cover_image}
@@ -523,7 +523,7 @@ function AutomationContent() {
               <button
                 onClick={handleAiDeepEnhance}
                 disabled={isAiGenerating}
-                className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-navy-950 to-blue-900 hover:from-navy-900 hover:to-blue-800 text-gold-400 font-extrabold text-xs shadow-md transition-all flex items-center justify-center space-x-2 disabled:opacity-60"
+                className="w-full py-3 px-4 rounded-xl bg-linear-to-r/srgb from-navy-950 to-blue-900 hover:from-navy-900 hover:to-blue-800 text-gold-400 font-extrabold text-xs shadow-md transition-all flex items-center justify-center space-x-2 disabled:opacity-60"
               >
                 {isAiGenerating ? (
                   <>
@@ -554,7 +554,7 @@ function AutomationContent() {
                 <div className="flex items-center space-x-2">
                   <button
                     onClick={() => handleCopyText(generatedPost?.fullPost || '', 'post')}
-                    className="px-4 py-2 rounded-xl bg-navy-950 hover:bg-navy-900 text-gold-400 font-bold text-xs flex items-center space-x-1.5 shadow-sm transition-all active:scale-95"
+                    className="px-4 py-2 rounded-xl bg-navy-950 hover:bg-navy-900 text-gold-400 font-bold text-xs flex items-center space-x-1.5 shadow-xs transition-all active:scale-95"
                   >
                     {copiedKey === 'post' ? (
                       <>
@@ -573,7 +573,7 @@ function AutomationContent() {
                     href={`https://line.me/R/msg/text/?${encodeURIComponent(generatedPost?.fullPost || '')}`}
                     target="_blank"
                     rel="noreferrer"
-                    className="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center space-x-1.5 shadow-sm transition-all"
+                    className="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center space-x-1.5 shadow-xs transition-all"
                   >
                     <Share2 className="w-3.5 h-3.5" />
                     <span>แชร์ไป LINE</span>
@@ -582,9 +582,9 @@ function AutomationContent() {
               </div>
 
               {/* AI Best Time Suggestion Badge Box */}
-              <div className="p-3.5 rounded-2xl bg-gradient-to-r from-navy-950 via-slate-900 to-navy-900 border border-gold-500/40 text-white flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+              <div className="p-3.5 rounded-2xl bg-linear-to-r/srgb from-navy-950 via-slate-900 to-navy-900 border border-gold-500/40 text-white flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
                 <div className="flex items-center space-x-3">
-                  <div className="w-10 h-10 rounded-xl bg-gold-500/20 text-gold-400 border border-gold-500/30 flex items-center justify-center flex-shrink-0">
+                  <div className="w-10 h-10 rounded-xl bg-gold-500/20 text-gold-400 border border-gold-500/30 flex items-center justify-center shrink-0">
                     <Clock className="w-5 h-5 text-gold-400" />
                   </div>
                   <div>
@@ -592,7 +592,7 @@ function AutomationContent() {
                       <span className="text-[11px] font-bold text-gold-400">
                         ช่วงเวลาที่แนะนำให้ทดลองโพสต์:
                       </span>
-                      <span className="text-[10px] px-1.5 py-0.2 rounded bg-emerald-500/20 text-emerald-300 font-bold">
+                      <span className="text-[10px] px-1.5 py-0.2 rounded-sm bg-emerald-500/20 text-emerald-300 font-bold">
                         {bestTimeRec.planningPriority}
                       </span>
                     </div>
@@ -643,13 +643,13 @@ function AutomationContent() {
                   readOnly
                   value={generatedPost?.fullPost || ''}
                   rows={14}
-                  className="w-full bg-slate-900 text-slate-100 rounded-2xl p-4 font-mono text-xs leading-relaxed border border-slate-800 focus:outline-none focus:ring-2 focus:ring-gold-500 shadow-inner resize-y"
+                  className="w-full bg-slate-900 text-slate-100 rounded-2xl p-4 font-mono text-xs leading-relaxed border border-slate-800 focus:outline-hidden focus:ring-2 focus:ring-gold-500 inset-shadow-sm resize-y"
                 />
               </div>
 
               {/* Quick Tips */}
               <div className="p-3.5 bg-blue-50/70 border border-blue-200/80 rounded-2xl text-xs text-blue-900 flex items-start space-x-2.5">
-                <Zap className="w-4 h-4 text-blue-600 flex-shrink-0 mt-0.5" />
+                <Zap className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
                 <p className="leading-relaxed">
                   <strong>ทดลองและวัดผล:</strong> ใช้ช่วง {bestTimeRec.dayName} เวลา {bestTimeRec.timeLabel} เป็นจุดเริ่มต้น แล้วเปรียบเทียบยอดคลิกและผู้ติดต่อจริง เพื่อปรับแผนโพสต์ของทีม
                 </p>
@@ -685,7 +685,7 @@ function AutomationContent() {
       {activeTab === 'best_time' && (
         <div className="space-y-6">
           {/* Real-Time Posting Pulse Gauge Banner */}
-          <div className="p-5 sm:p-6 rounded-3xl bg-gradient-to-r from-navy-950 via-slate-900 to-navy-900 text-white border border-navy-800 shadow-xl flex flex-col md:flex-row items-stretch md:items-center justify-between gap-5">
+          <div className="p-5 sm:p-6 rounded-3xl bg-linear-to-r/srgb from-navy-950 via-slate-900 to-navy-900 text-white border border-navy-800 shadow-xl flex flex-col md:flex-row items-stretch md:items-center justify-between gap-5">
             <div className="space-y-2">
               <div className="inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-gold-500/20 border border-gold-500/30 text-gold-300 text-xs font-bold">
                 <Activity className="w-3.5 h-3.5 text-gold-400" />
@@ -715,7 +715,7 @@ function AutomationContent() {
           {/* Interactive Channel & Property Filtering Bar */}
           <div className="bg-white p-5 rounded-3xl border border-gray-200 shadow-xs flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4">
             <div className="flex items-center space-x-3">
-              <Wand2 className="w-5 h-5 text-gold-600 flex-shrink-0" />
+              <Wand2 className="w-5 h-5 text-gold-600 shrink-0" />
               <div>
                 <h3 className="font-extrabold text-sm text-navy-950">เลือกช่องทางโซเชียลเพื่อวิเคราะห์เวลา:</h3>
                 <p className="text-xs text-gray-500">พฤติกรรมผู้ซื้อและช่วงเวลาเสพสื่อมีความแตกต่างกันในแต่ละแพลตฟอร์ม</p>
@@ -735,7 +735,7 @@ function AutomationContent() {
                   onClick={() => setSelectedChannel(item.id as MarketingChannel)}
                   className={`px-3.5 py-2 rounded-xl text-xs font-bold flex items-center space-x-1.5 transition-all ${
                     selectedChannel === item.id
-                      ? 'bg-navy-950 text-gold-400 shadow-sm scale-102 font-black'
+                      ? 'bg-navy-950 text-gold-400 shadow-xs scale-102 font-black'
                       : 'bg-gray-100 hover:bg-gray-200 text-gray-700'
                   }`}
                 >
@@ -763,15 +763,15 @@ function AutomationContent() {
               </div>
               <ul className="space-y-2 text-xs text-gray-600 leading-relaxed">
                 <li className="flex items-start space-x-2">
-                  <CheckCircle2 className="w-4 h-4 text-emerald-500 flex-shrink-0 mt-0.5" />
+                  <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />
                   <span><strong>Facebook Meta Business Suite:</strong> เข้าไปที่ Meta Planner แล้วกำหนดเวลาล่วงหน้าตามเวลาที่ D3 แนะนำ</span>
                 </li>
                 <li className="flex items-start space-x-2">
-                  <CheckCircle2 className="w-4 h-4 text-emerald-500 flex-shrink-0 mt-0.5" />
+                  <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />
                   <span><strong>LINE Official Account:</strong> ตั้งเวลาบรอดแคสต์ช่วง 08:30 น. หรือ 12:15 น. เพื่อให้อัตรา Open Rate สูงสุด</span>
                 </li>
                 <li className="flex items-start space-x-2">
-                  <CheckCircle2 className="w-4 h-4 text-emerald-500 flex-shrink-0 mt-0.5" />
+                  <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />
                   <span><strong>TikTok / Shorts:</strong> แนะนำปล่อยคลิประหว่าง 19:30 - 21:45 น. เป็นช่วงที่มีการส่งต่อและคอมเมนต์สูงสุด</span>
                 </li>
               </ul>
@@ -821,7 +821,7 @@ function AutomationContent() {
               <select
                 value={selectedInquiryId}
                 onChange={(e) => setSelectedInquiryId(e.target.value)}
-                className="w-full bg-gray-50 border border-gray-300 rounded-xl px-3 py-2 text-xs font-bold text-navy-950 focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+                className="w-full bg-gray-50 border border-gray-300 rounded-xl px-3 py-2 text-xs font-bold text-navy-950 focus:ring-2 focus:ring-emerald-500 focus:outline-hidden"
               >
                 {inquiries.map((inq) => (
                   <option key={inq.id} value={inq.id}>
@@ -963,7 +963,7 @@ function AutomationContent() {
                           <ul className="text-[11px] text-gray-700 space-y-0.5">
                             {match.matchingFactors.slice(0, 3).map((f, i) => (
                               <li key={i} className="flex items-start space-x-1">
-                                <CheckCircle2 className="w-3 h-3 text-emerald-500 flex-shrink-0 mt-0.5" />
+                                <CheckCircle2 className="w-3 h-3 text-emerald-500 shrink-0 mt-0.5" />
                                 <span className="line-clamp-1">{f}</span>
                               </li>
                             ))}
@@ -1140,7 +1140,7 @@ function AutomationContent() {
               <div className="flex items-center space-x-2">
                 <button
                   onClick={() => handleCopyText(valuationData.investorPitchCard, 'pitch_card')}
-                  className="px-4 py-2 rounded-xl bg-gold-500 hover:bg-gold-600 text-navy-950 font-bold text-xs flex items-center space-x-1.5 shadow-sm transition-all"
+                  className="px-4 py-2 rounded-xl bg-gold-500 hover:bg-gold-600 text-navy-950 font-bold text-xs flex items-center space-x-1.5 shadow-xs transition-all"
                 >
                   {copiedKey === 'pitch_card' ? (
                     <>
@@ -1197,7 +1197,7 @@ function AutomationContent() {
               <select
                 value={contractType}
                 onChange={(e) => setContractType(e.target.value as ContractType)}
-                className="w-full bg-gray-50 border border-gray-300 rounded-xl px-3 py-2 text-xs font-bold text-navy-950 focus:ring-2 focus:ring-amber-500 focus:outline-none"
+                className="w-full bg-gray-50 border border-gray-300 rounded-xl px-3 py-2 text-xs font-bold text-navy-950 focus:ring-2 focus:ring-amber-500 focus:outline-hidden"
               >
                 <option value="sale_agreement">สัญญาจะซื้อจะขายที่ดินและสิ่งปลูกสร้าง (มาตรฐาน)</option>
                 <option value="lease_agreement">สัญญาเช่าอสังหาริมทรัพย์ (Residential Lease)</option>
@@ -1214,7 +1214,7 @@ function AutomationContent() {
                   placeholder="เช่น นายสมศักดิ์ สุขใจ"
                   value={buyerName}
                   onChange={(e) => setBuyerName(e.target.value)}
-                  className="w-full mt-1 bg-gray-50 border border-gray-300 rounded-xl px-3 py-2 text-xs focus:ring-2 focus:ring-amber-500 focus:outline-none"
+                  className="w-full mt-1 bg-gray-50 border border-gray-300 rounded-xl px-3 py-2 text-xs focus:ring-2 focus:ring-amber-500 focus:outline-hidden"
                 />
               </div>
 
@@ -1225,7 +1225,7 @@ function AutomationContent() {
                   placeholder="1-9098-00000-00-0"
                   value={buyerIdCard}
                   onChange={(e) => setBuyerIdCard(e.target.value)}
-                  className="w-full mt-1 bg-gray-50 border border-gray-300 rounded-xl px-3 py-2 text-xs focus:ring-2 focus:ring-amber-500 focus:outline-none"
+                  className="w-full mt-1 bg-gray-50 border border-gray-300 rounded-xl px-3 py-2 text-xs focus:ring-2 focus:ring-amber-500 focus:outline-hidden"
                 />
               </div>
 
@@ -1236,7 +1236,7 @@ function AutomationContent() {
                   placeholder="081-234-5678"
                   value={buyerPhone}
                   onChange={(e) => setBuyerPhone(e.target.value)}
-                  className="w-full mt-1 bg-gray-50 border border-gray-300 rounded-xl px-3 py-2 text-xs focus:ring-2 focus:ring-amber-500 focus:outline-none"
+                  className="w-full mt-1 bg-gray-50 border border-gray-300 rounded-xl px-3 py-2 text-xs focus:ring-2 focus:ring-amber-500 focus:outline-hidden"
                 />
               </div>
 
@@ -1247,7 +1247,7 @@ function AutomationContent() {
                     type="number"
                     value={depositAmount}
                     onChange={(e) => setDepositAmount(Number(e.target.value))}
-                    className="w-full mt-1 bg-gray-50 border border-gray-300 rounded-xl px-3 py-2 text-xs font-bold text-navy-950 focus:ring-2 focus:ring-amber-500 focus:outline-none"
+                    className="w-full mt-1 bg-gray-50 border border-gray-300 rounded-xl px-3 py-2 text-xs font-bold text-navy-950 focus:ring-2 focus:ring-amber-500 focus:outline-hidden"
                   />
                   <span className="text-[10px] text-gray-500 mt-0.5 block">
                     คงเหลือจ่ายวันโอน: {formatPrice((selectedProperty?.price || 0) - depositAmount)} บาท
@@ -1307,7 +1307,7 @@ function AutomationContent() {
             </div>
 
             {/* Printable A4 Paper Effect */}
-            <div className="p-6 bg-amber-50/20 border border-gray-300 rounded-2xl shadow-inner font-serif text-xs text-gray-800 leading-relaxed whitespace-pre-wrap max-h-[600px] overflow-y-auto">
+            <div className="p-6 bg-amber-50/20 border border-gray-300 rounded-2xl inset-shadow-sm font-serif text-xs text-gray-800 leading-relaxed whitespace-pre-wrap max-h-[600px] overflow-y-auto">
               {generatedContract?.content}
             </div>
           </div>

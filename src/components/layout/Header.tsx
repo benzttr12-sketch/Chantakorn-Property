@@ -111,11 +111,11 @@ export default function Header() {
   return (
     <>
       {/* Top Notification / Trust Bar */}
-      <div className="bg-navy-950 text-white text-xs py-2 px-4 hidden md:block border-b border-navy-800 shadow-inner">
+      <div className="bg-navy-950 text-white text-xs py-2 px-4 hidden md:block border-b border-navy-800 inset-shadow-sm">
         <div className="max-w-7xl mx-auto flex justify-between items-center">
           <div className="flex items-center space-x-3 min-w-0">
             <span className="inline-flex items-center text-gold-300 font-bold tracking-wide whitespace-nowrap">
-              <ShieldCheck className="w-4 h-4 mr-1.5 text-gold-400 flex-shrink-0" />
+              <ShieldCheck className="w-4 h-4 mr-1.5 text-gold-400 shrink-0" />
               นายหน้าอสังหาริมทรัพย์มืออาชีพ หาดใหญ่ – สงขลา
             </span>
             <span className="text-navy-600">|</span>
@@ -168,7 +168,7 @@ export default function Header() {
               >
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
                 <span className="font-bold max-w-[120px] truncate text-white">{currentUser.full_name || 'บัญชีของฉัน'}</span>
-                <span className="text-[10px] px-1.5 py-0.5 bg-gold-400 text-navy-950 rounded font-black">
+                <span className="text-[10px] px-1.5 py-0.5 bg-gold-400 text-navy-950 rounded-sm font-black">
                   {currentUser.role}
                 </span>
               </Link>
@@ -176,7 +176,7 @@ export default function Header() {
               <Link 
                 id="topbar-login-link"
                 href="/login" 
-                className="inline-flex items-center space-x-1 px-3 py-1 rounded-full bg-gold-400 text-navy-950 hover:bg-gold-300 hover:text-navy-900 font-bold text-xs shadow-sm transition-all"
+                className="inline-flex items-center space-x-1 px-3 py-1 rounded-full bg-gold-400 text-navy-950 hover:bg-gold-300 hover:text-navy-900 font-bold text-xs shadow-xs transition-all"
               >
                 <LogIn className="w-3.5 h-3.5 text-navy-950 stroke-[2.5]" />
                 <span>เข้าสู่ระบบ</span>
@@ -198,7 +198,7 @@ export default function Header() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between">
           {/* Brand Logo */}
           <Link href="/" className="flex items-center space-x-3 group">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-gold-400 via-gold-500 to-amber-600 flex items-center justify-center text-navy-950 font-bold shadow-md shadow-gold-500/20 group-hover:scale-105 group-hover:shadow-gold-500/30 transition-all">
+            <div className="w-10 h-10 rounded-xl bg-linear-to-br/srgb from-gold-400 via-gold-500 to-amber-600 flex items-center justify-center text-navy-950 font-bold shadow-md shadow-gold-500/20 group-hover:scale-105 group-hover:shadow-gold-500/30 transition-all">
               <Building2 className="w-6 h-6 text-navy-950" />
             </div>
             <div className="flex flex-col">
@@ -222,7 +222,7 @@ export default function Header() {
                   onClick={() => setMobileMenuOpen(false)}
                   className={`px-3 py-1.5 rounded-xl text-sm transition-all ${
                     isActive
-                      ? 'text-gold-300 bg-navy-900 border border-gold-400/50 font-bold shadow-sm'
+                      ? 'text-gold-300 bg-navy-900 border border-gold-400/50 font-bold shadow-xs'
                       : 'text-white hover:text-gold-300 hover:bg-navy-900/80 font-medium'
                   }`}
                 >
@@ -241,7 +241,7 @@ export default function Header() {
             >
               <Heart className="w-5 h-5" />
               {favCount > 0 && (
-                <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center shadow-sm">
+                <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center shadow-xs">
                   {favCount}
                 </span>
               )}
@@ -252,10 +252,10 @@ export default function Header() {
               <Link
                 id="main-user-profile-btn"
                 href={currentUser.role === 'ADMIN' || currentUser.role === 'AGENT' ? '/admin' : '/profile'}
-                className="flex items-center space-x-2 pl-2 pr-3 py-1.5 bg-navy-900 hover:bg-navy-850 rounded-full border border-gold-400/50 hover:border-gold-300 shadow-sm transition-all group"
+                className="flex items-center space-x-2 pl-2 pr-3 py-1.5 bg-navy-900 hover:bg-navy-850 rounded-full border border-gold-400/50 hover:border-gold-300 shadow-xs transition-all group"
                 title="คลิกเพื่อจัดการโปรไฟล์"
               >
-                <div className="w-7 h-7 rounded-full overflow-hidden ring-2 ring-gold-400 bg-navy-950 flex items-center justify-center flex-shrink-0">
+                <div className="w-7 h-7 rounded-full overflow-hidden ring-2 ring-gold-400 bg-navy-950 flex items-center justify-center shrink-0">
                   {currentUser.avatar_url ? (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img src={currentUser.avatar_url} alt={currentUser.full_name} className="w-full h-full object-cover" />
@@ -278,7 +278,7 @@ export default function Header() {
               <Link
                 id="main-login-btn"
                 href="/login"
-                className="flex items-center space-x-2 bg-navy-900 hover:bg-navy-850 text-white hover:text-gold-300 px-3.5 py-1.5 text-sm font-bold rounded-xl border border-gold-400/40 hover:border-gold-300 transition-all shadow-sm group"
+                className="flex items-center space-x-2 bg-navy-900 hover:bg-navy-850 text-white hover:text-gold-300 px-3.5 py-1.5 text-sm font-bold rounded-xl border border-gold-400/40 hover:border-gold-300 transition-all shadow-xs group"
               >
                 <LogIn className="w-4 h-4 text-gold-400 group-hover:translate-x-0.5 transition-transform" />
                 <span className="text-white group-hover:text-gold-300">เข้าสู่ระบบ</span>
@@ -287,7 +287,7 @@ export default function Header() {
 
             <Link
               href="/sell"
-              className="flex items-center space-x-1.5 px-3.5 py-1.5 text-xs font-bold text-gold-300 border border-gold-400/50 hover:border-gold-300 hover:bg-gold-500/15 rounded-xl transition-all shadow-sm"
+              className="flex items-center space-x-1.5 px-3.5 py-1.5 text-xs font-bold text-gold-300 border border-gold-400/50 hover:border-gold-300 hover:bg-gold-500/15 rounded-xl transition-all shadow-xs"
             >
               <PlusCircle className="w-3.5 h-3.5 text-gold-400" />
               <span>ลงประกาศ</span>
@@ -295,7 +295,7 @@ export default function Header() {
 
             <Link
               href="/contact"
-              className="px-4 py-2 text-xs font-bold text-navy-950 bg-gradient-to-r from-gold-400 via-gold-500 to-amber-500 hover:from-gold-300 hover:to-gold-400 rounded-xl shadow-md hover:shadow-gold-500/25 transition-all transform hover:-translate-y-0.5"
+              className="px-4 py-2 text-xs font-bold text-navy-950 bg-linear-to-r/srgb from-gold-400 via-gold-500 to-amber-500 hover:from-gold-300 hover:to-gold-400 rounded-xl shadow-md hover:shadow-gold-500/25 transition-all transform hover:-translate-y-0.5"
             >
               ติดต่อเรา
             </Link>
@@ -319,7 +319,7 @@ export default function Header() {
             <button
               type="button"
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="p-2 text-gray-200 hover:text-gold-400 hover:bg-navy-900 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-400 focus-visible:ring-offset-2 focus-visible:ring-offset-navy-950"
+              className="p-2 text-gray-200 hover:text-gold-400 hover:bg-navy-900 rounded-lg focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-gold-400 focus-visible:ring-offset-2 focus-visible:ring-offset-navy-950"
               aria-label={mobileMenuOpen ? 'ปิดเมนูหลัก' : 'เปิดเมนูหลัก'}
               aria-expanded={mobileMenuOpen}
               aria-controls="mobile-navigation-menu"
@@ -341,7 +341,7 @@ export default function Header() {
           {currentUser && (
             <div className="mb-5 p-4 rounded-2xl bg-navy-900 border border-gold-500/40 flex items-center justify-between shadow-md">
               <div className="flex items-center space-x-3">
-                <div className="w-10 h-10 rounded-full overflow-hidden ring-2 ring-gold-400 bg-navy-950 flex items-center justify-center flex-shrink-0">
+                <div className="w-10 h-10 rounded-full overflow-hidden ring-2 ring-gold-400 bg-navy-950 flex items-center justify-center shrink-0">
                   {currentUser.avatar_url ? (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img src={currentUser.avatar_url} alt={currentUser.full_name} className="w-full h-full object-cover" />
@@ -389,7 +389,7 @@ export default function Header() {
                   }`}
                 >
                   <span className="tracking-wide">{link.name}</span>
-                  <ChevronRight className={`w-4 h-4 flex-shrink-0 ${isActive ? 'text-gold-400' : 'text-gray-400'}`} />
+                  <ChevronRight className={`w-4 h-4 shrink-0 ${isActive ? 'text-gold-400' : 'text-gray-400'}`} />
                 </Link>
               );
             })}
@@ -399,7 +399,7 @@ export default function Header() {
             <Link
               href="/sell"
               onClick={() => setMobileMenuOpen(false)}
-              className="w-full flex items-center justify-center space-x-2 py-3 px-4 rounded-xl border border-gold-400/50 bg-navy-900 text-gold-300 font-bold hover:bg-navy-850 transition-all shadow-sm"
+              className="w-full flex items-center justify-center space-x-2 py-3 px-4 rounded-xl border border-gold-400/50 bg-navy-900 text-gold-300 font-bold hover:bg-navy-850 transition-all shadow-xs"
             >
               <PlusCircle className="w-4 h-4 text-gold-400" />
               <span>ลงประกาศ / ฝากขายทรัพย์</span>
@@ -451,7 +451,7 @@ export default function Header() {
             <Link
               href="/contact"
               onClick={() => setMobileMenuOpen(false)}
-              className="w-full flex items-center justify-center py-3.5 px-4 rounded-xl bg-gradient-to-r from-gold-400 via-gold-500 to-amber-500 text-navy-950 font-black shadow-md hover:shadow-gold-500/25 transition-all"
+              className="w-full flex items-center justify-center py-3.5 px-4 rounded-xl bg-linear-to-r/srgb from-gold-400 via-gold-500 to-amber-500 text-navy-950 font-black shadow-md hover:shadow-gold-500/25 transition-all"
             >
               ติดต่อ Chantakorn Property
             </Link>

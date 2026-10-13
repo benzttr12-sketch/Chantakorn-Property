@@ -186,7 +186,7 @@ export default function AdminAgentsPage() {
       )}
 
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-6 rounded-3xl border border-slate-200 shadow-sm">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-6 rounded-3xl border border-slate-200 shadow-xs">
         <div>
           <div className="inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-gold-50 border border-gold-200 text-gold-800 text-xs font-bold mb-2">
             <UserCheck className="w-3.5 h-3.5 text-gold-600" />
@@ -230,7 +230,7 @@ export default function AdminAgentsPage() {
         {agents.map((agent) => (
           <div
             key={agent.id}
-            className="bg-white rounded-3xl border border-slate-200 shadow-sm hover:shadow-lg transition-all overflow-hidden flex flex-col justify-between"
+            className="bg-white rounded-3xl border border-slate-200 shadow-xs hover:shadow-lg transition-all overflow-hidden flex flex-col justify-between"
           >
             <div>
               {/* Agent Photo & Header */}
@@ -243,9 +243,9 @@ export default function AdminAgentsPage() {
                   className="object-cover"
                   referrerPolicy="no-referrer"
                 /> : <span className="flex h-full items-center justify-center bg-navy-900 text-2xl font-bold text-gold-300">{agent.name.slice(0, 1)}</span>}
-                <div className="absolute inset-0 bg-gradient-to-t from-navy-950/90 via-navy-950/20 to-transparent" />
+                <div className="absolute inset-0 bg-linear-to-t/srgb from-navy-950/90 via-navy-950/20 to-transparent" />
                 
-                <div className="absolute top-3 right-3 bg-white/95 px-2.5 py-1 rounded-full text-xs font-bold text-slate-800 flex items-center space-x-1 shadow-sm">
+                <div className="absolute top-3 right-3 bg-white/95 px-2.5 py-1 rounded-full text-xs font-bold text-slate-800 flex items-center space-x-1 shadow-xs">
                   <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
                   <span className="font-mono">{agent.rating ? agent.rating.toFixed(1) : 'ยังไม่มีคะแนน'}</span>
                 </div>
@@ -339,7 +339,7 @@ export default function AdminAgentsPage() {
 
       {/* EDIT / CREATE MODAL */}
       {editingAgent && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
           <div className="bg-white rounded-3xl max-w-2xl w-full max-h-[90vh] overflow-y-auto border border-slate-200 shadow-2xl animate-in fade-in zoom-in-95">
             {/* Modal Header */}
             <div className="p-6 border-b border-slate-100 flex items-center justify-between sticky top-0 bg-white z-10">
@@ -366,7 +366,7 @@ export default function AdminAgentsPage() {
               {error && <p role="alert" className="rounded-xl bg-red-50 p-3 text-sm text-red-800">{error}</p>}
               {(editingAgent.user_id || selectedMemberId) && <label className="flex items-start gap-3 rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm"><input type="checkbox" checked={syncLinkedProfile} onChange={event => setSyncLinkedProfile(event.target.checked)} className="mt-1" /><span>อัปเดตข้อมูลติดต่อของสมาชิกที่เชื่อมโยงด้วย<span className="mt-1 block text-xs text-slate-500">ใช้สิทธิ์แก้ไขสมาชิกของคุณ โดยไม่เปลี่ยนสิทธิ์เข้าสู่ระบบ</span></span></label>}
               {/* MEMBER SELECTION BOX (ดึงข้อมูลของสมาชิก) */}
-              <div className="bg-gradient-to-r from-gold-50/80 to-amber-50/50 p-4 rounded-2xl border border-gold-200 space-y-2">
+              <div className="bg-linear-to-r/srgb from-gold-50/80 to-amber-50/50 p-4 rounded-2xl border border-gold-200 space-y-2">
                 <div className="flex items-center justify-between">
                   <label className="text-xs font-black text-navy-950 flex items-center space-x-1.5">
                     <UserPlus className="w-4 h-4 text-gold-600" />
@@ -382,7 +382,7 @@ export default function AdminAgentsPage() {
                     <select
                       value={selectedMemberId}
                       onChange={(e) => handleSelectMemberToImport(e.target.value)}
-                      className="w-full px-3.5 py-2.5 bg-white border border-gold-300 rounded-xl text-xs font-bold text-navy-950 focus:ring-2 focus:ring-gold-500 outline-none"
+                      className="w-full px-3.5 py-2.5 bg-white border border-gold-300 rounded-xl text-xs font-bold text-navy-950 focus:ring-2 focus:ring-gold-500 outline-hidden"
                     >
                       <option value="">-- เลือกสมาชิกเพื่อดึงข้อมูลอัตโนมัติ (คลิกเพื่อเลือก) --</option>
                       {users.map((u) => (
@@ -412,7 +412,7 @@ export default function AdminAgentsPage() {
                     required
                     value={editingAgent.name}
                     onChange={(e) => setEditingAgent({ ...editingAgent, name: e.target.value })}
-                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs sm:text-sm text-navy-950 focus:ring-2 focus:ring-gold-400 outline-none"
+                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs sm:text-sm text-navy-950 focus:ring-2 focus:ring-gold-400 outline-hidden"
                     placeholder="เช่น คุณฉันทากร นวลจันทร์ (เบนซ์)"
                   />
                 </div>
@@ -424,7 +424,7 @@ export default function AdminAgentsPage() {
                   <select
                     value={editingAgent.rank || 'นายหน้า'}
                     onChange={(e) => setEditingAgent({ ...editingAgent, rank: e.target.value as any })}
-                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs sm:text-sm text-navy-950 focus:ring-2 focus:ring-gold-400 outline-none"
+                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs sm:text-sm text-navy-950 focus:ring-2 focus:ring-gold-400 outline-hidden"
                   >
                     <option value="แอดมิน">แอดมิน (Admin / ผู้บริหาร)</option>
                     <option value="นายหน้า">นายหน้า (Agent / ที่ปรึกษา)</option>
@@ -439,7 +439,7 @@ export default function AdminAgentsPage() {
                     type="text"
                     value={editingAgent.title}
                     onChange={(e) => setEditingAgent({ ...editingAgent, title: e.target.value })}
-                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs sm:text-sm text-navy-950 focus:ring-2 focus:ring-gold-400 outline-none"
+                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs sm:text-sm text-navy-950 focus:ring-2 focus:ring-gold-400 outline-hidden"
                     placeholder="เช่น กรรมการผู้จัดการ & หัวหน้าฝ่ายที่ปรึกษา"
                   />
                 </div>
@@ -453,7 +453,7 @@ export default function AdminAgentsPage() {
                     required
                     value={editingAgent.phone}
                     onChange={(e) => setEditingAgent({ ...editingAgent, phone: e.target.value })}
-                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs sm:text-sm font-mono text-navy-950 focus:ring-2 focus:ring-gold-400 outline-none"
+                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs sm:text-sm font-mono text-navy-950 focus:ring-2 focus:ring-gold-400 outline-hidden"
                     placeholder="081-604-0097"
                   />
                 </div>
@@ -466,7 +466,7 @@ export default function AdminAgentsPage() {
                     type="text"
                     value={editingAgent.line_id}
                     onChange={(e) => setEditingAgent({ ...editingAgent, line_id: e.target.value })}
-                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs sm:text-sm text-navy-950 focus:ring-2 focus:ring-gold-400 outline-none"
+                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs sm:text-sm text-navy-950 focus:ring-2 focus:ring-gold-400 outline-hidden"
                     placeholder="@930xzcyi"
                   />
                 </div>
@@ -479,7 +479,7 @@ export default function AdminAgentsPage() {
                     type="email"
                     value={editingAgent.email}
                     onChange={(e) => setEditingAgent({ ...editingAgent, email: e.target.value })}
-                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs sm:text-sm text-navy-950 focus:ring-2 focus:ring-gold-400 outline-none"
+                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs sm:text-sm text-navy-950 focus:ring-2 focus:ring-gold-400 outline-hidden"
                     placeholder="contact@chantakornproperty.com"
                   />
                 </div>
@@ -492,7 +492,7 @@ export default function AdminAgentsPage() {
                     type="text"
                     value={editingAgent.facebook || ''}
                     onChange={(e) => setEditingAgent({ ...editingAgent, facebook: e.target.value })}
-                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs sm:text-sm text-navy-950 focus:ring-2 focus:ring-gold-400 outline-none"
+                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs sm:text-sm text-navy-950 focus:ring-2 focus:ring-gold-400 outline-hidden"
                     placeholder="https://www.facebook.com/..."
                   />
                 </div>
@@ -505,7 +505,7 @@ export default function AdminAgentsPage() {
                     type="url"
                     value={editingAgent.photo_url}
                     onChange={(e) => setEditingAgent({ ...editingAgent, photo_url: e.target.value })}
-                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs sm:text-sm text-navy-950 focus:ring-2 focus:ring-gold-400 outline-none"
+                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs sm:text-sm text-navy-950 focus:ring-2 focus:ring-gold-400 outline-hidden"
                     placeholder="https://images.unsplash.com/photo-..."
                   />
                 </div>
@@ -518,7 +518,7 @@ export default function AdminAgentsPage() {
                     type="text"
                     value={editingAgent.zone}
                     onChange={(e) => setEditingAgent({ ...editingAgent, zone: e.target.value })}
-                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs sm:text-sm text-navy-950 focus:ring-2 focus:ring-gold-400 outline-none"
+                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs sm:text-sm text-navy-950 focus:ring-2 focus:ring-gold-400 outline-hidden"
                     placeholder="เช่น โซน ม.อ. – คอหงส์ – ปุณณกัณฑ์"
                   />
                 </div>
@@ -531,7 +531,7 @@ export default function AdminAgentsPage() {
                     type="text"
                     value={editingAgent.specialty}
                     onChange={(e) => setEditingAgent({ ...editingAgent, specialty: e.target.value })}
-                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs sm:text-sm text-navy-950 focus:ring-2 focus:ring-gold-400 outline-none"
+                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs sm:text-sm text-navy-950 focus:ring-2 focus:ring-gold-400 outline-hidden"
                     placeholder="เช่น คอนโดปล่อยเช่า, บ้านเดี่ยว, ที่ดินจัดสรร"
                   />
                 </div>
@@ -546,7 +546,7 @@ export default function AdminAgentsPage() {
                       min="1"
                       value={editingAgent.experienceYears}
                       onChange={(e) => setEditingAgent({ ...editingAgent, experienceYears: Number(e.target.value) })}
-                      className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs font-bold text-navy-950 focus:ring-2 focus:ring-gold-400 outline-none"
+                      className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs font-bold text-navy-950 focus:ring-2 focus:ring-gold-400 outline-hidden"
                     />
                   </div>
 
@@ -559,7 +559,7 @@ export default function AdminAgentsPage() {
                       min="0"
                       value={editingAgent.closedDeals}
                       onChange={(e) => setEditingAgent({ ...editingAgent, closedDeals: Number(e.target.value) })}
-                      className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs font-bold text-navy-950 focus:ring-2 focus:ring-gold-400 outline-none"
+                      className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs font-bold text-navy-950 focus:ring-2 focus:ring-gold-400 outline-hidden"
                     />
                   </div>
 
@@ -574,7 +574,7 @@ export default function AdminAgentsPage() {
                       max="5"
                       value={editingAgent.rating}
                       onChange={(e) => setEditingAgent({ ...editingAgent, rating: Number(e.target.value) })}
-                      className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs font-bold text-navy-950 focus:ring-2 focus:ring-gold-400 outline-none"
+                      className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs font-bold text-navy-950 focus:ring-2 focus:ring-gold-400 outline-hidden"
                     />
                   </div>
                 </div>
@@ -587,7 +587,7 @@ export default function AdminAgentsPage() {
                     rows={3}
                     value={editingAgent.bio}
                     onChange={(e) => setEditingAgent({ ...editingAgent, bio: e.target.value })}
-                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs sm:text-sm text-navy-950 focus:ring-2 focus:ring-gold-400 outline-none resize-none"
+                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs sm:text-sm text-navy-950 focus:ring-2 focus:ring-gold-400 outline-hidden resize-none"
                     placeholder="เขียนแนะนำตัว ความเชี่ยวชาญ และความตั้งใจในการดูแลลูกค้า..."
                   />
                 </div>

@@ -50,14 +50,14 @@ export default function Footer() {
   return (
     <footer className="bg-navy-950 text-gray-300 border-t border-navy-800">
       {/* Gold accent line */}
-      <div className="h-px w-full bg-gradient-to-r from-transparent via-gold-500/60 to-transparent" />
+      <div className="h-px w-full bg-linear-to-r/srgb from-transparent via-gold-500/60 to-transparent" />
       <div className="pt-16 pb-24 md:pb-12">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-10 pb-12 border-b border-navy-800/80">
           {/* Col 1: Brand & Bio */}
           <div className="lg:col-span-2 space-y-4">
             <Link href="/" className="flex items-center space-x-3 group">
-              <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-gold-400 to-gold-600 flex items-center justify-center text-navy-950 font-bold shadow-md">
+              <div className="w-10 h-10 rounded-lg bg-linear-to-br/srgb from-gold-400 to-gold-600 flex items-center justify-center text-navy-950 font-bold shadow-md">
                 <Building2 className="w-6 h-6 text-navy-950" />
               </div>
               <div className="flex flex-col">
@@ -191,19 +191,19 @@ export default function Footer() {
             </h3>
             <ul className="space-y-3 text-sm">
               <li className="flex items-start space-x-2.5">
-                <MapPin className="w-4 h-4 text-gold-400 flex-shrink-0 mt-1" />
+                <MapPin className="w-4 h-4 text-gold-400 shrink-0 mt-1" />
                 <span className="text-gray-300 text-xs leading-relaxed">
                   สำนักงาน ฉันทากร พร็อพเพอร์ตี้ อ.หาดใหญ่ จ.สงขลา 90110
                 </span>
               </li>
               <li className="flex items-center space-x-2.5">
-                <Phone className="w-4 h-4 text-gold-400 flex-shrink-0" />
+                <Phone className="w-4 h-4 text-gold-400 shrink-0" />
                 <a href="tel:0816040097" className="hover:text-gold-400 font-semibold text-white">
                   081-604-0097
                 </a>
               </li>
               <li className="flex items-center space-x-2.5">
-                <MessageCircle className="w-4 h-4 text-[#06C755] flex-shrink-0 fill-current" />
+                <MessageCircle className="w-4 h-4 text-[#06C755] shrink-0 fill-current" />
                 <a
                   href="https://lin.ee/NMSe28T3"
                   target="_blank"
@@ -215,7 +215,7 @@ export default function Footer() {
                 </a>
               </li>
               <li className="flex items-center space-x-2.5">
-                <Facebook className="w-4 h-4 text-[#1877F2] flex-shrink-0" />
+                <Facebook className="w-4 h-4 text-[#1877F2] shrink-0" />
                 <a
                   href="https://www.facebook.com/people/Chantakorn-Property-%E0%B8%99%E0%B8%B2%E0%B8%A2%E0%B8%AB%E0%B8%99%E0%B9%89%E0%B8%B2-%E0%B8%9A%E0%B9%89%E0%B8%B2%E0%B8%99-%E0%B8%97%E0%B8%B5%E0%B9%88%E0%B8%94%E0%B8%B4%E0%B8%99-%E0%B8%84%E0%B8%AD%E0%B8%99%E0%B9%82%E0%B8%94-%E0%B8%AB%E0%B8%B2%E0%B8%94%E0%B9%83%E0%B8%AB%E0%B8%8D%E0%B9%88-%E0%B8%AA%E0%B8%87%E0%B8%82%E0%B8%A5%E0%B8%B2/61593092347613/"
                   target="_blank"
@@ -226,13 +226,13 @@ export default function Footer() {
                 </a>
               </li>
               <li className="flex items-center space-x-2.5">
-                <Mail className="w-4 h-4 text-gold-400 flex-shrink-0" />
+                <Mail className="w-4 h-4 text-gold-400 shrink-0" />
                 <a href="mailto:contact@chantakornproperty.com" className="hover:text-gold-400 text-xs">
                   contact@chantakornproperty.com
                 </a>
               </li>
               <li className="flex items-center space-x-2.5">
-                <Clock className="w-4 h-4 text-gold-400 flex-shrink-0" />
+                <Clock className="w-4 h-4 text-gold-400 shrink-0" />
                 <span className="text-gray-400 text-xs">
                   เปิดทำการ: ทุกวัน 08:30 – 18:00 น.
                 </span>

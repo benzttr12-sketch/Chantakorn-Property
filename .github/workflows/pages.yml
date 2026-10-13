@@ -26,6 +26,8 @@ jobs:
           node-version: '22'
           cache: npm
       - run: npm ci
+      - name: Reject vulnerable dependencies
+        run: npm run audit:security
       - name: Check for exposed LINE credentials
         run: python3 scripts/check-line-credentials.py --index
       - run: npm run lint

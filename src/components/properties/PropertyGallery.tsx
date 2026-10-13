@@ -132,7 +132,7 @@ export default function PropertyGallery({ id, title, images, videoUrl }: Propert
     }
   }
 
-  const controls = 'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-400 focus-visible:ring-offset-2';
+  const controls = 'focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-gold-400 focus-visible:ring-offset-2';
   const gestures = { onPointerDown: beginGesture, onPointerMove: moveGesture, onPointerUp: endGesture, onPointerCancel: () => { gestureRef.current = null; } };
   function choosePhoto(index: number) { setSelectedIndex(index); setZoomed(false); }
 
@@ -142,10 +142,10 @@ export default function PropertyGallery({ id, title, images, videoUrl }: Propert
       <div className="flex flex-wrap items-center justify-between gap-3 pb-1">
         <span className="text-xs font-semibold text-gray-500">{total ? `ภาพถ่ายสถานที่จริง (${total} รูป)` : 'ภาพประกอบทรัพย์'}</span>
         <div className="flex flex-wrap items-center gap-2">
-          <button type="button" onClick={handleShare} className={`flex items-center gap-1.5 px-3 py-2 bg-white hover:bg-gray-50 border border-surface-border text-navy-900 text-xs font-semibold rounded-xl shadow-sm ${controls}`} title="คัดลอกลิงก์เพื่อแชร์">
+          <button type="button" onClick={handleShare} className={`flex items-center gap-1.5 px-3 py-2 bg-white hover:bg-gray-50 border border-surface-border text-navy-900 text-xs font-semibold rounded-xl shadow-xs ${controls}`} title="คัดลอกลิงก์เพื่อแชร์">
             {copied ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Share2 className="w-3.5 h-3.5" />}<span role={copied ? 'status' : undefined}>{copied ? 'คัดลอกลิงก์แล้ว' : 'แชร์'}</span>
           </button>
-          <button type="button" aria-pressed={isFavorite} onClick={() => { const value = toggleFavoriteId(id); setIsFavorite(value); setFavoriteFeedback(value); }} className={`flex items-center gap-1.5 px-3 py-2 border text-xs font-semibold rounded-xl shadow-sm ${controls} ${isFavorite ? 'bg-red-50 text-red-600 border-red-200' : 'bg-white hover:bg-gray-50 text-navy-900 border-surface-border'}`}>
+          <button type="button" aria-pressed={isFavorite} onClick={() => { const value = toggleFavoriteId(id); setIsFavorite(value); setFavoriteFeedback(value); }} className={`flex items-center gap-1.5 px-3 py-2 border text-xs font-semibold rounded-xl shadow-xs ${controls} ${isFavorite ? 'bg-red-50 text-red-600 border-red-200' : 'bg-white hover:bg-gray-50 text-navy-900 border-surface-border'}`}>
             <span className={`inline-flex ${favoriteFeedback ? 'favorite-pop' : ''}`} onAnimationEnd={() => setFavoriteFeedback(false)}><Heart className={`w-3.5 h-3.5 ${isFavorite ? 'fill-red-500 text-red-500' : ''}`} /></span><span>{isFavorite ? 'บันทึกแล้ว' : 'บันทึก'}</span>
           </button>
           {videoUrl && <button type="button" onClick={() => document.getElementById('video-tour-section')?.scrollIntoView({ behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' })} className={`flex items-center gap-1.5 px-3 py-2 bg-red-600 hover:bg-red-700 text-white text-xs font-bold rounded-xl ${controls}`}><Film className="w-3.5 h-3.5" />วิดีโอพาทัวร์</button>}
@@ -158,8 +158,8 @@ export default function PropertyGallery({ id, title, images, videoUrl }: Propert
           <Image key={photo} src={photo} alt={`${title} - รูปที่ ${activeIndex + 1}`} fill priority unoptimized={photo.startsWith('data:')} className="object-cover gallery-image-enter motion-safe:transition-transform motion-safe:duration-500 motion-safe:group-hover:scale-[1.025]" draggable={false} />
         </button> : <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 text-slate-300"><Images className="w-10 h-10" /><p className="text-sm">ยังไม่มีภาพทรัพย์</p></div>}
         {total > 1 && <>
-          <button type="button" data-gallery-control aria-label="ภาพก่อนหน้า" onClick={() => changeImage(-1)} className={`absolute z-10 left-3 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-black/50 hover:bg-black/80 text-white flex items-center justify-center backdrop-blur-sm ${controls}`}><ChevronLeft className="w-6 h-6" /></button>
-          <button type="button" data-gallery-control aria-label="ภาพถัดไป" onClick={() => changeImage(1)} className={`absolute z-10 right-3 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-black/50 hover:bg-black/80 text-white flex items-center justify-center backdrop-blur-sm ${controls}`}><ChevronRight className="w-6 h-6" /></button>
+          <button type="button" data-gallery-control aria-label="ภาพก่อนหน้า" onClick={() => changeImage(-1)} className={`absolute z-10 left-3 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-black/50 hover:bg-black/80 text-white flex items-center justify-center backdrop-blur-xs ${controls}`}><ChevronLeft className="w-6 h-6" /></button>
+          <button type="button" data-gallery-control aria-label="ภาพถัดไป" onClick={() => changeImage(1)} className={`absolute z-10 right-3 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-black/50 hover:bg-black/80 text-white flex items-center justify-center backdrop-blur-xs ${controls}`}><ChevronRight className="w-6 h-6" /></button>
         </>}
         {!!total && <div className="absolute bottom-3 right-3 pointer-events-none px-3 py-1.5 bg-navy-950/80 backdrop-blur-md rounded-lg text-xs font-bold text-white border border-white/10">{activeIndex + 1} / {total}</div>}
       </div>

@@ -119,7 +119,7 @@ export default function PropertyFilterPanel({
               onClick={() => handleStatusChange(st.value)}
               className={`py-1.5 px-2 text-xs font-semibold rounded-lg transition-all ${
                 (filters.status || 'all') === st.value
-                  ? 'bg-navy-950 text-gold-400 shadow-sm'
+                  ? 'bg-navy-950 text-gold-400 shadow-xs'
                   : 'text-gray-600 hover:text-navy-900'
               }`}
             >
@@ -166,7 +166,7 @@ export default function PropertyFilterPanel({
         <select
           value={filters.district || 'all'}
           onChange={(e) => handleDistrictChange(e.target.value)}
-          className="w-full bg-gray-50 border border-gray-200 rounded-lg py-2.5 px-3 text-xs text-gray-800 focus:outline-none focus:ring-2 focus:ring-gold-500 transition-all cursor-pointer"
+          className="w-full bg-gray-50 border border-gray-200 rounded-lg py-2.5 px-3 text-xs text-gray-800 focus:outline-hidden focus:ring-2 focus:ring-gold-500 transition-all cursor-pointer"
         >
           <option value="all">ทุกทำเลในสงขลา</option>
           {DISTRICTS_LIST.map((dist) => (
@@ -195,7 +195,7 @@ export default function PropertyFilterPanel({
                 minPrice: e.target.value ? Number(e.target.value) : undefined,
               })
             }
-            className="w-full bg-gray-50 border border-gray-200 rounded-lg py-2 px-2.5 text-xs text-gray-800 focus:outline-none focus:ring-2 focus:ring-gold-500"
+            className="w-full bg-gray-50 border border-gray-200 rounded-lg py-2 px-2.5 text-xs text-gray-800 focus:outline-hidden focus:ring-2 focus:ring-gold-500"
           />
           <input
             type="number"
@@ -208,7 +208,7 @@ export default function PropertyFilterPanel({
                 maxPrice: e.target.value ? Number(e.target.value) : undefined,
               })
             }
-            className="w-full bg-gray-50 border border-gray-200 rounded-lg py-2 px-2.5 text-xs text-gray-800 focus:outline-none focus:ring-2 focus:ring-gold-500"
+            className="w-full bg-gray-50 border border-gray-200 rounded-lg py-2 px-2.5 text-xs text-gray-800 focus:outline-hidden focus:ring-2 focus:ring-gold-500"
           />
         </div>
       </div>
@@ -234,7 +234,7 @@ export default function PropertyFilterPanel({
                 onClick={() => handleBedroomsChange(rawVal)}
                 className={`py-1.5 text-xs font-semibold rounded-lg border text-center transition-all ${
                   isSelected
-                    ? 'bg-navy-950 text-gold-400 border-navy-950 shadow-sm'
+                    ? 'bg-navy-950 text-gold-400 border-navy-950 shadow-xs'
                     : 'border-gray-200 text-gray-600 hover:border-gray-300'
                 }`}
               >
@@ -266,7 +266,7 @@ export default function PropertyFilterPanel({
                 onClick={() => handleBathroomsChange(rawVal)}
                 className={`py-1.5 text-xs font-semibold rounded-lg border text-center transition-all ${
                   isSelected
-                    ? 'bg-navy-950 text-gold-400 border-navy-950 shadow-sm'
+                    ? 'bg-navy-950 text-gold-400 border-navy-950 shadow-xs'
                     : 'border-gray-200 text-gray-600 hover:border-gray-300'
                 }`}
               >
@@ -284,7 +284,7 @@ export default function PropertyFilterPanel({
           onClick={() => onChange({ ...filters, hasVideo: !filters.hasVideo })}
           className={`w-full py-2.5 px-3 rounded-xl border flex items-center justify-between text-xs font-bold transition-all ${
             filters.hasVideo
-              ? 'bg-red-50 border-red-300 text-red-700 shadow-sm'
+              ? 'bg-red-50 border-red-300 text-red-700 shadow-xs'
               : 'bg-gray-50 border-gray-200 text-gray-700 hover:bg-gray-100'
           }`}
         >
@@ -316,9 +316,9 @@ export default function PropertyFilterPanel({
                 className="flex items-center space-x-2 text-left w-full text-xs text-gray-700 hover:text-navy-950 group"
               >
                 {checked ? (
-                  <CheckSquare className="w-4 h-4 text-gold-600 flex-shrink-0" />
+                  <CheckSquare className="w-4 h-4 text-gold-600 shrink-0" />
                 ) : (
-                  <Square className="w-4 h-4 text-gray-300 group-hover:text-gray-400 flex-shrink-0" />
+                  <Square className="w-4 h-4 text-gray-300 group-hover:text-gray-400 shrink-0" />
                 )}
                 <span className={checked ? 'font-semibold text-navy-950' : ''}>
                   {opt}

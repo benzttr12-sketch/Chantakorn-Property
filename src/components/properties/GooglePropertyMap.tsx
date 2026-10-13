@@ -347,7 +347,7 @@ export default function GooglePropertyMap({
                     onMouseLeave={() => setHoveredPropertyId(null)}
                     className={`group relative flex items-center space-x-1.5 px-2.5 py-1 rounded-full cursor-pointer transition-all duration-300 transform select-none ${
                       isSelected
-                        ? 'bg-gradient-to-r from-gold-500 to-amber-400 text-navy-950 font-black scale-110 shadow-2xl ring-4 ring-gold-400/50 z-30'
+                        ? 'bg-linear-to-r/srgb from-gold-500 to-amber-400 text-navy-950 font-black scale-110 shadow-2xl ring-4 ring-gold-400/50 z-30'
                         : isHovered
                         ? 'bg-navy-900 text-gold-300 font-extrabold scale-105 shadow-xl ring-2 ring-white/60 z-20'
                         : isRent
@@ -436,7 +436,7 @@ export default function GooglePropertyMap({
                   {/* CTA Link to Details */}
                   <Link
                     href={propertyHref(activePopupProperty)}
-                    className="w-full py-1.5 px-3 bg-navy-950 hover:bg-gold-500 hover:text-navy-950 text-white text-xs font-bold rounded-lg flex items-center justify-center space-x-1.5 transition-colors shadow-sm"
+                    className="w-full py-1.5 px-3 bg-navy-950 hover:bg-gold-500 hover:text-navy-950 text-white text-xs font-bold rounded-lg flex items-center justify-center space-x-1.5 transition-colors shadow-xs"
                   >
                     <span>ดูรายละเอียดทรัพย์</span>
                     <ArrowRight className="w-3 h-3" />
@@ -474,7 +474,7 @@ export default function GooglePropertyMap({
                     setTargetCenter({ lat: Number(p.latitude), lng: Number(p.longitude), zoom: 15 });
                     if (onSelectProperty) onSelectProperty(p);
                   }}
-                  className={`flex-shrink-0 w-72 bg-white rounded-2xl p-2.5 shadow-2xl border transition-all cursor-pointer flex items-center space-x-3 ${
+                  className={`shrink-0 w-72 bg-white rounded-2xl p-2.5 shadow-2xl border transition-all cursor-pointer flex items-center space-x-3 ${
                     isSelected
                       ? 'border-gold-500 ring-2 ring-gold-400 scale-102 bg-gold-50/20'
                       : 'border-slate-200 hover:border-gold-300'

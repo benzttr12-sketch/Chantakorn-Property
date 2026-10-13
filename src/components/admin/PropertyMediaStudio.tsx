@@ -64,7 +64,7 @@ export default function PropertyMediaStudio({ property }: { property: Property |
     }
   }
 
-  const button = 'inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold text-navy-950 transition hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-500 disabled:opacity-50';
+  const button = 'inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold text-navy-950 transition hover:bg-slate-50 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-gold-500 disabled:opacity-50';
 
   return (
     <section className="space-y-5" aria-labelledby="media-studio-title">
@@ -79,7 +79,7 @@ export default function PropertyMediaStudio({ property }: { property: Property |
         </div>
         <div className="mt-5">
           <label htmlFor="media-brief" className="mb-2 block text-sm font-semibold text-navy-950">อยากนำเสนอทรัพย์แบบไหน</label>
-          <textarea id="media-brief" rows={3} maxLength={2500} value={prompt} onChange={(event) => setPrompt(event.target.value)} placeholder="เช่น เน้นขนาดที่ดิน ทางเข้า และบรรยากาศรอบทรัพย์ ใช้รูปที่อัปโหลดไว้" className="w-full rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm leading-6 focus:border-gold-500 focus:outline-none focus:ring-2 focus:ring-gold-500/20" />
+          <textarea id="media-brief" rows={3} maxLength={2500} value={prompt} onChange={(event) => setPrompt(event.target.value)} placeholder="เช่น เน้นขนาดที่ดิน ทางเข้า และบรรยากาศรอบทรัพย์ ใช้รูปที่อัปโหลดไว้" className="w-full rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm leading-6 focus:border-gold-500 focus:outline-hidden focus:ring-2 focus:ring-gold-500/20" />
         </div>
         {!property && <p className="mt-3 text-sm text-slate-600" role="status">เพิ่มหรือเลือกทรัพย์ก่อนเตรียมบรีฟสื่อ</p>}
       </div>
@@ -101,7 +101,7 @@ export default function PropertyMediaStudio({ property }: { property: Property |
             <button type="button" disabled={!property} onClick={() => copy(videoBrief, 'video')} className={button}>{copied === 'video' ? <Check className="size-4" /> : <Copy className="size-4" />}คัดลอกบรีฟวิดีโอ</button>
             <button type="button" disabled={!property} onClick={() => download(videoBrief, 'property-video-brief.txt')} className={button}><Download className="size-4" />ดาวน์โหลดบรีฟ</button>
           </div>
-          <button type="button" disabled={!!busy || !property} onClick={() => generate('generate_video')} className="mt-4 inline-flex min-h-11 items-center gap-2 text-sm font-semibold text-slate-600 underline underline-offset-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-500 disabled:opacity-50">{busy === 'generate_video' && <Loader2 className="size-4 animate-spin" />}ตรวจบริการสร้างวิดีโอ AI</button>
+          <button type="button" disabled={!!busy || !property} onClick={() => generate('generate_video')} className="mt-4 inline-flex min-h-11 items-center gap-2 text-sm font-semibold text-slate-600 underline underline-offset-4 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-gold-500 disabled:opacity-50">{busy === 'generate_video' && <Loader2 className="size-4 animate-spin" />}ตรวจบริการสร้างวิดีโอ AI</button>
         </div>
 
         <div className="rounded-2xl border border-slate-200 bg-white p-5 sm:p-6">
@@ -109,7 +109,7 @@ export default function PropertyMediaStudio({ property }: { property: Property |
           <h3 className="text-lg font-bold text-navy-950">แผนเตรียมภาพและการตกแต่ง</h3>
           <p className="mt-2 text-sm leading-6 text-slate-600">AI ช่วยเขียนคำแนะนำจากบรีฟที่ให้ ผลลัพธ์เป็นข้อความสำหรับทีมงานนำไปใช้จัดภาพ</p>
           <label htmlFor="media-style" className="mb-2 mt-4 block text-sm font-semibold text-navy-950">สไตล์ภาพ</label>
-          <select id="media-style" value={style} onChange={(event) => setStyle(event.target.value)} className="min-h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-gold-500">
+          <select id="media-style" value={style} onChange={(event) => setStyle(event.target.value)} className="min-h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm focus:outline-hidden focus:ring-2 focus:ring-gold-500">
             <option value="Modern Luxury">โมเดิร์น หรูเรียบ</option>
             <option value="Minimalist Scandinavian">มินิมอล อบอุ่น</option>
             <option value="Contemporary Thai-Bali">ร่วมสมัย ผ่อนคลาย</option>

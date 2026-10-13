@@ -30,6 +30,7 @@ Shared Firestore transactions limit both a caller and the whole application, inc
 
 ```text
 npm ci
+npm run audit:security
 npm run lint
 npm run typecheck
 npm test
@@ -42,4 +43,6 @@ Rules tests use a demo project and an isolated emulator; Java 21 is required. Th
 
 Configure and verify the server federation and deploy the new API before deploying `firestore.rules` to the explicit production project and named database from `firebase.json`. Do not use the Firebase CLI's unrelated global default project. Then verify the public catalog, image responses and staff access, and confirm that anonymous direct document reads/follower writes/inquiry writes are denied. If the server identity fails, repair federation rather than reopening the private collections.
 
-Dependency advisories requiring major framework/toolchain upgrades remain a separate release concern. An application-boundary fix or Ready deployment does not establish that every dependency is free of vulnerabilities, nor does a LINE API acceptance establish handset receipt.
+`audit:security` checks the complete npm dependency tree, including development tools, and CI rejects any reported vulnerability. Tailwind 4 removes the unpatched Braces dependency chain; its CSS compatibility rules preserve the previous theme and utility behavior. The browser floor is Safari 16.4+, Chrome 111+ and Firefox 128+.
+
+Scoped overrides keep patched Undici/gRPC versions inside Firebase 10 and remove the vulnerable Glob/Braces lint chain while retaining the existing Next lint rules. Recheck these overrides when upgrading their parent packages. A zero audit result describes the advisories known at the time of the check, and does not replace application-boundary testing. A Ready deployment or LINE API acceptance does not establish handset receipt.

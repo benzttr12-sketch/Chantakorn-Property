@@ -198,7 +198,7 @@ export default function MortgageCalculator({
                     step={10000}
                     value={propertyValue || ''}
                     onChange={(e) => setPropertyValue(Math.max(0, Number(e.target.value)))}
-                    className="w-32 sm:w-36 text-sm sm:text-base font-black text-navy-950 font-mono bg-transparent outline-none text-right"
+                    className="w-32 sm:w-36 text-sm sm:text-base font-black text-navy-950 font-mono bg-transparent outline-hidden text-right"
                     placeholder="50000"
                   />
                 </div>
@@ -346,7 +346,7 @@ export default function MortgageCalculator({
                     onClick={() => setContractYears(item.yrs)}
                     className={`py-2 px-2 text-center rounded-xl text-xs font-bold border transition-all ${
                       contractYears === item.yrs
-                        ? 'bg-navy-950 text-gold-400 border-navy-950 shadow-sm'
+                        ? 'bg-navy-950 text-gold-400 border-navy-950 shadow-xs'
                         : 'bg-gray-50 hover:bg-gray-100 text-gray-700 border-gray-200'
                     }`}
                   >
@@ -361,7 +361,7 @@ export default function MortgageCalculator({
           </div>
 
           {/* Results Summary Card (5 Cols) */}
-          <div className="lg:col-span-5 bg-gradient-to-br from-navy-950 via-navy-900 to-slate-900 text-white rounded-3xl p-6 sm:p-7 shadow-xl border border-navy-800 space-y-6">
+          <div className="lg:col-span-5 bg-linear-to-br/srgb from-navy-950 via-navy-900 to-slate-900 text-white rounded-3xl p-6 sm:p-7 shadow-xl border border-navy-800 space-y-6">
             <div>
               <span className="text-[11px] font-bold text-gold-400 uppercase tracking-wider block mb-1">
                 ดอกเบี้ยที่ต้องชำระต่อเดือน
@@ -425,7 +425,7 @@ export default function MortgageCalculator({
                 href="https://lin.ee/NMSe28T3"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-gold-500 to-gold-600 hover:from-gold-600 hover:to-gold-700 text-navy-950 font-bold text-xs sm:text-sm flex items-center justify-center space-x-2 shadow-lg hover:scale-[1.02] active:scale-[0.98] transition-all"
+                className="w-full py-3 px-4 rounded-xl bg-linear-to-r/srgb from-gold-500 to-gold-600 hover:from-gold-600 hover:to-gold-700 text-navy-950 font-bold text-xs sm:text-sm flex items-center justify-center space-x-2 shadow-lg hover:scale-[1.02] active:scale-[0.98] transition-all"
               >
                 <Sparkles className="w-4 h-4 fill-navy-950" />
                 <span>ส่งโฉนดประเมินวงเงินขายฝากด่วน (LINE)</span>
@@ -459,7 +459,7 @@ export default function MortgageCalculator({
                   step={10000}
                   value={customAppraisalValue || ''}
                   onChange={(e) => setCustomAppraisalValue(Math.max(0, Number(e.target.value)))}
-                  className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-2.5 text-sm font-mono font-bold text-navy-950 focus:bg-white focus:ring-2 focus:ring-navy-950 outline-none"
+                  className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-2.5 text-sm font-mono font-bold text-navy-950 focus:bg-white focus:ring-2 focus:ring-navy-950 outline-hidden"
                   placeholder="50000"
                 />
               </div>
@@ -495,7 +495,7 @@ export default function MortgageCalculator({
                   onClick={() => setHoldingYears('more_than_5')}
                   className={`p-3.5 rounded-xl border text-left transition-all ${
                     holdingYears === 'more_than_5'
-                      ? 'bg-navy-950 text-white border-navy-950 shadow-sm ring-2 ring-gold-400/50'
+                      ? 'bg-navy-950 text-white border-navy-950 shadow-xs ring-2 ring-gold-400/50'
                       : 'bg-gray-50 hover:bg-gray-100 text-gray-800 border-gray-200'
                   }`}
                 >
@@ -510,7 +510,7 @@ export default function MortgageCalculator({
                   onClick={() => setHoldingYears('less_than_5')}
                   className={`p-3.5 rounded-xl border text-left transition-all ${
                     holdingYears === 'less_than_5'
-                      ? 'bg-navy-950 text-white border-navy-950 shadow-sm ring-2 ring-gold-400/50'
+                      ? 'bg-navy-950 text-white border-navy-950 shadow-xs ring-2 ring-gold-400/50'
                       : 'bg-gray-50 hover:bg-gray-100 text-gray-800 border-gray-200'
                   }`}
                 >
@@ -556,7 +556,7 @@ export default function MortgageCalculator({
           </div>
 
           {/* Summary Card */}
-          <div className="lg:col-span-5 bg-gradient-to-br from-slate-900 via-navy-950 to-slate-950 text-white rounded-3xl p-6 sm:p-7 shadow-xl border border-navy-800 space-y-6">
+          <div className="lg:col-span-5 bg-linear-to-br/srgb from-slate-900 via-navy-950 to-slate-950 text-white rounded-3xl p-6 sm:p-7 shadow-xl border border-navy-800 space-y-6">
             <div>
               <span className="text-[11px] font-bold text-gold-400 uppercase tracking-wider block mb-1">
                 ประมาณการค่าใช้จ่ายรวม ณ สำนักงานที่ดิน
@@ -571,7 +571,7 @@ export default function MortgageCalculator({
 
             <div className="bg-white/10 backdrop-blur-md rounded-2xl p-4 border border-white/15 space-y-2 text-xs">
               <div className="flex items-center space-x-2 text-gold-300 font-bold">
-                <ShieldCheck className="w-4 h-4 text-gold-400 flex-shrink-0" />
+                <ShieldCheck className="w-4 h-4 text-gold-400 shrink-0" />
                 <span>คำแนะนำจาก Chantakorn Property</span>
               </div>
               <p className="text-[11px] text-gray-300 leading-relaxed">
@@ -584,7 +584,7 @@ export default function MortgageCalculator({
                 href="https://lin.ee/NMSe28T3"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-gold-500 to-gold-600 hover:from-gold-600 hover:to-gold-700 text-navy-950 font-bold text-xs sm:text-sm flex items-center justify-center space-x-2 shadow-lg transition-all"
+                className="w-full py-3 px-4 rounded-xl bg-linear-to-r/srgb from-gold-500 to-gold-600 hover:from-gold-600 hover:to-gold-700 text-navy-950 font-bold text-xs sm:text-sm flex items-center justify-center space-x-2 shadow-lg transition-all"
               >
                 <Sparkles className="w-4 h-4 fill-navy-950" />
                 <span>เช็กค่าธรรมเนียมที่ดินอย่างละเอียดฟรี</span>
@@ -658,7 +658,7 @@ export default function MortgageCalculator({
           </div>
 
           {/* Inquiry Form (5 Cols) */}
-          <div className="lg:col-span-5 bg-gradient-to-br from-navy-950 via-navy-900 to-slate-900 text-white rounded-3xl p-6 sm:p-7 shadow-xl border border-navy-800 space-y-5">
+          <div className="lg:col-span-5 bg-linear-to-br/srgb from-navy-950 via-navy-900 to-slate-900 text-white rounded-3xl p-6 sm:p-7 shadow-xl border border-navy-800 space-y-5">
             <div>
               <span className="text-[11px] font-bold text-gold-400 uppercase tracking-wider block mb-1">
                 ยื่นเรื่องประเมินขายฝากด่วน
@@ -691,7 +691,7 @@ export default function MortgageCalculator({
                     value={inquiryName}
                     onChange={(e) => setInquiryName(e.target.value)}
                     placeholder="เช่น คุณสมชาย"
-                    className="w-full bg-white/10 border border-white/15 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-gray-400 outline-none focus:ring-2 focus:ring-gold-400 focus:bg-white/15"
+                    className="w-full bg-white/10 border border-white/15 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-gray-400 outline-hidden focus:ring-2 focus:ring-gold-400 focus:bg-white/15"
                   />
                 </div>
 
@@ -705,13 +705,13 @@ export default function MortgageCalculator({
                     value={inquiryPhone}
                     onChange={(e) => setInquiryPhone(e.target.value)}
                     placeholder="08X-XXX-XXXX"
-                    className="w-full bg-white/10 border border-white/15 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-gray-400 outline-none focus:ring-2 focus:ring-gold-400 focus:bg-white/15"
+                    className="w-full bg-white/10 border border-white/15 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-gray-400 outline-hidden focus:ring-2 focus:ring-gold-400 focus:bg-white/15"
                   />
                 </div>
 
                 <button
                   type="submit"
-                  className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-gold-500 to-gold-600 hover:from-gold-600 hover:to-gold-700 text-navy-950 font-bold text-xs sm:text-sm flex items-center justify-center space-x-2 shadow-lg transition-all cursor-pointer"
+                  className="w-full py-3 px-4 rounded-xl bg-linear-to-r/srgb from-gold-500 to-gold-600 hover:from-gold-600 hover:to-gold-700 text-navy-950 font-bold text-xs sm:text-sm flex items-center justify-center space-x-2 shadow-lg transition-all cursor-pointer"
                 >
                   <Send className="w-4 h-4" />
                   <span>ส่งข้อมูลขอประเมินวงเงิน</span>

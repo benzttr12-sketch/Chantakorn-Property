@@ -233,7 +233,7 @@ export default function ViewingBookingSection({ initialAgent, initialPropertyTit
                   <select
                     value={selectedProperty}
                     onChange={(e) => setSelectedProperty(e.target.value)}
-                    className="w-full px-4 py-3 bg-slate-50 border border-slate-300 rounded-xl text-xs sm:text-sm font-medium text-navy-950 focus:ring-2 focus:ring-gold-400 focus:outline-none"
+                    className="w-full px-4 py-3 bg-slate-50 border border-slate-300 rounded-xl text-xs sm:text-sm font-medium text-navy-950 focus:ring-2 focus:ring-gold-400 focus:outline-hidden"
                   >
                     <option value="custom">-- นัดหมายพาชมหลายหลัง / ให้แนะนำตามงบประมาณ --</option>
                     {properties.map((p) => {
@@ -256,7 +256,7 @@ export default function ViewingBookingSection({ initialAgent, initialPropertyTit
                       placeholder="เช่น สนใจบ้านเดี่ยวโซน ม.อ. หรือสนามบิน งบ 3-5 ล้าน"
                       value={customPropertyDesc}
                       onChange={(e) => setCustomPropertyDesc(e.target.value)}
-                      className="w-full px-4 py-3 bg-slate-50 border border-slate-300 rounded-xl text-xs sm:text-sm text-navy-950 focus:ring-2 focus:ring-gold-400 focus:outline-none"
+                      className="w-full px-4 py-3 bg-slate-50 border border-slate-300 rounded-xl text-xs sm:text-sm text-navy-950 focus:ring-2 focus:ring-gold-400 focus:outline-hidden"
                     />
                   )}
                 </div>
@@ -277,7 +277,7 @@ export default function ViewingBookingSection({ initialAgent, initialPropertyTit
                       required
                       value={selectedDate}
                       onChange={(e) => setSelectedDate(e.target.value)}
-                      className="w-full px-4 py-3 bg-slate-50 border border-slate-300 rounded-xl text-xs sm:text-sm font-bold text-navy-950 focus:ring-2 focus:ring-gold-400 focus:outline-none cursor-pointer"
+                      className="w-full px-4 py-3 bg-slate-50 border border-slate-300 rounded-xl text-xs sm:text-sm font-bold text-navy-950 focus:ring-2 focus:ring-gold-400 focus:outline-hidden cursor-pointer"
                     />
                   </div>
 
@@ -375,7 +375,7 @@ export default function ViewingBookingSection({ initialAgent, initialPropertyTit
                       placeholder="เช่น คุณสมชาย สุขเกษม"
                       value={customerName}
                       onChange={(e) => setCustomerName(e.target.value)}
-                      className="w-full px-4 py-3 bg-slate-50 border border-slate-300 rounded-xl text-xs sm:text-sm text-navy-950 focus:ring-2 focus:ring-gold-400 focus:outline-none"
+                      className="w-full px-4 py-3 bg-slate-50 border border-slate-300 rounded-xl text-xs sm:text-sm text-navy-950 focus:ring-2 focus:ring-gold-400 focus:outline-hidden"
                     />
                   </div>
 
@@ -387,7 +387,7 @@ export default function ViewingBookingSection({ initialAgent, initialPropertyTit
                       placeholder="เช่น 081-234-5678"
                       value={customerPhone}
                       onChange={(e) => setCustomerPhone(e.target.value)}
-                      className="w-full px-4 py-3 bg-slate-50 border border-slate-300 rounded-xl text-xs sm:text-sm text-navy-950 font-mono focus:ring-2 focus:ring-gold-400 focus:outline-none"
+                      className="w-full px-4 py-3 bg-slate-50 border border-slate-300 rounded-xl text-xs sm:text-sm text-navy-950 font-mono focus:ring-2 focus:ring-gold-400 focus:outline-hidden"
                     />
                   </div>
 
@@ -398,7 +398,7 @@ export default function ViewingBookingSection({ initialAgent, initialPropertyTit
                       placeholder="เช่น somchai_line"
                       value={customerLine}
                       onChange={(e) => setCustomerLine(e.target.value)}
-                      className="w-full px-4 py-3 bg-slate-50 border border-slate-300 rounded-xl text-xs sm:text-sm text-navy-950 focus:ring-2 focus:ring-gold-400 focus:outline-none"
+                      className="w-full px-4 py-3 bg-slate-50 border border-slate-300 rounded-xl text-xs sm:text-sm text-navy-950 focus:ring-2 focus:ring-gold-400 focus:outline-hidden"
                     />
                   </div>
                 </div>
@@ -410,7 +410,7 @@ export default function ViewingBookingSection({ initialAgent, initialPropertyTit
                     placeholder="เช่น สะดวกเริ่มเดินทางจากเซ็นทรัลหาดใหญ่ หรือต้องการสอบถามเรื่องการขอสินเชื่อธนาคารด้วย"
                     value={notes}
                     onChange={(e) => setNotes(e.target.value)}
-                    className="w-full px-4 py-3 bg-slate-50 border border-slate-300 rounded-xl text-xs sm:text-sm text-navy-950 focus:ring-2 focus:ring-gold-400 focus:outline-none"
+                    className="w-full px-4 py-3 bg-slate-50 border border-slate-300 rounded-xl text-xs sm:text-sm text-navy-950 focus:ring-2 focus:ring-gold-400 focus:outline-hidden"
                   />
                 </div>
               </div>
@@ -425,7 +425,7 @@ export default function ViewingBookingSection({ initialAgent, initialPropertyTit
                 <button
                   type="submit"
                   disabled={isSubmitting}
-                  className="px-8 py-4 bg-gradient-to-r from-gold-400 via-amber-500 to-gold-400 hover:from-gold-300 hover:to-gold-400 text-navy-950 font-black text-sm sm:text-base rounded-2xl shadow-xl flex items-center justify-center space-x-2 transition-all transform hover:-translate-y-0.5 cursor-pointer disabled:opacity-50"
+                  className="px-8 py-4 bg-linear-to-r/srgb from-gold-400 via-amber-500 to-gold-400 hover:from-gold-300 hover:to-gold-400 text-navy-950 font-black text-sm sm:text-base rounded-2xl shadow-xl flex items-center justify-center space-x-2 transition-all transform hover:-translate-y-0.5 cursor-pointer disabled:opacity-50"
                 >
                   {isSubmitting ? (
                     <span>กำลังบันทึกการนัดหมาย...</span>

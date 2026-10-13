@@ -147,7 +147,7 @@ export default function FeaturedAgents({ onSelectAgentForBooking }: FeaturedAgen
           {agents.map((agent) => (
             <div
               key={agent.id}
-              className="w-[280px] sm:w-[320px] shrink-0 snap-start bg-white rounded-2xl border border-slate-200/90 hover:border-gold-400/80 shadow-sm hover:shadow-md transition-all flex flex-col justify-between overflow-hidden group"
+              className="w-[280px] sm:w-[320px] shrink-0 snap-start bg-white rounded-2xl border border-slate-200/90 hover:border-gold-400/80 shadow-xs hover:shadow-md transition-all flex flex-col justify-between overflow-hidden group"
             >
               {/* Compact Card Header */}
               <div className="p-4 space-y-3">
@@ -167,7 +167,7 @@ export default function FeaturedAgents({ onSelectAgentForBooking }: FeaturedAgen
                   {/* Name & Title */}
                   <div className="overflow-hidden flex-1 min-w-0">
                     <div className="flex items-center space-x-1.5 mb-0.5">
-                      <span className="text-[10px] font-bold px-1.5 py-0.2 rounded bg-navy-950 text-gold-400 shrink-0">
+                      <span className="text-[10px] font-bold px-1.5 py-0.2 rounded-sm bg-navy-950 text-gold-400 shrink-0">
                         {agent.rank || 'นายหน้า'}
                       </span>
                       <div className="flex items-center text-amber-500 text-[11px] font-bold font-mono">

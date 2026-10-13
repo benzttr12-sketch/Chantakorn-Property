@@ -162,12 +162,12 @@ export default function CustomerReviewsSection() {
             ref={scrollRef}
             tabIndex={0}
             aria-label="รีวิวจากลูกค้า เลื่อนเพื่อดูเพิ่มเติม"
-            className="flex snap-x snap-mandatory gap-5 overflow-x-auto pb-4 pt-1 focus-visible:rounded-2xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-400"
+            className="flex snap-x snap-mandatory gap-5 overflow-x-auto pb-4 pt-1 focus-visible:rounded-2xl focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-gold-400"
           >
             {reviews.map((review) => (
               <article
                 key={review.id}
-                className="flex w-[min(340px,85vw)] shrink-0 snap-start flex-col justify-between gap-5 rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:w-[350px] sm:p-6"
+                className="flex w-[min(340px,85vw)] shrink-0 snap-start flex-col justify-between gap-5 rounded-3xl border border-slate-200 bg-white p-5 shadow-xs sm:w-[350px] sm:p-6"
               >
                 <div className="space-y-4">
                   <div className="flex flex-wrap items-center justify-between gap-2">

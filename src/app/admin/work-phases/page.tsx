@@ -149,7 +149,7 @@ export default function WorkPhasesAdminPage() {
       )}
 
       {/* Header Banner */}
-      <div className="bg-gradient-to-r from-navy-950 via-navy-900 to-navy-950 text-white rounded-3xl p-6 sm:p-8 border border-navy-800 shadow-md flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div className="bg-linear-to-r/srgb from-navy-950 via-navy-900 to-navy-950 text-white rounded-3xl p-6 sm:p-8 border border-navy-800 shadow-md flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <div className="flex items-center space-x-2 text-gold-400 text-xs font-bold uppercase tracking-widest mb-1">
             <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
@@ -166,7 +166,7 @@ export default function WorkPhasesAdminPage() {
         <button
           type="button"
           onClick={() => setCreateModalOpen(true)}
-          className="px-5 py-3 rounded-2xl bg-gradient-to-r from-gold-400 to-gold-500 hover:from-gold-500 hover:to-gold-600 text-navy-950 font-extrabold text-xs shadow-lg flex items-center justify-center gap-2 transition-all active:scale-95 shrink-0"
+          className="px-5 py-3 rounded-2xl bg-linear-to-r/srgb from-gold-400 to-gold-500 hover:from-gold-500 hover:to-gold-600 text-navy-950 font-extrabold text-xs shadow-lg flex items-center justify-center gap-2 transition-all active:scale-95 shrink-0"
         >
           <PlusCircle className="w-4 h-4" />
           <span>ลงทะเบียนงานเฟสใหม่</span>
@@ -216,14 +216,14 @@ export default function WorkPhasesAdminPage() {
       </div>
 
       {/* Search Input */}
-      <div className="bg-white rounded-2xl p-4 border border-surface-border shadow-sm flex items-center gap-3">
+      <div className="bg-white rounded-2xl p-4 border border-surface-border shadow-xs flex items-center gap-3">
         <Search className="w-4 h-4 text-gray-400 shrink-0" />
         <input
           type="text"
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
           placeholder="ค้นหาตามชื่อรหัสงาน, ชื่อทรัพย์, ชื่อลูกค้า หรือชื่อนายหน้าผู้รับผิดชอบ..."
-          className="w-full text-xs font-medium outline-none bg-transparent"
+          className="w-full text-xs font-medium outline-hidden bg-transparent"
         />
         {searchQuery && (
           <button
@@ -241,7 +241,7 @@ export default function WorkPhasesAdminPage() {
           กำลังโหลดข้อมูลเฟสงาน...
         </div>
       ) : filteredJobs.length === 0 ? (
-        <div className="bg-white rounded-3xl p-12 text-center border border-surface-border shadow-sm space-y-4">
+        <div className="bg-white rounded-3xl p-12 text-center border border-surface-border shadow-xs space-y-4">
           <Layers className="w-12 h-12 text-gray-300 mx-auto" />
           <h3 className="text-base font-bold text-navy-950">ยังไม่มีงานติดตามเฟสในส่วนนี้</h3>
           <p className="text-xs text-gray-500 max-w-md mx-auto">
@@ -267,7 +267,7 @@ export default function WorkPhasesAdminPage() {
             return (
               <div
                 key={job.id}
-                className={`bg-white rounded-3xl border transition-all shadow-sm hover:shadow-md overflow-hidden ${
+                className={`bg-white rounded-3xl border transition-all shadow-xs hover:shadow-md overflow-hidden ${
                   isDone ? 'border-emerald-200' : 'border-surface-border'
                 }`}
               >
@@ -313,7 +313,7 @@ export default function WorkPhasesAdminPage() {
                       <button
                         type="button"
                         onClick={() => handleOpenTransitionModal(job)}
-                        className="px-5 py-3 rounded-2xl bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-700 hover:to-emerald-800 text-white font-extrabold text-xs shadow-md flex items-center justify-center gap-2 transition-all active:scale-95 shrink-0"
+                        className="px-5 py-3 rounded-2xl bg-linear-to-r/srgb from-emerald-600 to-emerald-700 hover:from-emerald-700 hover:to-emerald-800 text-white font-extrabold text-xs shadow-md flex items-center justify-center gap-2 transition-all active:scale-95 shrink-0"
                       >
                         <Sparkles className="w-4 h-4 text-gold-300" />
                         <span>✅ ลงงานเสร็จ & ต่อเฟสถัดไปทันที</span>
@@ -323,7 +323,7 @@ export default function WorkPhasesAdminPage() {
 
                   {/* Active Phase Banner */}
                   {!isDone && activePhase && (
-                    <div className="p-4 rounded-2xl bg-gradient-to-r from-navy-950 to-navy-900 text-white flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-inner">
+                    <div className="p-4 rounded-2xl bg-linear-to-r/srgb from-navy-950 to-navy-900 text-white flex flex-col sm:flex-row sm:items-center justify-between gap-3 inset-shadow-sm">
                       <div className="space-y-1">
                         <span className="text-[10px] font-bold text-gold-400 uppercase tracking-wider flex items-center gap-1">
                           <span className="w-1.5 h-1.5 rounded-full bg-gold-400 animate-ping"></span>
@@ -363,7 +363,7 @@ export default function WorkPhasesAdminPage() {
                             isCompleted
                               ? 'bg-emerald-50 border-emerald-300 text-emerald-900'
                               : isActive
-                              ? 'bg-navy-950 border-navy-900 text-white shadow-sm ring-1 ring-gold-400/50'
+                              ? 'bg-navy-950 border-navy-900 text-white shadow-xs ring-1 ring-gold-400/50'
                               : 'bg-gray-50 border-gray-200 text-gray-400'
                           }`}
                         >
@@ -515,7 +515,7 @@ export default function WorkPhasesAdminPage() {
 
       {/* Modal: Create New Work Job */}
       {createModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/75 backdrop-blur-sm animate-in fade-in duration-200">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/75 backdrop-blur-xs animate-in fade-in duration-200">
           <div className="relative w-full max-w-lg bg-white rounded-3xl shadow-2xl border border-surface-border p-6 sm:p-8 space-y-5">
             <div className="flex items-center justify-between border-b border-gray-100 pb-3">
               <h3 className="text-lg font-extrabold text-navy-950 flex items-center gap-2">
@@ -542,7 +542,7 @@ export default function WorkPhasesAdminPage() {
                   value={newTitle}
                   onChange={(e) => setNewTitle(e.target.value)}
                   placeholder="เช่น: ฝากขายบ้านเดี่ยว 2 ชั้น คอหงส์ หรือ งานประเมินที่ดินควนลัง"
-                  className="w-full p-3 rounded-xl border border-gray-300 text-xs font-medium focus:ring-2 focus:ring-navy-950 outline-none"
+                  className="w-full p-3 rounded-xl border border-gray-300 text-xs font-medium focus:ring-2 focus:ring-navy-950 outline-hidden"
                 />
               </div>
 
@@ -554,7 +554,7 @@ export default function WorkPhasesAdminPage() {
                     value={newCustomerName}
                     onChange={(e) => setNewCustomerName(e.target.value)}
                     placeholder="คุณสมชาย ใจดี"
-                    className="w-full p-2.5 rounded-xl border border-gray-300 text-xs outline-none"
+                    className="w-full p-2.5 rounded-xl border border-gray-300 text-xs outline-hidden"
                   />
                 </div>
                 <div className="space-y-1">
@@ -564,7 +564,7 @@ export default function WorkPhasesAdminPage() {
                     value={newCustomerPhone}
                     onChange={(e) => setNewCustomerPhone(e.target.value)}
                     placeholder="081-234-5678"
-                    className="w-full p-2.5 rounded-xl border border-gray-300 text-xs outline-none"
+                    className="w-full p-2.5 rounded-xl border border-gray-300 text-xs outline-hidden"
                   />
                 </div>
               </div>
@@ -574,7 +574,7 @@ export default function WorkPhasesAdminPage() {
                 <select
                   value={newAssignedAgent}
                   onChange={(e) => setNewAssignedAgent(e.target.value)}
-                  className="w-full p-2.5 rounded-xl border border-gray-300 text-xs outline-none"
+                  className="w-full p-2.5 rounded-xl border border-gray-300 text-xs outline-hidden"
                 >
                   <option value="คุณจันทรกร (Admin)">คุณจันทรกร (Admin)</option>
                   <option value="คุณพิชชา (Agent)">คุณพิชชา (Agent)</option>
@@ -590,7 +590,7 @@ export default function WorkPhasesAdminPage() {
                   onChange={(e) => setNewInitialNotes(e.target.value)}
                   placeholder="รายละเอียดเอกสารหรือบันทึกย่อเบื้องต้น..."
                   rows={2}
-                  className="w-full p-2.5 rounded-xl border border-gray-300 text-xs outline-none"
+                  className="w-full p-2.5 rounded-xl border border-gray-300 text-xs outline-hidden"
                 />
               </div>
 
