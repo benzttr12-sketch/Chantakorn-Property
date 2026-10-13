@@ -99,7 +99,19 @@
   },
   "overrides": {
     "postcss": "$postcss",
-    "firebase": {
+    "@firebase/auth": {
+      "undici": "6.29.0"
+    },
+    "@firebase/auth-compat": {
+      "undici": "6.29.0"
+    },
+    "@firebase/functions": {
+      "undici": "6.29.0"
+    },
+    "@firebase/storage": {
+      "undici": "6.29.0"
+    },
+    "@firebase/firestore": {
       "undici": "6.29.0",
       "@grpc/grpc-js": "1.14.5"
     },
