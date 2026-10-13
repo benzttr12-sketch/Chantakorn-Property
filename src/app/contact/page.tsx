@@ -83,7 +83,7 @@ export default function ContactPage() {
 
               <div className="space-y-4 text-sm">
                 <div className="flex items-start space-x-3.5">
-                  <div className="w-10 h-10 rounded-xl bg-gold-50 text-gold-600 flex items-center justify-center flex-shrink-0">
+                  <div className="w-10 h-10 rounded-xl bg-gold-50 text-gold-600 flex items-center justify-center shrink-0">
                     <MapPin className="w-5 h-5" />
                   </div>
                   <div>
@@ -95,7 +95,7 @@ export default function ContactPage() {
                 </div>
 
                 <div className="flex items-start space-x-3.5">
-                  <div className="w-10 h-10 rounded-xl bg-gold-50 text-gold-600 flex items-center justify-center flex-shrink-0">
+                  <div className="w-10 h-10 rounded-xl bg-gold-50 text-gold-600 flex items-center justify-center shrink-0">
                     <Phone className="w-5 h-5" />
                   </div>
                   <div>
@@ -107,7 +107,7 @@ export default function ContactPage() {
                 </div>
 
                 <div className="flex items-start space-x-3.5">
-                  <div className="w-10 h-10 rounded-xl bg-emerald-50 text-[#06C755] flex items-center justify-center flex-shrink-0">
+                  <div className="w-10 h-10 rounded-xl bg-emerald-50 text-[#06C755] flex items-center justify-center shrink-0">
                     <MessageCircle className="w-5 h-5 fill-current" />
                   </div>
                   <div>
@@ -124,7 +124,7 @@ export default function ContactPage() {
                 </div>
 
                 <div className="flex items-start space-x-3.5">
-                  <div className="w-10 h-10 rounded-xl bg-blue-50 text-[#1877F2] flex items-center justify-center flex-shrink-0">
+                  <div className="w-10 h-10 rounded-xl bg-blue-50 text-[#1877F2] flex items-center justify-center shrink-0">
                     <Facebook className="w-5 h-5 fill-current" />
                   </div>
                   <div>
@@ -141,7 +141,7 @@ export default function ContactPage() {
                 </div>
 
                 <div className="flex items-start space-x-3.5">
-                  <div className="w-10 h-10 rounded-xl bg-navy-50 text-navy-900 flex items-center justify-center flex-shrink-0">
+                  <div className="w-10 h-10 rounded-xl bg-navy-50 text-navy-900 flex items-center justify-center shrink-0">
                     <Mail className="w-5 h-5" />
                   </div>
                   <div>
@@ -153,7 +153,7 @@ export default function ContactPage() {
                 </div>
 
                 <div className="flex items-start space-x-3.5">
-                  <div className="w-10 h-10 rounded-xl bg-gray-100 text-gray-700 flex items-center justify-center flex-shrink-0">
+                  <div className="w-10 h-10 rounded-xl bg-gray-100 text-gray-700 flex items-center justify-center shrink-0">
                     <Clock className="w-5 h-5" />
                   </div>
                   <div>
@@ -222,7 +222,7 @@ export default function ContactPage() {
                         placeholder="เช่น คุณวิชัย รัตนศักดิ์"
                         value={name}
                         onChange={(e) => setName(e.target.value)}
-                        className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3 text-xs text-gray-900 focus:bg-white focus:ring-2 focus:ring-gold-500 outline-none"
+                        className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3 text-xs text-gray-900 focus:bg-white focus:ring-2 focus:ring-gold-500 outline-hidden"
                       />
                     </div>
 
@@ -236,7 +236,7 @@ export default function ContactPage() {
                         placeholder="081-xxx-xxxx"
                         value={phone}
                         onChange={(e) => setPhone(e.target.value)}
-                        className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3 text-xs text-gray-900 focus:bg-white focus:ring-2 focus:ring-gold-500 outline-none"
+                        className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3 text-xs text-gray-900 focus:bg-white focus:ring-2 focus:ring-gold-500 outline-hidden"
                       />
                     </div>
                   </div>
@@ -251,7 +251,7 @@ export default function ContactPage() {
                         placeholder="ไอดีไลน์ (ถ้ามี)"
                         value={lineId}
                         onChange={(e) => setLineId(e.target.value)}
-                        className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3 text-xs text-gray-900 focus:bg-white focus:ring-2 focus:ring-gold-500 outline-none"
+                        className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3 text-xs text-gray-900 focus:bg-white focus:ring-2 focus:ring-gold-500 outline-hidden"
                       />
                     </div>
 
@@ -264,7 +264,7 @@ export default function ContactPage() {
                         placeholder="name@example.com"
                         value={email}
                         onChange={(e) => setEmail(e.target.value)}
-                        className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3 text-xs text-gray-900 focus:bg-white focus:ring-2 focus:ring-gold-500 outline-none"
+                        className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3 text-xs text-gray-900 focus:bg-white focus:ring-2 focus:ring-gold-500 outline-hidden"
                       />
                     </div>
                   </div>
@@ -276,7 +276,7 @@ export default function ContactPage() {
                     <select
                       value={subject}
                       onChange={(e) => setSubject(e.target.value)}
-                      className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3 text-xs text-gray-900 font-medium cursor-pointer focus:bg-white focus:ring-2 focus:ring-gold-500 outline-none"
+                      className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3 text-xs text-gray-900 font-medium cursor-pointer focus:bg-white focus:ring-2 focus:ring-gold-500 outline-hidden"
                     >
                       <option value="สนใจซื้ออสังหาริมทรัพย์">สนใจซื้ออสังหาริมทรัพย์</option>
                       <option value="ต้องการเช่าบ้าน / คอนโด">ต้องการเช่าบ้าน / คอนโด</option>
@@ -297,7 +297,7 @@ export default function ContactPage() {
                       placeholder="ระบุความต้องการ ทำเล งบประมาณ หรือข้อมูลที่ต้องการสอบถาม..."
                       value={message}
                       onChange={(e) => setMessage(e.target.value)}
-                      className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3 text-xs text-gray-900 focus:bg-white focus:ring-2 focus:ring-gold-500 outline-none resize-none"
+                      className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3 text-xs text-gray-900 focus:bg-white focus:ring-2 focus:ring-gold-500 outline-hidden resize-none"
                     />
                   </div>
 

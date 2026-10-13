@@ -104,7 +104,7 @@ export default function PropertyCategories() {
               <Link
                 key={category.type}
                 href={`/properties?type=${category.type}`}
-                className="group flex flex-col overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm outline-none hover:border-gold-400 hover:shadow-card-hover focus-visible:border-gold-500 focus-visible:ring-4 focus-visible:ring-gold-200 motion-safe:transition-[transform,box-shadow,border-color] motion-safe:duration-300 motion-safe:hover:-translate-y-1 motion-reduce:transition-none"
+                className="group flex flex-col overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-xs outline-hidden hover:border-gold-400 hover:shadow-card-hover focus-visible:border-gold-500 focus-visible:ring-4 focus-visible:ring-gold-200 motion-safe:transition-[transform,translate,box-shadow,border-color] motion-safe:duration-300 motion-safe:hover:-translate-y-1 motion-reduce:transition-none"
               >
                 <div className="relative aspect-[16/9] overflow-hidden bg-navy-950">
                   <Image
@@ -116,8 +116,8 @@ export default function PropertyCategories() {
                     className="object-cover motion-safe:transition-transform motion-safe:duration-700 motion-safe:group-hover:scale-105 motion-safe:group-focus-visible:scale-105 motion-reduce:transition-none"
                     referrerPolicy="no-referrer"
                   />
-                  <div aria-hidden="true" className="absolute inset-0 bg-gradient-to-t from-navy-950/70 via-transparent to-navy-950/15" />
-                  <span aria-hidden="true" className="absolute left-4 top-4 flex h-9 w-9 items-center justify-center rounded-full border border-white/40 bg-navy-950/40 text-xs font-semibold tabular-nums text-white backdrop-blur-sm">
+                  <div aria-hidden="true" className="absolute inset-0 bg-linear-to-t/srgb from-navy-950/70 via-transparent to-navy-950/15" />
+                  <span aria-hidden="true" className="absolute left-4 top-4 flex h-9 w-9 items-center justify-center rounded-full border border-white/40 bg-navy-950/40 text-xs font-semibold tabular-nums text-white backdrop-blur-xs">
                     {String(index + 1).padStart(2, '0')}
                   </span>
                   <span className="absolute bottom-4 left-5 text-xs font-medium text-white/90">{category.location}</span>

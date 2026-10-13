@@ -173,7 +173,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     const failed = sessionState === 'error';
     return (
       <main className="admin-workspace flex min-h-[100dvh] items-center justify-center bg-slate-50 p-6">
-        <div className="w-full max-w-md rounded-3xl border border-slate-200 bg-white p-7 text-center shadow-sm">
+        <div className="w-full max-w-md rounded-3xl border border-slate-200 bg-white p-7 text-center shadow-xs">
           <div className="mx-auto mb-5 flex h-14 w-14 items-center justify-center rounded-2xl bg-navy-50 text-navy-900">
             {denied || failed ? <ShieldAlert className="h-7 w-7" /> : <LoaderCircle className="h-7 w-7 animate-spin motion-reduce:animate-none" />}
           </div>

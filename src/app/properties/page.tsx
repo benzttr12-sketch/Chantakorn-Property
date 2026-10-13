@@ -151,7 +151,7 @@ function PropertiesContent() {
                 placeholder="ค้นหาชื่อโครงการ, ถนน, หรือทำเล เช่น เซ็นทรัล, ควนลัง..."
                 value={filters.searchQuery || ''}
                 onChange={(e) => setFilters({ ...filters, searchQuery: e.target.value })}
-                className="w-full bg-navy-900 border border-navy-700 text-white text-xs sm:text-sm rounded-xl pl-10 pr-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-gold-500 placeholder-gray-400"
+                className="w-full bg-navy-900 border border-navy-700 text-white text-xs sm:text-sm rounded-xl pl-10 pr-4 py-2.5 focus:outline-hidden focus:ring-2 focus:ring-gold-500 placeholder-gray-400"
               />
               <Search className="w-4 h-4 text-gray-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
               {filters.searchQuery && (
@@ -168,15 +168,15 @@ function PropertiesContent() {
 
           {/* Quick Filter Horizontal Scrollbar */}
           <div className="mt-5 pt-4 border-t border-navy-800/80 flex items-center gap-2 overflow-x-auto pb-1 text-xs no-scrollbar">
-            <span className="text-gray-400 text-xs font-semibold flex-shrink-0 mr-1">กรองด่วน:</span>
+            <span className="text-gray-400 text-xs font-semibold shrink-0 mr-1">กรองด่วน:</span>
 
             {/* Status pills */}
             <button
               type="button"
               onClick={() => setFilters({ ...filters, status: 'all' })}
-              className={`px-3 py-1.5 rounded-xl font-bold flex-shrink-0 transition-all ${
+              className={`px-3 py-1.5 rounded-xl font-bold shrink-0 transition-all ${
                 filters.status === 'all'
-                  ? 'bg-gold-500 text-navy-950 shadow-sm'
+                  ? 'bg-gold-500 text-navy-950 shadow-xs'
                   : 'bg-navy-900 text-gray-300 hover:bg-navy-800'
               }`}
             >
@@ -185,9 +185,9 @@ function PropertiesContent() {
             <button
               type="button"
               onClick={() => setFilters({ ...filters, status: 'sale' })}
-              className={`px-3 py-1.5 rounded-xl font-bold flex-shrink-0 transition-all ${
+              className={`px-3 py-1.5 rounded-xl font-bold shrink-0 transition-all ${
                 filters.status === 'sale'
-                  ? 'bg-gold-500 text-navy-950 shadow-sm'
+                  ? 'bg-gold-500 text-navy-950 shadow-xs'
                   : 'bg-navy-900 text-gray-300 hover:bg-navy-800'
               }`}
             >
@@ -196,9 +196,9 @@ function PropertiesContent() {
             <button
               type="button"
               onClick={() => setFilters({ ...filters, status: 'rent' })}
-              className={`px-3 py-1.5 rounded-xl font-bold flex-shrink-0 transition-all ${
+              className={`px-3 py-1.5 rounded-xl font-bold shrink-0 transition-all ${
                 filters.status === 'rent'
-                  ? 'bg-gold-500 text-navy-950 shadow-sm'
+                  ? 'bg-gold-500 text-navy-950 shadow-xs'
                   : 'bg-navy-900 text-gray-300 hover:bg-navy-800'
               }`}
             >
@@ -209,7 +209,7 @@ function PropertiesContent() {
             <button
               type="button"
               onClick={() => setFilters({ ...filters, hasVideo: !filters.hasVideo })}
-              className={`px-3 py-1.5 rounded-xl font-bold flex-shrink-0 transition-all flex items-center space-x-1.5 ${
+              className={`px-3 py-1.5 rounded-xl font-bold shrink-0 transition-all flex items-center space-x-1.5 ${
                 filters.hasVideo
                   ? 'bg-red-600 text-white shadow-md ring-2 ring-red-400'
                   : 'bg-navy-900 text-red-300 hover:bg-navy-850 hover:text-white border border-red-500/40'
@@ -219,7 +219,7 @@ function PropertiesContent() {
               <span>วิดีโอพาทัวร์ 🎬</span>
             </button>
 
-            <span className="text-navy-700 mx-1 flex-shrink-0">|</span>
+            <span className="text-navy-700 mx-1 shrink-0">|</span>
 
             {/* Popular property types */}
             {[
@@ -232,9 +232,9 @@ function PropertiesContent() {
                 key={item.val}
                 type="button"
                 onClick={() => setFilters({ ...filters, type: filters.type === item.val ? 'all' : item.val as PropertyType })}
-                className={`px-3 py-1.5 rounded-xl font-medium flex-shrink-0 transition-all ${
+                className={`px-3 py-1.5 rounded-xl font-medium shrink-0 transition-all ${
                   filters.type === item.val
-                    ? 'bg-gold-400 text-navy-950 font-bold shadow-sm'
+                    ? 'bg-gold-400 text-navy-950 font-bold shadow-xs'
                     : 'bg-navy-900 text-gray-300 hover:bg-navy-800'
                 }`}
               >
@@ -242,7 +242,7 @@ function PropertiesContent() {
               </button>
             ))}
 
-            <span className="text-navy-700 mx-1 flex-shrink-0">|</span>
+            <span className="text-navy-700 mx-1 shrink-0">|</span>
 
             {/* Popular districts */}
             {['หาดใหญ่', 'ควนลัง', 'คลองแห', 'บ้านพรุ', 'เมืองสงขลา', 'สะเดา', 'สิงหนคร'].map(dist => (
@@ -250,9 +250,9 @@ function PropertiesContent() {
                 key={dist}
                 type="button"
                 onClick={() => handleDistrictSelect(dist)}
-                className={`px-3 py-1.5 rounded-xl font-medium flex-shrink-0 transition-all ${
+                className={`px-3 py-1.5 rounded-xl font-medium shrink-0 transition-all ${
                   filters.district === dist
-                    ? 'bg-gold-400 text-navy-950 font-bold shadow-sm'
+                    ? 'bg-gold-400 text-navy-950 font-bold shadow-xs'
                     : 'bg-navy-900 text-gray-300 hover:bg-navy-800'
                 }`}
               >
@@ -266,7 +266,7 @@ function PropertiesContent() {
       {/* Main Container */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6">
         {/* Mobile Control Bar */}
-        <div className="lg:hidden flex items-center justify-between bg-white p-3 rounded-2xl border border-surface-border shadow-sm mb-4">
+        <div className="lg:hidden flex items-center justify-between bg-white p-3 rounded-2xl border border-surface-border shadow-xs mb-4">
           <button
             onClick={() => setMobileFilterOpen(true)}
             className="flex items-center space-x-1.5 px-3.5 py-2 bg-gray-100 hover:bg-gray-200 text-navy-950 text-xs font-semibold rounded-xl"
@@ -284,7 +284,7 @@ function PropertiesContent() {
               }}
               className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center space-x-1.5 transition-all ${
                 mobileViewMode === 'list'
-                  ? 'bg-navy-950 text-gold-400 shadow-sm'
+                  ? 'bg-navy-950 text-gold-400 shadow-xs'
                   : 'text-gray-600 hover:text-navy-950'
               }`}
             >
@@ -298,7 +298,7 @@ function PropertiesContent() {
               }}
               className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center space-x-1.5 transition-all ${
                 mobileViewMode === 'map'
-                  ? 'bg-navy-950 text-gold-400 shadow-sm'
+                  ? 'bg-navy-950 text-gold-400 shadow-xs'
                   : 'text-gray-600 hover:text-navy-950'
               }`}
             >
@@ -309,7 +309,7 @@ function PropertiesContent() {
         </div>
 
         {/* Desktop View Header / Toggle Controls */}
-        <div className="hidden lg:flex items-center justify-between bg-white p-3.5 rounded-2xl border border-surface-border shadow-sm mb-6">
+        <div className="hidden lg:flex items-center justify-between bg-white p-3.5 rounded-2xl border border-surface-border shadow-xs mb-6">
           <div className="flex items-center space-x-3">
             <span className="text-sm font-bold text-navy-950">
               พบ <span className="text-gold-600 font-extrabold text-base">{sortedProperties.length}</span> รายการ
@@ -329,7 +329,7 @@ function PropertiesContent() {
               <select
                 value={filters.sortBy || 'newest'}
                 onChange={(e) => setFilters({ ...filters, sortBy: e.target.value as PropertyFilters['sortBy'] })}
-                className="text-xs font-semibold text-navy-950 bg-gray-50 border border-gray-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-gold-500 cursor-pointer"
+                className="text-xs font-semibold text-navy-950 bg-gray-50 border border-gray-200 rounded-lg px-2.5 py-1.5 focus:outline-hidden focus:ring-1 focus:ring-gold-500 cursor-pointer"
               >
                 <option value="newest">ล่าสุด</option>
                 <option value="price_asc">ราคาต่ำ → สูง</option>
@@ -347,7 +347,7 @@ function PropertiesContent() {
                 onClick={() => setViewMode('grid')}
                 className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
                   viewMode === 'grid'
-                    ? 'bg-navy-950 text-gold-400 shadow-sm'
+                    ? 'bg-navy-950 text-gold-400 shadow-xs'
                     : 'text-gray-600 hover:text-navy-950'
                 }`}
                 title="แสดงเฉพาะรายการแบบเต็มจอ"
@@ -361,7 +361,7 @@ function PropertiesContent() {
                 onClick={() => setViewMode('split')}
                 className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
                   viewMode === 'split'
-                    ? 'bg-navy-950 text-gold-400 shadow-sm'
+                    ? 'bg-navy-950 text-gold-400 shadow-xs'
                     : 'text-gray-600 hover:text-navy-950'
                 }`}
                 title="แสดงรายการพร้อมแผนที่แบ่งครึ่งจอ"
@@ -375,7 +375,7 @@ function PropertiesContent() {
                 onClick={() => setViewMode('map')}
                 className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
                   viewMode === 'map'
-                    ? 'bg-navy-950 text-gold-400 shadow-sm'
+                    ? 'bg-navy-950 text-gold-400 shadow-xs'
                     : 'text-gray-600 hover:text-navy-950'
                 }`}
                 title="แสดงแผนที่แบบเต็มจอ"
@@ -391,7 +391,7 @@ function PropertiesContent() {
         {viewMode === 'map' || mobileViewMode === 'map' ? (
           <div className="space-y-4">
             {/* Quick Top Bar for Full Map Mode */}
-            <div className="flex items-center justify-between bg-white p-3 rounded-2xl border border-surface-border shadow-sm">
+            <div className="flex items-center justify-between bg-white p-3 rounded-2xl border border-surface-border shadow-xs">
               <div className="flex items-center space-x-2">
                 <span className="text-xs font-bold text-navy-950">
                   กำลังแสดงผลบน Google Map ({sortedProperties.length} รายการ)
@@ -455,7 +455,7 @@ function PropertiesContent() {
             >
               {/* Active Filters Bar */}
               {(filters.type !== 'all' || filters.status !== 'all' || filters.district || filters.minPrice || filters.maxPrice || filters.bedrooms !== 'any' || filters.searchQuery) && (
-                <div className="bg-white/80 backdrop-blur rounded-2xl p-3 border border-gray-200 mb-4 flex flex-wrap items-center gap-1.5 text-xs animate-in fade-in">
+                <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-3 border border-gray-200 mb-4 flex flex-wrap items-center gap-1.5 text-xs animate-in fade-in">
                   <span className="text-[11px] text-gray-500 font-semibold mr-1">กำลังกรอง:</span>
                   
                   {filters.status !== 'all' && (
@@ -597,7 +597,7 @@ function PropertiesContent() {
 
       {/* Mobile Slide-Out Filter Drawer Modal */}
       {mobileFilterOpen && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex justify-end">
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex justify-end">
           <div className="w-full max-w-sm bg-white h-full overflow-y-auto p-5 shadow-2xl flex flex-col justify-between animate-fadeIn">
             <div>
               <div className="flex items-center justify-between pb-4 border-b border-gray-100 mb-4">

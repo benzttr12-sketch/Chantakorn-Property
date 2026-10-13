@@ -195,7 +195,7 @@ export default function RealEstateFAQ() {
                 value={searchQuery}
                 onChange={e => setSearchQuery(e.target.value)}
                 placeholder="ค้นหาตามหัวข้อ เช่น โฉนด, กู้บ้าน, ขายฝาก, ม.อ., ค่าโอน..."
-                className="w-full pl-10 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl text-xs sm:text-sm text-navy-950 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-gold-500 shadow-xs"
+                className="w-full pl-10 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl text-xs sm:text-sm text-navy-950 placeholder-slate-400 focus:outline-hidden focus:ring-2 focus:ring-gold-500 shadow-xs"
               />
               {searchQuery && (
                 <button
@@ -210,7 +210,7 @@ export default function RealEstateFAQ() {
             <button
               onClick={() => fetchFaqs(activeCategory, true)}
               disabled={refreshingAi || loading}
-              className="w-full sm:w-auto px-4 py-2.5 bg-gradient-to-r from-amber-500 to-gold-500 hover:from-amber-600 hover:to-gold-600 disabled:opacity-70 text-navy-950 text-xs font-bold rounded-xl shadow-xs hover:shadow-md flex items-center justify-center space-x-2 shrink-0 transition-all cursor-pointer"
+              className="w-full sm:w-auto px-4 py-2.5 bg-linear-to-r/srgb from-amber-500 to-gold-500 hover:from-amber-600 hover:to-gold-600 disabled:opacity-70 text-navy-950 text-xs font-bold rounded-xl shadow-xs hover:shadow-md flex items-center justify-center space-x-2 shrink-0 transition-all cursor-pointer"
               title="สืบค้นและสร้างคำถามใหม่แบบสดๆ ด้วย Gemini API"
             >
               <RefreshCw className={`w-3.5 h-3.5 ${refreshingAi ? 'animate-spin' : ''}`} />
@@ -250,7 +250,7 @@ export default function RealEstateFAQ() {
                 >
                   <button
                     onClick={() => toggleAccordion(faq.id)}
-                    className="w-full text-left p-5 sm:p-6 flex items-start justify-between gap-4 cursor-pointer focus:outline-none"
+                    className="w-full text-left p-5 sm:p-6 flex items-start justify-between gap-4 cursor-pointer focus:outline-hidden"
                     aria-expanded={isExpanded}
                   >
                     <div className="space-y-1.5 flex-1">
@@ -278,7 +278,7 @@ export default function RealEstateFAQ() {
                       </div>
 
                       {faq.tip && (
-                        <div className="p-3.5 bg-gradient-to-r from-amber-50 to-gold-50/60 rounded-xl border border-gold-200 flex items-start space-x-2.5 text-xs text-amber-950">
+                        <div className="p-3.5 bg-linear-to-r/srgb from-amber-50 to-gold-50/60 rounded-xl border border-gold-200 flex items-start space-x-2.5 text-xs text-amber-950">
                           <Lightbulb className="w-4 h-4 text-gold-600 shrink-0 mt-0.5" />
                           <div className="leading-relaxed">
                             <strong className="font-bold text-gold-900">คำแนะนำจากผู้เชี่ยวชาญ:</strong>{' '}
@@ -295,7 +295,7 @@ export default function RealEstateFAQ() {
         </div>
 
         {/* Interactive Custom Question Box: Ask Gemini AI */}
-        <div className="max-w-3xl mx-auto mt-12 bg-gradient-to-br from-navy-950 via-navy-900 to-navy-950 rounded-3xl p-6 sm:p-8 text-white border border-gold-500/20 shadow-xl relative overflow-hidden">
+        <div className="max-w-3xl mx-auto mt-12 bg-linear-to-br/srgb from-navy-950 via-navy-900 to-navy-950 rounded-3xl p-6 sm:p-8 text-white border border-gold-500/20 shadow-xl relative overflow-hidden">
           <div className="absolute top-0 right-0 w-64 h-64 bg-gold-400/10 rounded-full blur-3xl pointer-events-none" />
 
           <div className="relative z-10 space-y-4">
@@ -320,12 +320,12 @@ export default function RealEstateFAQ() {
                   value={customQuestion}
                   onChange={e => setCustomQuestion(e.target.value)}
                   placeholder="เช่น คนต่างชาติสามารถถือกรรมสิทธิ์คอนโดในหาดใหญ่ได้กี่เปอร์เซ็นต์? หรือ ค่ารังวัดที่ดินคิดอย่างไร?"
-                  className="w-full pl-4 pr-28 py-3.5 bg-navy-800/90 border border-slate-700 focus:border-gold-400 rounded-2xl text-xs sm:text-sm text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-gold-400/40 shadow-inner"
+                  className="w-full pl-4 pr-28 py-3.5 bg-navy-800/90 border border-slate-700 focus:border-gold-400 rounded-2xl text-xs sm:text-sm text-white placeholder-slate-400 focus:outline-hidden focus:ring-2 focus:ring-gold-400/40 inset-shadow-sm"
                 />
                 <button
                   type="submit"
                   disabled={askingAi || !customQuestion.trim()}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 px-4 py-2 bg-gradient-to-r from-gold-400 to-gold-500 hover:from-gold-300 hover:to-gold-400 disabled:opacity-50 text-navy-950 text-xs font-bold rounded-xl shadow-md flex items-center space-x-1.5 transition-all cursor-pointer"
+                  className="absolute right-2 top-1/2 -translate-y-1/2 px-4 py-2 bg-linear-to-r/srgb from-gold-400 to-gold-500 hover:from-gold-300 hover:to-gold-400 disabled:opacity-50 text-navy-950 text-xs font-bold rounded-xl shadow-md flex items-center space-x-1.5 transition-all cursor-pointer"
                 >
                   {askingAi ? (
                     <>

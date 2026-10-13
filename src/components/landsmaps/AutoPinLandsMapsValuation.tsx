@@ -22,7 +22,7 @@ interface Props {
   onSaved?: () => void;
 }
 
-const inputClass = 'w-full rounded-xl border border-gray-300 bg-white px-3 py-2.5 text-sm text-navy-950 focus:border-gold-500 focus:outline-none focus:ring-2 focus:ring-gold-500/20 disabled:bg-gray-100';
+const inputClass = 'w-full rounded-xl border border-gray-300 bg-white px-3 py-2.5 text-sm text-navy-950 focus:border-gold-500 focus:outline-hidden focus:ring-2 focus:ring-gold-500/20 disabled:bg-gray-100';
 const money = (value: number | null) => value === null ? 'ยังไม่มีข้อมูล' : `฿${value.toLocaleString('th-TH', { maximumFractionDigits: 2 })}`;
 
 function TextField({ label, value, onChange, placeholder, type = 'text' }: {

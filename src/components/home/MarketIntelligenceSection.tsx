@@ -129,7 +129,7 @@ export default function MarketIntelligenceSection() {
   };
 
   return (
-    <section className="py-20 bg-gradient-to-b from-navy-950 via-slate-950 to-navy-950 text-white relative overflow-hidden">
+    <section className="py-20 bg-linear-to-b/srgb from-navy-950 via-slate-950 to-navy-950 text-white relative overflow-hidden">
       {/* Glow Effects */}
       <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-96 h-96 bg-gold-500/10 rounded-full blur-3xl pointer-events-none" />
       <div className="absolute bottom-10 left-10 w-72 h-72 bg-blue-600/10 rounded-full blur-3xl pointer-events-none" />
@@ -142,7 +142,7 @@ export default function MarketIntelligenceSection() {
             <span>GOOGLE SEARCH GROUNDED INTELLIGENCE</span>
           </div>
           <h2 className="text-2xl sm:text-4xl font-black text-white tracking-tight">
-            เจาะลึกทัศนียภาพและทิศทางตลาดอสังหาฯ หาดใหญ่–สงขลา <span className="bg-gradient-to-r from-gold-300 via-amber-200 to-amber-400 bg-clip-text text-transparent font-sans not-italic drop-shadow-[0_2px_10px_rgba(234,179,8,0.35)] border-b-2 border-gold-400/40 pb-0.5 inline-block ml-1">แบบเรียลไทม์</span>
+            เจาะลึกทัศนียภาพและทิศทางตลาดอสังหาฯ หาดใหญ่–สงขลา <span className="bg-linear-to-r/srgb from-gold-300 via-amber-200 to-amber-400 bg-clip-text text-transparent font-sans not-italic drop-shadow-[0_2px_10px_rgba(234,179,8,0.35)] border-b-2 border-gold-400/40 pb-0.5 inline-block ml-1">แบบเรียลไทม์</span>
           </h2>
           <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
             ผสานข้อมูลสืบค้นสดจาก <strong>Google Search</strong> เพื่อรายงานสถิติราคาประเมิน ทิศทางโครงการเมกะโปรเจกต์ และแนวโน้มอัตราดอกเบี้ยอย่างแม่นยำ พร้อมแหล่งอ้างอิงที่เชื่อถือได้
@@ -159,7 +159,7 @@ export default function MarketIntelligenceSection() {
                 onClick={() => handleFetchInsight(topic.query, topic.id)}
                 className={`p-4 rounded-2xl text-left border transition-all relative overflow-hidden group ${
                   isSelected
-                    ? 'bg-gradient-to-br from-gold-500/20 via-navy-900 to-navy-950 border-gold-500/80 shadow-lg shadow-gold-500/10 scale-102'
+                    ? 'bg-linear-to-br/srgb from-gold-500/20 via-navy-900 to-navy-950 border-gold-500/80 shadow-lg shadow-gold-500/10 scale-102'
                     : 'bg-navy-900/60 border-navy-800 hover:border-slate-700 text-slate-300 hover:text-white'
                 }`}
               >
@@ -186,18 +186,18 @@ export default function MarketIntelligenceSection() {
         {/* Live Search Grounding Interactive Bar */}
         <form onSubmit={handleSearchSubmit} className="max-w-3xl mx-auto mb-10">
           <div className="relative flex items-center bg-slate-900/90 border border-gold-500/40 rounded-2xl p-1.5 shadow-2xl focus-within:border-gold-400 focus-within:ring-2 focus-within:ring-gold-500/30 transition-all">
-            <Search className="w-5 h-5 text-gold-400 ml-3 flex-shrink-0" />
+            <Search className="w-5 h-5 text-gold-400 ml-3 shrink-0" />
             <input
               type="text"
               value={customQuery}
               onChange={(e) => setCustomQuery(e.target.value)}
               placeholder="พิมพ์คำถามที่อยากรู้ เช่น 'ราคาที่ดินโซนคลองแห', 'ผลตอบแทนปล่อยเช่าคอนโด ม.อ.'..."
-              className="w-full bg-transparent text-white placeholder-slate-400 text-xs sm:text-sm px-3 py-2.5 focus:outline-none"
+              className="w-full bg-transparent text-white placeholder-slate-400 text-xs sm:text-sm px-3 py-2.5 focus:outline-hidden"
             />
             <button
               type="submit"
               disabled={isLoading || !customQuery.trim()}
-              className="px-4 sm:px-6 py-2.5 bg-gradient-to-r from-gold-500 to-amber-600 hover:from-gold-400 hover:to-amber-500 text-navy-950 font-black text-xs rounded-xl shadow-md transition-all flex items-center space-x-1.5 disabled:opacity-50 flex-shrink-0 active:scale-95"
+              className="px-4 sm:px-6 py-2.5 bg-linear-to-r/srgb from-gold-500 to-amber-600 hover:from-gold-400 hover:to-amber-500 text-navy-950 font-black text-xs rounded-xl shadow-md transition-all flex items-center space-x-1.5 disabled:opacity-50 shrink-0 active:scale-95"
             >
               {isLoading ? (
                 <>
@@ -219,7 +219,7 @@ export default function MarketIntelligenceSection() {
           {/* Top Banner Status */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-5 border-b border-slate-800">
             <div className="flex items-center space-x-3">
-              <div className="w-10 h-10 rounded-xl bg-gold-500/20 text-gold-400 border border-gold-500/30 flex items-center justify-center flex-shrink-0">
+              <div className="w-10 h-10 rounded-xl bg-gold-500/20 text-gold-400 border border-gold-500/30 flex items-center justify-center shrink-0">
                 <TrendingUp className="w-5 h-5" />
               </div>
               <div>
@@ -285,7 +285,7 @@ export default function MarketIntelligenceSection() {
                         {source.uri.replace(/^https?:\/\//, '').split('/')[0]}
                       </span>
                     </div>
-                    <ExternalLink className="w-3.5 h-3.5 text-slate-500 group-hover:text-gold-400 flex-shrink-0 mt-0.5" />
+                    <ExternalLink className="w-3.5 h-3.5 text-slate-500 group-hover:text-gold-400 shrink-0 mt-0.5" />
                   </a>
                 ))}
               </div>
@@ -293,7 +293,7 @@ export default function MarketIntelligenceSection() {
           )}
 
           {/* Bottom Consultant CTA */}
-          <div className="p-4 rounded-2xl bg-gradient-to-r from-gold-500/10 via-navy-900 to-gold-500/10 border border-gold-500/30 flex flex-col sm:flex-row items-center justify-between gap-4">
+          <div className="p-4 rounded-2xl bg-linear-to-r/srgb from-gold-500/10 via-navy-900 to-gold-500/10 border border-gold-500/30 flex flex-col sm:flex-row items-center justify-between gap-4">
             <div className="space-y-0.5 text-center sm:text-left">
               <p className="text-xs font-bold text-gold-300">
                 ต้องการปรึกษาการลงทุนอสังหาฯ หาดใหญ่ หรือเช็กราคาประเมินรายแปลง?
@@ -307,7 +307,7 @@ export default function MarketIntelligenceSection() {
               href="https://lin.ee/NMSe28T3"
               target="_blank"
               rel="noopener noreferrer"
-              className="px-4 py-2 bg-gold-500 hover:bg-gold-400 text-navy-950 font-black text-xs rounded-xl shadow-md transition-all flex items-center space-x-1.5 flex-shrink-0 active:scale-95"
+              className="px-4 py-2 bg-gold-500 hover:bg-gold-400 text-navy-950 font-black text-xs rounded-xl shadow-md transition-all flex items-center space-x-1.5 shrink-0 active:scale-95"
             >
               <span>ปรึกษาผู้เชี่ยวชาญทันที</span>
               <ChevronRight className="w-3.5 h-3.5" />

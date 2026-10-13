@@ -221,13 +221,13 @@ export default function AdminUsersPage() {
       {/* Notification Toast */}
       {notification && (
         <div className="fixed top-6 right-6 z-50 bg-emerald-900 text-emerald-100 px-5 py-3.5 rounded-2xl shadow-2xl border border-emerald-500/50 flex items-center space-x-2.5 animate-fadeIn">
-          <Check className="w-5 h-5 text-emerald-400 flex-shrink-0" />
+          <Check className="w-5 h-5 text-emerald-400 shrink-0" />
           <span className="text-xs font-semibold">{notification}</span>
         </div>
       )}
 
       {/* Header */}
-      <div className="bg-white p-6 rounded-2xl border border-surface-border shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="bg-white p-6 rounded-2xl border border-surface-border shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <div className="flex items-center space-x-2 text-gold-600 font-bold text-xs uppercase tracking-widest mb-1">
             <Shield className="w-4 h-4" />
@@ -250,7 +250,7 @@ export default function AdminUsersPage() {
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div className="bg-white p-5 rounded-2xl border border-surface-border shadow-sm flex items-center justify-between">
+        <div className="bg-white p-5 rounded-2xl border border-surface-border shadow-xs flex items-center justify-between">
           <div>
             <span className="text-xs font-bold text-gray-500 uppercase tracking-wider block">ผู้ดูแลระบบสูงสุด (ADMIN)</span>
             <div className="text-2xl font-extrabold text-gold-600 mt-1">{adminCount} ท่าน</div>
@@ -261,7 +261,7 @@ export default function AdminUsersPage() {
           </div>
         </div>
 
-        <div className="bg-white p-5 rounded-2xl border border-surface-border shadow-sm flex items-center justify-between">
+        <div className="bg-white p-5 rounded-2xl border border-surface-border shadow-xs flex items-center justify-between">
           <div>
             <span className="text-xs font-bold text-gray-500 uppercase tracking-wider block">นายหน้า / ตัวแทน (AGENT)</span>
             <div className="text-2xl font-extrabold text-navy-900 mt-1">{agentCount} ท่าน</div>
@@ -272,7 +272,7 @@ export default function AdminUsersPage() {
           </div>
         </div>
 
-        <div className="bg-white p-5 rounded-2xl border border-surface-border shadow-sm flex items-center justify-between">
+        <div className="bg-white p-5 rounded-2xl border border-surface-border shadow-xs flex items-center justify-between">
           <div>
             <span className="text-xs font-bold text-gray-500 uppercase tracking-wider block">ลูกค้า / สมาชิกทั่วไป (USER)</span>
             <div className="text-2xl font-extrabold text-gray-700 mt-1">{generalUserCount} ท่าน</div>
@@ -285,14 +285,14 @@ export default function AdminUsersPage() {
       </div>
 
       {/* Filter and Search */}
-      <div className="bg-white p-4 rounded-2xl border border-surface-border shadow-sm flex flex-col sm:flex-row items-center justify-between gap-3">
+      <div className="bg-white p-4 rounded-2xl border border-surface-border shadow-xs flex flex-col sm:flex-row items-center justify-between gap-3">
         <div className="relative w-full sm:w-80">
           <input
             type="text"
             placeholder="ค้นหาชื่อ, อีเมล หรือเบอร์โทรศัพท์..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full bg-gray-50 border border-gray-200 rounded-xl pl-9 pr-3 py-2 text-xs text-navy-950 focus:outline-none focus:ring-2 focus:ring-gold-500"
+            className="w-full bg-gray-50 border border-gray-200 rounded-xl pl-9 pr-3 py-2 text-xs text-navy-950 focus:outline-hidden focus:ring-2 focus:ring-gold-500"
           />
           <Search className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
         </div>
@@ -334,7 +334,7 @@ export default function AdminUsersPage() {
       </div>
 
       {/* Users & Roles Management Table */}
-      <div className="bg-white rounded-2xl border border-surface-border shadow-sm overflow-hidden">
+      <div className="bg-white rounded-2xl border border-surface-border shadow-xs overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs">
             <thead>
@@ -366,7 +366,7 @@ export default function AdminUsersPage() {
                         <div className="flex items-center space-x-3">
                           <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-bold text-sm ${
                             isAdmin 
-                              ? 'bg-gradient-to-br from-gold-400 to-gold-600 text-navy-950 shadow-sm' 
+                              ? 'bg-linear-to-br/srgb from-gold-400 to-gold-600 text-navy-950 shadow-xs'
                               : isAgent 
                               ? 'bg-navy-900 text-white' 
                               : 'bg-gray-200 text-gray-700'
@@ -390,24 +390,24 @@ export default function AdminUsersPage() {
                       {/* Contact Info */}
                       <td className="p-4 text-gray-600">
                         <div className="flex items-center space-x-1.5 text-xs text-gray-900 font-medium">
-                          <Mail className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
+                          <Mail className="w-3.5 h-3.5 text-gray-400 shrink-0" />
                           <span>{u.email || '-'}</span>
                         </div>
                         {u.phone && (
                           <div className="flex items-center space-x-1.5 text-[11px] text-gray-600 mt-0.5">
-                            <Phone className="w-3 h-3 text-gold-600 flex-shrink-0" />
+                            <Phone className="w-3 h-3 text-gold-600 shrink-0" />
                             <span>{u.phone}</span>
                           </div>
                         )}
                         {u.line_id && (
                           <div className="flex items-center space-x-1.5 text-[11px] text-emerald-600 font-semibold mt-0.5">
-                            <MessageCircle className="w-3 h-3 text-emerald-500 flex-shrink-0" />
+                            <MessageCircle className="w-3 h-3 text-emerald-500 shrink-0" />
                             <span>LINE: {u.line_id}</span>
                           </div>
                         )}
                         {u.facebook && (
                           <div className="flex items-center space-x-1.5 text-[11px] text-blue-600 font-medium mt-0.5 truncate max-w-[190px]">
-                            <Facebook className="w-3 h-3 text-blue-500 flex-shrink-0" />
+                            <Facebook className="w-3 h-3 text-blue-500 shrink-0" />
                             <span className="truncate">FB: {u.facebook}</span>
                           </div>
                         )}
@@ -430,13 +430,13 @@ export default function AdminUsersPage() {
                       <td className="p-4 text-center">
                         <button
                           onClick={() => handleRoleChange(u.id, isAdmin ? 'AGENT' : 'ADMIN')}
-                          className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                          className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-hidden ${
                             isAdmin ? 'bg-gold-500' : 'bg-gray-300'
                           }`}
                           title={isAdmin ? 'คลิกเพื่อเปลี่ยนเป็นยศนายหน้า' : 'คลิกเพื่อแต่งตั้งเป็นยศแอดมิน'}
                         >
                           <span
-                            className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                            className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-sm ring-0 transition duration-200 ease-in-out ${
                               isAdmin ? 'translate-x-5' : 'translate-x-0'
                             }`}
                           />
@@ -451,7 +451,7 @@ export default function AdminUsersPage() {
                         <select
                           value={u.role}
                           onChange={(e) => handleRoleChange(u.id, e.target.value as any)}
-                          className="bg-gray-50 border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs text-navy-950 font-bold focus:outline-none focus:ring-2 focus:ring-gold-500 cursor-pointer"
+                          className="bg-gray-50 border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs text-navy-950 font-bold focus:outline-hidden focus:ring-2 focus:ring-gold-500 cursor-pointer"
                         >
                           <option value="ADMIN">🛡️ ยศ: แอดมิน (ADMIN)</option>
                           <option value="AGENT">👔 ยศ: นายหน้า (AGENT)</option>
@@ -496,7 +496,7 @@ export default function AdminUsersPage() {
       </div>
 
       {/* Info Guide Box */}
-      <div className="bg-navy-950 text-white p-6 rounded-2xl border border-navy-800 shadow-sm flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+      <div className="bg-navy-950 text-white p-6 rounded-2xl border border-navy-800 shadow-xs flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
         <div className="space-y-1">
           <div className="flex items-center space-x-2 text-gold-400 font-bold text-sm">
             <ShieldCheck className="w-4 h-4" />
@@ -512,7 +512,7 @@ export default function AdminUsersPage() {
 
       {/* Add User / Assign Admin Modal */}
       {showAddModal && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
           <div className="bg-white rounded-3xl max-w-md w-full p-6 sm:p-8 shadow-2xl border border-surface-border animate-fadeIn relative">
             <div className="border-b border-gray-100 pb-4 mb-5">
               <h3 className="text-lg font-bold text-navy-950">เพิ่มผู้ใช้ / แต่งตั้งแอดมินใหม่</h3>
@@ -532,7 +532,7 @@ export default function AdminUsersPage() {
                   placeholder="เช่น คุณกานดา วงศ์สวัสดิ์"
                   value={newFullName}
                   onChange={(e) => setNewFullName(e.target.value)}
-                  className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3 text-xs text-gray-900 focus:bg-white focus:ring-2 focus:ring-gold-500 outline-none"
+                  className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3 text-xs text-gray-900 focus:bg-white focus:ring-2 focus:ring-gold-500 outline-hidden"
                 />
               </div>
 
@@ -546,7 +546,7 @@ export default function AdminUsersPage() {
                   placeholder="admin-kanda@chantakornproperty.com"
                   value={newEmail}
                   onChange={(e) => setNewEmail(e.target.value)}
-                  className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3 text-xs text-gray-900 focus:bg-white focus:ring-2 focus:ring-gold-500 outline-none"
+                  className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3 text-xs text-gray-900 focus:bg-white focus:ring-2 focus:ring-gold-500 outline-hidden"
                 />
               </div>
 
@@ -559,7 +559,7 @@ export default function AdminUsersPage() {
                   placeholder="081-xxx-xxxx"
                   value={newPhone}
                   onChange={(e) => setNewPhone(e.target.value)}
-                  className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3 text-xs text-gray-900 focus:bg-white focus:ring-2 focus:ring-gold-500 outline-none"
+                  className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3 text-xs text-gray-900 focus:bg-white focus:ring-2 focus:ring-gold-500 outline-hidden"
                 />
               </div>
 
@@ -573,7 +573,7 @@ export default function AdminUsersPage() {
                   placeholder="เช่น @930xzcyi หรือ somchai_agent"
                   value={newLineId}
                   onChange={(e) => setNewLineId(e.target.value)}
-                  className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3 text-xs text-gray-900 focus:bg-white focus:ring-2 focus:ring-emerald-500 outline-none"
+                  className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3 text-xs text-gray-900 focus:bg-white focus:ring-2 focus:ring-emerald-500 outline-hidden"
                 />
               </div>
 
@@ -587,7 +587,7 @@ export default function AdminUsersPage() {
                   placeholder="เช่น https://www.facebook.com/yourprofile"
                   value={newFacebook}
                   onChange={(e) => setNewFacebook(e.target.value)}
-                  className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3 text-xs text-gray-900 focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none"
+                  className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3 text-xs text-gray-900 focus:bg-white focus:ring-2 focus:ring-blue-500 outline-hidden"
                 />
               </div>
 
@@ -601,7 +601,7 @@ export default function AdminUsersPage() {
                     onClick={() => setNewRole('ADMIN')}
                     className={`py-2 px-2 text-xs font-bold rounded-xl border transition-all ${
                       newRole === 'ADMIN'
-                        ? 'bg-gold-500 text-navy-950 border-gold-500 shadow-sm'
+                        ? 'bg-gold-500 text-navy-950 border-gold-500 shadow-xs'
                         : 'bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100'
                     }`}
                   >
@@ -612,7 +612,7 @@ export default function AdminUsersPage() {
                     onClick={() => setNewRole('AGENT')}
                     className={`py-2 px-2 text-xs font-bold rounded-xl border transition-all ${
                       newRole === 'AGENT'
-                        ? 'bg-navy-900 text-white border-navy-900 shadow-sm'
+                        ? 'bg-navy-900 text-white border-navy-900 shadow-xs'
                         : 'bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100'
                     }`}
                   >
@@ -623,7 +623,7 @@ export default function AdminUsersPage() {
                     onClick={() => setNewRole('USER')}
                     className={`py-2 px-2 text-xs font-bold rounded-xl border transition-all ${
                       newRole === 'USER'
-                        ? 'bg-gray-800 text-white border-gray-800 shadow-sm'
+                        ? 'bg-gray-800 text-white border-gray-800 shadow-xs'
                         : 'bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100'
                     }`}
                   >
@@ -659,7 +659,7 @@ export default function AdminUsersPage() {
 
       {/* ===== Edit User Modal ===== */}
       {editingUser && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
           <div className="bg-white rounded-3xl max-w-md w-full p-6 sm:p-8 shadow-2xl border border-surface-border animate-fadeIn relative">
             {/* Header */}
             <div className="flex items-center justify-between border-b border-gray-100 pb-4 mb-5">
@@ -687,7 +687,7 @@ export default function AdminUsersPage() {
                   required
                   value={editFullName}
                   onChange={(e) => setEditFullName(e.target.value)}
-                  className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3 text-xs text-gray-900 focus:bg-white focus:ring-2 focus:ring-gold-500 outline-none"
+                  className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3 text-xs text-gray-900 focus:bg-white focus:ring-2 focus:ring-gold-500 outline-hidden"
                   placeholder="ชื่อ-นามสกุล"
                 />
               </div>
@@ -701,7 +701,7 @@ export default function AdminUsersPage() {
                   type="email"
                   value={editEmail}
                   onChange={(e) => setEditEmail(e.target.value)}
-                  className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3 text-xs text-gray-900 focus:bg-white focus:ring-2 focus:ring-gold-500 outline-none"
+                  className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3 text-xs text-gray-900 focus:bg-white focus:ring-2 focus:ring-gold-500 outline-hidden"
                   placeholder="example@email.com"
                 />
               </div>
@@ -715,7 +715,7 @@ export default function AdminUsersPage() {
                   type="tel"
                   value={editPhone}
                   onChange={(e) => setEditPhone(e.target.value)}
-                  className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3 text-xs text-gray-900 focus:bg-white focus:ring-2 focus:ring-gold-500 outline-none"
+                  className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3 text-xs text-gray-900 focus:bg-white focus:ring-2 focus:ring-gold-500 outline-hidden"
                   placeholder="081-xxx-xxxx"
                 />
               </div>
@@ -730,7 +730,7 @@ export default function AdminUsersPage() {
                   type="text"
                   value={editLineId}
                   onChange={(e) => setEditLineId(e.target.value)}
-                  className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3 text-xs text-gray-900 focus:bg-white focus:ring-2 focus:ring-emerald-500 outline-none"
+                  className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3 text-xs text-gray-900 focus:bg-white focus:ring-2 focus:ring-emerald-500 outline-hidden"
                   placeholder="เช่น @930xzcyi หรือ benz_agent"
                 />
               </div>
@@ -745,14 +745,14 @@ export default function AdminUsersPage() {
                   type="url"
                   value={editFacebook}
                   onChange={(e) => setEditFacebook(e.target.value)}
-                  className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3 text-xs text-gray-900 focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none"
+                  className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3 text-xs text-gray-900 focus:bg-white focus:ring-2 focus:ring-blue-500 outline-hidden"
                   placeholder="เช่น https://www.facebook.com/yourprofile"
                 />
               </div>
 
               {/* Role info (read-only in this modal) */}
               <div className="bg-gray-50 rounded-xl p-3 flex items-center space-x-2 border border-gray-100">
-                <Shield className="w-4 h-4 text-gray-400 flex-shrink-0" />
+                <Shield className="w-4 h-4 text-gray-400 shrink-0" />
                 <span className="text-xs text-gray-600">
                   บทบาทปัจจุบัน:{' '}
                   <strong className="text-navy-950">

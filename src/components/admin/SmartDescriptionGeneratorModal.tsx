@@ -189,12 +189,12 @@ export default function SmartDescriptionGeneratorModal({
   ];
 
   return (
-    <div className="fixed inset-0 z-[100] bg-black/65 backdrop-blur-sm flex items-center justify-center p-3 sm:p-5 overflow-y-auto animate-fadeIn">
+    <div className="fixed inset-0 z-[100] bg-black/65 backdrop-blur-xs flex items-center justify-center p-3 sm:p-5 overflow-y-auto animate-fadeIn">
       <div className="bg-white rounded-3xl max-w-3xl w-full border border-slate-200 shadow-2xl overflow-hidden flex flex-col max-h-[92vh]">
         {/* Modal Header */}
-        <div className="p-5 sm:p-6 bg-gradient-to-r from-navy-950 via-navy-900 to-navy-950 text-white flex items-center justify-between border-b border-navy-800">
+        <div className="p-5 sm:p-6 bg-linear-to-r/srgb from-navy-950 via-navy-900 to-navy-950 text-white flex items-center justify-between border-b border-navy-800">
           <div className="flex items-center space-x-3">
-            <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-gold-400 to-amber-500 flex items-center justify-center text-navy-950 shadow-md">
+            <div className="w-10 h-10 rounded-2xl bg-linear-to-br/srgb from-gold-400 to-amber-500 flex items-center justify-center text-navy-950 shadow-md">
               <Sparkles className="w-5 h-5 text-navy-950 stroke-[2.5]" />
             </div>
             <div>
@@ -276,7 +276,7 @@ export default function SmartDescriptionGeneratorModal({
                         <span className={`text-xs font-bold ${isSelected ? 'text-gold-300' : 'text-navy-950'}`}>
                           {t.label}
                         </span>
-                        <span className={`text-[10px] font-semibold px-1.5 py-0.2 rounded ${
+                        <span className={`text-[10px] font-semibold px-1.5 py-0.2 rounded-sm ${
                           isSelected ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-600'
                         }`}>
                           {t.badge}
@@ -308,7 +308,7 @@ export default function SmartDescriptionGeneratorModal({
                     <button
                       type="button"
                       onClick={() => setVoiceLang('th-TH')}
-                      className={`px-1.5 py-0.5 rounded transition-colors ${
+                      className={`px-1.5 py-0.5 rounded-sm transition-colors ${
                         voiceLang === 'th-TH' ? 'bg-navy-950 text-gold-400' : 'text-slate-500 hover:text-navy-950'
                       }`}
                     >
@@ -317,7 +317,7 @@ export default function SmartDescriptionGeneratorModal({
                     <button
                       type="button"
                       onClick={() => setVoiceLang('en-US')}
-                      className={`px-1.5 py-0.5 rounded transition-colors ${
+                      className={`px-1.5 py-0.5 rounded-sm transition-colors ${
                         voiceLang === 'en-US' ? 'bg-navy-950 text-gold-400' : 'text-slate-500 hover:text-navy-950'
                       }`}
                     >
@@ -358,7 +358,7 @@ export default function SmartDescriptionGeneratorModal({
                 value={customHighlights}
                 onChange={(e) => setCustomHighlights(e.target.value)}
                 placeholder="เช่น บ้านสร้างใหม่มือหนึ่ง, ฟรีค่าโอน, แถมแอร์ 3 เครื่อง, เจ้าของย้ายไปต่างจังหวัด..."
-                className={`w-full bg-slate-50 border rounded-xl p-3 text-xs text-navy-950 outline-none focus:bg-white focus:ring-2 focus:ring-gold-500 transition-all ${
+                className={`w-full bg-slate-50 border rounded-xl p-3 text-xs text-navy-950 outline-hidden focus:bg-white focus:ring-2 focus:ring-gold-500 transition-all ${
                   isVoiceListening ? 'border-rose-400 ring-2 ring-rose-200' : 'border-slate-200'
                 }`}
               />
@@ -396,7 +396,7 @@ export default function SmartDescriptionGeneratorModal({
               type="button"
               onClick={handleGenerate}
               disabled={loading}
-              className="w-full py-3.5 px-6 bg-gradient-to-r from-gold-400 via-gold-500 to-amber-500 hover:from-gold-300 hover:to-gold-400 text-navy-950 font-black text-xs sm:text-sm rounded-2xl shadow-lg hover:shadow-gold-500/25 flex items-center justify-center space-x-2 transition-all cursor-pointer disabled:opacity-50"
+              className="w-full py-3.5 px-6 bg-linear-to-r/srgb from-gold-400 via-gold-500 to-amber-500 hover:from-gold-300 hover:to-gold-400 text-navy-950 font-black text-xs sm:text-sm rounded-2xl shadow-lg hover:shadow-gold-500/25 flex items-center justify-center space-x-2 transition-all cursor-pointer disabled:opacity-50"
             >
               {loading ? (
                 <>
@@ -414,7 +414,7 @@ export default function SmartDescriptionGeneratorModal({
 
           {/* Generated Result Preview */}
           {generatedData && (
-            <div className="border border-gold-300/80 rounded-2xl overflow-hidden bg-white shadow-sm space-y-4 p-4 sm:p-5">
+            <div className="border border-gold-300/80 rounded-2xl overflow-hidden bg-white shadow-xs space-y-4 p-4 sm:p-5">
               {/* Result Header & Tabs */}
               <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-3">
                 <div className="flex items-center space-x-1.5">
@@ -486,7 +486,7 @@ export default function SmartDescriptionGeneratorModal({
                       readOnly
                       rows={10}
                       value={generatedData.description || ''}
-                      className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3.5 text-xs text-navy-950 leading-relaxed font-sans outline-none resize-none focus:bg-white focus:ring-1 focus:ring-gold-400"
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3.5 text-xs text-navy-950 leading-relaxed font-sans outline-hidden resize-none focus:bg-white focus:ring-1 focus:ring-gold-400"
                     />
                     <button
                       type="button"
@@ -521,7 +521,7 @@ export default function SmartDescriptionGeneratorModal({
                     <button
                       type="button"
                       onClick={() => handleApply('replace')}
-                      className="px-5 py-2 bg-navy-950 hover:bg-navy-900 text-gold-400 text-xs font-black rounded-xl shadow-sm flex items-center space-x-1.5 transition-colors cursor-pointer"
+                      className="px-5 py-2 bg-navy-950 hover:bg-navy-900 text-gold-400 text-xs font-black rounded-xl shadow-xs flex items-center space-x-1.5 transition-colors cursor-pointer"
                     >
                       <CheckCircle2 className="w-4 h-4 text-gold-400" />
                       <span>นำไปใส่ในช่องคำอธิบายทันที</span>
@@ -538,7 +538,7 @@ export default function SmartDescriptionGeneratorModal({
                       readOnly
                       rows={8}
                       value={generatedData.socialCaption || ''}
-                      className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3.5 text-xs text-navy-950 leading-relaxed font-sans outline-none resize-none"
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3.5 text-xs text-navy-950 leading-relaxed font-sans outline-hidden resize-none"
                     />
                     <button
                       type="button"

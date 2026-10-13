@@ -145,7 +145,7 @@ export default function ServicesPage() {
         </div>
 
         {/* Bottom Contact Callout */}
-        <div className="mt-16 bg-gradient-to-br from-navy-950 via-navy-900 to-navy-950 rounded-3xl p-8 sm:p-12 text-center text-white border border-navy-800 shadow-xl">
+        <div className="mt-16 bg-linear-to-br/srgb from-navy-950 via-navy-900 to-navy-950 rounded-3xl p-8 sm:p-12 text-center text-white border border-navy-800 shadow-xl">
           <h2 className="text-2xl sm:text-3xl font-bold text-white mb-3">
             ต้องการคำปรึกษาเฉพาะด้านเกี่ยวกับอสังหาริมทรัพย์ของคุณ?
           </h2>
@@ -155,7 +155,7 @@ export default function ServicesPage() {
           <div className="flex flex-wrap items-center justify-center gap-4">
             <a
               href="tel:0816040097"
-              className="px-6 py-3 bg-gradient-to-r from-gold-400 to-gold-500 text-navy-950 font-bold text-sm rounded-xl shadow-md flex items-center space-x-2"
+              className="px-6 py-3 bg-linear-to-r/srgb from-gold-400 to-gold-500 text-navy-950 font-bold text-sm rounded-xl shadow-md flex items-center space-x-2"
             >
               <PhoneCall className="w-4 h-4 text-navy-950" />
               <span>โทร 081-604-0097</span>

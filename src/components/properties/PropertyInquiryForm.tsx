@@ -73,7 +73,7 @@ export default function PropertyInquiryForm({ property }: PropertyInquiryFormPro
           onClick={() => setFormMode('booking')}
           className={`py-2 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center space-x-1.5 cursor-pointer ${
             formMode === 'booking'
-              ? 'bg-navy-950 text-gold-400 shadow-sm'
+              ? 'bg-navy-950 text-gold-400 shadow-xs'
               : 'text-slate-600 hover:text-navy-950'
           }`}
         >
@@ -85,7 +85,7 @@ export default function PropertyInquiryForm({ property }: PropertyInquiryFormPro
           onClick={() => setFormMode('inquiry')}
           className={`py-2 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center space-x-1.5 cursor-pointer ${
             formMode === 'inquiry'
-              ? 'bg-navy-950 text-gold-400 shadow-sm'
+              ? 'bg-navy-950 text-gold-400 shadow-xs'
               : 'text-slate-600 hover:text-navy-950'
           }`}
         >
@@ -119,7 +119,7 @@ export default function PropertyInquiryForm({ property }: PropertyInquiryFormPro
               href="https://lin.ee/NMSe28T3"
               target="_blank"
               rel="noreferrer"
-              className="py-2.5 px-4 bg-[#06C755] text-white text-xs font-bold rounded-xl shadow-sm flex items-center justify-center space-x-1.5"
+              className="py-2.5 px-4 bg-[#06C755] text-white text-xs font-bold rounded-xl shadow-xs flex items-center justify-center space-x-1.5"
             >
               <MessageCircle className="w-4 h-4" />
               <span>แชท LINE ยืนยันคิวด่วน</span>
@@ -149,7 +149,7 @@ export default function PropertyInquiryForm({ property }: PropertyInquiryFormPro
                   required
                   value={selectedDate}
                   onChange={(e) => setSelectedDate(e.target.value)}
-                  className="w-full bg-white border border-slate-300 rounded-lg p-2 text-xs font-bold text-navy-950 focus:ring-2 focus:ring-gold-400 outline-none"
+                  className="w-full bg-white border border-slate-300 rounded-lg p-2 text-xs font-bold text-navy-950 focus:ring-2 focus:ring-gold-400 outline-hidden"
                 />
               </div>
 
@@ -161,7 +161,7 @@ export default function PropertyInquiryForm({ property }: PropertyInquiryFormPro
                 <select
                   value={timeSlot}
                   onChange={(e) => setTimeSlot(e.target.value)}
-                  className="w-full bg-white border border-slate-300 rounded-lg p-2 text-xs text-navy-950 font-medium focus:ring-2 focus:ring-gold-400 outline-none"
+                  className="w-full bg-white border border-slate-300 rounded-lg p-2 text-xs text-navy-950 font-medium focus:ring-2 focus:ring-gold-400 outline-hidden"
                 >
                   <option value="รอบเช้า (09:30 - 11:30 น.)">รอบเช้า (09:30 - 11:30 น.)</option>
                   <option value="รอบบ่าย (13:30 - 15:30 น.)">รอบบ่าย (13:30 - 15:30 น.)</option>
@@ -182,7 +182,7 @@ export default function PropertyInquiryForm({ property }: PropertyInquiryFormPro
               placeholder="ชื่อ-นามสกุลของคุณ"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              className="w-full bg-gray-50 border border-gray-200 rounded-xl p-2.5 text-xs text-gray-900 focus:bg-white focus:ring-2 focus:ring-gold-400 outline-none"
+              className="w-full bg-gray-50 border border-gray-200 rounded-xl p-2.5 text-xs text-gray-900 focus:bg-white focus:ring-2 focus:ring-gold-400 outline-hidden"
             />
           </div>
 
@@ -197,7 +197,7 @@ export default function PropertyInquiryForm({ property }: PropertyInquiryFormPro
               placeholder="081-xxx-xxxx"
               value={phone}
               onChange={(e) => setPhone(e.target.value)}
-              className="w-full bg-gray-50 border border-gray-200 rounded-xl p-2.5 text-xs text-gray-900 font-mono focus:bg-white focus:ring-2 focus:ring-gold-400 outline-none"
+              className="w-full bg-gray-50 border border-gray-200 rounded-xl p-2.5 text-xs text-gray-900 font-mono focus:bg-white focus:ring-2 focus:ring-gold-400 outline-hidden"
             />
           </div>
 
@@ -211,7 +211,7 @@ export default function PropertyInquiryForm({ property }: PropertyInquiryFormPro
               placeholder="ไอดีไลน์ของคุณ"
               value={lineId}
               onChange={(e) => setLineId(e.target.value)}
-              className="w-full bg-gray-50 border border-gray-200 rounded-xl p-2.5 text-xs text-gray-900 focus:bg-white focus:ring-2 focus:ring-gold-400 outline-none"
+              className="w-full bg-gray-50 border border-gray-200 rounded-xl p-2.5 text-xs text-gray-900 focus:bg-white focus:ring-2 focus:ring-gold-400 outline-hidden"
             />
           </div>
 
@@ -224,14 +224,14 @@ export default function PropertyInquiryForm({ property }: PropertyInquiryFormPro
               rows={2}
               value={message}
               onChange={(e) => setMessage(e.target.value)}
-              className="w-full bg-gray-50 border border-gray-200 rounded-xl p-2.5 text-xs text-gray-900 focus:bg-white focus:ring-2 focus:ring-gold-400 outline-none resize-none"
+              className="w-full bg-gray-50 border border-gray-200 rounded-xl p-2.5 text-xs text-gray-900 focus:bg-white focus:ring-2 focus:ring-gold-400 outline-hidden resize-none"
             />
           </div>
 
           <button
             type="submit"
             disabled={submitting}
-            className="w-full py-3.5 bg-gradient-to-r from-navy-950 to-navy-900 hover:from-navy-900 hover:to-navy-800 text-gold-400 font-black text-xs sm:text-sm rounded-xl shadow-md hover:shadow-lg transition-all flex items-center justify-center space-x-2 disabled:opacity-50 cursor-pointer"
+            className="w-full py-3.5 bg-linear-to-r/srgb from-navy-950 to-navy-900 hover:from-navy-900 hover:to-navy-800 text-gold-400 font-black text-xs sm:text-sm rounded-xl shadow-md hover:shadow-lg transition-all flex items-center justify-center space-x-2 disabled:opacity-50 cursor-pointer"
           >
             <Send className="w-4 h-4 text-gold-400" />
             <span>

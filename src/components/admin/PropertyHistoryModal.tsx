@@ -211,15 +211,15 @@ export default function PropertyHistoryModal({
       <div className="bg-white w-full max-w-2xl max-h-[90vh] rounded-3xl shadow-2xl border border-gray-200 flex flex-col overflow-hidden animate-in zoom-in-95 duration-200">
         
         {/* Modal Header */}
-        <div className="p-4 sm:p-5 bg-gradient-to-r from-navy-950 to-blue-950 text-white flex items-start justify-between gap-3 border-b border-navy-800">
+        <div className="p-4 sm:p-5 bg-linear-to-r/srgb from-navy-950 to-blue-950 text-white flex items-start justify-between gap-3 border-b border-navy-800">
           <div className="flex items-start gap-3 min-w-0">
-            <div className="relative w-14 h-14 rounded-xl overflow-hidden bg-navy-900 border border-gold-500/40 flex-shrink-0">
+            <div className="relative w-14 h-14 rounded-xl overflow-hidden bg-navy-900 border border-gold-500/40 shrink-0">
               <StaffPropertyImage
                 src={property.cover_image} propertyId={property.id}
                 alt={property.title}
                 className="object-cover"
               />
-              <span className={`absolute top-0.5 left-0.5 px-1 py-0.2 rounded text-[8px] font-bold ${
+              <span className={`absolute top-0.5 left-0.5 px-1 py-0.2 rounded-sm text-[8px] font-bold ${
                 property.status === 'rent' ? 'bg-emerald-600 text-white' : 'bg-gold-500 text-navy-950'
               }`}>
                 {property.status === 'rent' ? 'เช่า' : 'ขาย'}
@@ -228,7 +228,7 @@ export default function PropertyHistoryModal({
 
             <div className="min-w-0">
               <div className="flex items-center gap-2">
-                <span className="font-mono text-[10px] font-bold bg-gold-500/20 text-gold-300 px-1.5 py-0.2 rounded border border-gold-500/30">
+                <span className="font-mono text-[10px] font-bold bg-gold-500/20 text-gold-300 px-1.5 py-0.2 rounded-sm border border-gold-500/30">
                   {formatPropertyCode(property.id)}
                 </span>
                 <span className="text-[11px] text-gray-300 font-medium truncate">
@@ -414,7 +414,7 @@ export default function PropertyHistoryModal({
               value={manualNoteText}
               onChange={(e) => setManualNoteText(e.target.value)}
               placeholder="ระบุบันทึก เช่น เจ้าของทรัพย์ยินยอมลดราคาพิเศษ 2 แสน, ลูกค้าคุณสมชายนัดดูบ้านวันเสาร์นี้..."
-              className="w-full p-2 text-xs bg-white border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-gold-500 font-medium"
+              className="w-full p-2 text-xs bg-white border border-gray-300 rounded-xl focus:outline-hidden focus:ring-2 focus:ring-gold-500 font-medium"
               autoFocus
             />
             <div className="flex items-center justify-end gap-2">
@@ -522,7 +522,7 @@ export default function PropertyHistoryModal({
                           <span>บันทึกโดย:</span>
                           <strong className="text-navy-950 font-bold">{log.actor_name}</strong>
                           {log.actor_role && (
-                            <span className="bg-gray-100 text-gray-600 px-1 py-0.2 rounded text-[9px]">
+                            <span className="bg-gray-100 text-gray-600 px-1 py-0.2 rounded-sm text-[9px]">
                               {log.actor_role}
                             </span>
                           )}

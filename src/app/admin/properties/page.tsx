@@ -652,7 +652,7 @@ function PropertiesContent() {
         <Link
           id="add-new-property-btn"
           href="/admin/properties/new"
-          className="inline-flex min-h-11 shrink-0 items-center justify-center gap-2 rounded-xl bg-navy-950 px-5 text-sm font-semibold text-white shadow-sm hover:bg-navy-900"
+          className="inline-flex min-h-11 shrink-0 items-center justify-center gap-2 rounded-xl bg-navy-950 px-5 text-sm font-semibold text-white shadow-xs hover:bg-navy-900"
         >
           <PlusCircle className="h-4 w-4 text-gold-400" />
           เพิ่มทรัพย์ใหม่
@@ -710,7 +710,7 @@ function PropertiesContent() {
 
       <section
         aria-label="ค้นหาและกรองทรัพย์"
-        className="space-y-4 rounded-3xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5"
+        className="space-y-4 rounded-3xl border border-slate-200 bg-white p-4 shadow-xs sm:p-5"
       >
         <div className="flex flex-col gap-3 sm:flex-row">
           <div className="relative flex-1">
@@ -723,7 +723,7 @@ function PropertiesContent() {
               placeholder="ค้นหาชื่อทรัพย์ อำเภอ หรือรหัส CK…"
               value={searchQuery}
               onChange={(event) => setSearchQuery(event.target.value)}
-              className="min-h-12 w-full rounded-xl border border-slate-200 bg-slate-50 pl-10 pr-3 text-base text-navy-950 focus:outline-none focus:ring-2 focus:ring-gold-400"
+              className="min-h-12 w-full rounded-xl border border-slate-200 bg-slate-50 pl-10 pr-3 text-base text-navy-950 focus:outline-hidden focus:ring-2 focus:ring-gold-400"
             />
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
           </div>

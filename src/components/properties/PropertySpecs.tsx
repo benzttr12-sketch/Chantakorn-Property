@@ -110,12 +110,12 @@ export default function PropertySpecs({ property }: PropertySpecsProps) {
                   : 'bg-gray-50/70 border-gray-100 text-gray-800'
               }`}
             >
-              <div className={`w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 ${
+              <div className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 ${
                 item.highlight ? 'bg-gold-500 text-navy-950' : 'bg-white text-navy-900 shadow-xs'
               }`}>
                 <Icon className="w-4 h-4" />
               </div>
-              <div className="min-w-0 flex-grow">
+              <div className="min-w-0 grow">
                 <span className="text-[11px] text-gray-500 block leading-tight">
                   {item.label}
                 </span>

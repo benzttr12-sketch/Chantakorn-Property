@@ -109,7 +109,7 @@ export default function LocationHighlights() {
           </div>
           <Link
             href="/properties"
-            className="group inline-flex min-h-12 shrink-0 items-center justify-center gap-3 self-start rounded-full border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-navy-900 outline-none hover:border-gold-400 hover:text-gold-700 focus-visible:ring-4 focus-visible:ring-gold-200 motion-safe:transition-colors md:self-auto"
+            className="group inline-flex min-h-12 shrink-0 items-center justify-center gap-3 self-start rounded-full border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-navy-900 outline-hidden hover:border-gold-400 hover:text-gold-700 focus-visible:ring-4 focus-visible:ring-gold-200 motion-safe:transition-colors md:self-auto"
           >
             <span>สำรวจทุกทำเล</span>
             <ArrowUpRight aria-hidden="true" className="h-4 w-4 motion-safe:transition-transform motion-safe:group-hover:-translate-y-0.5 motion-safe:group-hover:translate-x-0.5" />
@@ -135,7 +135,7 @@ export default function LocationHighlights() {
                 />
               </div>
             ))}
-            <div aria-hidden="true" className="absolute inset-0 bg-gradient-to-t from-navy-950 via-navy-950/25 to-navy-950/20" />
+            <div aria-hidden="true" className="absolute inset-0 bg-linear-to-t/srgb from-navy-950 via-navy-950/25 to-navy-950/20" />
 
             <div className="absolute inset-x-5 top-5 flex items-start justify-between gap-3 sm:inset-x-8 sm:top-8">
               <span className="flex max-w-[75%] items-center gap-2 rounded-full border border-white/25 bg-navy-950/30 px-3 py-2 text-[11px] font-medium text-white backdrop-blur-md">
@@ -157,16 +157,16 @@ export default function LocationHighlights() {
               <div className="flex flex-wrap items-center justify-between gap-4">
                 <Link
                   href={locationHref(selected)}
-                  className="group inline-flex min-h-12 items-center justify-center gap-3 rounded-full bg-gold-400 px-5 py-3 text-sm font-bold text-navy-950 outline-none hover:bg-gold-300 focus-visible:ring-4 focus-visible:ring-white/80 motion-safe:transition-colors"
+                  className="group inline-flex min-h-12 items-center justify-center gap-3 rounded-full bg-gold-400 px-5 py-3 text-sm font-bold text-navy-950 outline-hidden hover:bg-gold-300 focus-visible:ring-4 focus-visible:ring-white/80 motion-safe:transition-colors"
                 >
                   <span>ดูทรัพย์ใน{selected.name}</span>
                   <ArrowUpRight aria-hidden="true" className="h-4 w-4 motion-safe:transition-transform motion-safe:group-hover:-translate-y-0.5 motion-safe:group-hover:translate-x-0.5" />
                 </Link>
                 <div className="flex items-center gap-2">
-                  <button type="button" aria-label="เลือกทำเลก่อนหน้า" onClick={() => moveLocation(-1)} className="flex h-12 w-12 items-center justify-center rounded-full border border-white/35 bg-navy-950/20 text-white outline-none hover:bg-white hover:text-navy-950 focus-visible:ring-4 focus-visible:ring-gold-300 motion-safe:transition-colors">
+                  <button type="button" aria-label="เลือกทำเลก่อนหน้า" onClick={() => moveLocation(-1)} className="flex h-12 w-12 items-center justify-center rounded-full border border-white/35 bg-navy-950/20 text-white outline-hidden hover:bg-white hover:text-navy-950 focus-visible:ring-4 focus-visible:ring-gold-300 motion-safe:transition-colors">
                     <ArrowLeft aria-hidden="true" className="h-4 w-4" />
                   </button>
-                  <button type="button" aria-label="เลือกทำเลถัดไป" onClick={() => moveLocation(1)} className="flex h-12 w-12 items-center justify-center rounded-full border border-white/35 bg-navy-950/20 text-white outline-none hover:bg-white hover:text-navy-950 focus-visible:ring-4 focus-visible:ring-gold-300 motion-safe:transition-colors">
+                  <button type="button" aria-label="เลือกทำเลถัดไป" onClick={() => moveLocation(1)} className="flex h-12 w-12 items-center justify-center rounded-full border border-white/35 bg-navy-950/20 text-white outline-hidden hover:bg-white hover:text-navy-950 focus-visible:ring-4 focus-visible:ring-gold-300 motion-safe:transition-colors">
                     <ArrowRight aria-hidden="true" className="h-4 w-4" />
                   </button>
                 </div>
@@ -190,7 +190,7 @@ export default function LocationHighlights() {
                     aria-pressed={isSelected}
                     aria-controls="home-location-preview"
                     onClick={() => setSelectedIndex(index)}
-                    className={`group flex min-h-[84px] items-center gap-3 rounded-2xl border p-3 text-left outline-none focus-visible:ring-4 focus-visible:ring-gold-200 motion-safe:transition-colors lg:min-h-[72px] ${isSelected ? 'border-navy-800 bg-navy-800 text-white shadow-card' : 'border-slate-100 bg-slate-50 text-navy-950 hover:border-gold-300 hover:bg-gold-50'}`}
+                    className={`group flex min-h-[84px] items-center gap-3 rounded-2xl border p-3 text-left outline-hidden focus-visible:ring-4 focus-visible:ring-gold-200 motion-safe:transition-colors lg:min-h-[72px] ${isSelected ? 'border-navy-800 bg-navy-800 text-white shadow-card' : 'border-slate-100 bg-slate-50 text-navy-950 hover:border-gold-300 hover:bg-gold-50'}`}
                   >
                     <span aria-hidden="true" className={`hidden shrink-0 text-[10px] font-medium tabular-nums sm:block ${isSelected ? 'text-gold-300' : 'text-slate-400'}`}>{String(index + 1).padStart(2, '0')}</span>
                     <span className="min-w-0 flex-1">

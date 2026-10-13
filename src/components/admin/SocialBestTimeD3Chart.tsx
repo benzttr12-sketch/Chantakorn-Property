@@ -564,9 +564,9 @@ export default function SocialBestTimeD3Chart({
       </div>
 
       {/* Top Highlight: #1 Prime Recommended Window Banner */}
-      <div className="relative z-10 p-4 sm:p-5 rounded-2xl bg-gradient-to-r from-navy-900 via-slate-900 to-navy-900 border border-gold-500/40 shadow-lg flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-4">
+      <div className="relative z-10 p-4 sm:p-5 rounded-2xl bg-linear-to-r/srgb from-navy-900 via-slate-900 to-navy-900 border border-gold-500/40 shadow-lg flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-4">
         <div className="flex items-start sm:items-center space-x-3.5">
-          <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-gold-400 to-amber-600 flex items-center justify-center flex-shrink-0 shadow-md shadow-gold-500/20 text-navy-950">
+          <div className="w-12 h-12 rounded-2xl bg-linear-to-br/srgb from-gold-400 to-amber-600 flex items-center justify-center shrink-0 shadow-md shadow-gold-500/20 text-navy-950">
             <Flame className="w-6 h-6 animate-pulse" />
           </div>
           <div>

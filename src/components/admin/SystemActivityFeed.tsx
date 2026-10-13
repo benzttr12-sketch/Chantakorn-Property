@@ -132,7 +132,7 @@ export default function SystemActivityFeed() {
       {/* Feed Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-5 border-b border-gray-100">
         <div className="flex min-w-0 items-start gap-3">
-          <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-navy-950 to-blue-900 text-gold-400 flex items-center justify-center font-bold shadow-md border border-gold-500/30 flex-shrink-0">
+          <div className="w-11 h-11 rounded-2xl bg-linear-to-br/srgb from-navy-950 to-blue-900 text-gold-400 flex items-center justify-center font-bold shadow-md border border-gold-500/30 shrink-0">
             <Activity className="w-5 h-5 text-gold-400" />
           </div>
           <div className="min-w-0">
@@ -167,7 +167,7 @@ export default function SystemActivityFeed() {
           <button
             type="button"
             onClick={() => setCategoryFilter('all')}
-            className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center space-x-1.5 transition-all flex-shrink-0 cursor-pointer ${
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center space-x-1.5 transition-all shrink-0 cursor-pointer ${
               categoryFilter === 'all'
                 ? 'bg-navy-950 text-gold-400 shadow-xs'
                 : 'bg-white text-gray-600 hover:bg-gray-200/70 border border-gray-200'
@@ -182,7 +182,7 @@ export default function SystemActivityFeed() {
           <button
             type="button"
             onClick={() => setCategoryFilter('property')}
-            className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center space-x-1.5 transition-all flex-shrink-0 cursor-pointer ${
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center space-x-1.5 transition-all shrink-0 cursor-pointer ${
               categoryFilter === 'property'
                 ? 'bg-amber-600 text-white shadow-xs'
                 : 'bg-white text-gray-600 hover:bg-gray-200/70 border border-gray-200'
@@ -195,7 +195,7 @@ export default function SystemActivityFeed() {
           <button
             type="button"
             onClick={() => setCategoryFilter('inquiry')}
-            className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center space-x-1.5 transition-all flex-shrink-0 cursor-pointer ${
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center space-x-1.5 transition-all shrink-0 cursor-pointer ${
               categoryFilter === 'inquiry'
                 ? 'bg-emerald-600 text-white shadow-xs'
                 : 'bg-white text-gray-600 hover:bg-gray-200/70 border border-gray-200'
@@ -208,7 +208,7 @@ export default function SystemActivityFeed() {
           <button
             type="button"
             onClick={() => setCategoryFilter('user_role')}
-            className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center space-x-1.5 transition-all flex-shrink-0 cursor-pointer ${
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center space-x-1.5 transition-all shrink-0 cursor-pointer ${
               categoryFilter === 'user_role'
                 ? 'bg-navy-900 text-gold-300 shadow-xs'
                 : 'bg-white text-gray-600 hover:bg-gray-200/70 border border-gray-200'
@@ -229,7 +229,7 @@ export default function SystemActivityFeed() {
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="ค้นหากิจกรรมระบบ..."
-            className="w-full pl-8 pr-3 py-1.5 text-xs font-medium bg-white rounded-xl border border-gray-300 focus:outline-none focus:ring-2 focus:ring-gold-500 focus:border-transparent"
+            className="w-full pl-8 pr-3 py-1.5 text-xs font-medium bg-white rounded-xl border border-gray-300 focus:outline-hidden focus:ring-2 focus:ring-gold-500 focus:border-transparent"
           />
         </div>
       </div>
@@ -254,7 +254,7 @@ export default function SystemActivityFeed() {
               <div key={act.id} className="relative group">
                 {/* Chronological Timeline Node */}
                 <div 
-                  className={`absolute -left-[19px] sm:-left-[23px] top-1 w-6 h-6 rounded-full flex items-center justify-center font-bold text-[10px] ring-4 shadow-sm transition-transform group-hover:scale-110 ${badge.nodeBg}`}
+                  className={`absolute -left-[19px] sm:-left-[23px] top-1 w-6 h-6 rounded-full flex items-center justify-center font-bold text-[10px] ring-4 shadow-xs transition-transform group-hover:scale-110 ${badge.nodeBg}`}
                 >
                   {badge.icon}
                 </div>
@@ -286,10 +286,10 @@ export default function SystemActivityFeed() {
                   {/* Actor and Target Metadata Tag */}
                   <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] bg-slate-50 px-3 py-1.5 rounded-xl border border-slate-200/70 text-gray-600">
                     <div className="flex items-center space-x-1.5">
-                      <UserCircle className="w-3.5 h-3.5 text-navy-800 flex-shrink-0" />
+                      <UserCircle className="w-3.5 h-3.5 text-navy-800 shrink-0" />
                       <span>ผู้ดำเนินการ: <strong className="text-navy-950">{act.actor_name}</strong></span>
                       {act.actor_role && (
-                        <span className="text-[9px] font-extrabold px-1.5 py-0.2 rounded bg-navy-100 text-navy-900 uppercase">
+                        <span className="text-[9px] font-extrabold px-1.5 py-0.2 rounded-sm bg-navy-100 text-navy-900 uppercase">
                           {act.actor_role}
                         </span>
                       )}

@@ -92,13 +92,13 @@ function PropertySpotlight({ property }: { property: Property }) {
           <p className="mb-5 max-w-sm text-sm leading-relaxed text-slate-300">ดูภาพ ทำเล และข้อมูลทรัพย์ให้ครบ แล้วส่งคำขอนัดชมในวันที่คุณสะดวก</p>
           <Link
             href={`${propertyHref(property)}#inquiry`}
-            className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-gold-300 px-5 py-3.5 text-sm font-bold text-navy-950 transition-colors hover:bg-gold-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-4 focus-visible:ring-offset-navy-950 sm:w-auto"
+            className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-gold-300 px-5 py-3.5 text-sm font-bold text-navy-950 transition-colors hover:bg-gold-200 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-4 focus-visible:ring-offset-navy-950 sm:w-auto"
           >
             <CalendarDays aria-hidden="true" className="h-4 w-4" />
             ส่งคำขอนัดชมทรัพย์นี้
             <ArrowRight aria-hidden="true" className="h-4 w-4" />
           </Link>
-          <Link href={propertyHref(property)} className="mt-4 flex w-fit items-center gap-2 rounded text-xs font-semibold text-gold-200 underline decoration-gold-200/30 underline-offset-4 hover:decoration-gold-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-300">
+          <Link href={propertyHref(property)} className="mt-4 flex w-fit items-center gap-2 rounded-sm text-xs font-semibold text-gold-200 underline decoration-gold-200/30 underline-offset-4 hover:decoration-gold-200 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-gold-300">
             เปิดข้อมูลและภาพทรัพย์<ArrowRight aria-hidden="true" className="h-3.5 w-3.5" />
           </Link>
         </div>
@@ -167,7 +167,7 @@ export default function FeaturedProperties() {
               เลือกประเภทที่สนใจ เปิดดูภาพและรายละเอียด แล้วค่อยวางแผนนัดชมสถานที่จริง
             </p>
           </div>
-          <Link href="/properties" className="inline-flex shrink-0 items-center gap-2 self-start rounded-xl border border-slate-200 bg-white px-5 py-3 text-sm font-bold text-navy-950 transition-colors hover:border-gold-300 hover:text-gold-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-500 focus-visible:ring-offset-4 md:self-auto">
+          <Link href="/properties" className="inline-flex shrink-0 items-center gap-2 self-start rounded-xl border border-slate-200 bg-white px-5 py-3 text-sm font-bold text-navy-950 transition-colors hover:border-gold-300 hover:text-gold-700 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-gold-500 focus-visible:ring-offset-4 md:self-auto">
             ดูทรัพย์ทั้งหมด<ArrowRight aria-hidden="true" className="h-4 w-4 text-gold-600" />
           </Link>
         </div>
@@ -183,7 +183,7 @@ export default function FeaturedProperties() {
                 aria-pressed={isActive}
                 aria-controls="home-property-results"
                 onClick={() => setActiveCategory(tab.id)}
-                className={`inline-flex min-h-11 shrink-0 items-center gap-2 whitespace-nowrap rounded-full border px-4 py-2.5 text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-500 focus-visible:ring-offset-2 sm:text-sm ${isActive ? 'border-navy-950 bg-navy-950 text-gold-300 shadow-sm' : 'border-slate-200 bg-white text-slate-600 hover:border-gold-300 hover:text-navy-950'}`}
+                className={`inline-flex min-h-11 shrink-0 items-center gap-2 whitespace-nowrap rounded-full border px-4 py-2.5 text-xs font-semibold transition-colors focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-gold-500 focus-visible:ring-offset-2 sm:text-sm ${isActive ? 'border-navy-950 bg-navy-950 text-gold-300 shadow-xs' : 'border-slate-200 bg-white text-slate-600 hover:border-gold-300 hover:text-navy-950'}`}
               >
                 {Icon && <Icon aria-hidden="true" className="h-4 w-4 shrink-0" />}
                 <span>{tab.label}</span>
@@ -206,7 +206,7 @@ export default function FeaturedProperties() {
           ) : error ? (
             <div className="rounded-3xl border border-red-100 bg-white p-8 text-center">
               <p role="alert" className="text-sm text-red-700">{error}</p>
-              <button type="button" onClick={() => setLoadAttempt(attempt => attempt + 1)} className="mt-5 inline-flex min-h-11 items-center gap-2 rounded-xl bg-navy-950 px-5 py-2.5 text-sm font-semibold text-gold-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-500 focus-visible:ring-offset-2">
+              <button type="button" onClick={() => setLoadAttempt(attempt => attempt + 1)} className="mt-5 inline-flex min-h-11 items-center gap-2 rounded-xl bg-navy-950 px-5 py-2.5 text-sm font-semibold text-gold-300 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-gold-500 focus-visible:ring-offset-2">
                 <RotateCcw aria-hidden="true" className="h-4 w-4" />ลองโหลดอีกครั้ง
               </button>
             </div>
@@ -216,11 +216,11 @@ export default function FeaturedProperties() {
               <h3 className="text-lg font-bold text-navy-950">{activeCategory === 'all' ? 'ยังไม่มีรายการทรัพย์ที่เปิดเผยแพร่' : `ยังไม่มี${activeLabel}ในขณะนี้`}</h3>
               <p className="mx-auto mt-2 max-w-sm text-sm leading-relaxed text-slate-500">{activeCategory === 'all' ? 'คุณสามารถสอบถามทำเลและประเภททรัพย์ที่สนใจกับทีมงานได้' : 'ลองดูประเภทอื่น หรือกลับไปดูรายการทั้งหมดที่มีอยู่'}</p>
               {activeCategory !== 'all' ? (
-                <button type="button" onClick={() => setActiveCategory('all')} className="mt-5 inline-flex min-h-11 items-center gap-2 rounded-xl bg-navy-950 px-5 py-2.5 text-sm font-semibold text-gold-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-500 focus-visible:ring-offset-2">
+                <button type="button" onClick={() => setActiveCategory('all')} className="mt-5 inline-flex min-h-11 items-center gap-2 rounded-xl bg-navy-950 px-5 py-2.5 text-sm font-semibold text-gold-300 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-gold-500 focus-visible:ring-offset-2">
                   ดูรายการทั้งหมด<ArrowRight aria-hidden="true" className="h-4 w-4" />
                 </button>
               ) : (
-                <Link href="/contact" className="mt-5 inline-flex min-h-11 items-center gap-2 rounded-xl bg-navy-950 px-5 py-2.5 text-sm font-semibold text-gold-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-500 focus-visible:ring-offset-2">ปรึกษาทีมงาน<ArrowRight aria-hidden="true" className="h-4 w-4" /></Link>
+                <Link href="/contact" className="mt-5 inline-flex min-h-11 items-center gap-2 rounded-xl bg-navy-950 px-5 py-2.5 text-sm font-semibold text-gold-300 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-gold-500 focus-visible:ring-offset-2">ปรึกษาทีมงาน<ArrowRight aria-hidden="true" className="h-4 w-4" /></Link>
               )}
             </div>
           ) : (

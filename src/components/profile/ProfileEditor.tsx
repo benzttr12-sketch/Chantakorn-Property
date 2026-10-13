@@ -278,7 +278,7 @@ export default function ProfileEditor({ isAdminView = false }: ProfileEditorProp
   return (
     <div className="max-w-4xl mx-auto space-y-6">
       {/* Header Banner */}
-      <div className="bg-white p-6 sm:p-8 rounded-3xl border border-surface-border shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+      <div className="bg-white p-6 sm:p-8 rounded-3xl border border-surface-border shadow-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
           <div className="flex items-center space-x-2">
             <h1 className="text-2xl sm:text-3xl font-extrabold text-navy-950">
@@ -299,7 +299,7 @@ export default function ProfileEditor({ isAdminView = false }: ProfileEditorProp
             <Link
               id="goto-admin-btn"
               href="/admin"
-              className="px-4 py-2 bg-navy-950 hover:bg-navy-900 text-gold-300 border border-gold-400/40 font-bold text-xs rounded-xl shadow-sm flex items-center space-x-1.5 transition-all"
+              className="px-4 py-2 bg-navy-950 hover:bg-navy-900 text-gold-300 border border-gold-400/40 font-bold text-xs rounded-xl shadow-xs flex items-center space-x-1.5 transition-all"
             >
               <LayoutDashboard className="w-4 h-4 text-gold-400" />
               <span>แผงควบคุมระบบ (Admin)</span>
@@ -321,21 +321,21 @@ export default function ProfileEditor({ isAdminView = false }: ProfileEditorProp
       {/* Notifications */}
       {successMessage && (
         <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-2xl flex items-center space-x-3 text-xs sm:text-sm text-emerald-800 animate-fadeIn">
-          <CheckCircle2 className="w-5 h-5 text-emerald-600 flex-shrink-0" />
+          <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
           <span className="font-semibold">{successMessage}</span>
         </div>
       )}
 
       {errorMessage && (
         <div className="p-4 bg-red-50 border border-red-200 rounded-2xl flex items-center space-x-3 text-xs sm:text-sm text-red-800 animate-fadeIn">
-          <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0" />
+          <AlertCircle className="w-5 h-5 text-red-600 shrink-0" />
           <span className="font-semibold">{errorMessage}</span>
         </div>
       )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Left Column: Avatar & Photo Management */}
-        <div className="bg-white p-6 sm:p-7 rounded-3xl border border-surface-border shadow-sm flex flex-col items-center text-center space-y-5">
+        <div className="bg-white p-6 sm:p-7 rounded-3xl border border-surface-border shadow-xs flex flex-col items-center text-center space-y-5">
           <div className="relative group">
             <div className="w-32 h-32 rounded-full overflow-hidden border-4 border-gold-400/80 shadow-lg bg-gray-100 flex items-center justify-center relative">
               {avatarUrl ? (
@@ -346,7 +346,7 @@ export default function ProfileEditor({ isAdminView = false }: ProfileEditorProp
                   className="w-full h-full object-cover"
                 />
               ) : (
-                <div className="w-full h-full bg-gradient-to-br from-navy-900 to-navy-950 text-gold-400 flex items-center justify-center text-4xl font-extrabold">
+                <div className="w-full h-full bg-linear-to-br/srgb from-navy-900 to-navy-950 text-gold-400 flex items-center justify-center text-4xl font-extrabold">
                   {fullName ? fullName.charAt(0).toUpperCase() : 'U'}
                 </div>
               )}
@@ -414,7 +414,7 @@ export default function ProfileEditor({ isAdminView = false }: ProfileEditorProp
                   id="change-avatar-file-btn"
                   type="button"
                   onClick={() => fileInputRef.current?.click()}
-                  className="flex-1 py-2 px-3 bg-navy-950 hover:bg-navy-900 text-gold-400 font-bold text-xs rounded-xl shadow-sm transition-all flex items-center justify-center space-x-1.5"
+                  className="flex-1 py-2 px-3 bg-navy-950 hover:bg-navy-900 text-gold-400 font-bold text-xs rounded-xl shadow-xs transition-all flex items-center justify-center space-x-1.5"
                 >
                   <Camera className="w-3.5 h-3.5" />
                   <span>เปลี่ยนรูปภาพ</span>
@@ -434,7 +434,7 @@ export default function ProfileEditor({ isAdminView = false }: ProfileEditorProp
 
             {fileName && (
               <div className="text-[11px] text-gray-500 truncate text-left px-1 flex items-center space-x-1">
-                <ImageIcon className="w-3 h-3 text-gold-600 flex-shrink-0" />
+                <ImageIcon className="w-3 h-3 text-gold-600 shrink-0" />
                 <span className="truncate">{fileName}</span>
               </div>
             )}
@@ -442,7 +442,7 @@ export default function ProfileEditor({ isAdminView = false }: ProfileEditorProp
         </div>
 
         {/* Right Column: Profile Information Form */}
-        <div className="lg:col-span-2 bg-white p-6 sm:p-8 rounded-3xl border border-surface-border shadow-sm">
+        <div className="lg:col-span-2 bg-white p-6 sm:p-8 rounded-3xl border border-surface-border shadow-xs">
           <form onSubmit={handleSaveProfile} className="space-y-5">
             <div className="flex items-center justify-between pb-3 border-b border-gray-100">
               <h2 className="text-base sm:text-lg font-bold text-navy-950 flex items-center space-x-2">
@@ -465,7 +465,7 @@ export default function ProfileEditor({ isAdminView = false }: ProfileEditorProp
                   placeholder="เช่น จันทกร รัตนวิบูลย์"
                   value={fullName}
                   onChange={(e) => setFullName(e.target.value)}
-                  className="w-full bg-gray-50 border border-gray-200 rounded-xl pl-10 pr-4 py-2.5 text-xs sm:text-sm text-gray-900 focus:bg-white focus:ring-2 focus:ring-gold-500 outline-none transition-all"
+                  className="w-full bg-gray-50 border border-gray-200 rounded-xl pl-10 pr-4 py-2.5 text-xs sm:text-sm text-gray-900 focus:bg-white focus:ring-2 focus:ring-gold-500 outline-hidden transition-all"
                 />
                 <User className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
               </div>
@@ -487,7 +487,7 @@ export default function ProfileEditor({ isAdminView = false }: ProfileEditorProp
                   type="email"
                   disabled
                   value={userProfile.email || ''}
-                  className="w-full bg-gray-100 border border-gray-200 rounded-xl pl-10 pr-4 py-2.5 text-xs sm:text-sm text-gray-600 cursor-not-allowed outline-none"
+                  className="w-full bg-gray-100 border border-gray-200 rounded-xl pl-10 pr-4 py-2.5 text-xs sm:text-sm text-gray-600 cursor-not-allowed outline-hidden"
                 />
                 <Mail className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
               </div>
@@ -509,7 +509,7 @@ export default function ProfileEditor({ isAdminView = false }: ProfileEditorProp
                     placeholder="เช่น 081-604-0097"
                     value={phone}
                     onChange={(e) => setPhone(e.target.value)}
-                    className="w-full bg-gray-50 border border-gray-200 rounded-xl pl-10 pr-4 py-2.5 text-xs sm:text-sm text-gray-900 focus:bg-white focus:ring-2 focus:ring-gold-500 outline-none transition-all"
+                    className="w-full bg-gray-50 border border-gray-200 rounded-xl pl-10 pr-4 py-2.5 text-xs sm:text-sm text-gray-900 focus:bg-white focus:ring-2 focus:ring-gold-500 outline-hidden transition-all"
                   />
                   <Phone className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
                 </div>
@@ -525,7 +525,7 @@ export default function ProfileEditor({ isAdminView = false }: ProfileEditorProp
                   placeholder="เช่น @930xzcyi"
                   value={lineId}
                   onChange={(e) => setLineId(e.target.value)}
-                  className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-2.5 text-xs sm:text-sm text-gray-900 focus:bg-white focus:ring-2 focus:ring-gold-500 outline-none transition-all"
+                  className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-2.5 text-xs sm:text-sm text-gray-900 focus:bg-white focus:ring-2 focus:ring-gold-500 outline-hidden transition-all"
                 />
               </div>
             </div>
@@ -541,7 +541,7 @@ export default function ProfileEditor({ isAdminView = false }: ProfileEditorProp
                 placeholder="ระบุข้อมูลแนะนำตัว หรือประสบการณ์ที่ต้องการแสดงในระบบ..."
                 value={bio}
                 onChange={(e) => setBio(e.target.value)}
-                className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3 text-xs sm:text-sm text-gray-900 focus:bg-white focus:ring-2 focus:ring-gold-500 outline-none transition-all"
+                className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3 text-xs sm:text-sm text-gray-900 focus:bg-white focus:ring-2 focus:ring-gold-500 outline-hidden transition-all"
               />
             </div>
 

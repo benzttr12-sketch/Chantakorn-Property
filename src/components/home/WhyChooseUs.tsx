@@ -61,7 +61,7 @@ export default function WhyChooseUs() {
             return (
               <div
                 key={item.title}
-                className="bg-white/[0.04] border border-white/10 hover:border-gold-400/60 rounded-3xl p-7 transition-all duration-300 hover:-translate-y-1.5 hover:bg-white/[0.08] group flex flex-col justify-between backdrop-blur-sm shadow-xl"
+                className="bg-white/[0.04] border border-white/10 hover:border-gold-400/60 rounded-3xl p-7 transition-all duration-300 hover:-translate-y-1.5 hover:bg-white/[0.08] group flex flex-col justify-between backdrop-blur-xs shadow-xl"
               >
                 <div>
                   <div className="flex items-center justify-between mb-6">

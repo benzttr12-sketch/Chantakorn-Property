@@ -12,7 +12,7 @@ function AdvisorCard({ agent }: { agent: ExtendedAgent }) {
   const [failedPhotoUrl, setFailedPhotoUrl] = useState<string | null>(null);
   const hasDirectContact = Boolean(agent.phone.trim() || agent.line_id.trim() || agent.facebook?.trim());
   return (
-    <article className="flex min-w-0 flex-col rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm sm:p-6">
+    <article className="flex min-w-0 flex-col rounded-2xl border border-slate-200/80 bg-white p-5 shadow-xs sm:p-6">
       <div className="flex min-w-0 items-start gap-4"><div className="relative flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-navy-50 text-navy-700">{agent.photo_url && agent.photo_url !== failedPhotoUrl ? <Image src={agent.photo_url} alt={agent.name} fill sizes="80px" unoptimized referrerPolicy="no-referrer" onError={() => setFailedPhotoUrl(agent.photo_url)} className="object-cover" /> : <UserRound className="h-7 w-7" aria-hidden="true" />}</div><div className="min-w-0 pt-1"><p className="text-[11px] font-medium text-gold-700">ที่ปรึกษาอสังหาริมทรัพย์</p><h3 className="mt-2 break-words text-base font-bold leading-relaxed text-navy-950">{agent.name}</h3>{agent.zone && <p className="mt-2 flex items-start gap-1 text-xs leading-relaxed text-slate-400"><MapPin className="mt-0.5 h-3 w-3 shrink-0" /><span className="break-words">{agent.zone}</span></p>}</div></div>
       {agent.bio && <p className="mt-4 break-words text-xs leading-6 text-slate-500">{agent.bio}</p>}
       {agent.specialty && <p className="mt-3 break-words text-xs leading-6 text-slate-500"><span className="font-medium text-navy-950">ดูแลด้าน </span>{agent.specialty}</p>}

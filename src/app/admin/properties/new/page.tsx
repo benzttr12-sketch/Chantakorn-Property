@@ -1171,14 +1171,14 @@ function PropertyEditor() {
     <div className="space-y-6 pb-24">
       {error && (
         <div className="rounded-2xl bg-red-50 border border-red-200 p-4 text-xs sm:text-sm text-red-700 flex items-center space-x-2 animate-in fade-in">
-          <X className="w-4 h-4 text-red-600 flex-shrink-0 cursor-pointer" onClick={() => setError('')} />
+          <X className="w-4 h-4 text-red-600 shrink-0 cursor-pointer" onClick={() => setError('')} />
           <span>{error}</span>
         </div>
       )}
 
       {currentUserRole === 'USER' && (
-        <div className="rounded-2xl bg-amber-50 border border-amber-300 p-4 text-xs sm:text-sm text-amber-900 flex items-start space-x-3 shadow-sm">
-          <ShieldAlert className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
+        <div className="rounded-2xl bg-amber-50 border border-amber-300 p-4 text-xs sm:text-sm text-amber-900 flex items-start space-x-3 shadow-xs">
+          <ShieldAlert className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
           <div className="space-y-1">
             <h4 className="font-bold text-amber-950">จำกัดสิทธิ์การลงประกาศทรัพย์สิน (Role Restricted)</h4>
             <p className="text-xs text-amber-800 leading-relaxed">
@@ -1191,7 +1191,7 @@ function PropertyEditor() {
       {currentUserRole && currentUserRole !== 'USER' && (
         <div className="bg-emerald-50/90 border border-emerald-200 rounded-2xl px-4 py-2.5 text-xs flex flex-wrap items-center justify-between gap-2 shadow-xs">
           <div className="flex items-center space-x-2 text-emerald-950 font-medium">
-            <ShieldCheck className="w-4 h-4 text-emerald-600 flex-shrink-0" />
+            <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" />
             <span>เข้าสู่ระบบด้วยยศ: <strong className="text-navy-950">{currentUserRole === 'ADMIN' ? '🛡️ แอดมิน (Admin)' : '👔 นายหน้า (Agent)'}</strong> — สามารถลงข้อมูลทรัพย์สินและระบุ LINE, Facebook และเบอร์โทรของตนเองได้</span>
           </div>
           <span className="text-[10px] bg-emerald-100 text-emerald-800 font-bold px-2.5 py-0.5 rounded-full border border-emerald-300">
@@ -1201,8 +1201,8 @@ function PropertyEditor() {
       )}
 
       {/* Sticky Section Jump Navigation Bar with Real-time Progress */}
-      <div className="sticky top-16 z-20 bg-white/95 backdrop-blur-md p-2.5 rounded-2xl border border-gray-200 shadow-sm flex items-center justify-between gap-3 overflow-x-auto text-xs">
-        <div className="flex items-center space-x-1 sm:space-x-2 flex-shrink-0">
+      <div className="sticky top-16 z-20 bg-white/95 backdrop-blur-md p-2.5 rounded-2xl border border-gray-200 shadow-xs flex items-center justify-between gap-3 overflow-x-auto text-xs">
+        <div className="flex items-center space-x-1 sm:space-x-2 shrink-0">
           {[
             { id: 'section-1-basic', label: '1. ข้อมูล & ราคา', isValid: title.trim().length >= 10 && Boolean(price && Number(price) > 0) && Boolean(slug.trim()) },
             { id: 'section-2-location', label: '2. ทำเล (สงขลา)', isValid: Boolean(district && subdistrict) },
@@ -1224,7 +1224,7 @@ function PropertyEditor() {
         </div>
 
         {/* Real-time Progress Pill in Sticky Bar (Visible on all viewports) */}
-        <div className="flex items-center space-x-2 pl-3 border-l border-gray-200 flex-shrink-0">
+        <div className="flex items-center space-x-2 pl-3 border-l border-gray-200 shrink-0">
           <span className="text-[11px] text-gray-500 font-semibold hidden md:inline">ความคืบหน้า:</span>
           <div className="w-16 sm:w-24 bg-gray-200 h-2.5 rounded-full overflow-hidden">
             <div
@@ -1245,7 +1245,7 @@ function PropertyEditor() {
       </div>
 
       {/* Top Header & Fast Actions */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between bg-white p-5 sm:p-6 rounded-2xl border border-surface-border shadow-sm gap-4">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between bg-white p-5 sm:p-6 rounded-2xl border border-surface-border shadow-xs gap-4">
         <div className="flex items-center space-x-3">
           <Link
             href="/admin/properties"
@@ -1299,7 +1299,7 @@ function PropertyEditor() {
 
       {/* Smart Auto-Fill from LINE/Facebook/Raw text */}
       {!editId && (
-        <div className="bg-white rounded-2xl p-5 border border-gold-300 shadow-sm space-y-3">
+        <div className="bg-white rounded-2xl p-5 border border-gold-300 shadow-xs space-y-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-2.5">
               <div className="w-8 h-8 rounded-lg bg-gold-100 text-gold-800 flex items-center justify-center font-bold text-sm">
@@ -1333,7 +1333,7 @@ function PropertyEditor() {
                 value={smartText}
                 onChange={(e) => setSmartText(e.target.value)}
                 placeholder="วางข้อความที่นี่ เช่น: ขายบ้านเดี่ยว 2 ชั้น ควนลัง หาดใหญ่ 3 ห้องนอน 2 ห้องน้ำ ที่จอดรถ 2 คัน 54 ตรว. 165 ตรม. ราคา 3.89 ล้าน ใกล้สนามบินหาดใหญ่ แอร์ 3 ตัว ทิศใต้..."
-                className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3 text-xs text-navy-950 outline-none focus:bg-white focus:ring-2 focus:ring-gold-500 leading-relaxed font-mono"
+                className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3 text-xs text-navy-950 outline-hidden focus:bg-white focus:ring-2 focus:ring-gold-500 leading-relaxed font-mono"
               />
 
               {smartMessage && (
@@ -1342,7 +1342,7 @@ function PropertyEditor() {
                     ? 'bg-emerald-50 text-emerald-800 border border-emerald-200' 
                     : 'bg-blue-50 text-blue-800 border border-blue-200'
                 }`}>
-                  <Sparkles className="w-4 h-4 flex-shrink-0" />
+                  <Sparkles className="w-4 h-4 shrink-0" />
                   <span>{smartMessage.text}</span>
                 </div>
               )}
@@ -1352,7 +1352,7 @@ function PropertyEditor() {
                   <button
                     type="button"
                     onClick={() => handleApplySmartText()}
-                    className="px-4 py-2 bg-navy-950 hover:bg-navy-900 text-gold-400 font-bold text-xs rounded-xl shadow-sm flex items-center space-x-1.5 transition-all cursor-pointer"
+                    className="px-4 py-2 bg-navy-950 hover:bg-navy-900 text-gold-400 font-bold text-xs rounded-xl shadow-xs flex items-center space-x-1.5 transition-all cursor-pointer"
                   >
                     <Wand2 className="w-3.5 h-3.5 text-gold-400" />
                     <span>🪄 ถอดรหัส & กรอกข้อมูลลงฟอร์มอัตโนมัติ</span>
@@ -1399,7 +1399,7 @@ function PropertyEditor() {
 
       {/* 1-Click Fast Templates (แม่แบบโพสต์ด่วน 1 คลิก ช่วยให้โพสต์งานง่ายกว่าเดิม) */}
       {!editId && (
-        <div className="bg-gradient-to-r from-navy-950 via-navy-900 to-navy-950 text-white p-5 rounded-2xl border border-navy-800 shadow-md space-y-3">
+        <div className="bg-linear-to-r/srgb from-navy-950 via-navy-900 to-navy-950 text-white p-5 rounded-2xl border border-navy-800 shadow-md space-y-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-2">
               <Zap className="w-4 h-4 text-gold-400" />
@@ -1454,7 +1454,7 @@ function PropertyEditor() {
 
       <form onSubmit={handleSubmit} className="space-y-6">
         {/* Section 1: Basic Information & Price */}
-        <div id="section-1-basic" className="bg-white rounded-2xl p-6 border border-surface-border shadow-sm space-y-4 scroll-mt-28">
+        <div id="section-1-basic" className="bg-white rounded-2xl p-6 border border-surface-border shadow-xs space-y-4 scroll-mt-28">
           <h3 className="font-bold text-navy-950 text-base border-b border-gray-100 pb-3 flex items-center space-x-2">
             <Home className="w-4 h-4 text-gold-600" />
             <span>1. ข้อมูลประกาศและราคา</span>
@@ -1490,7 +1490,7 @@ function PropertyEditor() {
                 placeholder="เช่น ขายบ้านเดี่ยว 2 ชั้น โครงการหรู ทำเลควนลัง หาดใหญ่ ใกล้สนามบิน"
                 value={title}
                 onChange={(e) => handleTitleChange(e.target.value)}
-                className={`w-full border rounded-xl p-3.5 text-xs text-gray-900 outline-none font-semibold text-sm transition-all ${
+                className={`w-full border rounded-xl p-3.5 text-xs text-gray-900 outline-hidden font-semibold text-sm transition-all ${
                   title.trim().length >= 10
                     ? 'bg-emerald-50/20 border-emerald-300 focus:bg-white focus:ring-2 focus:ring-emerald-400'
                     : title.trim().length > 0
@@ -1536,7 +1536,7 @@ function PropertyEditor() {
                 placeholder="modern-house-hatyai-01"
                 value={slug}
                 onChange={(e) => { setSlugEdited(true); setSlug(e.target.value); }}
-                className={`w-full border rounded-xl p-3 text-xs text-gray-900 outline-none font-mono transition-all ${
+                className={`w-full border rounded-xl p-3 text-xs text-gray-900 outline-hidden font-mono transition-all ${
                   slug.trim() && !/[/?#\\]/.test(slug)
                     ? 'bg-emerald-50/20 border-emerald-300 focus:bg-white focus:ring-2 focus:ring-emerald-400'
                     : 'bg-gray-50 border-gray-200 focus:bg-white focus:ring-2 focus:ring-gold-500'
@@ -1572,7 +1572,7 @@ function PropertyEditor() {
                 placeholder="เช่น 3890000 หรือ 12000 (กรณีปล่อยเช่า)"
                 value={price}
                 onChange={(e) => setPrice(e.target.value)}
-                className={`w-full border rounded-xl p-3 text-xs text-navy-950 font-bold text-sm outline-none transition-all ${
+                className={`w-full border rounded-xl p-3 text-xs text-navy-950 font-bold text-sm outline-hidden transition-all ${
                   Number(price) > 0
                     ? 'bg-emerald-50/20 border-emerald-300 focus:bg-white focus:ring-2 focus:ring-emerald-400'
                     : 'bg-gray-50 border-gray-200 focus:bg-white focus:ring-2 focus:ring-gold-500'
@@ -1584,7 +1584,7 @@ function PropertyEditor() {
                 <div className="mt-2 p-2.5 bg-gold-50/80 border border-gold-200 rounded-xl text-xs space-y-1 animate-in fade-in">
                   <div className="flex items-center justify-between font-bold text-gold-950">
                     <span className="text-sm">{formatThaiBahtReadable(Number(price))}</span>
-                    <span className="text-[11px] text-navy-900 bg-gold-200/80 px-2 py-0.5 rounded font-mono font-bold">
+                    <span className="text-[11px] text-navy-900 bg-gold-200/80 px-2 py-0.5 rounded-sm font-mono font-bold">
                       {formatPrice(Number(price), status)}
                     </span>
                   </div>
@@ -1630,7 +1630,7 @@ function PropertyEditor() {
               <select
                 value={propertyType}
                 onChange={(e) => setPropertyType(e.target.value as PropertyType)}
-                className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3 text-xs text-gray-900 font-medium focus:bg-white focus:ring-2 focus:ring-gold-500 outline-none"
+                className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3 text-xs text-gray-900 font-medium focus:bg-white focus:ring-2 focus:ring-gold-500 outline-hidden"
               >
                 <option value="house">บ้านเดี่ยว / ทาวน์โฮม / บ้านแฝด</option>
                 <option value="condo">คอนโดมิเนียม</option>
@@ -1650,7 +1650,7 @@ function PropertyEditor() {
                   type="button"
                   onClick={() => setStatus('sale')}
                   className={`py-2.5 rounded-xl text-xs font-bold transition-all ${
-                    status === 'sale' ? 'bg-navy-950 text-gold-400 shadow-sm' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                    status === 'sale' ? 'bg-navy-950 text-gold-400 shadow-xs' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                   }`}
                 >
                   สำหรับขาย
@@ -1659,7 +1659,7 @@ function PropertyEditor() {
                   type="button"
                   onClick={() => setStatus('rent')}
                   className={`py-2.5 rounded-xl text-xs font-bold transition-all ${
-                    status === 'rent' ? 'bg-navy-950 text-gold-400 shadow-sm' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                    status === 'rent' ? 'bg-navy-950 text-gold-400 shadow-xs' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                   }`}
                 >
                   สำหรับเช่า
@@ -1670,7 +1670,7 @@ function PropertyEditor() {
         </div>
 
         {/* Section 2: Songkhla Districts & Subdistricts (เพิ่มอำเภอ ตำบล ทั้งหมดในสงขลา) */}
-        <div id="section-2-location" className="bg-white rounded-2xl p-6 border border-surface-border shadow-sm space-y-4 scroll-mt-28">
+        <div id="section-2-location" className="bg-white rounded-2xl p-6 border border-surface-border shadow-xs space-y-4 scroll-mt-28">
           <div className="border-b border-gray-100 pb-3 flex items-center justify-between">
             <h3 className="font-bold text-navy-950 text-base flex items-center space-x-2">
               <MapPin className="w-4 h-4 text-gold-600" />
@@ -1703,7 +1703,7 @@ function PropertyEditor() {
               <select
                 value={district}
                 onChange={(e) => handleDistrictChange(e.target.value)}
-                className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3 text-xs text-navy-950 font-bold focus:bg-white focus:ring-2 focus:ring-gold-500 outline-none"
+                className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3 text-xs text-navy-950 font-bold focus:bg-white focus:ring-2 focus:ring-gold-500 outline-hidden"
               >
                 {DISTRICTS_LIST.map((dist) => (
                   <option key={dist} value={dist}>อำเภอ{dist}</option>
@@ -1720,7 +1720,7 @@ function PropertyEditor() {
                 <select
                   value={subdistrict}
                   onChange={(e) => handleSubdistrictChange(e.target.value)}
-                  className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3 text-xs text-navy-950 font-medium focus:bg-white focus:ring-2 focus:ring-gold-500 outline-none"
+                  className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3 text-xs text-navy-950 font-medium focus:bg-white focus:ring-2 focus:ring-gold-500 outline-hidden"
                 >
                   {availableSubdistricts.map((sub) => (
                     <option key={sub} value={sub}>ตำบล{sub}</option>
@@ -1732,7 +1732,7 @@ function PropertyEditor() {
                   placeholder="ระบุตำบล"
                   value={subdistrict}
                   onChange={(e) => setSubdistrict(e.target.value)}
-                  className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3 text-xs text-gray-900 focus:bg-white focus:ring-2 focus:ring-gold-500 outline-none"
+                  className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3 text-xs text-gray-900 focus:bg-white focus:ring-2 focus:ring-gold-500 outline-hidden"
                 />
               )}
             </div>
@@ -1747,12 +1747,12 @@ function PropertyEditor() {
                 placeholder="เช่น ซอย 12 ถนนเพชรเกษม ใกล้บิ๊กซีเอ็กซ์ตร้า หาดใหญ่"
                 value={address}
                 onChange={(e) => setAddress(e.target.value)}
-                className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3 text-xs text-gray-900 focus:bg-white focus:ring-2 focus:ring-gold-500 outline-none"
+                className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3 text-xs text-gray-900 focus:bg-white focus:ring-2 focus:ring-gold-500 outline-hidden"
               />
             </div>
 
             {/* Google Maps Converter Box */}
-            <div className="sm:col-span-3 bg-gradient-to-br from-amber-50/40 via-white to-gold-50/30 border border-gold-300/90 rounded-2xl p-4 sm:p-5 shadow-xs space-y-3">
+            <div className="sm:col-span-3 bg-linear-to-br/srgb from-amber-50/40 via-white to-gold-50/30 border border-gold-300/90 rounded-2xl p-4 sm:p-5 shadow-xs space-y-3">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                 <div className="flex items-center space-x-2.5">
                   <div className="w-8 h-8 rounded-xl bg-gold-500 text-navy-950 flex items-center justify-center font-bold shadow-xs">
@@ -1806,7 +1806,7 @@ function PropertyEditor() {
                         handleConvertMapsInput(pasted);
                       }
                     }}
-                    className="w-full bg-white border border-gold-300/90 rounded-xl py-2.5 pl-3 pr-8 text-xs text-navy-950 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-gold-500 font-medium"
+                    className="w-full bg-white border border-gold-300/90 rounded-xl py-2.5 pl-3 pr-8 text-xs text-navy-950 placeholder-gray-400 focus:outline-hidden focus:ring-2 focus:ring-gold-500 font-medium"
                   />
                   {mapsInput && (
                     <button
@@ -1852,9 +1852,9 @@ function PropertyEditor() {
                   }`}
                 >
                   {mapsMessage.type === 'success' ? (
-                    <CheckCircle2 className="w-4 h-4 text-emerald-600 flex-shrink-0" />
+                    <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
                   ) : (
-                    <HelpCircle className="w-4 h-4 text-red-600 flex-shrink-0" />
+                    <HelpCircle className="w-4 h-4 text-red-600 shrink-0" />
                   )}
                   <span className="font-medium text-[11px] leading-relaxed">{mapsMessage.text}</span>
                 </div>
@@ -1905,7 +1905,7 @@ function PropertyEditor() {
 
               {/* Map Preview Iframe */}
               {showMapPreview && isValidLatLng(Number(latitude), Number(longitude)) && (
-                <div className="mt-2 rounded-xl overflow-hidden border border-gold-200 bg-gray-100 relative shadow-inner">
+                <div className="mt-2 rounded-xl overflow-hidden border border-gold-200 bg-gray-100 relative inset-shadow-sm">
                   <div className="p-2 bg-gray-50 border-b border-gray-200 flex items-center justify-between text-[11px] text-gray-600 px-3">
                     <span className="font-semibold text-navy-950 flex items-center gap-1">
                       <MapPin className="w-3.5 h-3.5 text-gold-600" />
@@ -1934,7 +1934,7 @@ function PropertyEditor() {
                 type="text"
                 value={latitude}
                 onChange={(e) => setLatitude(e.target.value)}
-                className="w-full bg-gray-50 border border-gray-200 rounded-xl p-2.5 text-xs font-mono font-bold text-navy-950 focus:bg-white focus:ring-2 focus:ring-gold-500 outline-none"
+                className="w-full bg-gray-50 border border-gray-200 rounded-xl p-2.5 text-xs font-mono font-bold text-navy-950 focus:bg-white focus:ring-2 focus:ring-gold-500 outline-hidden"
               />
             </div>
 
@@ -1946,7 +1946,7 @@ function PropertyEditor() {
                 type="text"
                 value={longitude}
                 onChange={(e) => setLongitude(e.target.value)}
-                className="w-full bg-gray-50 border border-gray-200 rounded-xl p-2.5 text-xs font-mono font-bold text-navy-950 focus:bg-white focus:ring-2 focus:ring-gold-500 outline-none"
+                className="w-full bg-gray-50 border border-gray-200 rounded-xl p-2.5 text-xs font-mono font-bold text-navy-950 focus:bg-white focus:ring-2 focus:ring-gold-500 outline-hidden"
               />
             </div>
 
@@ -1965,10 +1965,10 @@ function PropertyEditor() {
 
           {/* Auto-Discovered Nearby Landmarks Box */}
           {isValidLatLng(Number(latitude), Number(longitude)) && (
-            <div className="mt-4 p-4 rounded-xl bg-gradient-to-br from-slate-50 to-gold-50/30 border border-gold-200">
+            <div className="mt-4 p-4 rounded-xl bg-linear-to-br/srgb from-slate-50 to-gold-50/30 border border-gold-200">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3">
                 <div className="flex items-center space-x-2">
-                  <Sparkles className="w-4 h-4 text-gold-600 flex-shrink-0" />
+                  <Sparkles className="w-4 h-4 text-gold-600 shrink-0" />
                   <h4 className="text-xs font-bold text-navy-950">
                     สถานที่สำคัญใกล้เคียงที่ค้นพบอัตโนมัติจากหมุดพิกัด ({Number(latitude).toFixed(4)}, {Number(longitude).toFixed(4)})
                   </h4>
@@ -1976,7 +1976,7 @@ function PropertyEditor() {
                 <button
                   type="button"
                   onClick={handleAppendLandmarksToDescription}
-                  className="px-3 py-1.5 bg-navy-950 hover:bg-navy-900 text-gold-400 text-[11px] font-bold rounded-lg shadow-sm flex items-center space-x-1.5 transition-all cursor-pointer self-start sm:self-auto"
+                  className="px-3 py-1.5 bg-navy-950 hover:bg-navy-900 text-gold-400 text-[11px] font-bold rounded-lg shadow-xs flex items-center space-x-1.5 transition-all cursor-pointer self-start sm:self-auto"
                 >
                   <Wand2 className="w-3.5 h-3.5" />
                   <span>เเทรกสถานที่ใกล้เคียงลงในคำอธิบายประกาศ 1-Click</span>
@@ -1987,7 +1987,7 @@ function PropertyEditor() {
                 {autoLandmarks.map((lm, idx) => (
                   <div key={idx} className="p-2.5 bg-white rounded-lg border border-slate-200 text-xs flex flex-col justify-between shadow-2xs">
                     <div className="flex items-center space-x-1.5 mb-1">
-                      <span className="text-[10px] font-bold px-1.5 py-0.2 rounded bg-navy-100 text-navy-800 flex-shrink-0">
+                      <span className="text-[10px] font-bold px-1.5 py-0.2 rounded-sm bg-navy-100 text-navy-800 shrink-0">
                         {lm.categoryLabel}
                       </span>
                       <span className="font-semibold text-navy-950 truncate">{lm.title}</span>
@@ -2002,14 +2002,14 @@ function PropertyEditor() {
           )}
 
           {/* Automated Feng Shui & Auspicious Direction Engine */}
-          <div className="mt-4 p-5 rounded-xl bg-gradient-to-br from-navy-950 via-navy-900 to-navy-950 text-white border border-gold-500/30 shadow-md relative overflow-hidden">
+          <div className="mt-4 p-5 rounded-xl bg-linear-to-br/srgb from-navy-950 via-navy-900 to-navy-950 text-white border border-gold-500/30 shadow-md relative overflow-hidden">
             {/* Background subtle glow */}
             <div className="absolute -right-8 -bottom-8 w-40 h-40 bg-gold-500/10 rounded-full blur-2xl pointer-events-none" />
 
             <div className="relative z-10 space-y-4">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-white/10">
                 <div className="flex items-center space-x-3">
-                  <div className="w-10 h-10 rounded-xl bg-gold-500/20 border border-gold-400/40 flex items-center justify-center text-gold-400 font-bold text-lg flex-shrink-0">
+                  <div className="w-10 h-10 rounded-xl bg-gold-500/20 border border-gold-400/40 flex items-center justify-center text-gold-400 font-bold text-lg shrink-0">
                     ☯
                   </div>
                   <div>
@@ -2031,7 +2031,7 @@ function PropertyEditor() {
                 <button
                   type="button"
                   onClick={handleAppendFengShuiToDescription}
-                  className="px-3.5 py-2 bg-gold-500 hover:bg-gold-400 text-navy-950 text-xs font-bold rounded-xl shadow-sm flex items-center space-x-1.5 transition-all cursor-pointer self-start sm:self-auto hover:shadow-gold-500/20"
+                  className="px-3.5 py-2 bg-gold-500 hover:bg-gold-400 text-navy-950 text-xs font-bold rounded-xl shadow-xs flex items-center space-x-1.5 transition-all cursor-pointer self-start sm:self-auto hover:shadow-gold-500/20"
                 >
                   <Wand2 className="w-3.5 h-3.5" />
                   <span>แทรกบทวิเคราะห์ฮวงจุ้ยลงในคำอธิบาย 1-Click</span>
@@ -2047,7 +2047,7 @@ function PropertyEditor() {
                   <select
                     value={facingDirection}
                     onChange={(e) => setFacingDirection(e.target.value as FacingDirection | 'auto')}
-                    className="w-full bg-navy-800/90 border border-gold-500/40 rounded-xl p-3 text-xs font-semibold text-gold-300 outline-none focus:ring-2 focus:ring-gold-500"
+                    className="w-full bg-navy-800/90 border border-gold-500/40 rounded-xl p-3 text-xs font-semibold text-gold-300 outline-hidden focus:ring-2 focus:ring-gold-500"
                   >
                     <option value="auto">🌟 คำนวณอัตโนมัติจากพิกัดและทำเล (แนะนำ)</option>
                     {ALL_FACING_DIRECTIONS.map((dir) => {
@@ -2085,7 +2085,7 @@ function PropertyEditor() {
                     </p>
                   </div>
 
-                  <div className="text-right bg-white/10 px-3.5 py-2 rounded-xl border border-white/10 flex-shrink-0">
+                  <div className="text-right bg-white/10 px-3.5 py-2 rounded-xl border border-white/10 shrink-0">
                     <span className="text-[10px] text-gray-400 block uppercase">คะแนนมงคล</span>
                     <span className="text-2xl font-black text-gold-400">{autoFengShui.score}</span>
                     <span className="text-xs text-gray-300 font-normal">/100</span>
@@ -2115,7 +2115,7 @@ function PropertyEditor() {
         </div>
 
         {/* Section 3: Property Specs & Features */}
-        <div id="section-3-specs" className="bg-white rounded-2xl p-6 border border-surface-border shadow-sm space-y-4 scroll-mt-28">
+        <div id="section-3-specs" className="bg-white rounded-2xl p-6 border border-surface-border shadow-xs space-y-4 scroll-mt-28">
           <h3 className="font-bold text-navy-950 text-base border-b border-gray-100 pb-3 flex items-center space-x-2">
             <Maximize className="w-4 h-4 text-gold-600" />
             <span>3. รายละเอียดและสิ่งอำนวยความสะดวก</span>
@@ -2241,7 +2241,7 @@ function PropertyEditor() {
                   type="button"
                   onClick={handleQuickAiGenerate}
                   disabled={quickAiGenerating}
-                  className="px-3 py-1.5 bg-gradient-to-r from-gold-400 via-gold-500 to-amber-500 hover:from-gold-300 hover:to-gold-400 text-navy-950 font-black text-xs rounded-xl shadow-xs flex items-center space-x-1.5 transition-all cursor-pointer active:scale-95 disabled:opacity-50"
+                  className="px-3 py-1.5 bg-linear-to-r/srgb from-gold-400 via-gold-500 to-amber-500 hover:from-gold-300 hover:to-gold-400 text-navy-950 font-black text-xs rounded-xl shadow-xs flex items-center space-x-1.5 transition-all cursor-pointer active:scale-95 disabled:opacity-50"
                   title="ใช้ AI วิเคราะห์สเปกปัจจุบันและร่างคำบรรยายให้อัตโนมัติทันที"
                 >
                   {quickAiGenerating ? (
@@ -2304,7 +2304,7 @@ function PropertyEditor() {
               placeholder="จุดเด่นของทรัพย์ เส้นทางการเดินทาง สถานที่สำคัญใกล้เคียง สิ่งอำนวยความสะดวกในโครงการ... หรือกดปุ่ม '🎙️ พิมพ์ด้วยเสียง' หรือ '✨ ให้ AI ร่างคำบรรยาย 1-Click' ด้านบน"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3.5 text-xs text-gray-900 focus:bg-white focus:ring-2 focus:ring-gold-500 outline-none leading-relaxed font-sans"
+              className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3.5 text-xs text-gray-900 focus:bg-white focus:ring-2 focus:ring-gold-500 outline-hidden leading-relaxed font-sans"
             />
 
             <div className="flex items-center justify-between text-[11px] text-gray-500 pt-1">
@@ -2336,11 +2336,11 @@ function PropertyEditor() {
                     onClick={() => toggleFeature(feat)}
                     className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all flex items-center space-x-1.5 ${
                       active
-                        ? 'bg-navy-950 text-gold-400 border border-navy-900 shadow-sm'
+                        ? 'bg-navy-950 text-gold-400 border border-navy-900 shadow-xs'
                         : 'bg-gray-100 text-gray-600 hover:bg-gray-200 border border-transparent'
                     }`}
                   >
-                    <div className={`w-3.5 h-3.5 rounded flex items-center justify-center text-[10px] ${
+                    <div className={`w-3.5 h-3.5 rounded-sm flex items-center justify-center text-[10px] ${
                       active ? 'bg-gold-500 text-navy-950' : 'bg-white border border-gray-300'
                     }`}>
                       {active && <Check className="w-2.5 h-2.5 stroke-[3]" />}
@@ -2354,7 +2354,7 @@ function PropertyEditor() {
         </div>
 
         {/* Section 4: Property Images (รองรับสูงสุด 100MB พร้อมระบบบีบอัดอัตโนมัติ Full HD) */}
-        <div id="section-4-images" className="bg-white rounded-2xl p-6 border border-surface-border shadow-sm space-y-5 scroll-mt-28">
+        <div id="section-4-images" className="bg-white rounded-2xl p-6 border border-surface-border shadow-xs space-y-5 scroll-mt-28">
           <div className="border-b border-gray-100 pb-3 flex flex-wrap items-center justify-between gap-2">
             <div>
               <h3 className="font-bold text-navy-950 text-base flex items-center space-x-2">
@@ -2387,8 +2387,8 @@ function PropertyEditor() {
           </div>
 
           {/* Auto Compression Feature Banner */}
-          <div className="bg-gradient-to-r from-emerald-50 via-teal-50 to-blue-50 border border-emerald-200/80 rounded-2xl p-4 text-xs text-emerald-950 flex items-start space-x-3 shadow-xs">
-            <Gauge className="w-5 h-5 text-emerald-600 flex-shrink-0 mt-0.5" />
+          <div className="bg-linear-to-r/srgb from-emerald-50 via-teal-50 to-blue-50 border border-emerald-200/80 rounded-2xl p-4 text-xs text-emerald-950 flex items-start space-x-3 shadow-xs">
+            <Gauge className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />
             <div className="space-y-1">
               <div className="flex items-center space-x-2">
                 <span className="font-bold text-emerald-900">⚡ ระบบบีบอัดรูปภาพอัตโนมัติ (Smart Auto-Compressor)</span>
@@ -2403,7 +2403,7 @@ function PropertyEditor() {
           </div>
 
           {/* Watermark Settings */}
-          <div className="bg-navy-950 border border-navy-800 rounded-2xl p-4 text-xs space-y-3 shadow-sm">
+          <div className="bg-navy-950 border border-navy-800 rounded-2xl p-4 text-xs space-y-3 shadow-xs">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div className="flex items-center space-x-2">
                 <Sparkles className="w-4 h-4 text-gold-400" />
@@ -2438,7 +2438,7 @@ function PropertyEditor() {
                     onClick={() => setWatermarkPosition(opt.value)}
                     className={`px-3 py-1.5 rounded-lg font-bold text-[11px] transition-all cursor-pointer ${
                       watermarkPosition === opt.value
-                        ? 'bg-gold-500 text-navy-950 shadow-sm'
+                        ? 'bg-gold-500 text-navy-950 shadow-xs'
                         : 'bg-navy-800 text-gray-300 hover:bg-navy-700 border border-navy-700'
                     }`}
                   >
@@ -2454,7 +2454,7 @@ function PropertyEditor() {
 
           {/* Real-time Compression Progress Indicator */}
           {compressionProgress && (
-            <div className="bg-emerald-50 border-2 border-emerald-400 rounded-2xl p-4 text-xs text-emerald-950 space-y-2.5 shadow-sm animate-in fade-in duration-300">
+            <div className="bg-emerald-50 border-2 border-emerald-400 rounded-2xl p-4 text-xs text-emerald-950 space-y-2.5 shadow-xs animate-in fade-in duration-300">
               <div className="flex items-center justify-between font-bold">
                 <span className="flex items-center space-x-2 text-emerald-950">
                   <Loader2 className="w-4 h-4 text-emerald-600 animate-spin" />
@@ -2512,11 +2512,11 @@ function PropertyEditor() {
                 </div>
               ) : (
                 <>
-                  <div className="w-12 h-12 rounded-full bg-gold-100 text-gold-700 flex items-center justify-center shadow-sm">
+                  <div className="w-12 h-12 rounded-full bg-gold-100 text-gold-700 flex items-center justify-center shadow-xs">
                     <Upload className="w-6 h-6" />
                   </div>
                   <div>
-                    <span className="text-xs font-bold text-navy-950 bg-gold-100 hover:bg-gold-200 px-4 py-2 rounded-xl transition-colors inline-block shadow-sm">
+                    <span className="text-xs font-bold text-navy-950 bg-gold-100 hover:bg-gold-200 px-4 py-2 rounded-xl transition-colors inline-block shadow-xs">
                       คลิกเลือกไฟล์รูปภาพจากเครื่อง
                     </span>
                     <span className="text-xs text-gray-500 block mt-2">
@@ -2535,7 +2535,7 @@ function PropertyEditor() {
               placeholder="วางลิงก์รูปทรัพย์ https://…"
               value={imageUrlInput}
               onChange={(e) => setImageUrlInput(e.target.value)}
-              className="min-w-0 flex-1 bg-gray-50 border border-gray-200 rounded-xl p-2.5 text-sm text-gray-900 focus:ring-2 focus:ring-gold-500 outline-none"
+              className="min-w-0 flex-1 bg-gray-50 border border-gray-200 rounded-xl p-2.5 text-sm text-gray-900 focus:ring-2 focus:ring-gold-500 outline-hidden"
             />
             <button
               type="button"
@@ -2578,7 +2578,7 @@ function PropertyEditor() {
                       />
                       
                       {isCover ? (
-                        <div className="absolute top-1.5 left-1.5 bg-gold-500 text-navy-950 text-[10px] font-black px-2 py-0.5 rounded shadow-sm flex items-center space-x-1 z-10">
+                        <div className="absolute top-1.5 left-1.5 bg-gold-500 text-navy-950 text-[10px] font-black px-2 py-0.5 rounded-sm shadow-xs flex items-center space-x-1 z-10">
                           <Star className="w-3 h-3 fill-current" />
                           <span>หน้าปก</span>
                         </div>
@@ -2586,7 +2586,7 @@ function PropertyEditor() {
                         <button
                           type="button"
                           onClick={() => setCoverImage(img)}
-                          className="absolute bottom-1.5 left-1.5 right-1.5 bg-black/75 hover:bg-gold-500 hover:text-navy-950 text-white text-[10px] font-bold py-1 rounded transition-colors text-center opacity-0 group-hover:opacity-100 z-10"
+                          className="absolute bottom-1.5 left-1.5 right-1.5 bg-black/75 hover:bg-gold-500 hover:text-navy-950 text-white text-[10px] font-bold py-1 rounded-sm transition-colors text-center opacity-0 group-hover:opacity-100 z-10"
                         >
                           ตั้งเป็นหน้าปก
                         </button>
@@ -2596,7 +2596,7 @@ function PropertyEditor() {
                         type="button"
                         onClick={() => handleRemoveImage(i)}
                         title="ลบรูปภาพนี้"
-                        className="absolute top-1.5 right-1.5 w-6 h-6 bg-black/75 hover:bg-red-600 text-white rounded-full flex items-center justify-center text-xs transition-colors shadow z-10"
+                        className="absolute top-1.5 right-1.5 w-6 h-6 bg-black/75 hover:bg-red-600 text-white rounded-full flex items-center justify-center text-xs transition-colors shadow-sm z-10"
                       >
                         <X className="w-3.5 h-3.5" />
                       </button>
@@ -2609,7 +2609,7 @@ function PropertyEditor() {
         </div>
 
         {/* Section 5: Property Video Tour (วิดีโอพาทัวร์อสังหาริมทรัพย์) */}
-        <div id="section-5-video" className="bg-white rounded-2xl p-6 border border-surface-border shadow-sm space-y-5 scroll-mt-28">
+        <div id="section-5-video" className="bg-white rounded-2xl p-6 border border-surface-border shadow-xs space-y-5 scroll-mt-28">
           <div className="border-b border-gray-100 pb-3 flex flex-wrap items-center justify-between gap-2">
             <div>
               <h3 className="font-bold text-navy-950 text-base flex items-center space-x-2">
@@ -2636,7 +2636,7 @@ function PropertyEditor() {
 
           {/* Helpful Tip */}
           <div className="p-3.5 bg-red-50/70 border border-red-200 rounded-xl text-xs text-red-950 leading-relaxed flex items-start gap-2.5">
-            <Film className="w-4 h-4 text-red-600 flex-shrink-0 mt-0.5" />
+            <Film className="w-4 h-4 text-red-600 shrink-0 mt-0.5" />
             <div>
               <p className="font-bold">ช่องทางใส่วิดีโอที่รองรับ:</p>
               <p className="text-red-900 text-[11px] mt-0.5">
@@ -2659,13 +2659,13 @@ function PropertyEditor() {
                     value={videoUrl.startsWith('data:video/') ? '' : videoUrl}
                     onChange={(e) => setVideoUrl(e.target.value)}
                     placeholder="เช่น https://www.youtube.com/watch?v=... หรือ https://youtu.be/..."
-                    className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3 pr-24 text-xs text-navy-950 focus:bg-white focus:ring-2 focus:ring-red-500 outline-none transition-all shadow-sm"
+                    className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3 pr-24 text-xs text-navy-950 focus:bg-white focus:ring-2 focus:ring-red-500 outline-hidden transition-all shadow-xs"
                   />
                   {videoUrl && !videoUrl.startsWith('data:video/') && (
                     <button
                       type="button"
                       onClick={() => setVideoUrl('')}
-                      className="absolute right-2.5 top-2.5 text-xs text-gray-400 hover:text-red-600 px-2 py-1 rounded bg-gray-100 hover:bg-red-50 transition-colors"
+                      className="absolute right-2.5 top-2.5 text-xs text-gray-400 hover:text-red-600 px-2 py-1 rounded-sm bg-gray-100 hover:bg-red-50 transition-colors"
                     >
                       ล้างลิงก์
                     </button>
@@ -2690,7 +2690,7 @@ function PropertyEditor() {
                   />
                   <label
                     htmlFor="property-video-file-upload"
-                    className="cursor-pointer inline-flex items-center space-x-2 px-4 py-2.5 bg-navy-950 hover:bg-navy-900 text-white rounded-xl text-xs font-bold shadow-sm transition-all"
+                    className="cursor-pointer inline-flex items-center space-x-2 px-4 py-2.5 bg-navy-950 hover:bg-navy-900 text-white rounded-xl text-xs font-bold shadow-xs transition-all"
                   >
                     {uploadingVideo ? (
                       <>
@@ -2777,7 +2777,7 @@ function PropertyEditor() {
         </div>
 
         {/* Section 6: Responsible Agent (นายหน้าที่รับผิดชอบทรัพย์นี้ - อ้างอิงจากสมาชิกที่มียศ นายหน้า และ แอดมิน เท่านั้น และให้ใส่วิธีติดต่อของนายหน้าคนนั้นเอง) */}
-        <div id="section-6-agent" className="bg-white rounded-2xl p-6 border border-surface-border shadow-sm space-y-5 scroll-mt-28">
+        <div id="section-6-agent" className="bg-white rounded-2xl p-6 border border-surface-border shadow-xs space-y-5 scroll-mt-28">
           <div className="border-b border-gray-100 pb-3 flex flex-wrap items-center justify-between gap-2">
             <h3 className="font-bold text-navy-950 text-base flex items-center space-x-2">
               <UserCheck className="w-4 h-4 text-gold-600" />
@@ -2792,7 +2792,7 @@ function PropertyEditor() {
           </div>
 
           <div className="p-3.5 bg-blue-50/70 border border-blue-200 rounded-xl text-xs text-blue-900 leading-relaxed flex items-start gap-2.5">
-            <Sparkles className="w-4 h-4 text-blue-600 flex-shrink-0 mt-0.5" />
+            <Sparkles className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
             <div>
               <p className="font-bold">นโยบายช่องทางติดต่อนายหน้าผู้ลงทรัพย์:</p>
               <p className="text-blue-800 text-[11px] mt-0.5">
@@ -2813,7 +2813,7 @@ function PropertyEditor() {
                 <select
                   value={selectedAgentId}
                   onChange={(e) => handleSelectAgent(e.target.value)}
-                  className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3 text-xs font-bold text-navy-950 focus:bg-white focus:ring-2 focus:ring-gold-500 outline-none transition-all shadow-sm"
+                  className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3 text-xs font-bold text-navy-950 focus:bg-white focus:ring-2 focus:ring-gold-500 outline-hidden transition-all shadow-xs"
                 >
                   {eligibleStaff.map((staff) => (
                     <option key={staff.id} value={staff.id}>
@@ -2834,7 +2834,7 @@ function PropertyEditor() {
                   value={agentPhone}
                   onChange={(e) => setAgentPhone(e.target.value)}
                   placeholder="เช่น 081-604-0097 หรือ 082-xxx-xxxx"
-                  className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3 text-xs text-navy-950 focus:bg-white focus:ring-2 focus:ring-gold-500 outline-none transition-all"
+                  className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3 text-xs text-navy-950 focus:bg-white focus:ring-2 focus:ring-gold-500 outline-hidden transition-all"
                 />
                 <p className="text-[10px] text-gray-500 mt-1">
                   💡 เบอร์โทรนี้จะเชื่อมต่อกับปุ่ม &quot;โทรด่วน&quot; บนหน้ารายละเอียดทรัพย์ให้ลูกค้ากดโทรหาทันที
@@ -2853,7 +2853,7 @@ function PropertyEditor() {
                     value={agentLine}
                     onChange={(e) => setAgentLine(e.target.value)}
                     placeholder="เช่น @930xzcyi หรือ benz_agent หรือ https://line.me/ti/p/~..."
-                    className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3 pr-20 text-xs text-navy-950 focus:bg-white focus:ring-2 focus:ring-[#06C755] outline-none transition-all"
+                    className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3 pr-20 text-xs text-navy-950 focus:bg-white focus:ring-2 focus:ring-[#06C755] outline-hidden transition-all"
                   />
                   <div className="absolute right-2.5 top-1/2 -translate-y-1/2">
                     <span className="text-[10px] font-bold bg-[#06C755]/10 text-[#06C755] px-2 py-0.5 rounded-md border border-[#06C755]/30">
@@ -2878,7 +2878,7 @@ function PropertyEditor() {
                     value={agentFacebook}
                     onChange={(e) => setAgentFacebook(e.target.value)}
                     placeholder="เช่น https://www.facebook.com/yourname หรือ ลิงก์เพจเฟสบุ๊ค"
-                    className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3 pr-20 text-xs text-navy-950 focus:bg-white focus:ring-2 focus:ring-[#1877F2] outline-none transition-all"
+                    className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3 pr-20 text-xs text-navy-950 focus:bg-white focus:ring-2 focus:ring-[#1877F2] outline-hidden transition-all"
                   />
                   <div className="absolute right-2.5 top-1/2 -translate-y-1/2">
                     <span className="text-[10px] font-bold bg-[#1877F2]/10 text-[#1877F2] px-2 py-0.5 rounded-md border border-[#1877F2]/30">
@@ -2898,7 +2898,7 @@ function PropertyEditor() {
                     type="checkbox" 
                     checked={published} 
                     onChange={e => setPublished(e.target.checked)} 
-                    className="w-4 h-4 rounded text-gold-600 focus:ring-gold-500"
+                    className="w-4 h-4 rounded-sm text-gold-600 focus:ring-gold-500"
                   />
                   <span>เผยแพร่ประกาศบนเว็บไซต์ทันที (เปิดให้บุคคลทั่วไปเข้าดู)</span>
                 </label>
@@ -2908,7 +2908,7 @@ function PropertyEditor() {
                     type="checkbox"
                     checked={featured}
                     onChange={(e) => setFeatured(e.target.checked)}
-                    className="w-4 h-4 rounded text-gold-600 focus:ring-gold-500"
+                    className="w-4 h-4 rounded-sm text-gold-600 focus:ring-gold-500"
                   />
                   <span>ตั้งเป็นทรัพย์เด่นประจำหน้าแรก (Featured Property)</span>
                 </label>
@@ -2916,7 +2916,7 @@ function PropertyEditor() {
             </div>
 
             {/* Right 5 cols: Live Preview Card of Agent Contacts as seen on the detail page */}
-            <div className="lg:col-span-5 bg-gradient-to-b from-navy-950 to-navy-900 text-white rounded-2xl p-5 border border-navy-800 shadow-xl space-y-4">
+            <div className="lg:col-span-5 bg-linear-to-b/srgb from-navy-950 to-navy-900 text-white rounded-2xl p-5 border border-navy-800 shadow-xl space-y-4">
               <div className="flex items-center justify-between pb-3 border-b border-navy-800/80">
                 <div className="flex items-center space-x-1.5 text-xs font-bold text-gold-400">
                   <Eye className="w-3.5 h-3.5" />
@@ -2929,7 +2929,7 @@ function PropertyEditor() {
 
               {/* Agent Profile Header */}
               <div className="flex items-center space-x-3.5">
-                <div className="relative w-16 h-16 rounded-2xl overflow-hidden bg-navy-800 flex-shrink-0 border-2 border-gold-400 shadow-md">
+                <div className="relative w-16 h-16 rounded-2xl overflow-hidden bg-navy-800 shrink-0 border-2 border-gold-400 shadow-md">
                   {currentAssignedStaff?.avatar_url ? (
                     <Image
                       src={currentAssignedStaff.avatar_url}
@@ -3016,10 +3016,10 @@ function PropertyEditor() {
         </div>
 
         {/* Section 7: Agent Internal Notes (บันทึกภายในเฉพาะนายหน้า & แอดมิน - ไม่แสดงต่อสาธารณะ) */}
-        <div id="section-7-internal-notes" className="bg-gradient-to-br from-amber-50/90 via-orange-50/40 to-amber-50/90 rounded-2xl p-6 border-2 border-amber-300/80 shadow-xs space-y-4 scroll-mt-28">
+        <div id="section-7-internal-notes" className="bg-linear-to-br/srgb from-amber-50/90 via-orange-50/40 to-amber-50/90 rounded-2xl p-6 border-2 border-amber-300/80 shadow-xs space-y-4 scroll-mt-28">
           <div className="border-b border-amber-200 pb-3 flex flex-wrap items-center justify-between gap-2">
             <h3 className="font-extrabold text-navy-950 text-base flex items-center space-x-2">
-              <ShieldAlert className="w-5 h-5 text-amber-700 flex-shrink-0" />
+              <ShieldAlert className="w-5 h-5 text-amber-700 shrink-0" />
               <span>7. บันทึกภายในสำหรับนายหน้า & แอดมิน (Agent Internal Notes - ซ่อนไม่แสดงหน้าบ้าน)</span>
             </h3>
             <span className="px-3 py-1 bg-amber-200 text-amber-950 border border-amber-400 rounded-full text-[11px] font-black flex items-center gap-1 shadow-2xs">
@@ -3041,7 +3041,7 @@ function PropertyEditor() {
               value={internalNotes}
               onChange={(e) => setInternalNotes(e.target.value)}
               placeholder="เช่น เจ้าของยอมลดราคาได้สุด 3.5 ล้านบาท, สัญญาแต่งตั้งถึง ธ.ค. 2569, กุญแจบ้านอยู่ที่นายหน้าคุณเบนซ์, สภาพหลังคาต้องซ่อมแซมจุดรั่ว..."
-              className="w-full bg-white border border-amber-300 rounded-xl p-3.5 text-xs text-navy-950 font-medium focus:ring-2 focus:ring-amber-500 focus:border-transparent outline-none transition-all shadow-inner leading-relaxed"
+              className="w-full bg-white border border-amber-300 rounded-xl p-3.5 text-xs text-navy-950 font-medium focus:ring-2 focus:ring-amber-500 focus:border-transparent outline-hidden transition-all inset-shadow-sm leading-relaxed"
             />
           </div>
         </div>
@@ -3059,7 +3059,7 @@ function PropertyEditor() {
             <button
               type="submit"
               disabled={submitting}
-              className="px-4 sm:px-7 py-3 bg-gradient-to-r from-gold-500 to-gold-400 hover:from-gold-400 hover:to-gold-300 text-navy-950 rounded-xl text-xs font-extrabold shadow-lg transition-all active:scale-95 flex items-center space-x-2 disabled:opacity-50"
+              className="px-4 sm:px-7 py-3 bg-linear-to-r/srgb from-gold-500 to-gold-400 hover:from-gold-400 hover:to-gold-300 text-navy-950 rounded-xl text-xs font-extrabold shadow-lg transition-all active:scale-95 flex items-center space-x-2 disabled:opacity-50"
             >
               {submitting ? (
                 <>

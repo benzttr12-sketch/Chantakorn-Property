@@ -17,7 +17,7 @@ export default function HeroSection() {
           <p className="hero-reveal mb-6 flex flex-wrap items-center gap-2 text-[10px] font-semibold tracking-[0.15em] text-gold-300 sm:text-xs"><span className="h-px w-8 bg-gold-400" /> CHANTAKORN PROPERTY <span className="text-white/40">/</span> หาดใหญ่–สงขลา</p>
           <h1 className="hero-reveal hero-reveal-heading text-[2.5rem] font-semibold leading-[1.3] tracking-tight text-white sm:text-5xl lg:text-[3.5rem]">
             บ้านที่ใช่<br />
-            <span className="bg-gradient-to-r from-gold-100 via-gold-300 to-gold-500 bg-clip-text text-transparent">ในทำเลที่คุณรัก</span>
+            <span className="bg-linear-to-r/srgb from-gold-100 via-gold-300 to-gold-500 bg-clip-text text-transparent">ในทำเลที่คุณรัก</span>
           </h1>
           <p className="hero-reveal hero-reveal-description mt-5 max-w-lg text-sm leading-7 text-slate-300 sm:text-base sm:leading-8">ซื้อ ขาย เช่า ฝากขาย บ้าน ที่ดิน และคอนโดในหาดใหญ่–สงขลา เริ่มต้นค้นหาทรัพย์ที่ตอบโจทย์ชีวิต พร้อมทีมงานดูแลตั้งแต่วันแรกจนถึงวันโอน</p>
           <div className="hero-reveal hero-reveal-actions mt-7 flex flex-wrap gap-3">
