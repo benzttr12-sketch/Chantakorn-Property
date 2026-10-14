@@ -55,13 +55,13 @@ export default function QuickPropertyModal({ isOpen, onClose, onSuccess }: Quick
   const [status, setStatus] = useState<PropertyStatus>('sale');
   const [district, setDistrict] = useState('หาดใหญ่');
   const [subdistrict, setSubdistrict] = useState('ควนลัง');
-  const [bedrooms, setBedrooms] = useState('3');
-  const [bathrooms, setBathrooms] = useState('2');
-  const [parking, setParking] = useState('2');
-  const [landSize, setLandSize] = useState('50');
-  const [usableArea, setUsableArea] = useState('150');
-  const [facingDirection, setFacingDirection] = useState<FacingDirection>('ทิศใต้');
-  const [features, setFeatures] = useState<string[]>(['ติดถนนใหญ่', 'ทำเลชุมชน']);
+  const [bedrooms, setBedrooms] = useState('');
+  const [bathrooms, setBathrooms] = useState('');
+  const [parking, setParking] = useState('');
+  const [landSize, setLandSize] = useState('');
+  const [usableArea, setUsableArea] = useState('');
+  const [facingDirection, setFacingDirection] = useState<FacingDirection | ''>('');
+  const [features, setFeatures] = useState<string[]>([]);
   const [description, setDescription] = useState('');
   const [internalNotes, setInternalNotes] = useState('');
   const [videoUrl, setVideoUrl] = useState('');
@@ -136,13 +136,14 @@ export default function QuickPropertyModal({ isOpen, onClose, onSuccess }: Quick
         if (subs.length > 0) setSubdistrict(subs[0]);
       }
     }
-    if (parsed.bedrooms !== undefined) setBedrooms(String(parsed.bedrooms));
-    if (parsed.bathrooms !== undefined) setBathrooms(String(parsed.bathrooms));
-    if (parsed.parking !== undefined) setParking(String(parsed.parking));
-    if (parsed.landSize !== undefined) setLandSize(String(parsed.landSize));
-    if (parsed.usableArea !== undefined) setUsableArea(String(parsed.usableArea));
-    if (parsed.facingDirection) setFacingDirection(parsed.facingDirection);
-    if (parsed.features && parsed.features.length > 0) setFeatures(parsed.features);
+    // A new text replaces optional specs; missing facts must not inherit earlier values.
+    setBedrooms(parsed.bedrooms !== undefined ? String(parsed.bedrooms) : '');
+    setBathrooms(parsed.bathrooms !== undefined ? String(parsed.bathrooms) : '');
+    setParking(parsed.parking !== undefined ? String(parsed.parking) : '');
+    setLandSize(parsed.landSize !== undefined ? String(parsed.landSize) : '');
+    setUsableArea(parsed.usableArea !== undefined ? String(parsed.usableArea) : '');
+    setFacingDirection(parsed.facingDirection || '');
+    setFeatures(parsed.features || []);
 
     const parsedDesc = generateProfessionalDescription({
       title: parsed.title || title,
@@ -151,13 +152,13 @@ export default function QuickPropertyModal({ isOpen, onClose, onSuccess }: Quick
       price: parsed.price || price,
       district: parsed.district || district,
       subdistrict: parsed.subdistrict || subdistrict,
-      bedrooms: parsed.bedrooms !== undefined ? parsed.bedrooms : bedrooms,
-      bathrooms: parsed.bathrooms !== undefined ? parsed.bathrooms : bathrooms,
-      parking: parsed.parking !== undefined ? parsed.parking : parking,
-      landSize: parsed.landSize !== undefined ? parsed.landSize : landSize,
-      usableArea: parsed.usableArea !== undefined ? parsed.usableArea : usableArea,
-      facingDirection: parsed.facingDirection || facingDirection,
-      features: parsed.features && parsed.features.length > 0 ? parsed.features : features,
+      bedrooms: parsed.bedrooms,
+      bathrooms: parsed.bathrooms,
+      parking: parsed.parking,
+      landSize: parsed.landSize,
+      usableArea: parsed.usableArea,
+      facingDirection: parsed.facingDirection,
+      features: parsed.features,
       rawNotes: text,
     });
     setDescription(parsedDesc);
@@ -182,11 +183,11 @@ export default function QuickPropertyModal({ isOpen, onClose, onSuccess }: Quick
       const coords = getSongkhlaCoordinates(district, subdistrict);
       const generatedSlug = `${slugify(title) || 'prop'}-${Date.now().toString().slice(-6)}`;
       
-      const fengShui = calculateFengShui(facingDirection, {
+      const fengShui = facingDirection ? calculateFengShui(facingDirection, {
         lat: coords.lat,
         lng: coords.lng,
         propertyType
-      });
+      }) : undefined;
 
       const fullDescription = generateProfessionalDescription({
         title,
@@ -221,18 +222,17 @@ export default function QuickPropertyModal({ isOpen, onClose, onSuccess }: Quick
         address: `${subdistrict ? `ต.${subdistrict} ` : ''}อ.${district} จ.สงขลา`,
         latitude: coords.lat,
         longitude: coords.lng,
-        facing_direction: facingDirection,
-        feng_shui: fengShui,
+        ...(facingDirection ? { facing_direction: facingDirection, feng_shui: fengShui } : {}),
         bedrooms: Number(bedrooms) || 0,
         bathrooms: Number(bathrooms) || 0,
         parking: Number(parking) || 0,
         land_size: Number(landSize) || 0,
         usable_area: Number(usableArea) || 0,
-        furniture: 'พร้อมอยู่',
+        furniture: '',
         cover_image: '',
         images: [],
         video_url: videoUrl.trim() || undefined,
-        features: features.length > 0 ? features : ['ทำเลดี เดินทางสะดวก'],
+        features,
         featured: false,
         published: publishImmediately,
         internal_notes: internalNotes.trim() || undefined,
@@ -346,7 +346,7 @@ export default function QuickPropertyModal({ isOpen, onClose, onSuccess }: Quick
                 <ul className="list-disc list-inside text-[11px] text-amber-800 space-y-0.5">
                   <li>สกัดราคา, อำเภอ, ตำบล, จำนวนห้อง และขนาดที่ดินออกมาให้อัตโนมัติ</li>
                   <li>คำนวณและดึงพิกัด Google Maps สงขลาให้ตรงทำเลทันที</li>
-                  <li>คำนวณทิศฮวงจุ้ยมงคล คะแนนพลังงาน และชี่ลม/สุริยันให้อัตโนมัติ</li>
+                  <li>เตรียมข้อมูลฮวงจุ้ยเมื่อคุณระบุทิศหน้าทรัพย์</li>
                   <li>เตรียมคำบรรยายประกาศ แล้วให้คุณตรวจสอบก่อนบันทึก</li>
                 </ul>
               </div>
@@ -510,9 +510,10 @@ export default function QuickPropertyModal({ isOpen, onClose, onSuccess }: Quick
                   <label className="block text-[10px] text-gray-500 mb-0.5">ทิศฮวงจุ้ย</label>
                   <select
                     value={facingDirection}
-                    onChange={(e) => setFacingDirection(e.target.value as FacingDirection)}
+                    onChange={(e) => setFacingDirection(e.target.value as FacingDirection | '')}
                     className="w-full bg-gray-50 border border-gray-200 rounded-lg p-1.5 text-[11px] font-bold text-navy-950"
                   >
+                    <option value="">ยังไม่ระบุ</option>
                     <option value="ทิศใต้">ทิศใต้ (ไฟ)</option>
                     <option value="ทิศเหนือ">ทิศเหนือ (น้ำ)</option>
                     <option value="ทิศตะวันออก">ทิศตะวันออก (ไม้)</option>
