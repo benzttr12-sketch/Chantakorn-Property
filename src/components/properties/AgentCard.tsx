@@ -8,6 +8,7 @@ import {
   Phone, 
   MessageCircle, 
   Facebook, 
+  Building2,
   Calendar, 
   ShieldCheck, 
   CheckCircle,
@@ -82,14 +83,20 @@ export default function AgentCard({ agent = DEFAULT_AGENT, property }: AgentCard
         {/* Agent Info Header */}
         <div className="flex items-center space-x-4">
           <div className="relative w-16 h-16 rounded-full overflow-hidden border-2 border-gold-400 shrink-0 bg-gray-100 shadow-xs">
-            <Image
-              src={agent.photo_url}
-              alt={agent.name}
-              fill
-              unoptimized
-              className="object-cover"
-              referrerPolicy="no-referrer"
-            />
+            {agent.photo_url ? (
+              <Image
+                src={agent.photo_url}
+                alt={agent.name}
+                fill
+                unoptimized
+                className="object-cover"
+                referrerPolicy="no-referrer"
+              />
+            ) : (
+              <span className="flex h-full items-center justify-center bg-navy-950 text-gold-400">
+                <Building2 className="h-7 w-7" aria-hidden="true" />
+              </span>
+            )}
           </div>
 
           <div className="min-w-0 grow">
@@ -105,7 +112,7 @@ export default function AgentCard({ agent = DEFAULT_AGENT, property }: AgentCard
                   ? 'bg-gold-50 text-gold-900 border-gold-300'
                   : 'bg-navy-50 text-navy-900 border-navy-200'
               }`}>
-                {(agent.rank === 'แอดมิน' || agent.title === 'แอดมิน')
+                {agent.id === DEFAULT_AGENT.id ? 'ทีมที่ปรึกษา' : (agent.rank === 'แอดมิน' || agent.title === 'แอดมิน')
                   ? '🛡️ ยศ: แอดมิน (Admin)'
                   : '👔 ยศ: นายหน้า (Agent)'}
               </span>

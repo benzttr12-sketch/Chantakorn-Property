@@ -208,14 +208,14 @@ export default function AdminUsersPage() {
   const adminCount = users.filter((u) => u.role === 'ADMIN').length;
   const agentCount = users.filter((u) => u.role === 'AGENT').length;
   const generalUserCount = users.filter((u) => u.role === 'USER').length;
-  const isCloudBackend = dataBackend === 'firebase' || dataBackend === 'supabase';
+  const isCloudBackend = dataBackend === 'firebase';
 
   return (
     <div className="space-y-6 pb-20">
       {error && <p role="alert" className="rounded-xl bg-red-50 p-4 text-sm text-red-800">{error}</p>}
       {isCloudBackend && (
         <p className="rounded-xl bg-amber-50 border border-amber-200 p-4 text-xs font-semibold text-amber-900">
-          หน้านี้จัดการข้อมูลโปรไฟล์และบทบาทของบัญชีที่มีอยู่แล้ว การสร้าง ลบ หรือเปลี่ยนอีเมลบัญชีจริงต้องทำผ่าน {dataBackend === 'firebase' ? 'Firebase Authentication Console หรือ Admin SDK' : 'Supabase Authentication Dashboard หรือเซิร์ฟเวอร์ที่ใช้ service role'}
+          หน้านี้จัดการข้อมูลโปรไฟล์และบทบาทของบัญชีที่มีอยู่แล้ว การสร้าง ลบ หรือเปลี่ยนอีเมลบัญชีจริงต้องทำผ่าน Firebase Authentication Console หรือ Admin SDK
         </p>
       )}
       {/* Notification Toast */}

@@ -194,7 +194,7 @@ export default function AdminSettingsPage() {
           <div className="rounded-2xl bg-slate-50 p-4 text-xs leading-relaxed text-slate-500">ค่าเชื่อมต่อและผู้รับอยู่บนเซิร์ฟเวอร์ หากต้องเปลี่ยนบัญชี ให้ผู้ดูแลปรับค่าที่ระบบโฮสต์</div>
         </div>
       </details>
-      <footer className="flex flex-wrap items-center gap-2 px-1 text-xs text-slate-400"><Database className="h-4 w-4" />ฐานข้อมูล: {dataBackend === 'firebase' ? 'Firebase Firestore' : dataBackend === 'supabase' ? 'Supabase' : 'โหมดข้อมูลในเครื่อง'}<span className="mx-1">·</span>CHANTAKORN PROPERTY</footer>
+      <footer className="flex flex-wrap items-center gap-2 px-1 text-xs text-slate-400"><Database className="h-4 w-4" />ฐานข้อมูล: {dataBackend === 'firebase' ? 'Firebase Firestore' : 'โหมดข้อมูลในเครื่อง'}<span className="mx-1">·</span>CHANTAKORN PROPERTY</footer>
     </div>
   );
 }

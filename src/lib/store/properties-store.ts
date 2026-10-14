@@ -3,7 +3,6 @@
 import { Property, PropertyFilters, Inquiry, UserProfile, Agent, AgentRank } from '@/lib/types';
 import { SAMPLE_PROPERTIES } from '@/data/sample-properties';
 import { formatPropertyCode } from '@/lib/format-code';
-import { supabase } from '@/lib/supabase/client';
 import { db } from '@/lib/firebase/client';
 import { dataBackend } from '@/lib/backend';
 import { fetchStaffApi } from '@/lib/staff-api';
@@ -28,7 +27,6 @@ const STORAGE_KEY_PROPERTIES = 'chantakorn_properties';
 const STORAGE_KEY_FAVORITES = 'chantakorn_favorites';
 const STORAGE_KEY_INQUIRIES = 'chantakorn_inquiries';
 const STORAGE_KEY_USERS = 'chantakorn_users';
-const PROPERTY_SELECT = '*, agents(*), property_images(image_url, sort_order)';
 
 function readArray<T>(key: string, fallback: T[], valid: (item: unknown) => item is T): T[] {
   if (typeof window !== 'undefined') {
@@ -94,19 +92,13 @@ export function saveLocalProperties(properties: Property[]) {
   writeArray(STORAGE_KEY_PROPERTIES, properties);
 }
 
-type PropertyRow = Property & {
-  agents?: Property['agent'];
-  property_images?: { image_url: string; sort_order: number }[];
-};
-
-function rowToProperty(row: PropertyRow): Property {
-  const { agents, property_images, ...property } = row;
+function rowToProperty(property: Property): Property {
   const parsedLat = Number(property.latitude);
   const parsedLng = Number(property.longitude);
   const validLat = property.latitude != null && String(property.latitude).trim() !== '' && Number.isFinite(parsedLat) && Math.abs(parsedLat) <= 90;
   const validLng = property.longitude != null && String(property.longitude).trim() !== '' && Number.isFinite(parsedLng) && Math.abs(parsedLng) <= 180;
 
-  let resolvedAgent = agents || property.agent || undefined;
+  let resolvedAgent = property.agent || undefined;
   if (typeof window !== 'undefined') {
     try {
       const allAgents = getAgents();
@@ -118,20 +110,6 @@ function rowToProperty(row: PropertyRow): Property {
 
       if (matched) {
         resolvedAgent = matched;
-      } else if (resolvedAgent) {
-        const stored = localStorage.getItem('chantakorn_auth_user');
-        if (stored) {
-          const u = JSON.parse(stored);
-          if (u && (u.id === property.agent_id || (u.email && u.email.toLowerCase() === resolvedAgent.email?.toLowerCase()) || u.id === resolvedAgent.id)) {
-            resolvedAgent = {
-              ...resolvedAgent,
-              photo_url: u.avatar_url || resolvedAgent.photo_url,
-              name: u.full_name || resolvedAgent.name,
-              phone: u.phone || resolvedAgent.phone,
-              line_id: u.line_id || resolvedAgent.line_id,
-            };
-          }
-        }
       }
     } catch {}
   }
@@ -147,9 +125,7 @@ function rowToProperty(row: PropertyRow): Property {
     parking: Number(property.parking) || 0,
     land_size: Number(property.land_size) || 0,
     usable_area: Number(property.usable_area) || 0,
-    images: Array.isArray(property_images)
-      ? [...property_images].sort((a, b) => a.sort_order - b.sort_order).map(image => image.image_url)
-      : property.images || [],
+    images: property.images || [],
     features: property.features || [],
     agent: resolvedAgent,
   };
@@ -191,16 +167,6 @@ function filterProperties(properties: Property[], filters?: PropertyFilters): Pr
 
 async function loadProperties(includeUnpublished: boolean): Promise<Property[]> {
   requireConnection();
-  if (dataBackend === 'supabase') {
-    if (supabase) {
-      let request = supabase.from('properties').select(PROPERTY_SELECT);
-      if (!includeUnpublished) request = request.eq('published', true);
-      const { data, error } = await request;
-      if (error) throw error;
-      return (data || []).map(row => rowToProperty(row as PropertyRow));
-    }
-    return [];
-  }
   const firestore: Firestore | null = db;
   if (dataBackend === 'firebase') {
     if (firestore) {
@@ -208,13 +174,13 @@ async function loadProperties(includeUnpublished: boolean): Promise<Property[]> 
         const response = await fetch(apiUrl('/api/properties'));
         const body = await response.json();
         if (!response.ok || !Array.isArray(body.properties)) throw new Error(body.error || 'โหลดรายการทรัพย์ไม่สำเร็จ');
-        return body.properties.map((row: PropertyRow) => rowToProperty(row));
+        return body.properties.map((row: Property) => rowToProperty(row));
       }
       const q = includeUnpublished
         ? query(collection(firestore, 'properties'))
         : query(collection(firestore, 'properties'), where('published', '==', true));
       const snapshot = await getDocs(q);
-      return snapshot.docs.map(item => rowToProperty({ ...item.data(), id: item.id } as PropertyRow));
+      return snapshot.docs.map(item => rowToProperty({ ...item.data(), id: item.id } as Property));
     }
     return [];
   }
@@ -243,25 +209,6 @@ function matchesPropertyKey(property: Property, key: string): boolean {
 
 export async function fetchPropertyBySlug(slug: string): Promise<Property | null> {
   requireConnection();
-  if (dataBackend === 'supabase') {
-    if (supabase) {
-      const { data, error } = await supabase.from('properties').select(PROPERTY_SELECT)
-        .eq('slug', slug).eq('published', true).maybeSingle();
-      if (error) throw error;
-      if (data) return rowToProperty(data as PropertyRow);
-      const all = await loadProperties(false);
-      return all.find(property => matchesPropertyKey(property, slug)) || null;
-    }
-    return null;
-  }
-  const firestore: Firestore | null = db;
-  if (dataBackend === 'firebase') {
-    if (firestore) {
-      const all = await loadProperties(false);
-      return all.find(property => matchesPropertyKey(property, slug)) || null;
-    }
-    return null;
-  }
   return (await loadProperties(false)).find(property => matchesPropertyKey(property, slug)) || null;
 }
 
@@ -305,21 +252,6 @@ async function triggerLineNotification(property: Property) {
 
 export async function createProperty(property: Omit<Property, 'id' | 'created_at'>): Promise<Property> {
   requireStaffBackend();
-  if (dataBackend === 'supabase' && supabase) {
-    const { images, agent, ...row } = property;
-    const { data, error } = await supabase.rpc('save_property', { p_property: row, p_images: images });
-    if (error) throw error;
-    const created = { ...(data as Property), images, agent };
-    recordPropertyHistory({
-      property_id: created.id,
-      property_title: created.title,
-      change_type: 'created',
-      new_value: created.price,
-      diff_summary: `สร้างประกาศทรัพย์ใหม่ "${created.title}" ในระบบ`,
-    }).catch(() => undefined);
-    triggerLineNotification(created).catch(() => undefined);
-    return created;
-  }
   const firestore: Firestore | null = db;
   if (dataBackend === 'firebase' && firestore) {
     const newId = generateShortPropertyId();
@@ -371,16 +303,6 @@ export async function updateProperty(id: string, updates: Partial<Property>): Pr
   requireStaffBackend();
   const { id: ignoredId, created_at: ignoredCreated, images, agent, ...fields } = updates;
   const changes = { ...fields, updated_at: new Date().toISOString() };
-  if (dataBackend === 'supabase' && supabase) {
-    const { error } = await supabase.rpc('save_property', { p_property: { ...fields, id }, p_images: images ?? null });
-    if (error) throw error;
-    const { data, error: readError } = await supabase.from('properties').select(PROPERTY_SELECT).eq('id', id).maybeSingle();
-    if (readError) throw readError;
-    if (!data) throw new Error('ไม่พบประกาศหรือไม่มีสิทธิ์แก้ไข');
-    const result = rowToProperty(data as PropertyRow);
-    logPropertyChanges(result, updates).catch(() => undefined);
-    return result;
-  }
   const firestore: Firestore | null = db;
   if (dataBackend === 'firebase' && firestore) {
     const current = (await loadProperties(true)).find(p => p.id === id);
@@ -422,11 +344,6 @@ export async function updateProperty(id: string, updates: Partial<Property>): Pr
 
 export async function deleteProperty(id: string): Promise<boolean> {
   requireStaffBackend();
-  if (dataBackend === 'supabase' && supabase) {
-    const { data, error } = await supabase.from('properties').delete().eq('id', id).select('id');
-    if (error) throw error;
-    return Boolean(data?.length);
-  }
   const firestore: Firestore | null = db;
   if (dataBackend === 'firebase' && firestore) {
     await deleteDoc(doc(firestore, 'properties', id));
@@ -490,7 +407,7 @@ export async function syncPropertiesAgentProfile(profile: UserProfile): Promise<
 
   // 2. Sync in Local Storage
   try {
-    const localProps = getLocalProperties();
+    const localProps = dataBackend === 'local' ? getLocalProperties() : [];
     let hasChanges = false;
     const updated = localProps.map(p => {
       const isMatch = 
@@ -550,16 +467,9 @@ export async function submitInquiry(inquiry: Omit<Inquiry, 'id' | 'created_at'>)
   if (!inquiry.name.trim() || !inquiry.phone.trim() || !inquiry.message.trim()) {
     throw new Error('กรุณากรอกชื่อ เบอร์โทรศัพท์ และข้อความให้ครบถ้วน');
   }
-  const result: Inquiry = { ...inquiry, id: crypto.randomUUID(), status: 'new', created_at: new Date().toISOString() };
   const firestore: Firestore | null = db;
   if (dataBackend === 'firebase' && firestore) {
     return submitFirebaseInquiry(inquiry);
-  }
-  if (dataBackend === 'supabase' && supabase) {
-    // Anonymous visitors may insert inquiries but may never read the private inbox.
-    const { error } = await supabase.from('inquiries').insert(result);
-    if (error) throw error;
-    return result;
   }
   throw new Error('ไม่สามารถเชื่อมต่อระบบรับข้อความ กรุณาติดต่อทางโทรศัพท์หรือ LINE');
 }
@@ -570,11 +480,6 @@ export function getLocalInquiries(): Inquiry[] {
 
 export async function fetchInquiries(): Promise<Inquiry[]> {
   requireStaffBackend();
-  if (dataBackend === 'supabase' && supabase) {
-    const { data, error } = await supabase.from('inquiries').select('*').order('created_at', { ascending: false });
-    if (error) throw error;
-    return (data || []) as Inquiry[];
-  }
   const firestore: Firestore | null = db;
   if (dataBackend === 'firebase' && firestore) {
     const snap = await getDocs(collection(firestore, 'inquiries'));
@@ -587,29 +492,23 @@ export async function fetchInquiries(): Promise<Inquiry[]> {
 export async function updateInquiryStatus(id: string, status: Inquiry['status']): Promise<Inquiry | null> {
   requireStaffBackend();
   let updatedInquiry: Inquiry | null = null;
-  if (dataBackend === 'supabase' && supabase) {
-    const { data, error } = await supabase.from('inquiries').update({ status }).eq('id', id).select().maybeSingle();
-    if (error) throw error;
-    updatedInquiry = data as Inquiry | null;
+  const firestore: Firestore | null = db;
+  if (dataBackend === 'firebase' && firestore) {
+    try {
+      await setDoc(doc(firestore, 'inquiries', id), { status }, { merge: true });
+      const snap = await getDocs(collection(firestore, 'inquiries'));
+      const found = snap.docs.find(d => d.id === id);
+      updatedInquiry = found ? ({ ...found.data(), id: found.id } as Inquiry) : null;
+    } catch (err) {
+      console.error('Firestore updateInquiryStatus error:', err);
+    }
   } else {
-    const firestore: Firestore | null = db;
-    if (dataBackend === 'firebase' && firestore) {
-      try {
-        await setDoc(doc(firestore, 'inquiries', id), { status }, { merge: true });
-        const snap = await getDocs(collection(firestore, 'inquiries'));
-        const found = snap.docs.find(d => d.id === id);
-        updatedInquiry = found ? ({ ...found.data(), id: found.id } as Inquiry) : null;
-      } catch (err) {
-        console.error('Firestore updateInquiryStatus error:', err);
-      }
-    } else {
-      const inquiries = getLocalInquiries();
-      const inquiry = inquiries.find(item => item.id === id);
-      if (inquiry) {
-        const updated = { ...inquiry, status };
-        writeArray(STORAGE_KEY_INQUIRIES, inquiries.map(item => item.id === id ? updated : item));
-        updatedInquiry = updated;
-      }
+    const inquiries = getLocalInquiries();
+    const inquiry = inquiries.find(item => item.id === id);
+    if (inquiry) {
+      const updated = { ...inquiry, status };
+      writeArray(STORAGE_KEY_INQUIRIES, inquiries.map(item => item.id === id ? updated : item));
+      updatedInquiry = updated;
     }
   }
 
@@ -643,12 +542,7 @@ export function saveLocalUsers(users: UserProfile[]) {
 export async function fetchUsers(): Promise<UserProfile[]> {
   requireStaffBackend();
   let usersList: UserProfile[];
-  if (dataBackend === 'supabase') {
-    if (!supabase) throw new Error('ระบบฐานข้อมูล Supabase ยังไม่ได้ตั้งค่า');
-    const { data, error } = await supabase.from('profiles').select('*').order('full_name');
-    if (error) throw error;
-    usersList = (data || []) as UserProfile[];
-  } else if (dataBackend === 'firebase') {
+  if (dataBackend === 'firebase') {
     if (!db) throw new Error('ระบบฐานข้อมูล Firebase ยังไม่ได้ตั้งค่า');
     const snapshot = await getDocs(collection(db, 'profiles'));
     usersList = snapshot.docs.map(item => ({ ...item.data(), id: item.id } as UserProfile));
@@ -694,22 +588,15 @@ export async function updateUserProfile(userId: string, updates: Partial<UserPro
   requireStaffBackend();
   const { id: ignoredId, ...fields } = updates;
   let all: UserProfile[] = [];
-  if (dataBackend === 'supabase' && supabase) {
-    const { data, error } = await supabase.from('profiles').update(fields).eq('id', userId).select('id');
-    if (error) throw error;
-    if (!data?.length) throw new Error('ไม่สามารถแก้ไขผู้ใช้นี้ได้ กรุณาตรวจสอบสิทธิ์');
+  const firestore: Firestore | null = db;
+  if (dataBackend === 'firebase' && firestore) {
+    await setDoc(doc(firestore, 'profiles', userId), fields, { merge: true });
     all = await fetchUsers();
   } else {
-    const firestore: Firestore | null = db;
-    if (dataBackend === 'firebase' && firestore) {
-      await setDoc(doc(firestore, 'profiles', userId), fields, { merge: true });
-      all = await fetchUsers();
-    } else {
-      const users = getLocalUsers();
-      const updated = users.map(user => user.id === userId ? { ...user, ...fields } : user);
-      saveLocalUsers(updated);
-      all = updated;
-    }
+    const users = getLocalUsers();
+    const updated = users.map(user => user.id === userId ? { ...user, ...fields } : user);
+    saveLocalUsers(updated);
+    all = updated;
   }
 
   // Sync to agents store

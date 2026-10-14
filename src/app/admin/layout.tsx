@@ -7,7 +7,6 @@ import { usePathname, useRouter } from 'next/navigation';
 import { onAuthStateChanged } from 'firebase/auth';
 import { Building2, ExternalLink, LoaderCircle, LogOut, Menu, Plus, RefreshCw, ShieldAlert, UserRound, X } from 'lucide-react';
 import { auth } from '@/lib/firebase/client';
-import { supabase } from '@/lib/supabase/client';
 import { dataBackend } from '@/lib/backend';
 import { getCurrentUserProfile, logoutUser } from '@/lib/auth-helpers';
 import { fetchInquiries } from '@/lib/store/properties-store';
@@ -87,12 +86,6 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       });
     } else {
       void loadSession();
-      if (dataBackend === 'supabase' && supabase) {
-        const { data: { subscription } } = supabase.auth.onAuthStateChange(() => {
-          setTimeout(() => { if (active) void loadSession(); }, 0);
-        });
-        unsubscribe = () => subscription.unsubscribe();
-      }
     }
     return () => {
       active = false;

@@ -16,7 +16,6 @@ function load() {
     CustomEvent: class { constructor(type, init) { this.type = type; this.detail = init.detail; } },
     require(name) {
       if (name === '@/lib/firebase/client') return { db: {} };
-      if (name === '@/lib/supabase/client') return { supabase: null };
       if (name === '@/lib/backend') return { dataBackend: 'firebase' };
       if (name === '@/lib/auth-helpers') return { getCurrentUserProfile: async () => ({ role: state.staff ? 'ADMIN' : 'USER' }) };
       if (name === 'firebase/firestore') return {

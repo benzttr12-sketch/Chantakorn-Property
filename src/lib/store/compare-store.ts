@@ -56,7 +56,7 @@ export function clearCompareList() {
 export function getCompareProperties(allProperties?: Property[]): Property[] {
   const ids = getCompareIds();
   if (ids.length === 0) return [];
-  const source = allProperties && allProperties.length > 0 ? allProperties : getLocalProperties();
+  const source = allProperties ?? getLocalProperties();
   return ids
     .map((id) => source.find((p) => p.id === id))
     .filter((p): p is Property => Boolean(p));

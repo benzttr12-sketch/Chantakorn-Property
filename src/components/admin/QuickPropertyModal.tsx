@@ -1,7 +1,6 @@
 ﻿'use client';
 
 import React, { useState } from 'react';
-import Image from 'next/image';
 import { 
   X, 
   Wand2, 
@@ -23,8 +22,7 @@ import {
   ExternalLink,
   ChevronRight,
   Film,
-  Video,
-  Play
+  Video
 } from 'lucide-react';
 import { Property, PropertyType, PropertyStatus, FacingDirection } from '@/lib/types';
 import { createProperty } from '@/lib/store/properties-store';
@@ -35,7 +33,7 @@ import { formatPrice, formatThaiBahtReadable, slugify } from '@/lib/utils';
 import { getStoredUser } from '@/lib/auth-helpers';
 import { parseVideoUrl } from '@/lib/image-compressor';
 import SmartDescriptionGeneratorModal, { PropertySpecsForAI } from '@/components/admin/SmartDescriptionGeneratorModal';
-import VoiceDictationBar from '@/components/admin/VoiceDictationBar';
+import VoiceDictationBar from '@/components/ui/VoiceDictationBar';
 import { fetchStaffApi } from '@/lib/staff-api';
 
 interface QuickPropertyModalProps {
@@ -43,22 +41,6 @@ interface QuickPropertyModalProps {
   onClose: () => void;
   onSuccess: (newProperty: Property) => void;
 }
-
-const SAMPLE_HOUSE_PHOTOS = [
-  'https://images.unsplash.com/photo-1580587771525-78b9dba3b914?auto=format&fit=crop&w=1200&q=80',
-  'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=1200&q=80',
-  'https://images.unsplash.com/photo-1600566753190-17f0baa2a6c3?auto=format&fit=crop&w=1200&q=80',
-];
-
-const SAMPLE_CONDO_PHOTOS = [
-  'https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?auto=format&fit=crop&w=1200&q=80',
-  'https://images.unsplash.com/photo-1512917774080-9991f1c4c750?auto=format&fit=crop&w=1200&q=80',
-];
-
-const SAMPLE_LAND_PHOTOS = [
-  'https://images.unsplash.com/photo-1500382017468-9049fed747ef?auto=format&fit=crop&w=1200&q=80',
-  'https://images.unsplash.com/photo-1472214103451-9374bd1c798e?auto=format&fit=crop&w=1200&q=80',
-];
 
 export default function QuickPropertyModal({ isOpen, onClose, onSuccess }: QuickPropertyModalProps) {
   const [rawText, setRawText] = useState('');
@@ -79,15 +61,13 @@ export default function QuickPropertyModal({ isOpen, onClose, onSuccess }: Quick
   const [landSize, setLandSize] = useState('50');
   const [usableArea, setUsableArea] = useState('150');
   const [facingDirection, setFacingDirection] = useState<FacingDirection>('ทิศใต้');
-  const [coverImage, setCoverImage] = useState(SAMPLE_HOUSE_PHOTOS[0]);
-  const [images, setImages] = useState<string[]>(SAMPLE_HOUSE_PHOTOS);
   const [features, setFeatures] = useState<string[]>(['ติดถนนใหญ่', 'ทำเลชุมชน']);
   const [description, setDescription] = useState('');
   const [internalNotes, setInternalNotes] = useState('');
   const [videoUrl, setVideoUrl] = useState('');
   const [showAiDescModal, setShowAiDescModal] = useState(false);
   const [quickAiGenerating, setQuickAiGenerating] = useState(false);
-  const [publishImmediately, setPublishImmediately] = useState(true);
+  const [publishImmediately, setPublishImmediately] = useState(false);
 
   if (!isOpen) return null;
 
@@ -136,7 +116,7 @@ export default function QuickPropertyModal({ isOpen, onClose, onSuccess }: Quick
   const handleParseText = () => {
     const text = rawText.trim();
     if (!text) {
-      setError('กรุณาวางข้อความรายละเอียดทรัพย์ หรือเลือกแม่แบบด่วนด้านล่างก่อน');
+      setError('กรุณาวางหรือพูดข้อความรายละเอียดทรัพย์ก่อน');
       return;
     }
     setError('');
@@ -164,18 +144,6 @@ export default function QuickPropertyModal({ isOpen, onClose, onSuccess }: Quick
     if (parsed.facingDirection) setFacingDirection(parsed.facingDirection);
     if (parsed.features && parsed.features.length > 0) setFeatures(parsed.features);
 
-    // Pick photos by property type
-    if (parsed.propertyType === 'condo') {
-      setCoverImage(SAMPLE_CONDO_PHOTOS[0]);
-      setImages(SAMPLE_CONDO_PHOTOS);
-    } else if (parsed.propertyType === 'land') {
-      setCoverImage(SAMPLE_LAND_PHOTOS[0]);
-      setImages(SAMPLE_LAND_PHOTOS);
-    } else {
-      setCoverImage(SAMPLE_HOUSE_PHOTOS[0]);
-      setImages(SAMPLE_HOUSE_PHOTOS);
-    }
-
     const parsedDesc = generateProfessionalDescription({
       title: parsed.title || title,
       propertyType: parsed.propertyType || propertyType,
@@ -195,22 +163,6 @@ export default function QuickPropertyModal({ isOpen, onClose, onSuccess }: Quick
     setDescription(parsedDesc);
 
     setStep('review');
-  };
-
-  // Quick preset loader
-  const handleLoadPreset = (type: 'house' | 'condo' | 'land' | 'townhome') => {
-    let preset = '';
-    if (type === 'house') {
-      preset = 'ขายบ้านเดี่ยว 2 ชั้น โครงการโมเดิร์น ทำเลควนลัง หาดใหญ่ 3 ห้องนอน 2 ห้องน้ำ ที่จอดรถ 2 คัน 54 ตรว. 165 ตรม. ราคา 3.89 ล้าน ใกล้สนามบินหาดใหญ่ ทิศใต้ แถมแอร์ 3 เครื่อง ปั๊มน้ำ แท้งค์น้ำ';
-    } else if (type === 'condo') {
-      preset = 'ให้เช่าคอนโดหรู ใจกลางเมืองหาดใหญ่ ย่าน ม.อ. 1 ห้องนอน 1 ห้องน้ำ 32 ตรม. ชั้น 8 วิวสระว่ายน้ำ เฟอร์ครบ แอร์ ทีวี ตู้เย็น ราคา 9,500 บาท/เดือน ใกล้ รพ.สงขลานครินทร์ ทิศตะวันออก';
-    } else if (type === 'land') {
-      preset = 'ขายที่ดินเปล่าถมแล้ว แปลงสวย สี่เหลี่ยม 100 ตารางวา หน้ากว้าง 16 เมตร ทำเลเมืองสงขลา ใกล้ ม.ทักษิณ และหาดชลาทัศน์ ราคา 2.5 ล้าน ทิศเหนือ เหมาะสร้างบ้านพักอาศัย';
-    } else {
-      preset = 'ขายทาวน์โฮม 2 ชั้น สไตล์มินิมอล ทำเลคลองแห หาดใหญ่ 2 ห้องนอน 2 ห้องน้ำ 1 ที่จอดรถ 22 ตรว. 110 ตรม. ราคา 2.19 ล้าน ใกล้ตลาดน้ำคลองแห และ Big C หาดใหญ่ ทิศตะวันออกเฉียงเหนือ';
-    }
-    setRawText(preset);
-    setError('');
   };
 
   const handleSave = async () => {
@@ -277,8 +229,8 @@ export default function QuickPropertyModal({ isOpen, onClose, onSuccess }: Quick
         land_size: Number(landSize) || 0,
         usable_area: Number(usableArea) || 0,
         furniture: 'พร้อมอยู่',
-        cover_image: coverImage,
-        images: images.length > 0 ? images : [coverImage],
+        cover_image: '',
+        images: [],
         video_url: videoUrl.trim() || undefined,
         features: features.length > 0 ? features : ['ทำเลดี เดินทางสะดวก'],
         featured: false,
@@ -294,7 +246,7 @@ export default function QuickPropertyModal({ isOpen, onClose, onSuccess }: Quick
           phone: currentUser?.phone || '081-604-0097',
           line_id: currentUser?.line_id || '@930xzcyi',
           email: currentUser?.email || 'contact@chantakorn.com',
-          photo_url: currentUser?.avatar_url || 'https://images.unsplash.com/photo-1560250097-0b93528c311a?auto=format&fit=crop&w=400&q=80',
+          photo_url: currentUser?.avatar_url || '',
           bio: currentUser?.bio || 'ผู้เชี่ยวชาญอสังหาริมทรัพย์หาดใหญ่-สงขลา',
         }
       };
@@ -386,41 +338,6 @@ export default function QuickPropertyModal({ isOpen, onClose, onSuccess }: Quick
                 />
               </div>
 
-              {/* Fast Presets */}
-              <div className="space-y-2">
-                <span className="text-[11px] font-bold text-gray-500">หรือคลิกทดลองใส่ตัวอย่าง:</span>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                  <button
-                    type="button"
-                    onClick={() => handleLoadPreset('house')}
-                    className="p-2.5 bg-gray-50 hover:bg-gold-50 hover:border-gold-300 border border-gray-200 rounded-xl text-xs font-medium text-navy-900 text-left transition-all cursor-pointer"
-                  >
-                    🏡 บ้านเดี่ยวหาดใหญ่
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleLoadPreset('condo')}
-                    className="p-2.5 bg-gray-50 hover:bg-gold-50 hover:border-gold-300 border border-gray-200 rounded-xl text-xs font-medium text-navy-900 text-left transition-all cursor-pointer"
-                  >
-                    🏢 คอนโด ม.อ.
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleLoadPreset('land')}
-                    className="p-2.5 bg-gray-50 hover:bg-gold-50 hover:border-gold-300 border border-gray-200 rounded-xl text-xs font-medium text-navy-900 text-left transition-all cursor-pointer"
-                  >
-                    🌳 ที่ดินเมืองสงขลา
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleLoadPreset('townhome')}
-                    className="p-2.5 bg-gray-50 hover:bg-gold-50 hover:border-gold-300 border border-gray-200 rounded-xl text-xs font-medium text-navy-900 text-left transition-all cursor-pointer"
-                  >
-                    🏬 ทาวน์โฮมคลองแห
-                  </button>
-                </div>
-              </div>
-
               <div className="bg-amber-50/80 border border-amber-200 p-3.5 rounded-2xl text-xs text-amber-900 space-y-1">
                 <span className="font-bold flex items-center space-x-1">
                   <Sparkles className="w-3.5 h-3.5 text-amber-600" />
@@ -430,7 +347,7 @@ export default function QuickPropertyModal({ isOpen, onClose, onSuccess }: Quick
                   <li>สกัดราคา, อำเภอ, ตำบล, จำนวนห้อง และขนาดที่ดินออกมาให้อัตโนมัติ</li>
                   <li>คำนวณและดึงพิกัด Google Maps สงขลาให้ตรงทำเลทันที</li>
                   <li>คำนวณทิศฮวงจุ้ยมงคล คะแนนพลังงาน และชี่ลม/สุริยันให้อัตโนมัติ</li>
-                  <li>แต่งคำบรรยายประกาศแบบมืออาชีพพร้อมรูปภาพมาตรฐานทันที</li>
+                  <li>เตรียมคำบรรยายประกาศ แล้วให้คุณตรวจสอบก่อนบันทึก</li>
                 </ul>
               </div>
             </div>
@@ -684,14 +601,6 @@ export default function QuickPropertyModal({ isOpen, onClose, onSuccess }: Quick
                     <span>วิดีโอพาทัวร์อสังหาริมทรัพย์ (Video Tour - ไม่บังคับ/เลือกใส่หรือไม่ใส่ก็ได้)</span>
                   </label>
                   <div className="flex items-center space-x-1.5">
-                    <button
-                      type="button"
-                      onClick={() => setVideoUrl('https://www.youtube.com/watch?v=ScMzIvxBSi4')}
-                      className="text-[10px] text-red-700 bg-white hover:bg-red-100 px-2 py-0.5 rounded-md border border-red-200 font-semibold flex items-center space-x-1 transition-colors cursor-pointer"
-                    >
-                      <Play className="w-2.5 h-2.5 fill-red-700" />
-                      <span>+ ลิงก์ตัวอย่าง (YouTube)</span>
-                    </button>
                     {videoUrl && (
                       <button
                         type="button"
@@ -744,29 +653,9 @@ export default function QuickPropertyModal({ isOpen, onClose, onSuccess }: Quick
                 )}
               </div>
 
-              {/* Photo Preview Strip */}
-              <div className="space-y-1.5">
-                <span className="text-[11px] font-bold text-gray-700">รูปภาพปกและแกลเลอรี (จัดเตรียมให้อัตโนมัติ):</span>
-                <div className="flex items-center space-x-2 overflow-x-auto pb-1">
-                  {images.map((img, idx) => (
-                    <div key={idx} className="relative w-20 h-16 rounded-xl overflow-hidden border border-gray-200 shrink-0">
-                      <Image
-                        src={img}
-                        alt="Property sample"
-                        fill
-                        unoptimized
-                        referrerPolicy="no-referrer"
-                        className="object-cover"
-                      />
-                      {idx === 0 && (
-                        <span className="absolute bottom-0.5 left-0.5 bg-gold-500 text-navy-950 text-[9px] font-black px-1.5 py-0.2 rounded-sm">
-                          รูปปก
-                        </span>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </div>
+              <p className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs leading-relaxed text-slate-600">
+                บันทึกเป็นฉบับร่าง แล้วเปิดแก้ไขทรัพย์เพื่อเพิ่มรูปภาพจริงก่อนเผยแพร่
+              </p>
 
               {/* Publish Toggle */}
               <div className="pt-2 border-t border-gray-100 flex items-center justify-between">
@@ -829,7 +718,7 @@ export default function QuickPropertyModal({ isOpen, onClose, onSuccess }: Quick
                 ) : (
                   <>
                     <Sparkles className="w-4 h-4" />
-                    <span>ยืนยันและบันทึกทรัพย์ทันที</span>
+                    <span>{publishImmediately ? 'ยืนยันและเผยแพร่ทรัพย์' : 'บันทึกฉบับร่าง'}</span>
                   </>
                 )}
               </button>

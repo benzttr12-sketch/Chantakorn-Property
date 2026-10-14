@@ -74,7 +74,7 @@ export async function GET(req: Request) {
   const token = req.headers.get('authorization')?.match(/^Bearer\s+(.+)$/i)?.[1];
   const settings = await getLineSettings(token);
   const recipients = configuredRecipients(settings);
-  const hostOrigin = new URL(req.url).origin || 'https://ais-dev-4fthqw6uuad4ntgghqrlse-213200673887.asia-east1.run.app';
+  const hostOrigin = new URL(req.url).origin;
   return jsonResponse({
     officialLineUrl: OFFICIAL_LINE_OA_URL,
     lineId: '@930xzcyi',
