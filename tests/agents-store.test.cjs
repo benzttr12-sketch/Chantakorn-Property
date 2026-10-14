@@ -5,7 +5,7 @@ const path = require('node:path');
 const vm = require('node:vm');
 const ts = require('typescript');
 
-function load({ backend = 'firebase', configured = true, supabase = null, rows = [], profiles = [] } = {}) {
+function load({ backend = 'firebase', configured = true, rows = [], profiles = [] } = {}) {
   const state = { rows, profiles, readError: null, writeError: null, writeWait: null, writes: [], events: [], storage: new Map(), storageError: null };
   const cache = new Map();
   const context = vm.createContext({ console, Event,
@@ -34,9 +34,7 @@ function load({ backend = 'firebase', configured = true, supabase = null, rows =
     function requireModule(name) {
       if (name === '@/lib/backend') return { dataBackend: backend };
       if (name === '@/lib/firebase/client') return { db: configured ? {} : null };
-      if (name === '@/lib/supabase/client') return { supabase };
       if (name === 'firebase/firestore') return firestore;
-      if (name === '@/data/agents') return { AGENTS: [{ id: 'demo-agent', name: 'Demo', languages: [], experienceYears: 0, closedDeals: 0, rating: 0 }] };
       if (name === '@/data/sample-properties') return { SAMPLE_PROPERTIES: [] };
       if (name === '@/lib/store/agents-store') return moduleAt('lib/store/agents-store.ts');
       if (name === '@/lib/store/property-history-store') return {};
@@ -63,20 +61,16 @@ test('empty cloud agents and profiles stay empty without demo seeds or database 
   assert.deepEqual(plain(await properties.fetchUsers()), []);
   assert.equal(state.writes.length, 0);
   assert.equal(state.storage.size, 0);
-  await assert.rejects(store.resetAgentsToDefault(), /โหมดทดลอง/);
-  assert.equal(state.writes.length, 0);
 });
 
 test('configured cloud errors or missing configuration never use browser-local agents or members', async () => {
-  for (const backend of ['firebase', 'supabase']) {
-    const { store, properties, state } = load({ backend, configured: false });
-    state.storage.set('chantakorn_featured_agents_v1', JSON.stringify([agent]));
-    await assert.rejects(store.fetchAgents(), /ยังไม่ได้ตั้งค่า/);
-    await assert.rejects(properties.fetchUsers(), /ยังไม่ได้ตั้งค่า/);
-    await assert.rejects(store.updateAgent(agent.id, agent), /ยังไม่ได้ตั้งค่า/);
-    assert.equal(state.writes.length, 0);
-    assert.equal(state.storage.size, 1);
-  }
+  const { store, properties, state } = load({ configured: false });
+  state.storage.set('chantakorn_featured_agents_v1', JSON.stringify([agent]));
+  await assert.rejects(store.fetchAgents(), /ยังไม่ได้ตั้งค่า/);
+  await assert.rejects(properties.fetchUsers(), /ยังไม่ได้ตั้งค่า/);
+  await assert.rejects(store.updateAgent(agent.id, agent), /ยังไม่ได้ตั้งค่า/);
+  assert.equal(state.writes.length, 0);
+  assert.equal(state.storage.size, 1);
 });
 
 test('agent success and cache publication wait until cloud persistence finishes', async () => {
@@ -156,26 +150,13 @@ test('local agent compatibility persists only when selected and storage failure 
   assert.equal(store.getAgents()[0].name, agent.name);
 });
 
-test('Supabase agents retain extended metadata and database failures propagate without a local fallback', async () => {
-  let failed = false;
-  let persisted;
-  const supabase = { from(table) {
-    assert.equal(table, 'agents');
-    return { select() { return this; }, order: async () => ({ data: [{ ...agent, metadata: { closedDeals: 7, zone: 'Actual zone' } }], error: failed ? Error('denied') : null }),
-      upsert(row) { persisted = row; return { select: async () => ({ data: [{ id: row.id }], error: failed ? Error('denied') : null }) }; },
-      delete() { return { eq() { return { select: async () => ({ data: [{ id: agent.id }], error: failed ? Error('denied') : null }) }; } }; },
-    };
-  } };
-  const { store, state } = load({ backend: 'supabase', supabase });
+test('Firebase agents retain extended metadata when another field is updated', async () => {
+  const { store, state } = load({ rows: [{ ...agent, closedDeals: 7, zone: 'Actual zone' }] });
   assert.equal((await store.fetchAgents())[0].closedDeals, 7);
   await store.updateAgent(agent.id, { specialty: 'Confirmed specialty' });
-  assert.equal(persisted.metadata.specialty, 'Confirmed specialty');
-  assert.equal(persisted.metadata.closedDeals, 7);
-  failed = true;
-  await assert.rejects(store.updateAgent(agent.id, { name: 'Rejected' }), /denied/);
-  await assert.rejects(store.deleteAgent(agent.id), /denied/);
-  await assert.rejects(store.fetchAgents(), /denied/);
-  assert.equal(store.getAgents()[0].name, agent.name);
+  assert.equal(state.writes[0].value.specialty, 'Confirmed specialty');
+  assert.equal(state.writes[0].value.closedDeals, 7);
+  assert.equal(state.writes[0].value.zone, 'Actual zone');
   assert.equal(state.storage.size, 0);
 });
 

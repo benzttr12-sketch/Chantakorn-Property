@@ -1,9 +1,8 @@
 'use client';
 
-import { ExtendedAgent, AGENTS as DEFAULT_AGENTS } from '@/data/agents';
+import type { ExtendedAgent } from '@/data/agents';
 import type { UserProfile } from '@/lib/types';
 import { db } from '@/lib/firebase/client';
-import { supabase } from '@/lib/supabase/client';
 import { dataBackend } from '@/lib/backend';
 import { collection, getDocs, doc, setDoc, deleteDoc } from 'firebase/firestore';
 
@@ -19,7 +18,6 @@ function publish(agents: ExtendedAgent[]): ExtendedAgent[] {
 
 function requireConnection() {
   if (dataBackend === 'firebase' && !db) throw new Error('ระบบฐานข้อมูล Firebase ยังไม่ได้ตั้งค่า');
-  if (dataBackend === 'supabase' && !supabase) throw new Error('ระบบฐานข้อมูล Supabase ยังไม่ได้ตั้งค่า');
 }
 
 function normalize(agent: Partial<ExtendedAgent>): ExtendedAgent {
@@ -47,20 +45,11 @@ function localWrite(agents: ExtendedAgent[]) {
   window.localStorage.setItem(LOCAL_KEY, JSON.stringify(agents));
 }
 
-function supabaseRow(agent: ExtendedAgent) {
-  const { id, name, title, phone, line_id, facebook, email, photo_url, bio, ...metadata } = agent;
-  return { id, name, title, phone, line_id, facebook, email, photo_url, bio, metadata };
-}
-
 async function persistAgent(agent: ExtendedAgent) {
   requireConnection();
   validate(agent);
   if (dataBackend === 'firebase') {
     await setDoc(doc(db!, 'agents', agent.id), clone(agent), { merge: true });
-  } else if (dataBackend === 'supabase') {
-    const { data, error } = await supabase!.from('agents').upsert(supabaseRow(agent), { onConflict: 'id' }).select('id');
-    if (error) throw error;
-    if (!data?.some(row => row.id === agent.id)) throw new Error('บันทึกนายหน้าไม่สำเร็จ กรุณาตรวจสอบสิทธิ์');
   }
 }
 
@@ -71,11 +60,6 @@ export async function fetchAgents(): Promise<ExtendedAgent[]> {
   if (dataBackend === 'firebase') {
     const snapshot = await getDocs(collection(db!, 'agents'));
     return publish(snapshot.docs.map(item => normalize({ ...item.data(), id: item.id })));
-  }
-  if (dataBackend === 'supabase') {
-    const { data, error } = await supabase!.from('agents').select('*').order('name');
-    if (error) throw error;
-    return publish((data || []).map(row => normalize({ ...row, ...row.metadata, id: row.id })));
   }
   if (typeof window !== 'undefined') {
     const stored = window.localStorage.getItem(LOCAL_KEY);
@@ -98,12 +82,6 @@ export async function saveAgentsToCloud(agents: ExtendedAgent[]): Promise<void> 
 }
 
 export async function saveAgents(agents: ExtendedAgent[]): Promise<void> { await saveAgentsToCloud(agents); }
-
-export async function resetAgentsToDefault(): Promise<ExtendedAgent[]> {
-  if (dataBackend !== 'local') throw new Error('ข้อมูลตัวอย่างใช้ได้เฉพาะโหมดทดลอง');
-  await saveAgents(DEFAULT_AGENTS);
-  return getAgents();
-}
 
 /** Reflect real profile fields in the current view. Reading profiles never writes agents. */
 export function syncAgentsFromUsers(users: UserProfile[]): ExtendedAgent[] {
@@ -142,11 +120,6 @@ export async function deleteAgent(agentId: string): Promise<ExtendedAgent[]> {
   requireConnection();
   if (!agentId || agentId.length > 120 || agentId.includes('/')) throw new Error('รหัสนายหน้าไม่ถูกต้อง');
   if (dataBackend === 'firebase') await deleteDoc(doc(db!, 'agents', agentId));
-  else if (dataBackend === 'supabase') {
-    const { data, error } = await supabase!.from('agents').delete().eq('id', agentId).select('id');
-    if (error) throw error;
-    if (!data?.some(row => row.id === agentId)) throw new Error('ลบนายหน้าไม่สำเร็จ กรุณาตรวจสอบสิทธิ์');
-  }
   const next = getAgents().filter(agent => agent.id !== agentId);
   if (dataBackend === 'local') localWrite(next);
   return publish(next);

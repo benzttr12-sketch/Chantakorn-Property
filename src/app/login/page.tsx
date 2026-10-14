@@ -16,10 +16,8 @@ import {
   Sparkles,
   Info
 } from 'lucide-react';
-import { supabase } from '@/lib/supabase/client';
-import { auth } from '@/lib/firebase/client';
 import { dataBackend } from '@/lib/backend';
-import { signInWithGoogle, loginWithEmail, notifyAuthChange } from '@/lib/auth-helpers';
+import { signInWithGoogle, loginWithEmail } from '@/lib/auth-helpers';
 
 function LoginForm() {
   const router = useRouter();
@@ -76,43 +74,9 @@ function LoginForm() {
     setError('');
     setLoading(true);
 
-    if (dataBackend === 'supabase' && supabase) {
-      try {
-        const { error: authError } = await supabase.auth.signInWithPassword({
-          email,
-          password,
-        });
-        if (authError) {
-          setError(authError.message);
-          setLoading(false);
-          return;
-        }
-        const { data: { user } } = await supabase.auth.getUser();
-        const { data: profile, error: profileError } = user
-          ? await supabase
-              .from('profiles')
-              .select('role')
-              .eq('id', user.id)
-              .single()
-          : { data: null, error: new Error('No authenticated user') };
 
-        if (profileError || !profile || !['ADMIN', 'AGENT', 'USER'].includes(profile.role)) {
-          await supabase.auth.signOut();
-          setError('บัญชีนี้ไม่มีสิทธิ์เข้าถึงระบบจัดการ');
-          setLoading(false);
-          return;
-        }
 
-        handleSuccessfulAuth(profile.role);
-        return;
-      } catch (err: any) {
-        setError(err.message || 'เกิดข้อผิดพลาดในการเข้าสู่ระบบ');
-        setLoading(false);
-        return;
-      }
-    }
-
-    if (dataBackend === 'local' || (dataBackend === 'firebase' && auth)) {
+    if (dataBackend === 'firebase') {
       try {
         const profile = await loginWithEmail(email, password);
         handleSuccessfulAuth(profile.role);
@@ -124,7 +88,7 @@ function LoginForm() {
       }
     }
 
-    setError('ระบบเข้าสู่ระบบยังไม่ได้ตั้งค่า');
+    setError('กรุณาตั้งค่า Firebase เพื่อเข้าสู่ระบบสมาชิก');
     setLoading(false);
   };
 

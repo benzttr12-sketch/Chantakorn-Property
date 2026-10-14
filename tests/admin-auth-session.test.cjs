@@ -5,7 +5,7 @@ const path = require('node:path');
 const vm = require('node:vm');
 const ts = require('typescript');
 
-function load({ role = 'ADMIN', verified = true, readError = false, current = true } = {}) {
+function load({ role = 'ADMIN', verified = true, readError = false, current = true, backend = 'firebase' } = {}) {
   const user = { uid: 'staff-id', email: 'staff@example.com', emailVerified: verified, displayName: 'Team member' };
   let fields = { id: user.uid, full_name: 'Team member', role, avatar_url: '' };
   const state = { reads: 0, failReads: readError, writes: [], events: [], storage: new Map([['chantakorn_auth_user', JSON.stringify({ id: 'forged', full_name: 'Forged', role: 'ADMIN' })]]) };
@@ -18,8 +18,7 @@ function load({ role = 'ADMIN', verified = true, readError = false, current = tr
     CustomEvent: class { constructor(type, init) { this.type = type; this.detail = init.detail; } },
     require(name) {
       if (name === '@/lib/firebase/client') return { auth, db: {}, googleProvider: {} };
-      if (name === '@/lib/backend') return { dataBackend: 'firebase', isDemoAuthEnabled: false };
-      if (name === '@/lib/supabase/client') return { supabase: null };
+      if (name === '@/lib/backend') return { dataBackend: backend };
       if (name === 'firebase/auth') return { updateProfile: async () => undefined };
       if (name === 'firebase/firestore') return {
         doc: (_db, collection, id) => ({ collection, id }),
@@ -87,4 +86,14 @@ test('signing out clears verified identity instead of using an earlier staff pro
   auth.currentUser = null;
   assert.equal(await api.getCurrentUserProfile(), null);
   assert.equal(api.getStoredUser(), null);
+});
+
+test('public local preview cannot authenticate or reset a browser-stored demo account', async () => {
+  const { api, state } = load({ backend: 'local' });
+  assert.equal(await api.getCurrentUserProfile(), null);
+  assert.equal(api.getStoredUser(), null);
+  assert.equal(state.reads, 0);
+  await assert.rejects(api.loginWithEmail('preview@example.test', 'preview-password'), /Firebase/);
+  await assert.rejects(api.registerWithEmail('preview@example.test', 'preview-password', 'Preview', ''), /Firebase/);
+  await assert.rejects(api.requestPasswordReset('preview@example.test'), /Firebase/);
 });

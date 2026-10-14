@@ -4,26 +4,19 @@ import React, { useState } from 'react';
 import Link from 'next/link';
 import {
   Building2,
-  Lock,
   Mail,
   ArrowRight,
   AlertCircle,
-  CheckCircle2,
-  ShieldAlert,
-  KeyRound
+  CheckCircle2
 } from 'lucide-react';
-import { dataBackend, isDemoAuthEnabled } from '@/lib/backend';
-import { requestPasswordReset, demoResetPassword } from '@/lib/auth-helpers';
+import { requestPasswordReset } from '@/lib/auth-helpers';
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState('');
-  const [newPassword, setNewPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [loading, setLoading] = useState(false);
 
-  const isDemo = dataBackend === 'local' && isDemoAuthEnabled;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -32,16 +25,8 @@ export default function ForgotPasswordPage() {
     setLoading(true);
 
     try {
-      if (isDemo) {
-        if (newPassword !== confirmPassword) {
-          throw new Error('รหัสผ่านใหม่ทั้งสองช่องไม่ตรงกัน');
-        }
-        await demoResetPassword(email, newPassword);
-        setSuccess('รีเซ็ตรหัสผ่านสำเร็จแล้ว กรุณาเข้าสู่ระบบด้วยรหัสผ่านใหม่');
-      } else {
-        await requestPasswordReset(email);
-        setSuccess('ส่งลิงก์รีเซ็ตรหัสผ่านไปที่อีเมลของคุณแล้ว กรุณาตรวจสอบกล่องจดหมาย (และโฟลเดอร์ Spam)');
-      }
+      await requestPasswordReset(email);
+      setSuccess('ส่งลิงก์รีเซ็ตรหัสผ่านไปที่อีเมลของคุณแล้ว กรุณาตรวจสอบกล่องจดหมาย (และโฟลเดอร์ Spam)');
     } catch (err: any) {
       setError(err?.message || 'เกิดข้อผิดพลาดในการรีเซ็ตรหัสผ่าน กรุณาลองใหม่อีกครั้ง');
     } finally {
@@ -69,9 +54,7 @@ export default function ForgotPasswordPage() {
           รีเซ็ตรหัสผ่าน
         </h2>
         <p className="mt-2 text-xs text-brand-muted">
-          {isDemo
-            ? 'ตั้งรหัสผ่านใหม่สำหรับบัญชีสมาชิกของคุณ (โหมดทดลองในเครื่องนี้)'
-            : 'กรอกอีเมลเพื่อรับลิงก์ตั้งรหัสผ่านใหม่'}
+          กรอกอีเมลเพื่อรับลิงก์ตั้งรหัสผ่านใหม่
         </p>
       </div>
 
@@ -117,58 +100,14 @@ export default function ForgotPasswordPage() {
                 </div>
               </div>
 
-              {isDemo && (
-                <>
-                  <div>
-                    <label className="block text-xs font-bold text-navy-950 mb-1.5">
-                      รหัสผ่านใหม่ (อย่างน้อย 6 ตัวอักษร)
-                    </label>
-                    <div className="relative">
-                      <input
-                        type="password"
-                        required
-                        minLength={6}
-                        value={newPassword}
-                        onChange={(e) => setNewPassword(e.target.value)}
-                        className="w-full bg-gray-50 border border-gray-200 rounded-xl pl-10 pr-4 py-2.5 text-xs sm:text-sm text-gray-900 focus:bg-white focus:ring-2 focus:ring-gold-500 outline-hidden transition-all"
-                        placeholder="••••••••"
-                      />
-                      <KeyRound className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
-                    </div>
-                  </div>
-                  <div>
-                    <label className="block text-xs font-bold text-navy-950 mb-1.5">
-                      ยืนยันรหัสผ่านใหม่
-                    </label>
-                    <div className="relative">
-                      <input
-                        type="password"
-                        required
-                        minLength={6}
-                        value={confirmPassword}
-                        onChange={(e) => setConfirmPassword(e.target.value)}
-                        className="w-full bg-gray-50 border border-gray-200 rounded-xl pl-10 pr-4 py-2.5 text-xs sm:text-sm text-gray-900 focus:bg-white focus:ring-2 focus:ring-gold-500 outline-hidden transition-all"
-                        placeholder="••••••••"
-                      />
-                      <Lock className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
-                    </div>
-                  </div>
-                  <div className="p-3 bg-amber-50/80 border border-amber-200/80 rounded-xl flex items-start space-x-2.5 text-[11px] text-amber-900">
-                    <ShieldAlert className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
-                    <span>
-                      โหมดทดลอง (Local): ข้อมูลสมาชิกถูกเก็บในเบราว์เซอร์เครื่องนี้เท่านั้น
-                      การรีเซ็ตจะมีผลเฉพาะเครื่องนี้
-                    </span>
-                  </div>
-                </>
-              )}
+
 
               <button
                 type="submit"
                 disabled={loading}
                 className="w-full py-3 px-4 bg-navy-950 hover:bg-navy-900 text-gold-400 font-bold text-xs sm:text-sm rounded-xl shadow-md transition-all flex items-center justify-center space-x-2 disabled:opacity-50 mt-2 cursor-pointer"
               >
-                <span>{loading ? 'กำลังดำเนินการ...' : isDemo ? 'ตั้งรหัสผ่านใหม่' : 'ส่งลิงก์รีเซ็ตรหัสผ่าน'}</span>
+                <span>{loading ? 'กำลังดำเนินการ...' : 'ส่งลิงก์รีเซ็ตรหัสผ่าน'}</span>
                 <ArrowRight className="w-4 h-4" />
               </button>
             </form>

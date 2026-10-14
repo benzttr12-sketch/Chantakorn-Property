@@ -13,8 +13,6 @@ import {
   CheckCircle2,
   AlertCircle 
 } from 'lucide-react';
-import { supabase } from '@/lib/supabase/client';
-import { auth } from '@/lib/firebase/client';
 import { dataBackend } from '@/lib/backend';
 import { signInWithGoogle, registerWithEmail } from '@/lib/auth-helpers';
 
@@ -49,34 +47,9 @@ export default function RegisterPage() {
     setError('');
     setLoading(true);
 
-    if (dataBackend === 'supabase' && supabase) {
-      try {
-        const { error: signUpError } = await supabase.auth.signUp({
-          email,
-          password,
-          options: {
-            data: {
-              full_name: fullName,
-              phone: phone,
-            },
-          },
-        });
-        if (signUpError) {
-          setError(signUpError.message);
-          setLoading(false);
-          return;
-        }
-        setRegistered(true);
-        setLoading(false);
-        return;
-      } catch (err: any) {
-        setError(err.message || 'เกิดข้อผิดพลาดในการลงทะเบียน');
-        setLoading(false);
-        return;
-      }
-    }
 
-    if (dataBackend === 'local' || (dataBackend === 'firebase' && auth)) {
+
+    if (dataBackend === 'firebase') {
       try {
         const profile = await registerWithEmail(email, password, fullName, phone);
         setRegistered(true);
@@ -96,7 +69,7 @@ export default function RegisterPage() {
       }
     }
 
-    setError('ระบบสมัครสมาชิกยังไม่ได้ตั้งค่า');
+    setError('กรุณาตั้งค่า Firebase เพื่อสมัครสมาชิก');
     setLoading(false);
   };
 

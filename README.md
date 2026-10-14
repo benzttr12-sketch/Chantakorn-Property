@@ -20,11 +20,12 @@ npm run dev
 
 รูปแบบเว็บใช้ Tailwind CSS 4 รองรับ Safari 16.4+, Chrome 111+ และ Firefox 128+
 
-ค่าเริ่มต้น `NEXT_PUBLIC_DATA_BACKEND=local` ใช้รายการตัวอย่าง บันทึกรายการโปรดและข้อมูลทดลองเฉพาะเบราว์เซอร์นั้น ฟอร์มในโหมดนี้ไม่ได้ส่งข้อมูลถึงทีมงาน หากต้องการทดลองหลังบ้าน ให้ตั้ง `NEXT_PUBLIC_ENABLE_DEMO_AUTH=true` แล้วเข้า `/login` เพื่อเลือกบัญชีทดลอง ไม่มีการเข้าเป็นแอดมินให้อัตโนมัติ
+ค่าเริ่มต้นใช้ Firebase สำหรับข้อมูลและบัญชีจริง หากต้องการดูหน้าเว็บในเครื่องโดยไม่เชื่อมฐานข้อมูล ให้กำหนด `NEXT_PUBLIC_DATA_BACKEND=local` อย่างชัดเจน โหมดนี้ใช้ข้อมูลสำหรับพัฒนา ฟอร์มไม่ส่งข้อมูลถึงทีมงาน และไม่มีระบบบัญชีหรือสิทธิ์พนักงานทดลอง
 
 ## ตรวจสอบและ build
 
 ```sh
+npm run audit:security
 npm run lint
 npm run typecheck
 npm test
@@ -41,7 +42,7 @@ npm run preview:pages
 
 เปิด http://localhost:4173 ไฟล์สำหรับเผยแพร่อยู่ใน `.next-pages/` ไม่ต้อง commit โฟลเดอร์นี้
 
-`build:pages` เลือกข้อมูลตัวอย่างและปิดล็อกอินทดลองโดยค่าเริ่มต้น แม้ในเครื่องมี `.env.local` สำหรับฐานข้อมูลจริง เพื่อให้ผลการ build สำหรับสาธารณะคาดเดาได้
+`build:pages` ใช้โหมดแสดงข้อมูลสำหรับพัฒนาโดยค่าเริ่มต้น แม้ในเครื่องมี `.env.local` สำหรับฐานข้อมูลจริง โหมดนี้ไม่มีบัญชีทดลอง เว็บไซต์ธุรกิจที่รับข้อมูลลูกค้าและใช้ LINE อยู่บน Vercel
 
 ## LINE production บน Vercel
 
@@ -73,53 +74,22 @@ npm run preview:pages
 
 ทรัพย์ตัวอย่างมีหน้าที่สร้างไว้ล่วงหน้า ส่วนทรัพย์ที่เพิ่มภายหลังใช้ `/properties/detail/?slug=...` เพื่อเปิดได้บน static hosting โดยไม่ต้อง build ใหม่ ข้อมูลจริงโหลดจาก backend ในเบราว์เซอร์
 
-## เชื่อมระบบใช้งานจริงด้วย Supabase
+## Firebase สำหรับใช้งานจริง
 
-1. สร้าง Supabase project แล้วรัน `supabase/schema.sql`, `supabase/agent-metadata.sql` และ `supabase/reviews.sql` ตามลำดับใน SQL Editor ของเจ้าของ project ไฟล์เหล่านี้ใช้เมื่อเลือก Supabase เท่านั้น ไม่รันอัตโนมัติระหว่างเผยแพร่เว็บ และไม่ต้องรันในระบบ Firebase
-2. ตั้ง `.env.local`:
-
-```dotenv
-NEXT_PUBLIC_DATA_BACKEND=supabase
-NEXT_PUBLIC_SUPABASE_URL=https://YOUR_PROJECT.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=YOUR_PUBLIC_ANON_OR_PUBLISHABLE_KEY
-NEXT_PUBLIC_ENABLE_DEMO_AUTH=false
-NEXT_PUBLIC_SITE_URL=https://YOUR_SITE
-```
-
-3. ตั้ง Supabase Authentication → URL Configuration ให้มี URL ของเว็บไซต์จริง และ URL redirect ที่ใช้ยืนยันอีเมล
-4. สมัครผู้ใช้ผ่าน `/register` แล้วยืนยันอีเมล บัญชีใหม่เริ่มเป็น `USER`
-5. เจ้าของ project กำหนดแอดมินใน SQL Editor ตามคำแนะนำท้าย `supabase/schema.sql`
-6. ล็อกอินที่ `/login` แล้วเพิ่มทรัพย์จาก `/admin/properties/new`
-
-บน GitHub ให้เพิ่ม **Settings → Secrets and variables → Actions**:
-
-| ประเภท | ชื่อ | ค่า |
-| --- | --- | --- |
-| Variable | `DEPLOY_DATA_BACKEND` | `supabase` |
-| Variable | `NEXT_PUBLIC_SUPABASE_URL` | URL ของ project |
-| Secret | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | public anon/publishable key |
-
-จากนั้นรัน workflow ใหม่ ค่าที่ขึ้นต้น `NEXT_PUBLIC_` จะรวมอยู่ใน JavaScript สาธารณะ จึงใช้ได้เฉพาะ public key และต้องมี RLS ตาม schema ห้ามใช้ service-role key
-
-ระบบจะรายงานข้อผิดพลาดเมื่อฐานข้อมูลอ่าน/บันทึกไม่ได้ และจะไม่แอบบันทึกในเครื่องแทน ฐานข้อมูลว่างจะแสดงว่าไม่พบรายการ รูปทรัพย์ในหลังบ้านรับ URL; รูปในฟอร์มฝากขายจำกัด 5 รูป รูปละ 5 MB และบีบอัดในเบราว์เซอร์ก่อนส่ง
-
-### Firebase
-
-ตั้ง `NEXT_PUBLIC_DATA_BACKEND=firebase` และค่า Firebase ใน `.env.example` จากนั้น deploy `firestore.rules` ไปยัง Firebase project ก่อนเปิดใช้งานจริง Rules อนุญาตให้สาธารณะอ่านเฉพาะทรัพย์ที่เผยแพร่และสร้าง inquiry สถานะ `new`; การอ่านข้อมูลส่วนตัวและแก้ข้อมูลหลังบ้านต้องเป็น `ADMIN` หรือ `AGENT` จากเอกสาร `profiles/{uid}` ที่ได้รับการป้องกัน
+ตั้ง `NEXT_PUBLIC_DATA_BACKEND=firebase` และค่า Firebase ตาม `.env.example` ใช้ Firebase Authentication สำหรับบัญชี และ Firestore สำหรับข้อมูลธุรกิจ รายการทรัพย์สาธารณะอ่านผ่าน `/api/properties` ซึ่งส่งเฉพาะข้อมูลที่เผยแพร่ รูปภาพและข้อมูลลูกค้าถูกควบคุมสิทธิ์บนเซิร์ฟเวอร์ ดู [การตั้งค่าเซิร์ฟเวอร์และระบบรูปภาพ](docs/security-media-operations.md)
 
 บัญชี Firebase ใหม่เริ่มด้วย role `USER` เสมอ ไม่มีการยกสิทธิ์จากชื่อโดเมนหรืออีเมลใน browser การตั้ง Admin คนแรกต้องทำจาก Firebase Console หรือ Admin SDK ที่เชื่อถือได้ โดยแก้ `profiles/{uid}.role` เป็น `ADMIN` หลังจากผู้ใช้นั้นสมัครและมี profile แล้ว หลังจากนั้น Admin สามารถเปลี่ยน role ของ profile ที่มีอยู่ผ่านหน้า `/admin/users`
 
 หน้า `/admin/users` ไม่สร้างหรือลบบัญชี Firebase Authentication และไม่เปลี่ยนอีเมลสำหรับเข้าสู่ระบบ เพราะการแก้ profile document อย่างเดียวไม่ใช่การจัดการ Auth account ให้สร้าง ลบ หรือเปลี่ยนอีเมลบัญชีผ่าน Firebase Authentication Console/Admin SDK แล้วใช้หน้านี้จัดการชื่อ เบอร์โทร และ role ของ profile
 
-ค่าที่กำหนดใน `NEXT_PUBLIC_DATA_BACKEND` เป็นตัวเลือกหลักเสมอ หากเลือก backend ที่ยังตั้งค่าไม่ครบ ระบบจะแสดงข้อผิดพลาดแทนการสลับไปใช้ backend อื่นหรือข้อมูล local โดยเงียบ ๆ
+ค่าที่กำหนดใน `NEXT_PUBLIC_DATA_BACKEND` รองรับ `firebase` และ `local` เท่านั้น ค่าไม่ถูกต้องหรือฐานข้อมูลที่เชื่อมไม่ได้จะแสดงข้อผิดพลาด ไม่มีการสลับไปใช้ข้อมูลตัวอย่างโดยเงียบ ๆ
 
 ## ขอบเขตข้อมูล
 
-- รายการตัวอย่าง ภาพ และข้อความรีวิวเป็นข้อมูลสาธิต ควรตรวจและแทนที่ข้อมูลติดต่อ/ทรัพย์ก่อนใช้งานธุรกิจจริง
-- โหมด local แยกข้อมูลตามเบราว์เซอร์ ไม่มีฐานข้อมูลส่วนกลาง และล้างข้อมูลเว็บไซต์แล้วข้อมูลทดลองจะหาย
-- Favorites เก็บในเบราว์เซอร์
+- ทรัพย์ นายหน้า รีวิว และลูกค้าบน Firebase ใช้ข้อมูลในระบบจริง การอ่านข้อมูลไม่สร้างข้อมูลตัวอย่างลงฐานข้อมูล
+- โหมด local ใช้ตรวจหน้าเว็บสำหรับพัฒนา ไม่มีบัญชีสมาชิกหรือสิทธิ์พนักงาน
+- Favorites และรายการเปรียบเทียบเก็บ ID ของทรัพย์ที่ผู้ใช้เลือกในเบราว์เซอร์
 - หน้าข้อมูลระบบแสดงโหมดที่เลือก การเปลี่ยนข้อมูลติดต่อหรือฐานข้อมูลต้องแก้โครงการแล้วเผยแพร่ใหม่
-- การติดตั้ง schema และทดสอบกับ Supabase project จริงต้องทำก่อนเปิดรับข้อมูลลูกค้าจริง
 - `.env.local`, dependency folders, build output และไฟล์ log ถูกกันออกจาก Git
 
 ## เอกสารอ้างอิง

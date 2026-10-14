@@ -6,25 +6,32 @@ const vm = require('node:vm');
 const ts = require('typescript');
 const { webcrypto } = require('node:crypto');
 
-function loadStore({ backend = 'local', supabase = null, firebase = false, firebaseError = null, firebaseDocuments = [], demoAuth = false } = {}) {
+function loadStore({ backend = 'local', firebase = false, firebaseError = null, firebaseDocuments = [] } = {}) {
   const sourceRoot = path.resolve(__dirname, '../src');
   const cache = new Map();
   const storage = new Map();
-  const mediaDocuments = [], deletions = [];
+  const mediaDocuments = [], deletions = [], submissions = [];
+  const localStorage = {
+    getItem: key => storage.get(key) ?? null,
+    setItem: (key, value) => storage.set(key, value),
+  };
   const context = vm.createContext({
     console, crypto: webcrypto, Event, atob, URL, Headers, TextEncoder,
-    fetch: async (url) => {
+    fetch: async (url, init) => {
       if (firebaseError) throw firebaseError;
       if (url === '/api/properties') return Response.json({ properties: firebaseDocuments.filter(row => row.published) });
+      if (url === '/api/inquiries') {
+        const submitted = JSON.parse(init.body);
+        submissions.push(submitted);
+        return Response.json({ inquiry: { ...submitted, created_at: new Date().toISOString() } });
+      }
       throw new Error('Unexpected API request');
     },
-    process: { env: { NEXT_PUBLIC_DATA_BACKEND: backend, NEXT_PUBLIC_ENABLE_DEMO_AUTH: String(demoAuth) } },
+    process: { env: { NEXT_PUBLIC_DATA_BACKEND: backend } },
+    localStorage,
     window: {
       location: { origin: 'https://example.com' },
-      localStorage: {
-        getItem: key => storage.get(key) ?? null,
-        setItem: (key, value) => storage.set(key, value),
-      },
+      localStorage,
       dispatchEvent() {},
     },
   });
@@ -36,7 +43,6 @@ function loadStore({ backend = 'local', supabase = null, firebase = false, fireb
       compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
     }).outputText;
     const requireModule = name => {
-      if (name === '@/lib/supabase/client') return { supabase, isSupabaseConfigured: Boolean(supabase) };
       if (name === '@/lib/firebase/client') return { db: firebase ? {} : null, isFirebaseConfigured: firebase, auth: null, googleProvider: {} };
       if (name === 'firebase/auth') return {
         signInWithPopup: async () => ({ user: {} }),
@@ -79,11 +85,7 @@ function loadStore({ backend = 'local', supabase = null, firebase = false, fireb
     vm.runInContext(`(function(require,module,exports){${compiled}\n})`, context)(requireModule, module, module.exports);
     return module.exports;
   }
-  return { store: load(path.join(sourceRoot, 'lib/store/properties-store.ts')), flags: load(path.join(sourceRoot, 'lib/backend.ts')), storage, deletions, mediaDocuments };
-}
-
-function queryResult(result) {
-  return { select() { return this; }, eq() { return this; }, order() { return this; }, then(resolve, reject) { return Promise.resolve(result).then(resolve, reject); } };
+  return { store: load(path.join(sourceRoot, 'lib/store/properties-store.ts')), compare: load(path.join(sourceRoot, 'lib/store/compare-store.ts')), flags: load(path.join(sourceRoot, 'lib/backend.ts')), storage, deletions, mediaDocuments, submissions };
 }
 
 test('local drafts remain manageable while excluded from public lists and slug lookup', async () => {
@@ -132,47 +134,47 @@ test('duplicate local slugs reject without overwriting the existing property', a
   assert.equal((await store.fetchPropertyBySlug(first.slug)).title, first.title);
 });
 
-test('an empty remote catalog remains empty and remote errors never use sample data', async () => {
-  const empty = loadStore({ backend: 'supabase', supabase: { from: () => queryResult({ data: [], error: null }) } });
-  assert.equal((await empty.store.fetchProperties()).length, 0);
-  const failed = loadStore({ backend: 'supabase', supabase: { from: () => queryResult({ data: null, error: new Error('permission denied') }) } });
-  await assert.rejects(failed.store.fetchProperties(), /permission denied/);
-});
-
 test('failed live property writes reject and do not mutate browser data', async () => {
-  const { store, storage } = loadStore({ backend: 'supabase', supabase: { rpc: async () => ({ data: null, error: new Error('write denied') }) } });
-  await assert.rejects(store.createProperty(store.getLocalProperties()[0]), /write denied/);
+  const fixture = loadStore().store.getLocalProperties()[0];
+  const { store, storage } = loadStore({ backend: 'firebase', firebase: true, firebaseError: new Error('write denied') });
+  await assert.rejects(store.createProperty(fixture), /write denied/);
   assert.equal(storage.has('chantakorn_properties'), false);
 });
 
 test('anonymous inquiry creation succeeds without requesting private inbox read access', async () => {
-  let inserted;
-  const { store } = loadStore({ backend: 'supabase', supabase: { from: () => ({ insert: async row => { inserted = row; return { error: null }; } }) } });
+  const { store, submissions } = loadStore({ backend: 'firebase', firebase: true });
   const result = await store.submitInquiry({ name: 'Visitor', phone: '0810000000', message: 'Please contact me', inquiry_type: 'inquiry', status: 'closed' });
-  assert.equal(inserted.id, result.id);
-  assert.equal(inserted.status, 'new');
+  assert.equal(submissions.length, 1);
+  assert.equal(submissions[0].id, result.id);
+  assert.equal(submissions[0].status, 'new');
 });
 
-test('local inquiry is never reported delivered and real backends cannot enable demo authentication', async () => {
-  const local = loadStore({ demoAuth: true });
-  assert.equal(local.flags.isDemoAuthEnabled, true);
+test('local inquiries and an unconfigured Firebase connection never report delivery or use sample data', async () => {
+  const local = loadStore();
   await assert.rejects(local.store.submitInquiry({ name: 'Visitor', phone: '0810000000', message: 'Hello', inquiry_type: 'inquiry', status: 'new' }), /LINE/);
-  assert.equal(loadStore().flags.isDemoAuthEnabled, false);
-  assert.equal(loadStore({ backend: 'firebase', firebase: true, demoAuth: true }).flags.isDemoAuthEnabled, false);
-  const configuredSupabase = loadStore({ backend: 'supabase', supabase: { from: () => ({ select: () => ({ eq: () => ({ order: () => Promise.resolve({ data: [], error: null }) }) }) }) }, demoAuth: true });
-  assert.equal(configuredSupabase.flags.isDemoAuthEnabled, false);
-  const missing = loadStore({ backend: 'supabase', demoAuth: true });
-  const properties = await missing.store.fetchProperties();
-  assert.ok(Array.isArray(properties));
+  const missing = loadStore({ backend: 'firebase' });
+  await assert.rejects(missing.store.fetchProperties(), /ยังไม่ได้ตั้งค่า/);
+  await assert.rejects(missing.store.submitInquiry({ name: 'Visitor', phone: '0810000000', message: 'Hello', inquiry_type: 'inquiry', status: 'new' }), /ยังไม่ได้ตั้งค่า/);
+  assert.equal(missing.storage.size, 0);
 });
 
 test('an explicit backend selection wins over automatic configuration detection', () => {
   const explicitLocal = loadStore({ backend: 'local', firebase: true });
   assert.equal(explicitLocal.flags.dataBackend, 'local');
 
-  const supabase = { from: () => queryResult({ data: [], error: null }) };
-  const explicitSupabase = loadStore({ backend: 'supabase', supabase, firebase: true });
-  assert.equal(explicitSupabase.flags.dataBackend, 'supabase');
+  const explicitFirebase = loadStore({ backend: 'firebase', firebase: true });
+  assert.equal(explicitFirebase.flags.dataBackend, 'firebase');
+  assert.throws(() => loadStore({ backend: 'unsupported', firebase: true }));
+});
+
+test('comparison respects a supplied empty catalog and retains browser-selected IDs', () => {
+  const { store, compare, storage } = loadStore();
+  const fixture = store.getLocalProperties()[0];
+  storage.set('chantakorn_compare_ids', JSON.stringify([fixture.id]));
+  assert.equal(compare.getCompareProperties([fixture])[0].id, fixture.id);
+  assert.equal(compare.getCompareProperties([]).length, 0);
+  assert.equal(compare.getCompareProperties()[0].id, fixture.id);
+  assert.equal(compare.getCompareIds()[0], fixture.id);
 });
 
 test('security-sensitive Firebase paths have regression guards', () => {

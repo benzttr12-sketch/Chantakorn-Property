@@ -4,12 +4,11 @@ import React, { useState, useEffect } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { propertyHref } from '@/components/properties/property-link';
-import { Heart, MapPin, Bed, Bath, Maximize, Images, ArrowRight, Video, Scale } from 'lucide-react';
+import { Heart, MapPin, Bed, Bath, Maximize, Images, ImageOff, ArrowRight, Video, Scale } from 'lucide-react';
 import { PropertyCardProps } from '@/lib/types';
 import { formatPrice, getPropertyStatusBadge, formatThaiNumber, formatPropertyCode } from '@/lib/utils';
 import { getFavoriteIds, toggleFavoriteId } from '@/lib/store/properties-store';
 import { getCompareIds, toggleCompareId } from '@/lib/store/compare-store';
-import { villaModernEstate } from '@/assets/images';
 import SendToLineButton from '@/components/properties/SendToLineButton';
 
 export default function PropertyCard({
@@ -34,7 +33,7 @@ export default function PropertyCard({
 }: PropertyCardProps) {
   const [isFavorite, setIsFavorite] = useState(false);
   const [isComparing, setIsComparing] = useState(false);
-  const [imageError, setImageError] = useState(false);
+  const [failedImages, setFailedImages] = useState<string[]>([]);
   const [favoriteFeedback, setFavoriteFeedback] = useState(false);
 
   useEffect(() => {
@@ -42,6 +41,7 @@ export default function PropertyCard({
     setIsFavorite(favs.includes(id));
     setIsComparing(getCompareIds().includes(id));
     setFavoriteFeedback(false);
+    setFailedImages([]);
 
     const handleFavUpdate = () => {
       setIsFavorite(getFavoriteIds().includes(id));
@@ -77,32 +77,33 @@ export default function PropertyCard({
   };
 
   const statusBadge = getPropertyStatusBadge(status);
-  const imageCount = images.length > 0 ? images.length : 1;
+  const imageCount = images.length > 0 ? images.length : coverImage ? 1 : 0;
   const displayLocation = location || `${district}, ${province}`;
 
-  const displayImage = imageError
-    ? villaModernEstate
-    : coverImage || images[0] || villaModernEstate;
+  const displayImage = [coverImage, ...images].find(image => image && !failedImages.includes(image));
 
   return (
     <div className="property-card group bg-white rounded-3xl overflow-hidden border border-slate-200/80 shadow-xs flex flex-col h-full">
       {/* 4:3 Image Container with Overlays */}
       <div className="relative aspect-[4/3] w-full overflow-hidden bg-slate-100">
         <Link href={propertyHref(slug)} className="property-card-image-link relative block w-full h-full">
-          <Image
-            src={displayImage}
-            alt={title}
-            fill
-            unoptimized={typeof displayImage === 'string' && displayImage.startsWith('data:')}
-            sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
-            className="property-card-image object-cover"
-            onError={() => {
-              if (typeof displayImage === 'string' && !displayImage.startsWith('data:')) {
-                setImageError(true);
-              }
-            }}
-            priority={featured}
-          />
+          {displayImage ? (
+            <Image
+              src={displayImage}
+              alt={title}
+              fill
+              unoptimized={displayImage.startsWith('data:')}
+              sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+              className="property-card-image object-cover"
+              onError={() => setFailedImages(previous => previous.includes(displayImage) ? previous : [...previous, displayImage])}
+              priority={featured}
+            />
+          ) : (
+            <span className="flex h-full flex-col items-center justify-center gap-3 bg-slate-100 px-4 text-sm text-slate-500">
+              <ImageOff className="h-9 w-9" aria-hidden="true" />
+              <span>{imageCount ? 'ยังแสดงรูปทรัพย์ไม่ได้' : 'ยังไม่มีรูปทรัพย์'}</span>
+            </span>
+          )}
         </Link>
 
         {/* Top-Left: Status Badge */}

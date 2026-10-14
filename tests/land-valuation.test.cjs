@@ -227,7 +227,8 @@ test('no auth, invalid storage key and denied writes never fall back to local su
   const denied = store({ deny: true });
   await assert.rejects(denied.saveLandValuation('manual', input()), /permission-denied/);
   assert.equal(denied.local.size, 0);
-  await assert.rejects(store({ backend: 'supabase' }).saveLandValuation('manual', input()));
+  await assert.rejects(denied.loadLandValuation('manual'), /permission-denied/);
+  assert.equal(denied.storageAccess.length, 0);
 });
 
 test('a restoring Firebase session loads the existing record before permitting any database operation', async () => {
@@ -302,7 +303,7 @@ test('private boundary persistence awaits auth restoration and uses staff-only s
   assert.equal(persistence.storageAccess.length, 0);
 });
 
-test('anonymous and denied boundary access cannot fall back, and unsupported backends reject access', async () => {
+test('anonymous and denied boundary access cannot fall back to browser data', async () => {
   const anonymous = store({ user: null });
   await assert.rejects(anonymous.loadLandBoundaries('manual'));
   await assert.rejects(anonymous.saveLandBoundaries('manual', boundary()));
@@ -314,11 +315,6 @@ test('anonymous and denied boundary access cannot fall back, and unsupported bac
     assert.equal(persistence.storageAccess.length, 0);
     assert.equal(persistence.local.size, 0);
   }
-  const unsupported = store({ backend: 'supabase' });
-  await assert.rejects(unsupported.loadLandBoundaries('manual'), /Supabase/);
-  await assert.rejects(unsupported.saveLandBoundaries('manual', boundary()), /Supabase/);
-  assert.equal(unsupported.calls.length, 0);
-  assert.equal(unsupported.storageAccess.length, 0);
 });
 
 test('local boundaries are copied in temporary memory without touching browser storage', async () => {

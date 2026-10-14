@@ -61,7 +61,7 @@ test('paid AI calls honor the persistent budget response before sending any prov
   assert.equal((await load('app/api/ai/market-intelligence/route.ts').POST(request({query:'house prices'}))).status,429);
   assert.equal(calls,0);
 });
-test('local demo with a configured key retains free fallbacks when shared database identity is unavailable', async () => {
+test('explicit local data preview retains free fallbacks when shared database identity is unavailable', async () => {
   let calls=0;
   const ai={models:{generateContent:async()=>{calls++;throw Error('Must not call');}}};
   const load=loader({'@/lib/server-auth':{requireStaff:async()=>null},'@/lib/gemini':{getGeminiClient:()=>ai},'@/lib/server-budget':{enforceRequestBudget:async()=>new Response(null,{status:503})}}, {process:{env:{NEXT_PUBLIC_DATA_BACKEND:'local',GEMINI_API_KEY:'test'}}});

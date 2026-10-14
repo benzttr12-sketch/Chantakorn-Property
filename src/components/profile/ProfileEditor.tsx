@@ -21,6 +21,7 @@ import {
   Image as ImageIcon
 } from 'lucide-react';
 import { auth } from '@/lib/firebase/client';
+import { dataBackend } from '@/lib/backend';
 import { onAuthStateChanged } from 'firebase/auth';
 import { getStoredUser, updateCurrentUserProfile, logoutUser, syncFirebaseUserProfile } from '@/lib/auth-helpers';
 import { UserProfile } from '@/lib/types';
@@ -49,7 +50,7 @@ export default function ProfileEditor({ isAdminView = false }: ProfileEditorProp
   const [avatarUrl, setAvatarUrl] = useState('');
 
   useEffect(() => {
-    // Local profile state exists only in explicitly enabled demo mode.
+    // Show only a profile already verified from Firebase in this session.
     const stored = getStoredUser();
     if (stored) {
       setUserProfile(stored);
@@ -62,7 +63,7 @@ export default function ProfileEditor({ isAdminView = false }: ProfileEditorProp
 
     // Firebase display and role data are loaded from the protected profile doc.
     let unsubscribe: (() => void) | undefined;
-    if (auth) {
+    if (dataBackend === 'firebase' && auth) {
       unsubscribe = onAuthStateChanged(auth, async (user) => {
         if (user) {
           try {
@@ -79,11 +80,7 @@ export default function ProfileEditor({ isAdminView = false }: ProfileEditorProp
           }
           setLoading(false);
         } else {
-          // Explicit demo auth may still provide a local profile.
-          const localUser = getStoredUser();
-          if (!localUser) {
-            setUserProfile(null);
-          }
+          setUserProfile(null);
           setLoading(false);
         }
       });

@@ -24,7 +24,7 @@ import PropertyVideoTour from '@/components/properties/PropertyVideoTour';
 import AgentCard from '@/components/properties/AgentCard';
 import PropertyInquiryForm from '@/components/properties/PropertyInquiryForm';
 import PropertyCard from '@/components/properties/PropertyCard';
-import PropertyMap from '@/components/properties/PropertyMap';
+import GooglePropertyMap from '@/components/properties/GooglePropertyMap';
 import LandsMapsParcelViewer from '@/components/landsmaps/LandsMapsParcelViewer';
 import SendToLineButton from '@/components/properties/SendToLineButton';
 import { fetchPropertyBySlug, fetchProperties } from '@/lib/store/properties-store';
@@ -364,7 +364,7 @@ export default function PropertyDetail({ slug, initialProperty = null }: { slug:
 
               {/* Map View */}
               <div className="h-80 sm:h-96 w-full rounded-2xl overflow-hidden mb-6 border border-gray-200 shadow-xs relative">
-                <PropertyMap
+                <GooglePropertyMap
                   properties={[property]}
                   selectedProperty={property}
                   zoom={15}

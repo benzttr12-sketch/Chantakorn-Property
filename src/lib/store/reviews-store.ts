@@ -1,7 +1,6 @@
 'use client';
 
 import { db } from '@/lib/firebase/client';
-import { supabase } from '@/lib/supabase/client';
 import { dataBackend } from '@/lib/backend';
 import { getCurrentUserProfile } from '@/lib/auth-helpers';
 import { collection, getDocsFromServer, doc, setDoc, deleteDoc, query, where } from 'firebase/firestore';
@@ -66,12 +65,6 @@ export async function fetchReviews(includeDrafts = false): Promise<Review[]> {
     const source = collection(db, 'reviews');
     const snapshot = await getDocsFromServer(includeDrafts ? source : query(source, where('published', '==', true)));
     reviews = snapshot.docs.map(item => normalizeReview({ ...item.data(), id: item.id } as Review));
-  } else if (dataBackend === 'supabase') {
-    if (!supabase) throw new Error('ยังไม่ได้เชื่อมต่อฐานข้อมูลรีวิว');
-    const source = supabase.from('reviews').select('id,published,data');
-    const result = await (includeDrafts ? source : source.eq('published', true));
-    if (result.error) throw new Error('โหลดรีวิวไม่สำเร็จ กรุณาลองใหม่');
-    reviews = (result.data || []).map(item => normalizeReview({ ...item.data, id: item.id, published: item.published }));
   } else reviews = readLocal();
   cache(reviews, includeDrafts);
   return includeDrafts ? reviews : reviews.filter(review => review.published);
@@ -84,10 +77,6 @@ async function persist(review: Review): Promise<void> {
   if (dataBackend === 'firebase') {
     if (!db) throw new Error('ยังไม่ได้เชื่อมต่อฐานข้อมูลรีวิว');
     await setDoc(doc(db, 'reviews', review.id), review);
-  } else if (dataBackend === 'supabase') {
-    if (!supabase) throw new Error('ยังไม่ได้เชื่อมต่อฐานข้อมูลรีวิว');
-    const { data, error } = await supabase.from('reviews').upsert({ id: review.id, published: review.published, data: review }).select('id');
-    if (error || !data?.some(item => item.id === review.id)) throw new Error('บันทึกรีวิวไม่สำเร็จ กรุณาลองใหม่');
   } else {
     if (typeof window === 'undefined') throw new Error('ไม่สามารถบันทึกรีวิวในเครื่องได้');
     const current = readLocal().filter(item => item.id !== review.id);
@@ -115,10 +104,6 @@ export async function deleteReview(id: string): Promise<Review[]> {
   if (dataBackend === 'firebase') {
     if (!db) throw new Error('ยังไม่ได้เชื่อมต่อฐานข้อมูลรีวิว');
     await deleteDoc(doc(db, 'reviews', id));
-  } else if (dataBackend === 'supabase') {
-    if (!supabase) throw new Error('ยังไม่ได้เชื่อมต่อฐานข้อมูลรีวิว');
-    const { data, error } = await supabase.from('reviews').delete().eq('id', id).select('id');
-    if (error || !data?.some(item => item.id === id)) throw new Error('ลบรีวิวไม่สำเร็จ กรุณาลองใหม่');
   } else {
     if (typeof window === 'undefined') throw new Error('ไม่สามารถบันทึกรีวิวในเครื่องได้');
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(current.filter(item => item.id !== id)));

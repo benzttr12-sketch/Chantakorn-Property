@@ -56,11 +56,6 @@ export async function loadLandValuation(
       ? validateLandValuation(snapshot.data().input)
       : null;
   }
-  if (dataBackend === 'supabase') {
-    throw new Error(
-      'ยังไม่ได้ตั้งค่าที่เก็บรายการประเมินส่วนตัวสำหรับ Supabase',
-    );
-  }
   const saved = localValuations.get(id);
   return saved === undefined ? null : validateLandValuation(saved);
 }
@@ -82,11 +77,6 @@ export async function saveLandValuation(
     });
     return;
   }
-  if (dataBackend === 'supabase') {
-    throw new Error(
-      'ยังไม่ได้ตั้งค่าที่เก็บรายการประเมินส่วนตัวสำหรับ Supabase',
-    );
-  }
   localValuations.set(id, validated);
 }
 
@@ -102,11 +92,6 @@ export async function loadLandBoundaries(
     if (typeof serialized !== 'string')
       throw new Error('ข้อมูลแนวเขตที่บันทึกไว้ไม่ถูกต้อง');
     return parseParcelBoundaryFile(serialized, 'boundaries.geojson');
-  }
-  if (dataBackend === 'supabase') {
-    throw new Error(
-      'ยังไม่ได้ตั้งค่าที่เก็บแนวเขตส่วนตัวสำหรับ Supabase',
-    );
   }
   const saved = localBoundaries.get(id);
   return saved === undefined ? null : validateParcelBoundaries(saved);
@@ -130,11 +115,6 @@ export async function saveLandBoundaries(
       updated_by: userId,
     });
     return;
-  }
-  if (dataBackend === 'supabase') {
-    throw new Error(
-      'ยังไม่ได้ตั้งค่าที่เก็บแนวเขตส่วนตัวสำหรับ Supabase',
-    );
   }
   localBoundaries.set(id, validated);
 }
