@@ -51,12 +51,16 @@ function component(relative, mocks, props) {
 function quickEntry() {
   const saved = [];
   const requests = [];
+  const fengShuiCalls = [];
   const staff = { id: 'staff-fixture', full_name: 'ทีมงานทดสอบ', role: 'AGENT', avatar_url: '' };
   const modal = component('components/admin/QuickPropertyModal.tsx', {
     '@/lib/store/properties-store': { createProperty: async property => { saved.push(property); } },
     '@/lib/property-text-parser': parser,
     '@/data/locations': locations,
-    '@/lib/feng-shui': { calculateFengShui: () => ({ score: 75 }) },
+    '@/lib/feng-shui': { calculateFengShui: (direction, options) => {
+      fengShuiCalls.push({ direction, options });
+      return { direction, score: 75 };
+    } },
     '@/lib/utils': { formatPrice: String, formatThaiBahtReadable: String, slugify: () => 'fixture-property' },
     '@/lib/auth-helpers': { getStoredUser: () => staff },
     '@/lib/image-compressor': video,
@@ -67,7 +71,7 @@ function quickEntry() {
       return Response.json({ success: true, description: 'คำบรรยายที่ทีมตรวจสอบจาก AI' });
     } },
   }, { isOpen: true, onSuccess() {}, onClose() {} });
-  return { ...modal, saved, requests };
+  return { ...modal, saved, requests, fengShuiCalls };
 }
 function button(output, label) {
   const result = nodes(output).find(node => node.type === 'button' && text(node).includes(label));
@@ -79,6 +83,107 @@ function parseEntry(modal, input) {
   button(modal.render(), 'ถอดรหัสข้อความ').props.onClick();
   return modal.render();
 }
+function field(output, label, type = 'input') {
+  const container = nodes(output).find(node => node.type === 'div' && node.children.some(child => child?.type === 'label' && text(child) === label));
+  assert.ok(container, `Expected field label: ${label}`);
+  const control = nodes(container).find(node => node.type === type);
+  assert.ok(control, `Expected ${type} for ${label}`);
+  return control;
+}
+
+test('missing quick-entry specs stay blank and never become property claims', async () => {
+  for (const fixture of [
+    { input: 'ขายบ้านเดี่ยว หาดใหญ่ ราคา 2.5 ล้าน', bedrooms: '', bathrooms: '' },
+    { input: 'ทดสอบการตรวจแบบฟอร์ม ขายบ้าน หาดใหญ่ 3 ห้องนอน 2 ห้องน้ำ ราคา 2.5 ล้าน', bedrooms: '3', bathrooms: '2' },
+  ]) {
+    const modal = quickEntry();
+    const review = parseEntry(modal, fixture.input);
+    assert.equal(field(review, 'ห้องนอน').props.value, fixture.bedrooms);
+    assert.equal(field(review, 'ห้องน้ำ').props.value, fixture.bathrooms);
+    for (const label of ['ที่จอดรถ', 'ที่ดิน (ตรว.)', 'ใช้สอย (ตรม.)']) {
+      assert.equal(field(review, label).props.value, '');
+    }
+    assert.equal(field(review, 'ทิศฮวงจุ้ย', 'select').props.value, '');
+    const description = nodes(review).find(node => node.type === 'textarea').props.value;
+    assert.doesNotMatch(description, /ที่จอดรถ:|ขนาดที่ดิน:|พื้นที่ใช้สอย:|ทิศหน้าทรัพย์:|พร้อมอยู่|ติดถนนใหญ่|ทำเลชุมชน|ทำเลดี เดินทางสะดวก/);
+    if (!fixture.bedrooms) assert.doesNotMatch(description, /ห้องนอน:|ห้องน้ำ:/);
+    await button(review, 'บันทึกฉบับร่าง').props.onClick();
+    const property = modal.saved[0];
+    assert.equal(property.bedrooms, Number(fixture.bedrooms));
+    assert.equal(property.bathrooms, Number(fixture.bathrooms));
+    assert.equal(property.parking, 0);
+    assert.equal(property.land_size, 0);
+    assert.equal(property.usable_area, 0);
+    assert.equal(property.furniture, '');
+    assert.equal(property.features.length, 0);
+    assert.equal(Object.hasOwn(property, 'facing_direction'), false);
+    assert.equal(Object.hasOwn(property, 'feng_shui'), false);
+    assert.equal(modal.fengShuiCalls.length, 0);
+  }
+});
+
+test('reparsing sparse text clears prior parsed and manually edited optional specs', async () => {
+  const modal = quickEntry();
+  let review = parseEntry(modal, 'ขายบ้านเดี่ยว ควนลัง หาดใหญ่ 4 ห้องนอน 3 ห้องน้ำ 2 คัน 60 ตารางวา 180 ตารางเมตร ราคา 4.2 ล้าน ทิศเหนือ ติดถนนใหญ่');
+  assert.equal(field(review, 'ที่จอดรถ').props.value, '2');
+  assert.equal(field(review, 'ที่ดิน (ตรว.)').props.value, '60');
+  assert.equal(field(review, 'ใช้สอย (ตรม.)').props.value, '180');
+  assert.equal(field(review, 'ทิศฮวงจุ้ย', 'select').props.value, 'ทิศเหนือ');
+  field(review, 'ห้องนอน').props.onChange({ target: { value: '5' } });
+  field(review, 'ที่จอดรถ').props.onChange({ target: { value: '3' } });
+  button(modal.render(), 'ย้อนกลับไปวางข้อความใหม่').props.onClick();
+  review = parseEntry(modal, 'ขายคอนโด คอหงส์ หาดใหญ่ ราคา 2.5 ล้าน');
+  for (const label of ['ห้องนอน', 'ห้องน้ำ', 'ที่จอดรถ', 'ที่ดิน (ตรว.)', 'ใช้สอย (ตรม.)']) {
+    assert.equal(field(review, label).props.value, '');
+  }
+  assert.equal(field(review, 'ทิศฮวงจุ้ย', 'select').props.value, '');
+  const description = nodes(review).find(node => node.type === 'textarea').props.value;
+  assert.doesNotMatch(description, /ห้องนอน:|ห้องน้ำ:|ที่จอดรถ:|ขนาดที่ดิน:|พื้นที่ใช้สอย:|ทิศหน้าทรัพย์:|ติดถนนใหญ่/);
+  await button(review, 'ให้ AI ร่างใหม่').props.onClick();
+  assert.equal(modal.requests[0].body.bedrooms, '');
+  assert.equal(modal.requests[0].body.facingDirection, '');
+  assert.equal(modal.requests[0].body.features.length, 0);
+  await button(modal.render(), 'บันทึกฉบับร่าง').props.onClick();
+  assert.equal(modal.saved[0].property_type, 'condo');
+  assert.equal(modal.saved[0].parking, 0);
+  assert.equal(modal.saved[0].features.length, 0);
+  assert.equal(Object.hasOwn(modal.saved[0], 'feng_shui'), false);
+  assert.equal(modal.fengShuiCalls.length, 0);
+});
+
+test('explicit specs and subsequent manual edits are saved and only an entered direction is analyzed', async () => {
+  const modal = quickEntry();
+  const review = parseEntry(modal, 'ขายบ้านเดี่ยว ควนลัง หาดใหญ่ 4 ห้องนอน 3 ห้องน้ำ 2 คัน 60 ตารางวา 180 ตารางเมตร ราคา 4.2 ล้าน ทิศเหนือ ติดถนนใหญ่');
+  assert.equal(field(review, 'ห้องนอน').props.value, '4');
+  assert.equal(field(review, 'ห้องน้ำ').props.value, '3');
+  assert.equal(field(review, 'ที่จอดรถ').props.value, '2');
+  assert.equal(field(review, 'ที่ดิน (ตรว.)').props.value, '60');
+  assert.equal(field(review, 'ใช้สอย (ตรม.)').props.value, '180');
+  assert.equal(field(review, 'ทิศฮวงจุ้ย', 'select').props.value, 'ทิศเหนือ');
+  field(review, 'ห้องนอน').props.onChange({ target: { value: '5' } });
+  field(review, 'ที่จอดรถ').props.onChange({ target: { value: '3' } });
+  field(review, 'ใช้สอย (ตรม.)').props.onChange({ target: { value: '200' } });
+  field(review, 'ทิศฮวงจุ้ย', 'select').props.onChange({ target: { value: 'ทิศใต้' } });
+  // Clearing the generated draft exercises regeneration from the reviewed, edited fields.
+  nodes(review).find(node => node.type === 'textarea').props.onChange({ target: { value: '' } });
+  await button(modal.render(), 'บันทึกฉบับร่าง').props.onClick();
+  const property = modal.saved[0];
+  assert.equal(property.bedrooms, 5);
+  assert.equal(property.bathrooms, 3);
+  assert.equal(property.parking, 3);
+  assert.equal(property.land_size, 60);
+  assert.equal(property.usable_area, 200);
+  assert.equal(property.furniture, '');
+  assert.equal(property.features[0], 'ติดถนนใหญ่');
+  assert.equal(property.facing_direction, 'ทิศใต้');
+  assert.equal(property.feng_shui.direction, 'ทิศใต้');
+  assert.equal(modal.fengShuiCalls.length, 1);
+  assert.equal(modal.fengShuiCalls[0].direction, 'ทิศใต้');
+  assert.match(property.description, /ห้องนอน: 5 ห้อง/);
+  assert.match(property.description, /ที่จอดรถ: 3 คัน/);
+  assert.match(property.description, /พื้นที่ใช้สอย: 200 ตารางเมตร/);
+  assert.match(property.description, /ทิศหน้าทรัพย์: ทิศใต้/);
+});
 
 test('real quick-entry text saves a draft without unrelated default photos or video', async () => {
   const fixtures = [
