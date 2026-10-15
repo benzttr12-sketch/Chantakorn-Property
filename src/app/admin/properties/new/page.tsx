@@ -1187,17 +1187,6 @@ function PropertyEditor() {
         </div>
       </div>
 
-      {/* REAL-TIME PROGRESS BAR & VALIDATION CHECKLIST COMPONENT */}
-      <PropertyFormProgress
-        items={validationItems}
-        overallPercentage={completionPercentage}
-        requiredPassedCount={requiredPassedCount}
-        totalRequired={requiredItems.length}
-        recommendedPassedCount={recommendedPassedCount}
-        totalRecommended={recommendedItems.length}
-        onScrollToSection={handleScrollToSection}
-      />
-
       {/* Smart Auto-Fill from LINE/Facebook/Raw text */}
       {!editId && (
         <div className="bg-white rounded-2xl p-5 border border-gold-300 shadow-xs space-y-3">
@@ -1494,6 +1483,16 @@ function PropertyEditor() {
             </div>
           </div>
         </div>
+
+        <PropertyFormProgress
+          items={validationItems}
+          overallPercentage={completionPercentage}
+          requiredPassedCount={requiredPassedCount}
+          totalRequired={requiredItems.length}
+          recommendedPassedCount={recommendedPassedCount}
+          totalRecommended={recommendedItems.length}
+          onScrollToSection={handleScrollToSection}
+        />
 
         {/* Section 2: Songkhla Districts & Subdistricts (เพิ่มอำเภอ ตำบล ทั้งหมดในสงขลา) */}
         <div id="section-2-location" className="bg-white rounded-2xl p-6 border border-surface-border shadow-xs space-y-4 scroll-mt-28">
