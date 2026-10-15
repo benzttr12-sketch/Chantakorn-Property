@@ -72,17 +72,6 @@ export async function fetchAgents(): Promise<ExtendedAgent[]> {
   return getAgents();
 }
 
-export async function saveAgentsToCloud(agents: ExtendedAgent[]): Promise<void> {
-  requireConnection();
-  const next = agents.map(normalize);
-  next.forEach(validate);
-  if (dataBackend === 'local') localWrite(next);
-  else await Promise.all(next.map(persistAgent));
-  publish(next);
-}
-
-export async function saveAgents(agents: ExtendedAgent[]): Promise<void> { await saveAgentsToCloud(agents); }
-
 /** Reflect real profile fields in the current view. Reading profiles never writes agents. */
 export function syncAgentsFromUsers(users: UserProfile[]): ExtendedAgent[] {
   if (!Array.isArray(users)) return getAgents();

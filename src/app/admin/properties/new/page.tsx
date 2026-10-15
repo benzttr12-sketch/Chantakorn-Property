@@ -5,14 +5,11 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
 import { 
-  Building2, 
   ArrowLeft, 
   Upload, 
   Check, 
   MapPin, 
-  Coins, 
   Home, 
-  Tag, 
   Bed, 
   Bath, 
   Car, 
@@ -26,11 +23,9 @@ import {
   UserCheck,
   Phone,
   MessageCircle,
-  Mail,
   ShieldCheck,
   Compass,
   Wand2,
-  Zap,
   HelpCircle,
   FileText,
   ExternalLink,
@@ -39,14 +34,9 @@ import {
   ShieldAlert,
   Video,
   Film,
-  Play,
-  Gauge,
-  Sliders,
   CheckCheck,
-  Trash2,
   ChevronDown,
-  ChevronUp,
-  RotateCcw
+  ChevronUp
 } from 'lucide-react';
 import { 
   createProperty, 
@@ -67,11 +57,8 @@ import {
   numberToThaiBahtWords, 
   parseGoogleMapsCoordinates, 
   isValidLatLng,
-  DEFAULT_OFFICIAL_FACEBOOK,
-  formatLineUrl,
-  formatFacebookUrl
+  DEFAULT_OFFICIAL_FACEBOOK
 } from '@/lib/utils';
-import { formatPropertyCode } from '@/lib/format-code';
 import { 
   DISTRICTS_LIST, 
   getSongkhlaSubdistricts, 
@@ -140,12 +127,6 @@ function PropertyEditor() {
     percentSaved?: number;
   } | null>(null);
 
-  const [uploadStatsList, setUploadStatsList] = useState<Array<{
-    url: string;
-    origSize: string;
-    compSize: string;
-    saved: number;
-  }>>([]);
   const [selectedFeatures, setSelectedFeatures] = useState<string[]>([]);
   const [featured, setFeatured] = useState(false);
   const [createdSuccessData, setCreatedSuccessData] = useState<{
@@ -214,6 +195,7 @@ function PropertyEditor() {
   const [agentPhone, setAgentPhone] = useState<string>('081-604-0097');
   const [agentLine, setAgentLine] = useState<string>('@930xzcyi');
   const [agentFacebook, setAgentFacebook] = useState<string>('');
+  const [agentPhoto, setAgentPhoto] = useState('');
   const [currentUserRole, setCurrentUserRole] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [imageUrlInput, setImageUrlInput] = useState('');
@@ -285,12 +267,13 @@ function PropertyEditor() {
   const [mapsParsing, setMapsParsing] = useState(false);
   const [mapsMessage, setMapsMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [showMapPreview, setShowMapPreview] = useState(true);
+  const [mapToolsOpen, setMapToolsOpen] = useState(false);
   const [gpsLoading, setGpsLoading] = useState(false);
 
   // Smart Auto-Fill from LINE/Facebook/Raw text state
   const [smartText, setSmartText] = useState('');
   const [smartMessage, setSmartMessage] = useState<{ type: 'success' | 'info'; text: string } | null>(null);
-  const [showSmartBox, setShowSmartBox] = useState(true);
+  const [showSmartBox, setShowSmartBox] = useState(false);
 
   // สกัดข้อมูลจากข้อความดิบอัตโนมัติ 1-Click
   const handleApplySmartText = (customInput?: string) => {
@@ -341,7 +324,7 @@ function PropertyEditor() {
       parking: parsed.parking !== undefined ? parsed.parking : parking,
       landSize: parsed.landSize !== undefined ? parsed.landSize : landSize,
       usableArea: parsed.usableArea !== undefined ? parsed.usableArea : usableArea,
-      furniture: furniture || 'พร้อมอยู่',
+      furniture,
       facingDirection: parsed.facingDirection || (facingDirection !== 'auto' ? facingDirection : undefined),
       features: parsed.features && parsed.features.length > 0 ? parsed.features : selectedFeatures,
       rawNotes: raw
@@ -352,48 +335,6 @@ function PropertyEditor() {
       type: 'success',
       text: `✨ ถอดรหัสสำเร็จ! ระบบสกัดข้อมูลสำคัญ ${filledCount} รายการ กรุณาตรวจข้อมูลและอัปโหลดรูปทรัพย์จริงก่อนบันทึก`
     });
-  };
-
-  // สร้างชื่อประกาศอัตโนมัติ 1-Click
-  const handleGenerateSmartTitle = () => {
-    const typeNames: Record<PropertyType, string> = {
-      house: 'บ้านเดี่ยว',
-      condo: 'คอนโด',
-      land: 'ที่ดินเปล่า',
-      commercial: 'อาคารพาณิชย์',
-      investment: 'เพื่อการลงทุน',
-      consignment: 'ขายฝาก-จำนอง'
-    };
-    const action = status === 'rent' ? 'ให้เช่า' : 'ขาย';
-    const typeLabel = typeNames[propertyType] || 'บ้าน';
-    const loc = subdistrict ? `ทำเล ${subdistrict} ${district}` : `ทำเล ${district}`;
-    const spec = Number(bedrooms) > 0 ? `${bedrooms} ห้องนอน` : (Number(landSize) > 0 ? `${landSize} ตร.ว.` : '');
-    const priceText = Number(price) > 0 ? `ราคา ${formatPrice(Number(price), status)}` : '';
-    const generated = `${action}${typeLabel} ${loc} ${spec} ${priceText} จ.สงขลา`.replace(/\s+/g, ' ').trim();
-    setTitle(generated);
-    handleTitleChange(generated);
-  };
-
-  // จัดรูปแบบคำอธิบายมืออาชีพ 1-Click
-  const handleFormatSmartDescription = () => {
-    const formatted = generateProfessionalDescription({
-      title,
-      propertyType,
-      status,
-      price,
-      district,
-      subdistrict,
-      bedrooms,
-      bathrooms,
-      parking,
-      landSize,
-      usableArea,
-      furniture,
-      facingDirection: facingDirection !== 'auto' ? facingDirection : undefined,
-      features: selectedFeatures,
-      rawNotes: description
-    });
-    setDescription(formatted);
   };
 
   // แปลงพิกัดจากข้อความ/ลิงก์ Google Maps โดยอัตโนมัติ
@@ -552,7 +493,7 @@ function PropertyEditor() {
             phone: '081-604-0097',
             line_id: '@930xzcyi',
             facebook: DEFAULT_OFFICIAL_FACEBOOK,
-            avatar_url: 'https://images.unsplash.com/photo-1560250097-0b93528c311a?auto=format&fit=crop&w=600&q=80',
+            avatar_url: '',
           });
         }
 
@@ -587,6 +528,7 @@ function PropertyEditor() {
       setAgentPhone(target.phone || '081-604-0097');
       setAgentLine(target.line_id || '@930xzcyi');
       setAgentFacebook(target.facebook || (target.role === 'ADMIN' ? DEFAULT_OFFICIAL_FACEBOOK : ''));
+      setAgentPhoto(target.avatar_url || '');
     }
   };
 
@@ -617,8 +559,8 @@ function PropertyEditor() {
       setParking(String(property.parking ?? '0'));
       setLandSize(String(property.land_size ?? '0'));
       setUsableArea(String(property.usable_area ?? '0'));
-      setYearBuilt(String(property.year_built ?? '2024'));
-      setFurniture(property.furniture || 'พร้อมอยู่บางส่วน');
+      setYearBuilt(property.year_built == null ? '' : String(property.year_built));
+      setFurniture(property.furniture || '');
       setDescription(property.description || '');
       setInternalNotes(property.internal_notes || '');
       setCoverImage(photos.cover_image || photos.images[0] || '');
@@ -635,6 +577,7 @@ function PropertyEditor() {
       setAgentPhone(property.agent?.phone || '081-604-0097');
       setAgentLine(property.agent?.line_id || '@930xzcyi');
       setAgentFacebook(property.agent?.facebook || '');
+      setAgentPhoto(property.agent?.photo_url || '');
       setPublished(property.published);
       setEditorLoaded(true);
     }).catch(err => { 
@@ -681,11 +624,6 @@ function PropertyEditor() {
     const code = Math.random().toString(36).substring(2, 7);
     setSlug(`${prefix}-${distCode}-${code}`);
     setSlugEdited(true);
-  };
-
-  // Type templates never invent prices, locations, photos or property details.
-  const applyPreset = (type: 'house' | 'condo' | 'land' | 'townhome' | 'commercial') => {
-    setPropertyType(type === 'townhome' ? 'house' : type);
   };
 
   const featureOptions = [
@@ -751,14 +689,6 @@ function PropertyEditor() {
       });
 
       const newPhotos = results.map(r => r.dataUrl);
-      const newStats = results.map(r => ({
-        url: r.dataUrl,
-        origSize: r.originalSizeFormatted,
-        compSize: r.compressedSizeFormatted,
-        saved: r.percentSaved,
-      }));
-
-      setUploadStatsList(prev => [...prev, ...newStats]);
       setImages(prev => {
         const updated = [...prev, ...newPhotos];
         if (!coverImage && updated.length > 0) {
@@ -843,14 +773,6 @@ function PropertyEditor() {
         if (!coverImage && updated.length > 0) setCoverImage(updated[0]);
         return updated;
       });
-      if (result.processed && typeof result.percentSaved === 'number' && result.percentSaved > 0) {
-        setUploadStatsList(prev => [...prev, {
-          url: result.dataUrl,
-          origSize: formatBytes(result.originalSize || 0),
-          compSize: formatBytes(result.compressedSize || 0),
-          saved: result.percentSaved || 0,
-        }]);
-      }
       setImageUrlInput('');
     } catch (error) {
       setError(error instanceof Error ? error.message : 'โหลดรูปไม่สำเร็จ กรุณาดาวน์โหลดแล้วอัปโหลดจากเครื่อง');
@@ -875,37 +797,37 @@ function PropertyEditor() {
     // Check required validation items
     if (!title.trim() || title.trim().length < 5) {
       setError('กรุณาระบุชื่อประกาศอย่างน้อย 5 ตัวอักษร');
-      document.getElementById('section-1-basic')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      handleScrollToSection('section-1-basic');
       return;
     }
     if (!Number.isFinite(Number(price)) || Number(price) <= 0) { 
       setError('กรุณาระบุราคาที่ถูกต้องมากกว่า 0 บาท'); 
-      document.getElementById('section-1-basic')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      handleScrollToSection('section-1-basic');
       return; 
     }
     if (!slug.trim() || /[/?#\\]/.test(slug)) { 
       setError('Slug ต้องไม่ว่างและไม่มีอักขระพิเศษ / ? # \\'); 
-      document.getElementById('section-1-basic')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      handleScrollToSection('section-1-basic');
       return; 
     }
     if (!district || !subdistrict) {
       setError('กรุณาเลือกอำเภอและตำบลในจังหวัดสงขลา');
-      document.getElementById('section-2-location')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      handleScrollToSection('section-2-location');
       return;
     }
     if (!images.length || !coverImage) { 
       setError('กรุณาเพิ่มรูปภาพอย่างน้อย 1 รูปสำหรับหน้าปก'); 
-      document.getElementById('section-4-images')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      handleScrollToSection('section-4-images');
       return; 
     }
     if (!selectedAgentId) {
       setError('กรุณาเลือกนายหน้าผู้ดูแลทรัพย์');
-      document.getElementById('section-6-agent')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      handleScrollToSection('section-6-agent');
       return;
     }
     if (!Number.isFinite(Number(latitude)) || Math.abs(Number(latitude)) > 90 || !Number.isFinite(Number(longitude)) || Math.abs(Number(longitude)) > 180) { 
       setError('พิกัดละติจูดหรือลองจิจูดไม่ถูกต้อง'); 
-      document.getElementById('section-2-location')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      handleScrollToSection('section-2-map-tools');
       return; 
     }
 
@@ -932,7 +854,7 @@ function PropertyEditor() {
         line_id: agentLine.trim() || agentProfile?.line_id || '@930xzcyi',
         facebook: agentFacebook.trim() || agentProfile?.facebook || (resolvedRank === 'แอดมิน' ? DEFAULT_OFFICIAL_FACEBOOK : ''),
         email: agentProfile?.email || 'chantakorn@chantakornproperty.com',
-        photo_url: agentProfile?.avatar_url || 'https://images.unsplash.com/photo-1560250097-0b93528c311a?auto=format&fit=crop&w=600&q=80',
+        photo_url: agentProfile?.avatar_url || agentPhoto,
         bio: agentProfile?.bio || (resolvedRank === 'แอดมิน'
           ? 'ผู้ดูแลระบบและที่ปรึกษาอสังหาริมทรัพย์ Chantakorn Property ดูแลลูกค้าทุกท่านอย่างซื่อตรงและโปร่งใส'
           : 'ตัวแทนนายหน้าอสังหาริมทรัพย์มืออาชีพ พร้อมดูแลพานัดชมทรัพย์และอำนวยความสะดวกทุกขั้นตอน'),
@@ -958,7 +880,7 @@ function PropertyEditor() {
         parking: Number(parking) || 0,
         land_size: Number(landSize) || 0,
         usable_area: Number(usableArea) || 0,
-        year_built: Number(yearBuilt) || 2024,
+        year_built: yearBuilt.trim() && Number.isFinite(Number(yearBuilt)) ? Number(yearBuilt) : undefined,
         furniture,
         features: selectedFeatures,
         cover_image: coverImage || images[0],
@@ -1067,7 +989,7 @@ function PropertyEditor() {
     {
       id: 'val-coordinates',
       fieldKey: 'coordinates',
-      targetElementId: 'section-2-location',
+      targetElementId: 'section-2-map-tools',
       label: 'พิกัดแผนที่ (Latitude & Longitude)',
       isRequired: false,
       isValid: isValidLatLng(Number(latitude), Number(longitude)),
@@ -1156,10 +1078,20 @@ function PropertyEditor() {
     (recommendedPassedCount / recommendedItems.length) * 25
   );
 
+  const revealFormElement = (element: HTMLElement) => {
+    let parent: HTMLElement | null = element;
+    while (parent) {
+      if (parent.tagName === 'DETAILS') (parent as HTMLDetailsElement).open = true;
+      parent = parent.parentElement;
+    }
+  };
+
   const handleScrollToSection = (targetElementId: string) => {
     const el = document.getElementById(targetElementId);
     if (el) {
+      revealFormElement(el);
       el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      el.querySelector<HTMLElement>('input:not([disabled]), select:not([disabled]), textarea:not([disabled]), summary')?.focus({ preventScroll: true });
       el.classList.add('ring-4', 'ring-gold-400/60', 'transition-all');
       setTimeout(() => {
         el.classList.remove('ring-4', 'ring-gold-400/60');
@@ -1188,18 +1120,6 @@ function PropertyEditor() {
         </div>
       )}
 
-      {currentUserRole && currentUserRole !== 'USER' && (
-        <div className="bg-emerald-50/90 border border-emerald-200 rounded-2xl px-4 py-2.5 text-xs flex flex-wrap items-center justify-between gap-2 shadow-xs">
-          <div className="flex items-center space-x-2 text-emerald-950 font-medium">
-            <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" />
-            <span>เข้าสู่ระบบด้วยยศ: <strong className="text-navy-950">{currentUserRole === 'ADMIN' ? '🛡️ แอดมิน (Admin)' : '👔 นายหน้า (Agent)'}</strong> — สามารถลงข้อมูลทรัพย์สินและระบุ LINE, Facebook และเบอร์โทรของตนเองได้</span>
-          </div>
-          <span className="text-[10px] bg-emerald-100 text-emerald-800 font-bold px-2.5 py-0.5 rounded-full border border-emerald-300">
-            สิทธิ์ได้รับอนุมัติ
-          </span>
-        </div>
-      )}
-
       {/* Sticky Section Jump Navigation Bar with Real-time Progress */}
       <div className="sticky top-16 z-20 bg-white/95 backdrop-blur-md p-2.5 rounded-2xl border border-gray-200 shadow-xs flex items-center justify-between gap-3 overflow-x-auto text-xs">
         <div className="flex items-center space-x-1 sm:space-x-2 shrink-0">
@@ -1223,25 +1143,6 @@ function PropertyEditor() {
           ))}
         </div>
 
-        {/* Real-time Progress Pill in Sticky Bar (Visible on all viewports) */}
-        <div className="flex items-center space-x-2 pl-3 border-l border-gray-200 shrink-0">
-          <span className="text-[11px] text-gray-500 font-semibold hidden md:inline">ความคืบหน้า:</span>
-          <div className="w-16 sm:w-24 bg-gray-200 h-2.5 rounded-full overflow-hidden">
-            <div
-              className={`h-full transition-all duration-500 rounded-full ${
-                completionPercentage === 100 
-                  ? 'bg-emerald-500' 
-                  : completionPercentage >= 75 
-                  ? 'bg-teal-500' 
-                  : completionPercentage >= 50 
-                  ? 'bg-gold-500' 
-                  : 'bg-amber-500'
-              }`}
-              style={{ width: `${completionPercentage}%` }}
-            />
-          </div>
-          <span className="text-xs font-black text-navy-950">{completionPercentage}%</span>
-        </div>
       </div>
 
       {/* Top Header & Fast Actions */}
@@ -1258,7 +1159,7 @@ function PropertyEditor() {
               {editId ? 'แก้ไขอสังหาริมทรัพย์' : 'เพิ่มอสังหาริมทรัพย์ใหม่'}
             </h1>
             <p className="text-xs text-brand-muted">
-              {editId ? 'ปรับปรุงข้อมูลประกาศทรัพย์ให้ทันสมัย' : 'ลงประกาศง่ายและรวดเร็ว พร้อมระบบซิงค์ข้อมูลนายหน้าอัตโนมัติ'}
+              {editId ? 'ปรับปรุงข้อมูลประกาศทรัพย์ให้ทันสมัย' : 'กรอกข้อมูลทรัพย์จริง เพิ่มรูปภาพ แล้วเลือกบันทึกหรือเผยแพร่'}
             </p>
           </div>
         </div>
@@ -1307,19 +1208,22 @@ function PropertyEditor() {
               </div>
               <div>
                 <h3 className="text-sm font-extrabold text-navy-950 flex items-center space-x-1.5">
-                  <span>ตัวช่วยลงทรัพย์ด่วน: สกัดข้อมูลจากข้อความ LINE / Facebook อัตโนมัติ</span>
+                  <span>กรอกจากข้อความที่มีอยู่</span>
                   <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
                     แนะนำ
                   </span>
                 </h3>
                 <p className="text-[11px] text-gray-500">
-                  วางข้อความโพสต์ขายหรือโน้ตย่อ ระบบจะช่วยกรอกราคา, ทำเล, ขนาดที่ดิน, ห้องนอน, ทิศ และแต่งรายละเอียดให้ทันที 1-Click
+                  วางข้อความจาก LINE หรือโพสต์เดิม แล้วตรวจข้อมูลก่อนบันทึก
                 </p>
               </div>
             </div>
             <button
               type="button"
-              onClick={() => setShowSmartBox(!showSmartBox)}
+              onClick={() => setShowSmartBox(value => !value)}
+              aria-expanded={showSmartBox}
+              aria-controls="property-smart-text"
+              aria-label={showSmartBox ? 'ซ่อนตัวช่วยกรอกจากข้อความ' : 'เปิดตัวช่วยกรอกจากข้อความ'}
               className="text-gray-400 hover:text-navy-950 p-1 rounded-lg"
             >
               {showSmartBox ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
@@ -1327,7 +1231,7 @@ function PropertyEditor() {
           </div>
 
           {showSmartBox && (
-            <div className="space-y-2.5 pt-1">
+            <div id="property-smart-text" className="space-y-2.5 pt-1">
               <textarea
                 rows={3}
                 value={smartText}
@@ -1397,62 +1301,11 @@ function PropertyEditor() {
         </div>
       )}
 
-      {/* 1-Click Fast Templates (แม่แบบโพสต์ด่วน 1 คลิก ช่วยให้โพสต์งานง่ายกว่าเดิม) */}
-      {!editId && (
-        <div className="bg-linear-to-r/srgb from-navy-950 via-navy-900 to-navy-950 text-white p-5 rounded-2xl border border-navy-800 shadow-md space-y-3">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-2">
-              <Zap className="w-4 h-4 text-gold-400" />
-              <span className="text-xs sm:text-sm font-bold text-white">เริ่มจากประเภททรัพย์:</span>
-            </div>
-            <span className="text-[11px] text-gold-300/80 hidden sm:inline">เลือกประเภท แล้วกรอกข้อมูลทรัพย์จริง</span>
-          </div>
-
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
-            <button
-              type="button"
-              onClick={() => applyPreset('house')}
-              className="px-3 py-2 bg-navy-800/80 hover:bg-gold-500 hover:text-navy-950 rounded-xl text-xs font-semibold text-gray-200 transition-all border border-navy-700/60 flex items-center space-x-1.5 justify-center text-center"
-            >
-              <span>บ้านเดี่ยว</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => applyPreset('condo')}
-              className="px-3 py-2 bg-navy-800/80 hover:bg-gold-500 hover:text-navy-950 rounded-xl text-xs font-semibold text-gray-200 transition-all border border-navy-700/60 flex items-center space-x-1.5 justify-center text-center"
-            >
-              <span>คอนโด</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => applyPreset('land')}
-              className="px-3 py-2 bg-navy-800/80 hover:bg-gold-500 hover:text-navy-950 rounded-xl text-xs font-semibold text-gray-200 transition-all border border-navy-700/60 flex items-center space-x-1.5 justify-center text-center"
-            >
-              <span>ที่ดิน</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => applyPreset('townhome')}
-              className="px-3 py-2 bg-navy-800/80 hover:bg-gold-500 hover:text-navy-950 rounded-xl text-xs font-semibold text-gray-200 transition-all border border-navy-700/60 flex items-center space-x-1.5 justify-center text-center"
-            >
-              <span>ทาวน์โฮม</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => applyPreset('commercial')}
-              className="px-3 py-2 bg-navy-800/80 hover:bg-gold-500 hover:text-navy-950 rounded-xl text-xs font-semibold text-gray-200 transition-all border border-navy-700/60 flex items-center space-x-1.5 justify-center text-center col-span-2 sm:col-span-1"
-            >
-              <span>อาคารพาณิชย์</span>
-            </button>
-          </div>
-        </div>
-      )}
-
-      <form onSubmit={handleSubmit} className="space-y-6">
+      <form onSubmit={handleSubmit} onInvalidCapture={event => {
+        const control = event.target as HTMLElement;
+        revealFormElement(control);
+        control.focus();
+      }} className="space-y-6">
         {/* Section 1: Basic Information & Price */}
         <div id="section-1-basic" className="bg-white rounded-2xl p-6 border border-surface-border shadow-xs space-y-4 scroll-mt-28">
           <h3 className="font-bold text-navy-950 text-base border-b border-gray-100 pb-3 flex items-center space-x-2">
@@ -1594,33 +1447,6 @@ function PropertyEditor() {
                 </div>
               )}
 
-              {/* Quick Price Buttons */}
-              <div className="mt-2 flex flex-wrap items-center gap-1 text-[11px]">
-                <span className="text-gray-500 font-medium">กดเลือกราคาด่วน:</span>
-                {status === 'sale' ? (
-                  [1990000, 2500000, 3200000, 4500000, 6900000].map((p) => (
-                    <button
-                      key={p}
-                      type="button"
-                      onClick={() => setPrice(String(p))}
-                      className="px-2 py-0.5 bg-gray-100 hover:bg-gold-500 hover:text-navy-950 text-gray-700 rounded-md font-medium transition-all cursor-pointer"
-                    >
-                      {(p / 1000000).toFixed(2).replace(/\.?0+$/, '')} ลบ.
-                    </button>
-                  ))
-                ) : (
-                  [6000, 8500, 12000, 15000, 25000].map((p) => (
-                    <button
-                      key={p}
-                      type="button"
-                      onClick={() => setPrice(String(p))}
-                      className="px-2 py-0.5 bg-gray-100 hover:bg-gold-500 hover:text-navy-950 text-gray-700 rounded-md font-medium transition-all cursor-pointer"
-                    >
-                      {p.toLocaleString()} / ด.
-                    </button>
-                  ))
-                )}
-              </div>
             </div>
 
             <div>
@@ -1674,11 +1500,8 @@ function PropertyEditor() {
           <div className="border-b border-gray-100 pb-3 flex items-center justify-between">
             <h3 className="font-bold text-navy-950 text-base flex items-center space-x-2">
               <MapPin className="w-4 h-4 text-gold-600" />
-              <span>2. ทำเลที่ตั้งในจังหวัดสงขลา (ครบทั้ง 16 อำเภอ 127 ตำบล)</span>
+              <span>2. ทำเลที่ตั้ง</span>
             </h3>
-            <span className="text-[11px] text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-full font-semibold border border-emerald-200">
-              ✓ พิกัด GPS เติมอัตโนมัติ
-            </span>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -1751,6 +1574,15 @@ function PropertyEditor() {
               />
             </div>
 
+          </div>
+
+          <details id="section-2-map-tools" onToggle={event => setMapToolsOpen(event.currentTarget.open)} className="group rounded-xl border border-slate-200 bg-slate-50/50 p-4 scroll-mt-28">
+            <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 text-sm font-semibold text-navy-950 [&::-webkit-details-marker]:hidden">
+              <span className="flex items-center gap-2"><MapPin className="h-4 w-4 text-gold-600" />แผนที่และข้อมูลทำเลเพิ่มเติม</span>
+              <ChevronDown className="h-4 w-4 shrink-0 transition-transform group-open:rotate-180" />
+            </summary>
+            <div className="mt-4 space-y-4">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
             {/* Google Maps Converter Box */}
             <div className="sm:col-span-3 bg-linear-to-br/srgb from-amber-50/40 via-white to-gold-50/30 border border-gold-300/90 rounded-2xl p-4 sm:p-5 shadow-xs space-y-3">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
@@ -1904,7 +1736,7 @@ function PropertyEditor() {
               </div>
 
               {/* Map Preview Iframe */}
-              {showMapPreview && isValidLatLng(Number(latitude), Number(longitude)) && (
+              {mapToolsOpen && showMapPreview && isValidLatLng(Number(latitude), Number(longitude)) && (
                 <div className="mt-2 rounded-xl overflow-hidden border border-gold-200 bg-gray-100 relative inset-shadow-sm">
                   <div className="p-2 bg-gray-50 border-b border-gray-200 flex items-center justify-between text-[11px] text-gray-600 px-3">
                     <span className="font-semibold text-navy-950 flex items-center gap-1">
@@ -2112,6 +1944,8 @@ function PropertyEditor() {
               </div>
             </div>
           </div>
+            </div>
+          </details>
         </div>
 
         {/* Section 3: Property Specs & Features */}
@@ -2359,7 +2193,7 @@ function PropertyEditor() {
             <div>
               <h3 className="font-bold text-navy-950 text-base flex items-center space-x-2">
                 <ImageIcon className="w-4 h-4 text-gold-600" />
-                <span>4. รูปภาพทรัพย์สิน & แกลเลอรี (บีบอัดอัตโนมัติ Full HD รองรับไฟล์สูงสุด 100MB)</span>
+                <span>4. รูปภาพทรัพย์</span>
               </h3>
               <p className="text-xs text-gray-500 mt-0.5">
                 เลือกรูปภาพที่มีความคมชัดสูง ระบบจะช่วยบีบอัดให้อัตโนมัติทันทีเพื่อให้เว็บโหลดเร็วและประหยัดพื้นที่
@@ -2386,21 +2220,9 @@ function PropertyEditor() {
             </div>
           </div>
 
-          {/* Auto Compression Feature Banner */}
-          <div className="bg-linear-to-r/srgb from-emerald-50 via-teal-50 to-blue-50 border border-emerald-200/80 rounded-2xl p-4 text-xs text-emerald-950 flex items-start space-x-3 shadow-xs">
-            <Gauge className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />
-            <div className="space-y-1">
-              <div className="flex items-center space-x-2">
-                <span className="font-bold text-emerald-900">⚡ ระบบบีบอัดรูปภาพอัตโนมัติ (Smart Auto-Compressor)</span>
-                <span className="bg-emerald-200/80 text-emerald-900 text-[10px] font-extrabold px-2 py-0.5 rounded-full">
-                  รองรับ 100MB/รูป
-                </span>
-              </div>
-              <p className="text-emerald-800 text-[11px] leading-relaxed">
-                คุณสามารถเลือกไฟล์ภาพความละเอียดสูง (DSLR, มือถือ 4K/8K) ขนาดใหญ่สูงสุดถึง <strong>100MB ต่อไฟล์</strong> โดยระบบบนเบราว์เซอร์จะทำการรีไซส์และบีบอัดคุณภาพสูง (Full HD 1920px WebP/JPEG) ให้อัตโนมัติทันที ลดขนาดลงถึง <strong>90-98%</strong> โดยที่ภาพยังคงสวยคมชัด
-              </p>
-            </div>
-          </div>
+          <p className="rounded-xl bg-slate-50 p-3 text-xs leading-relaxed text-slate-600">
+            รองรับ JPG, PNG และ WebP สูงสุด 100MB ต่อไฟล์ ระบบย่อรูปและใส่ลายน้ำตามที่เลือกให้อัตโนมัติ
+          </p>
 
           {/* Watermark Settings */}
           <div className="bg-navy-950 border border-navy-800 rounded-2xl p-4 text-xs space-y-3 shadow-xs">
@@ -2586,7 +2408,7 @@ function PropertyEditor() {
                         <button
                           type="button"
                           onClick={() => setCoverImage(img)}
-                          className="absolute bottom-1.5 left-1.5 right-1.5 bg-black/75 hover:bg-gold-500 hover:text-navy-950 text-white text-[10px] font-bold py-1 rounded-sm transition-colors text-center opacity-0 group-hover:opacity-100 z-10"
+                          className="absolute bottom-1.5 left-1.5 right-1.5 min-h-9 bg-black/75 hover:bg-gold-500 hover:text-navy-950 text-white text-[10px] font-bold py-1 rounded-sm transition-colors text-center focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gold-400 z-10"
                         >
                           ตั้งเป็นหน้าปก
                         </button>
@@ -2609,42 +2431,16 @@ function PropertyEditor() {
         </div>
 
         {/* Section 5: Property Video Tour (วิดีโอพาทัวร์อสังหาริมทรัพย์) */}
-        <div id="section-5-video" className="bg-white rounded-2xl p-6 border border-surface-border shadow-xs space-y-5 scroll-mt-28">
-          <div className="border-b border-gray-100 pb-3 flex flex-wrap items-center justify-between gap-2">
-            <div>
-              <h3 className="font-bold text-navy-950 text-base flex items-center space-x-2">
-                <Video className="w-4 h-4 text-red-600" />
-                <span>5. วิดีโอพาทัวร์อสังหาริมทรัพย์ (Video Tour)</span>
-              </h3>
-              <p className="text-xs text-gray-500 mt-0.5">
-                ใส่วิดีโอพาทัวร์สถานที่จริงเพื่อดึงดูดลูกค้าและเพิ่มความน่าสนใจของประกาศ
-              </p>
+        <details id="section-5-video" className="group bg-white rounded-2xl p-5 sm:p-6 border border-surface-border shadow-xs scroll-mt-28">
+          <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 text-sm font-semibold text-navy-950 [&::-webkit-details-marker]:hidden">
+            <span className="flex items-center gap-2"><Video className="h-4 w-4 text-gold-600" />5. วิดีโอพาทัวร์ <span className="text-xs font-normal text-slate-500">(ไม่บังคับ{videoUrl ? ' · เพิ่มแล้ว' : ''})</span></span>
+            <ChevronDown className="h-4 w-4 shrink-0 transition-transform group-open:rotate-180" />
+          </summary>
+          <div className="mt-4 space-y-4">
+            <div className="flex flex-wrap items-center justify-between gap-3 text-xs text-slate-500">
+              <p>วางลิงก์ YouTube, TikTok, Facebook หรือ MP4 หรือแนบคลิปสั้นไม่เกิน 5MB</p>
+              {videoUrl && <button type="button" onClick={() => setVideoUrl('')} className="min-h-11 rounded-lg px-3 font-medium text-red-600 hover:bg-red-50">ลบวิดีโอ</button>}
             </div>
-            <div className="flex items-center space-x-2">
-
-              {videoUrl && (
-                <button
-                  type="button"
-                  onClick={() => setVideoUrl('')}
-                  className="text-[11px] font-semibold text-gray-600 hover:text-red-600 bg-gray-100 px-2.5 py-1.5 rounded-xl transition-colors"
-                >
-                  ลบวิดีโอ
-                </button>
-              )}
-            </div>
-          </div>
-
-          {/* Helpful Tip */}
-          <div className="p-3.5 bg-red-50/70 border border-red-200 rounded-xl text-xs text-red-950 leading-relaxed flex items-start gap-2.5">
-            <Film className="w-4 h-4 text-red-600 shrink-0 mt-0.5" />
-            <div>
-              <p className="font-bold">ช่องทางใส่วิดีโอที่รองรับ:</p>
-              <p className="text-red-900 text-[11px] mt-0.5">
-                รองรับลิงก์ <strong>YouTube</strong> (ลิงก์ทั่วไป, youtu.be, YouTube Shorts), <strong>TikTok</strong>, <strong>Facebook Video</strong>, ลิงก์ไฟล์ <strong>MP4</strong> โดยตรง หรือจะ<strong>อัปโหลดไฟล์วิดีโอจากเครื่อง</strong> (สูงสุด 100MB) ก็ได้เช่นกัน
-              </p>
-            </div>
-          </div>
-
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
             {/* Left 7 Cols: Video inputs */}
             <div className="lg:col-span-7 space-y-4">
@@ -2774,14 +2570,15 @@ function PropertyEditor() {
               )}
             </div>
           </div>
-        </div>
+          </div>
+        </details>
 
         {/* Section 6: Responsible Agent (นายหน้าที่รับผิดชอบทรัพย์นี้ - อ้างอิงจากสมาชิกที่มียศ นายหน้า และ แอดมิน เท่านั้น และให้ใส่วิธีติดต่อของนายหน้าคนนั้นเอง) */}
         <div id="section-6-agent" className="bg-white rounded-2xl p-6 border border-surface-border shadow-xs space-y-5 scroll-mt-28">
           <div className="border-b border-gray-100 pb-3 flex flex-wrap items-center justify-between gap-2">
             <h3 className="font-bold text-navy-950 text-base flex items-center space-x-2">
               <UserCheck className="w-4 h-4 text-gold-600" />
-              <span>6. ข้อมูลนายหน้าผู้ลงประกาศ & ช่องทางติดต่อตรง (เฉพาะยศแอดมิน และยศนายหน้า)</span>
+              <span>6. นายหน้าผู้ดูแล</span>
             </h3>
             <div className="flex items-center gap-2">
               <span className="px-2.5 py-1 bg-amber-50 text-amber-800 border border-amber-200 rounded-full text-[11px] font-bold flex items-center space-x-1">
@@ -2916,24 +2713,19 @@ function PropertyEditor() {
             </div>
 
             {/* Right 5 cols: Live Preview Card of Agent Contacts as seen on the detail page */}
-            <div className="lg:col-span-5 bg-linear-to-b/srgb from-navy-950 to-navy-900 text-white rounded-2xl p-5 border border-navy-800 shadow-xl space-y-4">
-              <div className="flex items-center justify-between pb-3 border-b border-navy-800/80">
-                <div className="flex items-center space-x-1.5 text-xs font-bold text-gold-400">
-                  <Eye className="w-3.5 h-3.5" />
-                  <span>ตัวอย่างแสดงผลบนหน้าเว็บ (Live Preview)</span>
-                </div>
-                <span className="text-[10px] bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 px-2 py-0.5 rounded-full font-semibold">
-                  แสดงข้อมูลจริง
-                </span>
-              </div>
-
+            <details className="group lg:col-span-5 bg-navy-950 text-white rounded-2xl p-5 border border-navy-800">
+              <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 text-sm font-semibold text-gold-400 [&::-webkit-details-marker]:hidden">
+                <span className="flex items-center gap-2"><Eye className="h-4 w-4" />ดูตัวอย่างข้อมูลติดต่อ</span>
+                <ChevronDown className="h-4 w-4 shrink-0 transition-transform group-open:rotate-180" />
+              </summary>
+              <div className="mt-4 space-y-4">
               {/* Agent Profile Header */}
               <div className="flex items-center space-x-3.5">
                 <div className="relative w-16 h-16 rounded-2xl overflow-hidden bg-navy-800 shrink-0 border-2 border-gold-400 shadow-md">
-                  {currentAssignedStaff?.avatar_url ? (
+                  {currentAssignedStaff?.avatar_url || agentPhoto ? (
                     <Image
-                      src={currentAssignedStaff.avatar_url}
-                      alt={currentAssignedStaff.full_name || 'Agent'}
+                      src={currentAssignedStaff?.avatar_url || agentPhoto}
+                      alt={currentAssignedStaff?.full_name || 'นายหน้าผู้ดูแล'}
                       fill
                       unoptimized
                       className="object-cover"
@@ -3011,7 +2803,8 @@ function PropertyEditor() {
                   </span>
                 </div>
               </div>
-            </div>
+              </div>
+            </details>
           </div>
         </div>
 
@@ -3020,10 +2813,10 @@ function PropertyEditor() {
           <div className="border-b border-amber-200 pb-3 flex flex-wrap items-center justify-between gap-2">
             <h3 className="font-extrabold text-navy-950 text-base flex items-center space-x-2">
               <ShieldAlert className="w-5 h-5 text-amber-700 shrink-0" />
-              <span>7. บันทึกภายในสำหรับนายหน้า & แอดมิน (Agent Internal Notes - ซ่อนไม่แสดงหน้าบ้าน)</span>
+              <span>7. บันทึกภายในทีม</span>
             </h3>
             <span className="px-3 py-1 bg-amber-200 text-amber-950 border border-amber-400 rounded-full text-[11px] font-black flex items-center gap-1 shadow-2xs">
-              🔒 ข้อมูลความลับเฉพาะภายใน (Non-Public Agent Notes)
+              เฉพาะทีมงาน
             </span>
           </div>
 
@@ -3034,7 +2827,7 @@ function PropertyEditor() {
           <div>
             <label className="block text-xs font-bold text-navy-950 mb-1.5 flex items-center space-x-1.5">
               <FileText className="w-4 h-4 text-amber-700" />
-              <span>ข้อความบันทึกภายใน (Agent Internal Notes & Negotiation History)</span>
+              <span>บันทึกภายใน</span>
             </label>
             <textarea
               rows={4}
