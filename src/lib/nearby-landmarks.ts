@@ -1,7 +1,7 @@
 /**
  * Utility for calculating and finding nearby landmarks & places of interest (Songkhla & Hat Yai)
  * Uses Haversine distance formula + estimated drive/walk times
- * With online OpenStreetMap Overpass API search capability + curated fallback database
+ * Calculates approximate distances from a curated local landmark database.
  */
 
 export interface LandmarkItem {
@@ -157,80 +157,4 @@ export function calculateNearbyLandmarks(
   .sort((a, b) => a.distanceKm - b.distanceKm);
 
   return list.slice(0, limit);
-}
-
-/**
- * ค้นหาสถานที่สำคัญจาก OpenStreetMap Overpass API แบบ Real-Time (พร้อม Fallback ถ้าระบบออฟไลน์)
- */
-export async function fetchLiveNearbyPlaces(
-  lat: number,
-  lng: number,
-  radiusMeters: number = 3000
-): Promise<NearbyLandmarkResult[]> {
-  try {
-    const query = `
-      [out:json][timeout:5];
-      (
-        node["amenity"~"hospital|clinic|school|university|mall|supermarket|bank"](around:${radiusMeters},${lat},${lng});
-        way["amenity"~"hospital|clinic|school|university|mall|supermarket|bank"](around:${radiusMeters},${lat},${lng});
-        node["tourism"~"attraction|theme_park|zoo"](around:${radiusMeters},${lat},${lng});
-      );
-      out center 12;
-    `;
-    const url = `https://overpass-api.de/api/interpreter?data=${encodeURIComponent(query)}`;
-    
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 4000);
-
-    const res = await fetch(url, { signal: controller.signal });
-    clearTimeout(timeoutId);
-
-    if (res.ok) {
-      const data = await res.json();
-      if (Array.isArray(data.elements) && data.elements.length > 0) {
-        const liveResults: NearbyLandmarkResult[] = [];
-        const seenNames = new Set<string>();
-
-        for (const el of data.elements) {
-          const tags = el.tags || {};
-          const name = tags['name:th'] || tags.name;
-          if (!name || seenNames.has(name.trim())) continue;
-          seenNames.add(name.trim());
-
-          const eLat = el.lat || el.center?.lat;
-          const eLng = el.lon || el.center?.lon;
-          if (!eLat || !eLng) continue;
-
-          const distanceKm = haversineDistanceKm(lat, lng, eLat, eLng);
-          const estimate = formatTravelEstimate(distanceKm);
-
-          let cat = 'other';
-          let catLabel = 'สถานที่ใกล้เคียง';
-          if (tags.amenity === 'school' || tags.amenity === 'university') { cat = 'education'; catLabel = 'การศึกษา'; }
-          else if (tags.amenity === 'hospital' || tags.amenity === 'clinic') { cat = 'hospital'; catLabel = 'การแพทย์'; }
-          else if (tags.amenity === 'mall' || tags.amenity === 'supermarket') { cat = 'shopping'; catLabel = 'ห้าง/ตลาด'; }
-
-          liveResults.push({
-            id: `osm-${el.id}`,
-            title: name.trim(),
-            category: cat,
-            categoryLabel: catLabel,
-            distanceKm,
-            formattedDistance: estimate.formattedDistance,
-            estimatedTime: estimate.estimatedTime,
-            combinedText: estimate.combinedText,
-          });
-        }
-
-        if (liveResults.length >= 4) {
-          return liveResults.sort((a, b) => a.distanceKm - b.distanceKm).slice(0, 8);
-        }
-      }
-    }
-  } catch {
-    // If online API is slow or offline, gracefully fallback to local dataset
-  }
-
-  // Fallback to local calculated dataset
-  return calculateNearbyLandmarks(lat, lng, { limit: 8 });
 }

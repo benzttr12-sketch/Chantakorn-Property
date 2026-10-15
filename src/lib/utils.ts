@@ -161,14 +161,6 @@ export function isValidLatLng(lat: number, lng: number): boolean {
 }
 
 /**
- * ตรวจสอบว่าเป็น Short URL ของ Google Maps หรือไม่
- */
-export function isGoogleMapsShortUrl(input: string): boolean {
-  if (!input || typeof input !== 'string') return false;
-  return /maps\.app\.goo\.gl|goo\.gl\/maps/i.test(input.trim());
-}
-
-/**
  * ฟังก์ชันแปลงข้อความ ลิงก์ หรือ iframe จาก Google Maps ให้เป็นพิกัด Latitude และ Longitude
  * รองรับ:
  * 1. ลิงก์ Google Maps Desktop/Browser: @lat,lng หรือ ?q=lat,lng หรือ query=lat,lng

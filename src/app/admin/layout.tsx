@@ -120,13 +120,17 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     const originalOverflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
     closeButtonRef.current?.focus();
+    drawerRef.current?.querySelector<HTMLElement>('[aria-current]')?.scrollIntoView({ block: 'nearest' });
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
         event.preventDefault();
         setMobileSidebarOpen(false);
       }
       if (event.key === 'Tab') {
-        const elements = drawerRef.current?.querySelectorAll<HTMLElement>('a[href], button:not([disabled])');
+        const elements = Array.from(drawerRef.current?.querySelectorAll<HTMLElement>('a[href], button:not([disabled]), summary') || []).filter((element) => {
+          const closedGroup = element.closest('details:not([open])');
+          return element.tabIndex >= 0 && element.getClientRects().length > 0 && (!closedGroup || element.tagName === 'SUMMARY' && element.parentElement === closedGroup);
+        });
         if (!elements?.length) return;
         const first = elements[0];
         const last = elements[elements.length - 1];
@@ -189,7 +193,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-gold-400 text-navy-950"><Building2 className="h-5 w-5" /></span>
           <span><span className="block text-sm font-bold tracking-wider text-white">CHANTAKORN</span><span className="mt-1 block text-[11px] text-slate-400">พื้นที่ทำงานของทีม</span></span>
         </Link>
-        <button ref={closeButtonRef} onClick={() => setMobileSidebarOpen(false)} aria-label="ปิดเมนูหลังบ้าน" className="rounded-lg p-2 text-slate-300 hover:bg-white/10 md:hidden"><X className="h-5 w-5" /></button>
+        <button ref={closeButtonRef} onClick={() => setMobileSidebarOpen(false)} aria-label="ปิดเมนูหลังบ้าน" className="flex min-h-11 min-w-11 items-center justify-center rounded-lg p-2 text-slate-300 hover:bg-white/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-gold-400 md:hidden"><X className="h-5 w-5" /></button>
       </div>
       <div className="shrink-0 px-5 pb-3"><Link href="/admin/properties/new" onClick={() => setMobileSidebarOpen(false)} className="flex min-h-11 items-center justify-center gap-2 rounded-xl bg-gold-400 px-4 text-sm font-bold text-navy-950 transition-colors hover:bg-gold-300"><Plus className="h-4 w-4" />เพิ่มทรัพย์ใหม่</Link></div>
       <AdminNavigation pathname={pathname} role={currentUser.role} pendingCount={pendingInquiriesCount} onNavigate={() => setMobileSidebarOpen(false)} />
@@ -215,10 +219,10 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       <div className="min-w-0 flex-1">
         <header className="flex min-h-[76px] items-center justify-between gap-3 border-b border-slate-200/80 bg-white/95 px-4 sm:px-7 lg:px-9">
           <div className="flex min-w-0 items-center gap-3">
-            <button ref={menuButtonRef} onClick={() => setMobileSidebarOpen(true)} aria-label="เปิดเมนูหลังบ้าน" aria-expanded={mobileSidebarOpen} aria-controls="admin-mobile-menu" className="shrink-0 rounded-xl border border-slate-200 p-2.5 text-navy-950 md:hidden"><Menu className="h-5 w-5" /></button>
+            <button ref={menuButtonRef} onClick={() => setMobileSidebarOpen(true)} aria-label="เปิดเมนูหลังบ้าน" aria-expanded={mobileSidebarOpen} aria-controls="admin-mobile-menu" className="flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-xl border border-slate-200 p-2.5 text-navy-950 focus-visible:outline focus-visible:outline-2 focus-visible:outline-navy-950 md:hidden"><Menu className="h-5 w-5" /></button>
             <div className="min-w-0"><span className="hidden text-[11px] text-slate-400 sm:block">Chantakorn Property / หลังบ้าน</span><span className="block truncate text-sm font-semibold sm:mt-1">{getAdminPageTitle(pathname)}</span></div>
           </div>
-          <Link href="/" target="_blank" rel="noopener noreferrer" className="flex shrink-0 min-h-10 items-center gap-2 rounded-xl border border-slate-200 px-3 text-xs font-semibold text-slate-600 transition-colors hover:bg-slate-50"><ExternalLink className="h-4 w-4" /><span className="hidden sm:inline">ดูหน้าเว็บไซต์</span><span className="sr-only sm:hidden">ดูหน้าเว็บไซต์</span></Link>
+          <Link href="/" target="_blank" rel="noopener noreferrer" className="flex min-h-11 min-w-11 shrink-0 items-center justify-center gap-2 rounded-xl border border-slate-200 px-3 text-xs font-semibold text-slate-600 transition-colors hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-navy-950"><ExternalLink className="h-4 w-4" /><span className="hidden sm:inline">ดูหน้าเว็บไซต์</span><span className="sr-only sm:hidden">ดูหน้าเว็บไซต์</span></Link>
         </header>
         <main id="admin-main-content" className="mx-auto w-full max-w-[1440px] px-4 py-6 sm:px-7 sm:py-8 lg:px-9">{children}</main>
       </div>

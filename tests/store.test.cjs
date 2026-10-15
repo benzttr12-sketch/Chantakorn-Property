@@ -11,6 +11,7 @@ function loadStore({ backend = 'local', firebase = false, firebaseError = null, 
   const cache = new Map();
   const storage = new Map();
   const mediaDocuments = [], deletions = [], submissions = [];
+  const deletedField = Symbol('deleted-field');
   const localStorage = {
     getItem: key => storage.get(key) ?? null,
     setItem: (key, value) => storage.set(key, value),
@@ -62,12 +63,15 @@ function loadStore({ backend = 'local', firebase = false, firebaseError = null, 
         collection: (_db, collection) => ({ collection }), query: (ref,...constraints) => ({ ...ref,constraints }), where: (field,op,value) => ({field,op,value}), doc: (_db, collection, id) => ({ collection, id }),
         getDocs: async (reference) => { if (firebaseError) throw firebaseError; const rows=reference?.collection==='property_media'?mediaDocuments.filter(item=>item.property_id===reference.constraints?.[0]?.value):firebaseDocuments; return { docs: rows.map(item => ({ id: item.id, data: () => ({ ...item }) })) }; },
         getDocFromServer: async () => ({ exists: () => false, data: () => ({}) }),
-        setDoc: async (reference, value) => {
+        deleteField: () => deletedField,
+        setDoc: async (reference, value, options) => {
           if (firebaseError) throw firebaseError;
           if (reference.collection === 'properties') {
             const index = firebaseDocuments.findIndex(item => item.id === reference.id);
-            if (index >= 0) firebaseDocuments[index] = value;
-            else firebaseDocuments.push(value);
+            const next = { ...(options?.merge && index >= 0 ? firebaseDocuments[index] : {}), ...value };
+            for (const key of Object.keys(next)) if (next[key] === deletedField) delete next[key];
+            if (index >= 0) firebaseDocuments[index] = next;
+            else firebaseDocuments.push(next);
           }
           if(reference.collection === 'property_media') mediaDocuments.push({...value,id:reference.id});
         },
@@ -207,6 +211,23 @@ test('unrelated Firebase edits never turn missing coordinates into a real parcel
   assert.equal(result.latitude, 7.21);
   assert.equal(result.longitude, 100.56);
 });
+test('an optional build year stays absent, retains actual values and clears only when explicitly requested', async () => {
+  const sample = loadStore().store.getLocalProperties()[0];
+  const records = [{ ...sample, id: 'year-review', year_built: 2019, furniture: 'เฟอร์นิเจอร์ของเจ้าของ' }];
+  const { store } = loadStore({ backend: 'firebase', firebase: true, firebaseDocuments: records });
+  await store.updateProperty('year-review', { title: 'ปรับชื่อประกาศ' });
+  assert.equal(records[0].year_built, 2019);
+  await store.updateProperty('year-review', { year_built: undefined });
+  assert.equal(Object.hasOwn(records[0], 'year_built'), false);
+  assert.equal(records[0].furniture, 'เฟอร์นิเจอร์ของเจ้าของ');
+  assert.equal((await store.fetchAdminProperties())[0].year_built, undefined);
+  await store.updateProperty('year-review', { year_built: 2022 });
+  assert.equal(records[0].year_built, 2022);
+  const { year_built: _year, ...withoutYear } = sample;
+  const created = await store.createProperty({ ...withoutYear, slug: 'no-invented-year', year_built: undefined, published: false });
+  assert.equal(Object.hasOwn(records.find(record => record.id === created.id), 'year_built'), false);
+});
+
 test('deleting a Firebase listing cleans its individually saved photos only after the parent succeeds', async () => {
   const sample=loadStore().store.getLocalProperties()[0];
   const h=loadStore({backend:'firebase',firebase:true});

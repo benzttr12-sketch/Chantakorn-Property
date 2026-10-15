@@ -1,6 +1,6 @@
 'use client';
 
-import { Property, PropertyFilters, Inquiry, UserProfile, Agent, AgentRank } from '@/lib/types';
+import { Property, PropertyFilters, Inquiry, UserProfile } from '@/lib/types';
 import { SAMPLE_PROPERTIES } from '@/data/sample-properties';
 import { formatPropertyCode } from '@/lib/format-code';
 import { db } from '@/lib/firebase/client';
@@ -14,6 +14,7 @@ import {
   getDocs, 
   doc, 
   setDoc, 
+  deleteField,
   deleteDoc, 
   query, 
   where,
@@ -191,8 +192,6 @@ export async function fetchProperties(filters?: PropertyFilters): Promise<Proper
   return filterProperties(await loadProperties(false), filters);
 }
 
-export const getProperties = fetchProperties;
-
 export async function fetchAdminProperties(filters?: PropertyFilters): Promise<Property[]> {
   requireStaffBackend();
   return filterProperties(await loadProperties(true), filters);
@@ -322,7 +321,12 @@ export async function updateProperty(id: string, updates: Partial<Property>): Pr
     const media = await preparePropertyMedia(firestore, id, updated.images, updated.cover_image, previousPhotos.filter(photo => photo.startsWith('data:')));
     updated.images = media.images;
     updated.cover_image = media.cover_image;
-    try { await setDoc(doc(firestore, 'properties', id), JSON.parse(JSON.stringify(updated)), { merge: true }); }
+    const persisted = JSON.parse(JSON.stringify(updated));
+    // An explicitly cleared optional year must also be removed from a merged cloud document.
+    if (Object.prototype.hasOwnProperty.call(updates, 'year_built') && updates.year_built === undefined) {
+      persisted.year_built = deleteField();
+    }
+    try { await setDoc(doc(firestore, 'properties', id), persisted, { merge: true }); }
     catch (error) { await media.cleanup(); throw error; }
     await removeUnusedPropertyMedia(firestore, id, previousPhotos, [...updated.images, updated.cover_image]);
     logPropertyChanges(current, updates).catch(() => undefined);
@@ -359,95 +363,6 @@ export async function deleteProperty(id: string): Promise<boolean> {
   if (!properties.some(property => property.id === id)) return false;
   saveLocalProperties(properties.filter(property => property.id !== id));
   return true;
-}
-
-export async function syncPropertiesAgentProfile(profile: UserProfile): Promise<void> {
-  if (!profile) return;
-  const newAvatar = profile.avatar_url || '';
-  const newName = profile.full_name || '';
-  const newPhone = profile.phone || '';
-  const newLine = profile.line_id || '';
-  const newEmail = profile.email || '';
-
-  // 1. Sync in Firebase Firestore if connected
-  if (dataBackend === 'firebase' && db) {
-    try {
-      const snap = await getDocs(collection(db, 'properties'));
-      for (const docSnap of snap.docs) {
-        const p = docSnap.data() as Property;
-        const isMatch = 
-          (p.agent_id && (p.agent_id === profile.id || p.agent_id === profile.email)) ||
-          (p.agent && (p.agent.id === profile.id || (profile.email && p.agent.email?.toLowerCase() === profile.email.toLowerCase())));
-
-        if (isMatch) {
-          const resolvedRank: AgentRank = profile.role === 'ADMIN' ? 'แอดมิน' : 'นายหน้า';
-          const updatedAgent: Agent = {
-            id: p.agent?.id || profile.id,
-            name: newName || p.agent?.name || 'ตัวแทน Chantakorn Property',
-            rank: resolvedRank,
-            title: resolvedRank,
-            phone: newPhone || p.agent?.phone || '081-604-0097',
-            line_id: newLine || p.agent?.line_id || 'LINE Official Account',
-            email: newEmail || p.agent?.email || '',
-            photo_url: newAvatar || p.agent?.photo_url || 'https://images.unsplash.com/photo-1560250097-0b93528c311a?auto=format&fit=crop&w=600&q=80',
-            bio: p.agent?.bio || (profile.bio || (resolvedRank === 'แอดมิน' ? 'ผู้ดูแลระบบและที่ปรึกษาอสังหาริมทรัพย์ Chantakorn Property' : 'ตัวแทนนายหน้าอสังหาริมทรัพย์')),
-            facebook: p.agent?.facebook
-          };
-          await setDoc(doc(db, 'properties', docSnap.id), {
-            agent: updatedAgent,
-            agent_id: profile.id,
-            updated_at: new Date().toISOString()
-          }, { merge: true });
-        }
-      }
-    } catch (err) {
-      console.warn('Firebase syncPropertiesAgentProfile error:', err);
-    }
-  }
-
-  // 2. Sync in Local Storage
-  try {
-    const localProps = dataBackend === 'local' ? getLocalProperties() : [];
-    let hasChanges = false;
-    const updated = localProps.map(p => {
-      const isMatch = 
-        (p.agent_id && (p.agent_id === profile.id || p.agent_id === profile.email)) ||
-        (p.agent && (p.agent.id === profile.id || (profile.email && p.agent.email?.toLowerCase() === profile.email.toLowerCase())));
-
-      if (isMatch) {
-        hasChanges = true;
-        const resolvedRank: AgentRank = profile.role === 'ADMIN' ? 'แอดมิน' : 'นายหน้า';
-        const updatedAgent: Agent = {
-          id: p.agent?.id || profile.id,
-          name: newName || p.agent?.name || 'ตัวแทน Chantakorn Property',
-          rank: resolvedRank,
-          title: resolvedRank,
-          phone: newPhone || p.agent?.phone || '081-604-0097',
-          line_id: newLine || p.agent?.line_id || 'LINE Official Account',
-          email: newEmail || p.agent?.email || '',
-          photo_url: newAvatar || p.agent?.photo_url || 'https://images.unsplash.com/photo-1560250097-0b93528c311a?auto=format&fit=crop&w=600&q=80',
-          bio: p.agent?.bio || (profile.bio || (resolvedRank === 'แอดมิน' ? 'ผู้ดูแลระบบและที่ปรึกษาอสังหาริมทรัพย์ Chantakorn Property' : 'ตัวแทนนายหน้าอสังหาริมทรัพย์')),
-          facebook: p.agent?.facebook
-        };
-        return {
-          ...p,
-          agent: updatedAgent,
-          agent_id: profile.id,
-          updated_at: new Date().toISOString()
-        };
-      }
-      return p;
-    });
-
-    if (hasChanges) {
-      saveLocalProperties(updated);
-    }
-    if (typeof window !== 'undefined') {
-      window.dispatchEvent(new Event('properties-updated'));
-    }
-  } catch (err) {
-    console.warn('Local storage syncPropertiesAgentProfile error:', err);
-  }
 }
 
 export function getFavoriteIds(): string[] {
