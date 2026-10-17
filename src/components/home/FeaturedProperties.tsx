@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { useGSAP } from '@gsap/react';
 import Link from 'next/link';
 import { Sparkles, ArrowRight, Building, Home, Trees, Store, MapPin, CalendarDays, Maximize, Bed, RotateCcw } from 'lucide-react';
 import PropertyCard from '@/components/properties/PropertyCard';
@@ -8,6 +9,7 @@ import { propertyHref } from '@/components/properties/property-link';
 import { Property } from '@/lib/types';
 import { fetchProperties } from '@/lib/store/properties-store';
 import { formatThaiNumber, getPropertyTypeName } from '@/lib/utils';
+import { gsap, ScrollTrigger } from '@/lib/gsap';
 
 const FILTER_TABS = [
   { id: 'all', label: 'ทั้งหมด', icon: null },
@@ -46,7 +48,7 @@ function FeaturedCard({ property }: { property: Property }) {
 function PropertySpotlight({ property }: { property: Property }) {
   return (
     <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-[0.95fr_1.05fr] lg:gap-8">
-      <div className="min-w-0">
+      <div data-home-property-card className="min-w-0 h-full">
         <FeaturedCard property={property} />
       </div>
       <aside className="relative flex min-w-0 flex-col justify-between overflow-hidden rounded-3xl bg-navy-950 p-7 text-white sm:p-10 lg:p-12">
@@ -113,6 +115,7 @@ export default function FeaturedProperties() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [loadAttempt, setLoadAttempt] = useState(0);
+  const results = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     let active = true;
@@ -147,6 +150,32 @@ export default function FeaturedProperties() {
       : allProperties.filter(property => property.property_type === activeCategory);
     return [...filtered.filter(property => property.featured), ...filtered.filter(property => !property.featured)].slice(0, 6);
   }, [allProperties, activeCategory]);
+
+  useGSAP(() => {
+    if (loading || error || !displayedProperties.length || !results.current) return;
+
+    const media = gsap.matchMedia();
+    media.add('(prefers-reduced-motion: no-preference)', () => {
+      const cards = results.current?.querySelectorAll<HTMLElement>('[data-home-property-card]');
+      // Animate wrappers so the card's hover, favorite and compare controls stay independent.
+      cards?.forEach((card, index) => {
+        gsap.fromTo(card, { opacity: 0.8, y: 18 }, {
+          opacity: 1,
+          y: 0,
+          duration: 0.55,
+          delay: index * 0.06,
+          ease: 'power2.out',
+          immediateRender: false,
+          clearProps: 'opacity,transform',
+          scrollTrigger: { trigger: card, start: 'top 90%', once: true },
+        });
+      });
+      // Results can arrive asynchronously or change height when a filter is selected.
+      ScrollTrigger.refresh();
+    });
+
+    return () => media.revert();
+  }, { scope: results, dependencies: [displayedProperties, loading, error], revertOnUpdate: true });
 
   const totalMatches = categoryCounts.get(activeCategory) || 0;
   const activeLabel = FILTER_TABS.find(tab => tab.id === activeCategory)?.label || 'ทั้งหมด';
@@ -195,7 +224,7 @@ export default function FeaturedProperties() {
           })}
         </div>
 
-        <div id="home-property-results" aria-busy={loading}>
+        <div ref={results} id="home-property-results" aria-busy={loading}>
           <p role="status" aria-live="polite" className="mb-6 text-xs leading-relaxed text-slate-500">
             {loading ? 'กำลังโหลดรายการทรัพย์…' : error ? 'ยังโหลดรายการทรัพย์ไม่ได้' : `${activeLabel} · ${totalMatches} รายการ${totalMatches > 6 ? ' · แสดง 6 รายการแรก' : ''}`}
           </p>
@@ -224,10 +253,14 @@ export default function FeaturedProperties() {
               )}
             </div>
           ) : (
-            <div key={activeCategory} className="home-results-enter">
+            <div key={activeCategory}>
               {displayedProperties.length === 1 ? <PropertySpotlight property={displayedProperties[0]} /> : (
                 <div className={`grid gap-6 sm:grid-cols-2 lg:gap-8 ${displayedProperties.length > 2 ? 'lg:grid-cols-3' : ''}`}>
-                  {displayedProperties.map(property => <FeaturedCard key={property.id} property={property} />)}
+                  {displayedProperties.map(property => (
+                    <div key={property.id} data-home-property-card className="min-w-0 h-full">
+                      <FeaturedCard property={property} />
+                    </div>
+                  ))}
                 </div>
               )}
             </div>
