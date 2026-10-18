@@ -902,7 +902,7 @@ function PropertiesContent() {
               className="flex min-h-11 items-center gap-2 rounded-xl px-3 text-sm text-slate-600 hover:bg-slate-50"
             >
               <Sparkles className="h-4 w-4 text-gold-600" />
-              เครื่องมือ AI
+              เครื่องมือการขายและการตลาด
             </Link>
           </div>
         </details>

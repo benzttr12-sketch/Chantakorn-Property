@@ -11,7 +11,7 @@ const navigationGroups = [
   { id: 'tools', label: 'เครื่องมือธุรกิจ', items: [
     { label: 'ประเมินราคา / LandsMaps', href: '/admin/valuation', icon: MapPin },
     { label: 'ติดตามเฟสงาน', href: '/admin/work-phases', icon: Layers },
-    { label: 'ผู้ช่วย AI และการตลาด', href: '/admin/automation', icon: Sparkles },
+    { label: 'เครื่องมือการขายและการตลาด', href: '/admin/automation', icon: Sparkles },
   ] },
   { id: 'team', label: 'ทีมและเว็บไซต์', items: [
     { label: 'นายหน้าแนะนำ', href: '/admin/agents', icon: UserCheck },

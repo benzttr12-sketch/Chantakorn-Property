@@ -70,7 +70,7 @@ async function editor(existing) {
     '@/lib/nearby-landmarks': { calculateNearbyLandmarks: () => [] },
     '@/lib/feng-shui': load('lib/feng-shui.ts'),
     '@/lib/property-text-parser': load('lib/property-text-parser.ts'),
-    '@/components/admin/SmartDescriptionGeneratorModal': 'SmartDescriptionGeneratorModal',
+    '@/components/admin/PropertyDescriptionTemplateModal': 'PropertyDescriptionTemplateModal',
     '@/components/ui/VoiceDictationBar': 'VoiceDictationBar',
     '@/components/admin/PropertyFormProgress': 'PropertyFormProgress',
   };

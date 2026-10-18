@@ -2,18 +2,15 @@
 
 import { useState } from 'react';
 import Image from 'next/image';
-import { Check, Copy, Download, ImageIcon, Loader2, Sparkles, Video } from 'lucide-react';
+import { Check, Copy, Download, ImageIcon, Video } from 'lucide-react';
 import type { Property } from '@/lib/types';
-import { fetchStaffApi } from '@/lib/staff-api';
 import { formatPrice, getPropertyTypeName } from '@/lib/utils';
 
 export default function PropertyMediaStudio({ property }: { property: Property | null }) {
   const [prompt, setPrompt] = useState('');
   const [aspectRatio, setAspectRatio] = useState<'16:9' | '9:16'>('16:9');
   const [style, setStyle] = useState('Modern Luxury');
-  const [busy, setBusy] = useState<'generate_video' | 'edit_image' | null>(null);
   const [error, setError] = useState('');
-  const [plan, setPlan] = useState('');
   const [copied, setCopied] = useState('');
   const propertyBrief = property
     ? `${property.title}\nประเภท: ${getPropertyTypeName(property.property_type)}\nราคา: ${formatPrice(property.price)}\nทำเล: ${[property.subdistrict, property.district, property.province].filter(Boolean).join(' · ')}`
@@ -41,29 +38,6 @@ export default function PropertyMediaStudio({ property }: { property: Property |
     window.setTimeout(() => URL.revokeObjectURL(url), 1000);
   }
 
-  async function generate(action: 'generate_video' | 'edit_image') {
-    if (busy || !property) return;
-    setBusy(action);
-    setError('');
-    setPlan('');
-    try {
-      const response = await fetchStaffApi('/api/ai/property-media-studio', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action, prompt: action === 'generate_video' ? videoBrief : imageBrief, aspectRatio, editStyle: style }),
-      });
-      const result = await response.json();
-      if (!response.ok || !result.success || result.outputType !== 'staging_plan' || !result.stagingDescription) {
-        throw new Error(result.error || 'ยังเตรียมสื่อไม่ได้ กรุณาลองอีกครั้ง');
-      }
-      setPlan(result.stagingDescription);
-    } catch (failure) {
-      setError(failure instanceof Error ? failure.message : 'บริการ AI ยังไม่พร้อม กรุณาใช้บรีฟเพื่อทำงานต่อ');
-    } finally {
-      setBusy(null);
-    }
-  }
-
   const button = 'inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold text-navy-950 transition hover:bg-slate-50 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-gold-500 disabled:opacity-50';
 
   return (
@@ -73,7 +47,7 @@ export default function PropertyMediaStudio({ property }: { property: Property |
           <div className="max-w-xl">
             <p className="mb-2 text-xs font-semibold tracking-wider text-gold-700">สื่อสำหรับประกาศ</p>
             <h2 id="media-studio-title" className="text-2xl font-bold text-navy-950">เตรียมภาพและวิดีโอให้งานไปต่อได้</h2>
-            <p className="mt-2 text-sm leading-6 text-slate-600">เริ่มจากข้อมูลทรัพย์จริง เตรียมบรีฟให้ทีมผลิตสื่อ หรือให้ AI ช่วยเขียนแผนเตรียมภาพ</p>
+            <p className="mt-2 text-sm leading-6 text-slate-600">เริ่มจากข้อมูลทรัพย์จริง เตรียมบรีฟให้ทีมถ่ายภาพและผลิตวิดีโอ</p>
           </div>
           {property && <p className="max-w-xs rounded-xl bg-slate-50 px-4 py-3 text-sm font-semibold text-navy-950">{property.title}</p>}
         </div>
@@ -90,7 +64,7 @@ export default function PropertyMediaStudio({ property }: { property: Property |
         <div className="rounded-2xl border border-slate-200 bg-white p-5 sm:p-6">
           <Video className="mb-3 size-6 text-gold-700" aria-hidden="true" />
           <h3 className="text-lg font-bold text-navy-950">บรีฟวิดีโอประกาศ</h3>
-          <p className="mt-2 text-sm leading-6 text-slate-600">ส่งรายละเอียดให้ช่างภาพหรือทีมตัดต่อได้ทันที บริการสร้างวิดีโอ AI ยังไม่ได้เปิดใช้งาน</p>
+          <p className="mt-2 text-sm leading-6 text-slate-600">ส่งรายละเอียดให้ช่างภาพหรือทีมตัดต่อได้ทันที</p>
           <fieldset className="mt-4">
             <legend className="mb-2 text-sm font-semibold text-navy-950">สัดส่วนวิดีโอ</legend>
             <div className="grid grid-cols-2 gap-2">
@@ -101,13 +75,12 @@ export default function PropertyMediaStudio({ property }: { property: Property |
             <button type="button" disabled={!property} onClick={() => copy(videoBrief, 'video')} className={button}>{copied === 'video' ? <Check className="size-4" /> : <Copy className="size-4" />}คัดลอกบรีฟวิดีโอ</button>
             <button type="button" disabled={!property} onClick={() => download(videoBrief, 'property-video-brief.txt')} className={button}><Download className="size-4" />ดาวน์โหลดบรีฟ</button>
           </div>
-          <button type="button" disabled={!!busy || !property} onClick={() => generate('generate_video')} className="mt-4 inline-flex min-h-11 items-center gap-2 text-sm font-semibold text-slate-600 underline underline-offset-4 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-gold-500 disabled:opacity-50">{busy === 'generate_video' && <Loader2 className="size-4 animate-spin" />}ตรวจบริการสร้างวิดีโอ AI</button>
         </div>
 
         <div className="rounded-2xl border border-slate-200 bg-white p-5 sm:p-6">
           <ImageIcon className="mb-3 size-6 text-gold-700" aria-hidden="true" />
-          <h3 className="text-lg font-bold text-navy-950">แผนเตรียมภาพและการตกแต่ง</h3>
-          <p className="mt-2 text-sm leading-6 text-slate-600">AI ช่วยเขียนคำแนะนำจากบรีฟที่ให้ ผลลัพธ์เป็นข้อความสำหรับทีมงานนำไปใช้จัดภาพ</p>
+          <h3 className="text-lg font-bold text-navy-950">บรีฟเตรียมภาพและการตกแต่ง</h3>
+          <p className="mt-2 text-sm leading-6 text-slate-600">ระบุสไตล์และรายละเอียดสำหรับทีมงานนำไปใช้จัดภาพ</p>
           <label htmlFor="media-style" className="mb-2 mt-4 block text-sm font-semibold text-navy-950">สไตล์ภาพ</label>
           <select id="media-style" value={style} onChange={(event) => setStyle(event.target.value)} className="min-h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm focus:outline-hidden focus:ring-2 focus:ring-gold-500">
             <option value="Modern Luxury">โมเดิร์น หรูเรียบ</option>
@@ -116,20 +89,11 @@ export default function PropertyMediaStudio({ property }: { property: Property |
             <option value="Industrial Loft">ลอฟท์ เรียบเท่</option>
           </select>
           <div className="mt-4 flex flex-wrap gap-2">
-            <button type="button" disabled={!!busy || !property} onClick={() => generate('edit_image')} className={`${button} border-navy-950 bg-navy-950 text-white hover:bg-navy-900`}>{busy === 'edit_image' ? <Loader2 className="size-4 animate-spin" /> : <Sparkles className="size-4" />}ให้ AI ช่วยเขียนแผน</button>
+            <button type="button" disabled={!property} onClick={() => copy(imageBrief, 'image')} className={button}>{copied === 'image' ? <Check className="size-4" /> : <Copy className="size-4" />}คัดลอกบรีฟภาพ</button>
             <button type="button" disabled={!property} onClick={() => download(imageBrief, 'property-image-brief.txt')} className={button}><Download className="size-4" />ดาวน์โหลดบรีฟภาพ</button>
           </div>
         </div>
       </div>
-
-      {plan && <div className="rounded-2xl border border-gold-200 bg-gold-50/50 p-5 sm:p-6" aria-live="polite">
-        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-          <h3 className="text-lg font-bold text-navy-950">แผนเตรียมภาพจาก AI</h3>
-          <div className="flex flex-wrap gap-2"><button type="button" onClick={() => copy(plan, 'plan')} className={button}>{copied === 'plan' ? <Check className="size-4" /> : <Copy className="size-4" />}คัดลอกแผน</button><button type="button" onClick={() => download(plan, 'property-image-plan.txt')} className={button}><Download className="size-4" />ดาวน์โหลดแผน</button></div>
-        </div>
-        <p className="whitespace-pre-wrap text-sm leading-7 text-slate-700">{plan}</p>
-        <p className="mt-4 text-xs leading-5 text-slate-500">คำแนะนำนี้สร้างจากข้อมูลข้อความ รูปทรัพย์ต้นฉบับยังเป็นรูปเดิม</p>
-      </div>}
 
       {property?.images?.[0] && <div className="flex flex-wrap items-center gap-4 rounded-2xl border border-slate-200 bg-white p-4">
         <div className="relative size-20 shrink-0 overflow-hidden rounded-xl"><Image src={property.images[0]} alt={`รูปต้นฉบับ: ${property.title}`} fill sizes="80px" className="object-cover" /></div>

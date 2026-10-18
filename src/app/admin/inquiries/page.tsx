@@ -470,7 +470,7 @@ function InquiriesContent() {
                         className="flex min-h-11 items-center gap-2 rounded-lg px-2 text-sm text-navy-950 hover:bg-slate-50"
                       >
                         <Sparkles className="h-4 w-4 shrink-0 text-gold-600" />
-                        จับคู่ทรัพย์ด้วย AI
+                        จับคู่ลูกค้ากับทรัพย์
                       </Link>
                       <Link
                         href="/admin/work-phases"

@@ -34,7 +34,6 @@ import {
   Flame,
   Globe2,
   Video,
-  RefreshCw,
   Search,
   CheckCheck,
   Clock,
@@ -64,7 +63,6 @@ import {
   QuickClosingScript
 } from '@/lib/automation-engine';
 import SocialBestTimeD3Chart from '@/components/admin/SocialBestTimeD3Chart';
-import { fetchStaffApi } from '@/lib/staff-api';
 import PropertyMediaStudio from '@/components/admin/PropertyMediaStudio';
 import InvestmentZoneDistributionMap from '@/components/admin/InvestmentZoneDistributionMap';
 import {
@@ -108,7 +106,6 @@ function AutomationContent() {
   const [selectedChannel, setSelectedChannel] = useState<MarketingChannel>('facebook');
   const [selectedTone, setSelectedTone] = useState<MarketingTone>('hot_deal');
   const [generatedPost, setGeneratedPost] = useState<SocialMediaPostResult | null>(null);
-  const [isAiGenerating, setIsAiGenerating] = useState(false);
 
   // Best Time State
   const [selectedScheduleSlot, setSelectedScheduleSlot] = useState<{
@@ -195,40 +192,6 @@ function AutomationContent() {
     } catch { setError('คัดลอกไม่สำเร็จ กรุณาลองอีกครั้ง'); }
   };
 
-  const handleAiDeepEnhance = async () => {
-    if (!selectedProperty) return;
-    setIsAiGenerating(true);
-    try {
-      const res = await fetchStaffApi('/api/ai/automate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: 'generate-social-post',
-          payload: {
-            property: selectedProperty,
-            channel: selectedChannel,
-            tone: selectedTone,
-          },
-        }),
-      });
-      const data = await res.json();
-      if (res.ok && data.success && data.text) {
-        setGeneratedPost(prev => ({
-          headline: prev?.headline || 'AI Generated Post',
-          body: data.text,
-          hashtags: prev?.hashtags || [],
-          callToAction: prev?.callToAction || '',
-          fullPost: data.text,
-        }));
-      }
-      else { setError(data.error || 'สร้างข้อความด้วย AI ไม่สำเร็จ สามารถใช้ข้อความที่เตรียมไว้ได้'); }
-    } catch {
-      setError('เชื่อมต่อ AI ไม่สำเร็จ กรุณาลองใหม่');
-    } finally {
-      setIsAiGenerating(false);
-    }
-  };
-
   // Matched leads calculation
   const matchedLeads: LeadMatchScore[] = useMemo(() => {
     if (!selectedInquiry || properties.length === 0) return [];
@@ -270,7 +233,7 @@ function AutomationContent() {
               <span>เครื่องมือธุรกิจ</span>
             </div>
             <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
-              เครื่องมือการขายและการตลาด <span className="text-transparent bg-clip-text bg-linear-to-r/srgb from-gold-300 to-amber-500">Chantakorn AI</span>
+              เครื่องมือการขายและการตลาด <span className="text-transparent bg-clip-text bg-linear-to-r/srgb from-gold-300 to-amber-500">Chantakorn Property</span>
             </h1>
             <p className="text-xs sm:text-sm text-gray-300 leading-relaxed">
               เตรียมสื่อ จับคู่ลูกค้า และวางแผนการขายจากข้อมูลทรัพย์ในระบบ
@@ -518,25 +481,6 @@ function AutomationContent() {
                   </div>
                 </div>
               )}
-
-              {/* AI Deep Generate Button */}
-              <button
-                onClick={handleAiDeepEnhance}
-                disabled={isAiGenerating}
-                className="w-full py-3 px-4 rounded-xl bg-linear-to-r/srgb from-navy-950 to-blue-900 hover:from-navy-900 hover:to-blue-800 text-gold-400 font-extrabold text-xs shadow-md transition-all flex items-center justify-center space-x-2 disabled:opacity-60"
-              >
-                {isAiGenerating ? (
-                  <>
-                    <RefreshCw className="w-4 h-4 animate-spin text-gold-400" />
-                    <span>AI กำลังประพันธ์เนื้อหาการตลาดชั้นยอด...</span>
-                  </>
-                ) : (
-                  <>
-                    <Sparkles className="w-4 h-4 text-gold-400" />
-                    <span>✨ ยกระดับคำโฆษณาด้วย Gemini 3.8 AI</span>
-                  </>
-                )}
-              </button>
             </div>
 
             {/* Result Output Panel */}
@@ -581,7 +525,7 @@ function AutomationContent() {
                 </div>
               </div>
 
-              {/* AI Best Time Suggestion Badge Box */}
+              {/* Best Time Suggestion Badge Box */}
               <div className="p-3.5 rounded-2xl bg-linear-to-r/srgb from-navy-950 via-slate-900 to-navy-900 border border-gold-500/40 text-white flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
                 <div className="flex items-center space-x-3">
                   <div className="w-10 h-10 rounded-xl bg-gold-500/20 text-gold-400 border border-gold-500/30 flex items-center justify-center shrink-0">
@@ -680,7 +624,7 @@ function AutomationContent() {
       )}
 
       {/* ========================================================================= */}
-      {/* TAB 2: DEDICATED AI BEST TIME TO POST OPTIMIZER & D3 VISUALIZATION */}
+      {/* TAB 2: BEST TIME TO POST PLANNER & D3 VISUALIZATION */}
       {/* ========================================================================= */}
       {activeTab === 'best_time' && (
         <div className="space-y-6">
@@ -784,7 +728,7 @@ function AutomationContent() {
                   <h4 className="font-extrabold text-sm text-navy-950">สร้างคอนเทนต์สำหรับรอบเวลานี้</h4>
                 </div>
                 <p className="text-xs text-gray-600 mt-1 leading-relaxed">
-                  ใช้ระบบ AI Content Generator สร้างข้อความที่ปรับโทนเสียงและจุดเด่นให้เหมาะกับกลุ่มเป้าหมายที่จะออนไลน์ในรอบเวลานี้โดยเฉพาะ
+                  เตรียมข้อความจากข้อมูลทรัพย์ เลือกช่องทางและโทนเสียง แล้วคัดลอกพร้อมเวลาแนะนำเพื่อวางแผนโพสต์
                 </p>
               </div>
 
@@ -792,7 +736,7 @@ function AutomationContent() {
                 onClick={() => setActiveTab('marketing')}
                 className="w-full py-3 px-4 rounded-xl bg-navy-950 hover:bg-navy-900 text-gold-400 font-extrabold text-xs shadow-md transition-all flex items-center justify-center space-x-2"
               >
-                <span>ไปยังเครื่องมือสร้างข้อความโพสต์ AI</span>
+                <span>ไปยังเครื่องมือเตรียมข้อความโพสต์</span>
                 <ArrowRight className="w-4 h-4" />
               </button>
             </div>

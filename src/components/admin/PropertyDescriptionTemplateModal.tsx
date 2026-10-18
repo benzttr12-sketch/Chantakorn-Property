@@ -25,7 +25,7 @@ import { PropertyType, PropertyStatus } from '@/lib/types';
 import { useSpeechRecognition } from '@/lib/use-speech-recognition';
 import { fetchStaffApi } from '@/lib/staff-api';
 
-export interface PropertySpecsForAI {
+export interface PropertySpecs {
   title?: string;
   propertyType?: PropertyType;
   status?: PropertyStatus;
@@ -48,10 +48,10 @@ export interface PropertySpecsForAI {
   agentFacebook?: string;
 }
 
-interface SmartDescriptionGeneratorModalProps {
+interface PropertyDescriptionTemplateModalProps {
   isOpen: boolean;
   onClose: () => void;
-  specs: PropertySpecsForAI;
+  specs: PropertySpecs;
   currentDescription?: string;
   onApplyDescription: (text: string, mode: 'replace' | 'append') => void;
   onApplyTitle?: (title: string) => void;
@@ -59,14 +59,14 @@ interface SmartDescriptionGeneratorModalProps {
 
 type ToneType = 'luxury' | 'high_converting' | 'social_media' | 'investor';
 
-export default function SmartDescriptionGeneratorModal({
+export default function PropertyDescriptionTemplateModal({
   isOpen,
   onClose,
   specs,
   currentDescription = '',
   onApplyDescription,
   onApplyTitle,
-}: SmartDescriptionGeneratorModalProps) {
+}: PropertyDescriptionTemplateModalProps) {
   const [tone, setTone] = useState<ToneType>('high_converting');
   const [customHighlights, setCustomHighlights] = useState('');
   const [loading, setLoading] = useState(false);
@@ -97,13 +97,12 @@ export default function SmartDescriptionGeneratorModal({
   });
 
   // Result state
-  const [generatedData, setGeneratedData] = useState<{
+  const [templateData, setTemplateData] = useState<{
     headline?: string;
     description?: string;
     keyPoints?: string[];
     socialCaption?: string;
     hashtags?: string[];
-    source?: string;
   } | null>(null);
 
   const [activeResultTab, setActiveResultTab] = useState<'full' | 'social' | 'keypoints'>('full');
@@ -115,7 +114,7 @@ export default function SmartDescriptionGeneratorModal({
     setError('');
 
     try {
-      const res = await fetchStaffApi('/api/ai/generate-property-description', {
+      const res = await fetchStaffApi('/api/property-description', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -130,7 +129,7 @@ export default function SmartDescriptionGeneratorModal({
         throw new Error(data.error || 'ไม่สามารถสร้างคำบรรยายได้');
       }
 
-      setGeneratedData(data);
+      setTemplateData(data);
       setActiveResultTab('full');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'เกิดข้อผิดพลาดในการเชื่อมต่อ');
@@ -146,44 +145,44 @@ export default function SmartDescriptionGeneratorModal({
   };
 
   const handleApply = (mode: 'replace' | 'append') => {
-    if (!generatedData?.description) return;
-    onApplyDescription(generatedData.description, mode);
+    if (!templateData?.description) return;
+    onApplyDescription(templateData.description, mode);
     onClose();
   };
 
   const handleApplyTitleOnly = () => {
-    if (generatedData?.headline && onApplyTitle) {
-      onApplyTitle(generatedData.headline);
+    if (templateData?.headline && onApplyTitle) {
+      onApplyTitle(templateData.headline);
     }
   };
 
   const tones: { id: ToneType; label: string; icon: any; desc: string; badge: string }[] = [
     {
       id: 'high_converting',
-      label: 'เน้นปิดการขาย (High-Converting)',
+      label: 'ประกาศทั่วไป',
       icon: Flame,
-      desc: 'กระตุ้นการตัดสินใจ ชูจุดเด่นและความคุ้มค่า ชวนนัดชมทันที',
+      desc: 'จัดหัวข้อข้อมูลประกาศ จุดเด่น ราคา และช่องทางติดต่อ',
       badge: 'แนะนำ',
     },
     {
       id: 'luxury',
-      label: 'พรีเมียมหรูหรา (Luxury & Exclusive)',
+      label: 'รายละเอียดทรัพย์',
       icon: Crown,
-      desc: 'ภาษาไพเราะ สง่างาม เน้นภาพลักษณ์ชีวิตที่ดี และสถาปัตยกรรม',
-      badge: 'บ้านหรู/วิลล่า',
+      desc: 'จัดหัวข้อรายละเอียดทรัพย์และพื้นที่ใช้สอยจากข้อมูลที่กรอก',
+      badge: 'สเปกทรัพย์',
     },
     {
       id: 'social_media',
-      label: 'โพสต์โซเชียล & LINE (Social Ready)',
+      label: 'โพสต์โซเชียล & LINE',
       icon: Share2,
-      desc: 'อ่านง่ายบนมือถือ มีอิโมจิแบ่งหัวข้อสวยงาม คัดลอกลง Facebook/LINE ได้ทันที',
+      desc: 'จัดหัวข้อประกาศสำหรับแชร์ พร้อมแคปชันและแฮชแท็กให้คัดลอก',
       badge: 'แชร์ไว',
     },
     {
       id: 'investor',
-      label: 'สำหรับนักลงทุน (Investor Yield)',
+      label: 'ข้อมูลสำหรับนักลงทุน',
       icon: TrendingUp,
-      desc: 'เน้นกระแสเงินสด ค่าเช่า ใกล้มหาวิทยาลัย/รพ. และโอกาสทำกำไร',
+      desc: 'จัดหัวข้อข้อมูลทรัพย์เพื่อใช้ประกอบการพิจารณาลงทุน',
       badge: 'คอนโด/หอพัก',
     },
   ];
@@ -200,14 +199,14 @@ export default function SmartDescriptionGeneratorModal({
             <div>
               <div className="flex items-center space-x-2">
                 <h3 className="text-base sm:text-lg font-black text-white">
-                  AI Smart Description Generator
+                  แบบร่างคำบรรยายทรัพย์
                 </h3>
                 <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-gold-400 text-navy-950">
-                  Gemini 3.8 Flash
+                  เทมเพลต
                 </span>
               </div>
               <p className="text-xs text-slate-300 mt-0.5">
-                เขียนคำบรรยายทรัพย์ภาษาไทยระดับมืออาชีพ ดึงดูดสายตา และกระตุ้นยอดขายอัตโนมัติ
+                จัดข้อมูลทรัพย์เป็นแบบร่างคำบรรยาย พร้อมแก้ไขก่อนนำไปใช้
               </p>
             </div>
           </div>
@@ -249,7 +248,7 @@ export default function SmartDescriptionGeneratorModal({
           {/* Tone Selector */}
           <div>
             <label className="block text-xs font-bold text-navy-950 mb-2 flex items-center space-x-1.5">
-              <span>1. เลือกโทนการเขียน (Copywriting Tone)</span>
+              <span>1. เลือกเทมเพลตคำบรรยาย</span>
             </label>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
               {tones.map((t) => {
@@ -401,30 +400,25 @@ export default function SmartDescriptionGeneratorModal({
               {loading ? (
                 <>
                   <Loader2 className="w-4 h-4 animate-spin text-navy-950" />
-                  <span>AI กำลังวิเคราะห์สเปกและร่างคำบรรยายทรัพย์...</span>
+                  <span>กำลังจัดรูปแบบคำบรรยายจากข้อมูลทรัพย์...</span>
                 </>
               ) : (
                 <>
                   <Wand2 className="w-4 h-4 text-navy-950 stroke-[2.5]" />
-                  <span>{generatedData ? '✨ สร้างคำบรรยายใหม่ (Regenerate)' : '✨ ให้ AI ร่างคำบรรยายทันที'}</span>
+                  <span>{templateData ? 'สร้างคำบรรยายใหม่' : 'สร้างคำบรรยายจากเทมเพลต'}</span>
                 </>
               )}
             </button>
           </div>
 
           {/* Generated Result Preview */}
-          {generatedData && (
+          {templateData && (
             <div className="border border-gold-300/80 rounded-2xl overflow-hidden bg-white shadow-xs space-y-4 p-4 sm:p-5">
               {/* Result Header & Tabs */}
               <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-3">
                 <div className="flex items-center space-x-1.5">
                   <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                  <span className="text-xs font-bold text-navy-950">ผลลัพธ์คำบรรยายจาก AI</span>
-                  {generatedData.source && (
-                    <span className="text-[10px] bg-slate-100 text-slate-600 px-2 py-0.5 rounded-md font-mono">
-                      {generatedData.source}
-                    </span>
-                  )}
+                  <span className="text-xs font-bold text-navy-950">แบบร่างคำบรรยาย</span>
                 </div>
 
                 {/* Sub tabs */}
@@ -460,11 +454,11 @@ export default function SmartDescriptionGeneratorModal({
               </div>
 
               {/* Headline Suggestion Bar */}
-              {generatedData.headline && (
+              {templateData.headline && (
                 <div className="bg-gold-50/70 p-3 rounded-xl border border-gold-200/80 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                   <div className="text-xs">
                     <span className="font-bold text-gold-900 block sm:inline mr-2">📌 พาดหัวแนะนำ:</span>
-                    <span className="text-navy-950 font-semibold">{generatedData.headline}</span>
+                    <span className="text-navy-950 font-semibold">{templateData.headline}</span>
                   </div>
                   {onApplyTitle && (
                     <button
@@ -485,12 +479,12 @@ export default function SmartDescriptionGeneratorModal({
                     <textarea
                       readOnly
                       rows={10}
-                      value={generatedData.description || ''}
+                      value={templateData.description || ''}
                       className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3.5 text-xs text-navy-950 leading-relaxed font-sans outline-hidden resize-none focus:bg-white focus:ring-1 focus:ring-gold-400"
                     />
                     <button
                       type="button"
-                      onClick={() => handleCopy(generatedData.description || '', 'full')}
+                      onClick={() => handleCopy(templateData.description || '', 'full')}
                       className="absolute top-2.5 right-2.5 px-2.5 py-1 bg-white/90 hover:bg-white text-slate-700 hover:text-navy-950 rounded-lg border border-slate-200 shadow-xs text-[11px] font-bold flex items-center space-x-1"
                     >
                       {copiedTab === 'full' ? (
@@ -537,12 +531,12 @@ export default function SmartDescriptionGeneratorModal({
                     <textarea
                       readOnly
                       rows={8}
-                      value={generatedData.socialCaption || ''}
+                      value={templateData.socialCaption || ''}
                       className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3.5 text-xs text-navy-950 leading-relaxed font-sans outline-hidden resize-none"
                     />
                     <button
                       type="button"
-                      onClick={() => handleCopy(generatedData.socialCaption || '', 'social')}
+                      onClick={() => handleCopy(templateData.socialCaption || '', 'social')}
                       className="absolute top-2.5 right-2.5 px-2.5 py-1 bg-white/90 hover:bg-white text-slate-700 hover:text-navy-950 rounded-lg border border-slate-200 shadow-xs text-[11px] font-bold flex items-center space-x-1"
                     >
                       {copiedTab === 'social' ? (
@@ -559,9 +553,9 @@ export default function SmartDescriptionGeneratorModal({
                     </button>
                   </div>
 
-                  {generatedData.hashtags && (
+                  {templateData.hashtags && (
                     <div className="flex flex-wrap gap-1.5 text-xs">
-                      {generatedData.hashtags.map((h, i) => (
+                      {templateData.hashtags.map((h, i) => (
                         <span key={i} className="text-gold-700 bg-gold-50 px-2 py-0.5 rounded-md font-mono text-[11px]">
                           {h}
                         </span>
@@ -575,7 +569,7 @@ export default function SmartDescriptionGeneratorModal({
               {activeResultTab === 'keypoints' && (
                 <div className="space-y-3">
                   <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-2">
-                    {generatedData.keyPoints?.map((kp, i) => (
+                    {templateData.keyPoints?.map((kp, i) => (
                       <div key={i} className="flex items-start space-x-2 text-xs text-navy-950 font-medium">
                         <span className="text-gold-600 font-bold">•</span>
                         <span>{kp}</span>
@@ -584,7 +578,7 @@ export default function SmartDescriptionGeneratorModal({
                   </div>
                   <button
                     type="button"
-                    onClick={() => handleCopy(generatedData.keyPoints?.join('\n') || '', 'keypoints')}
+                    onClick={() => handleCopy(templateData.keyPoints?.join('\n') || '', 'keypoints')}
                     className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold rounded-xl transition-colors flex items-center space-x-1 ml-auto"
                   >
                     {copiedTab === 'keypoints' ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
@@ -600,7 +594,7 @@ export default function SmartDescriptionGeneratorModal({
         <div className="p-4 bg-slate-50 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
           <div className="flex items-center space-x-1.5">
             <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-            <span>คำบรรยายถูกปรับแต่งให้เข้ากับบริบทหาดใหญ่–สงขลา พร้อมช่องทางติดต่อถูกต้อง</span>
+            <span>ตรวจสอบรายละเอียดและช่องทางติดต่อก่อนนำแบบร่างไปใช้</span>
           </div>
           <button
             type="button"

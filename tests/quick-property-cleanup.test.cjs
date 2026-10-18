@@ -64,11 +64,11 @@ function quickEntry() {
     '@/lib/utils': { formatPrice: String, formatThaiBahtReadable: String, slugify: () => 'fixture-property' },
     '@/lib/auth-helpers': { getStoredUser: () => staff },
     '@/lib/image-compressor': video,
-    '@/components/admin/SmartDescriptionGeneratorModal': 'SmartDescriptionGeneratorModal',
+    '@/components/admin/PropertyDescriptionTemplateModal': 'PropertyDescriptionTemplateModal',
     '@/components/ui/VoiceDictationBar': 'VoiceDictationBar',
     '@/lib/staff-api': { fetchStaffApi: async (url, init) => {
       requests.push({ url, body: JSON.parse(init.body) });
-      return Response.json({ success: true, description: 'คำบรรยายที่ทีมตรวจสอบจาก AI' });
+      return Response.json({ success: true, description: 'คำบรรยายจากเทมเพลตที่ทีมตรวจสอบแล้ว' });
     } },
   }, { isOpen: true, onSuccess() {}, onClose() {} });
   return { ...modal, saved, requests, fengShuiCalls };
@@ -139,7 +139,7 @@ test('reparsing sparse text clears prior parsed and manually edited optional spe
   assert.equal(field(review, 'ทิศฮวงจุ้ย', 'select').props.value, '');
   const description = nodes(review).find(node => node.type === 'textarea').props.value;
   assert.doesNotMatch(description, /ห้องนอน:|ห้องน้ำ:|ที่จอดรถ:|ขนาดที่ดิน:|พื้นที่ใช้สอย:|ทิศหน้าทรัพย์:|ติดถนนใหญ่/);
-  await button(review, 'ให้ AI ร่างใหม่').props.onClick();
+  await button(review, 'สร้างจากเทมเพลต').props.onClick();
   assert.equal(modal.requests[0].body.bedrooms, '');
   assert.equal(modal.requests[0].body.facingDirection, '');
   assert.equal(modal.requests[0].body.features.length, 0);
@@ -210,14 +210,14 @@ test('real quick-entry text saves a draft without unrelated default photos or vi
   }
 });
 
-test('voice, AI drafting and a staff-entered video remain available with explicit publishing', async () => {
+test('voice, description templates and a staff-entered video remain available with explicit publishing', async () => {
   const modal = quickEntry();
   const voice = nodes(modal.render()).find(node => node.type === 'VoiceDictationBar');
   voice.props.onAppendText('ขายบ้านเดี่ยว ควนลัง หาดใหญ่ ราคา 3.89 ล้าน');
   button(modal.render(), 'ถอดรหัสข้อความ').props.onClick();
-  await button(modal.render(), 'ให้ AI ร่างใหม่').props.onClick();
+  await button(modal.render(), 'สร้างจากเทมเพลต').props.onClick();
   const review = modal.render();
-  assert.equal(modal.requests[0].url, '/api/ai/generate-property-description');
+  assert.equal(modal.requests[0].url, '/api/property-description');
   assert.equal(modal.requests[0].body.price, '3890000');
   const realVideo = 'https://www.youtube.com/watch?v=actualtour1';
   nodes(review).find(node => node.type === 'input' && node.props.type === 'url').props.onChange({ target: { value: realVideo } });
@@ -228,7 +228,7 @@ test('voice, AI drafting and a staff-entered video remain available with explici
   await button(updatedReview, 'ยืนยันและเผยแพร่ทรัพย์').props.onClick();
   assert.equal(modal.saved[0].published, true);
   assert.equal(modal.saved[0].video_url, realVideo);
-  assert.equal(modal.saved[0].description, 'คำบรรยายที่ทีมตรวจสอบจาก AI');
+  assert.equal(modal.saved[0].description, 'คำบรรยายจากเทมเพลตที่ทีมตรวจสอบแล้ว');
   assert.equal(modal.saved[0].cover_image, '');
   assert.equal(modal.saved[0].images.length, 0);
 });

@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import React, { useState } from 'react';
 import { 
@@ -32,7 +32,7 @@ import { calculateFengShui } from '@/lib/feng-shui';
 import { formatPrice, formatThaiBahtReadable, slugify } from '@/lib/utils';
 import { getStoredUser } from '@/lib/auth-helpers';
 import { parseVideoUrl } from '@/lib/image-compressor';
-import SmartDescriptionGeneratorModal, { PropertySpecsForAI } from '@/components/admin/SmartDescriptionGeneratorModal';
+import PropertyDescriptionTemplateModal from '@/components/admin/PropertyDescriptionTemplateModal';
 import VoiceDictationBar from '@/components/ui/VoiceDictationBar';
 import { fetchStaffApi } from '@/lib/staff-api';
 
@@ -65,17 +65,17 @@ export default function QuickPropertyModal({ isOpen, onClose, onSuccess }: Quick
   const [description, setDescription] = useState('');
   const [internalNotes, setInternalNotes] = useState('');
   const [videoUrl, setVideoUrl] = useState('');
-  const [showAiDescModal, setShowAiDescModal] = useState(false);
-  const [quickAiGenerating, setQuickAiGenerating] = useState(false);
+  const [showDescriptionTemplateModal, setShowDescriptionTemplateModal] = useState(false);
+  const [quickTemplateGenerating, setQuickTemplateGenerating] = useState(false);
   const [publishImmediately, setPublishImmediately] = useState(false);
 
   if (!isOpen) return null;
 
-  const handleQuickAiGenerate = async () => {
-    setQuickAiGenerating(true);
+  const handleQuickTemplateGenerate = async () => {
+    setQuickTemplateGenerating(true);
     try {
       const currentUser = getStoredUser();
-      const res = await fetchStaffApi('/api/ai/generate-property-description', {
+      const res = await fetchStaffApi('/api/property-description', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -108,7 +108,7 @@ export default function QuickPropertyModal({ isOpen, onClose, onSuccess }: Quick
     } catch (err) {
       alert(err instanceof Error ? err.message : 'เกิดข้อผิดพลาดในการสร้างคำบรรยาย');
     } finally {
-      setQuickAiGenerating(false);
+      setQuickTemplateGenerating(false);
     }
   };
 
@@ -526,34 +526,34 @@ export default function QuickPropertyModal({ isOpen, onClose, onSuccess }: Quick
                 </div>
               </div>
 
-              {/* Description with AI Tools */}
+              {/* Description template tools */}
               <div className="space-y-1.5 pt-1">
                 <div className="flex items-center justify-between">
                   <label className="block text-[11px] font-bold text-gray-700">
-                    คำอธิบายประกาศ (AI ปรับแต่งได้)
+                    คำอธิบายประกาศ
                   </label>
                   <div className="flex items-center space-x-1.5">
                     <button
                       type="button"
-                      onClick={handleQuickAiGenerate}
-                      disabled={quickAiGenerating}
+                      onClick={handleQuickTemplateGenerate}
+                      disabled={quickTemplateGenerating}
                       className="px-2.5 py-1 bg-linear-to-r/srgb from-gold-400 to-amber-500 hover:from-gold-300 hover:to-gold-400 text-navy-950 font-bold text-[10px] rounded-lg shadow-xs flex items-center space-x-1 transition-all cursor-pointer disabled:opacity-50"
-                      title="ใช้ AI ร่างคำบรรยายจากสเปกทันที"
+                      title="สร้างแบบร่างคำบรรยายจากข้อมูลทรัพย์"
                     >
-                      {quickAiGenerating ? (
+                      {quickTemplateGenerating ? (
                         <Loader2 className="w-3 h-3 animate-spin" />
                       ) : (
                         <Sparkles className="w-3 h-3 text-navy-950 stroke-[2.5]" />
                       )}
-                      <span>{quickAiGenerating ? 'AI กำลังเขียน...' : '✨ ให้ AI ร่างใหม่ 1-Click'}</span>
+                      <span>{quickTemplateGenerating ? 'กำลังจัดรูปแบบ...' : 'สร้างจากเทมเพลต'}</span>
                     </button>
                     <button
                       type="button"
-                      onClick={() => setShowAiDescModal(true)}
+                      onClick={() => setShowDescriptionTemplateModal(true)}
                       className="px-2.5 py-1 bg-navy-950 hover:bg-navy-900 text-gold-400 font-bold text-[10px] rounded-lg shadow-xs flex items-center space-x-1 transition-all cursor-pointer"
                     >
                       <Wand2 className="w-3 h-3" />
-                      <span>เลือกโทน AI</span>
+                      <span>เลือกเทมเพลต</span>
                     </button>
                   </div>
                 </div>
@@ -728,10 +728,10 @@ export default function QuickPropertyModal({ isOpen, onClose, onSuccess }: Quick
         </div>
       </div>
 
-      {showAiDescModal && (
-        <SmartDescriptionGeneratorModal
-          isOpen={showAiDescModal}
-          onClose={() => setShowAiDescModal(false)}
+      {showDescriptionTemplateModal && (
+        <PropertyDescriptionTemplateModal
+          isOpen={showDescriptionTemplateModal}
+          onClose={() => setShowDescriptionTemplateModal(false)}
           specs={{
             title,
             propertyType,
