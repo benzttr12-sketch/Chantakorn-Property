@@ -8,7 +8,6 @@ import FeaturedAgents from '@/components/home/FeaturedAgents';
 import CustomerReviewsSection from '@/components/home/CustomerReviewsSection';
 import SmartPropertyMatchmaker from '@/components/home/SmartPropertyMatchmaker';
 import MortgageCalculator from '@/components/tools/MortgageCalculator';
-import MarketIntelligenceSection from '@/components/home/MarketIntelligenceSection';
 import ViewingBookingSection from '@/components/home/ViewingBookingSection';
 import RealEstateFAQ from '@/components/home/RealEstateFAQ';
 import SellPropertyCTA from '@/components/home/SellPropertyCTA';
@@ -38,9 +37,6 @@ export default function HomePage() {
       {/* 5.1: SMART PROPERTY MATCHMAKER (เครื่องมือค้นหาอสังหาริมทรัพย์และฮวงจุ้ยแมตช์ตามความต้องการ) */}
       <div id="home-matchmaker" data-home-reveal><SmartPropertyMatchmaker /></div>
 
-      {/* 6: LIVE MARKET INTELLIGENCE (เจาะลึกทิศทางอสังหาฯ หาดใหญ่ ด้วย Google Search Grounding) */}
-      <div data-home-reveal><MarketIntelligenceSection /></div>
-
       {/* 7: FEATURED AGENTS (ทีมงานที่ปรึกษาอสังหาริมทรัพย์มืออาชีพ) */}
       <div data-home-reveal><FeaturedAgents /></div>
 
@@ -50,7 +46,7 @@ export default function HomePage() {
       {/* 9: PRIVATE VIEWING APPOINTMENT (จองคิวนัดชมทรัพย์ส่วนตัว) */}
       <div data-home-reveal><ViewingBookingSection /></div>
 
-      {/* 10: REAL ESTATE FAQ (คำถามที่พบบ่อย ขับเคลื่อนด้วย Gemini AI) */}
+      {/* 10: REAL ESTATE FAQ (คำถามที่พบบ่อย) */}
       <div data-home-reveal><RealEstateFAQ /></div>
 
       {/* 10.1: CONSIGNMENT & PROPERTY VALUATION CALCULATOR (เครื่องมือประเมินมูลค่าทรัพย์สิน & วงเงินขายฝาก-จำนอง) */}

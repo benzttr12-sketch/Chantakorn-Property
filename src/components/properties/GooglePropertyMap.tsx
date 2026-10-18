@@ -306,7 +306,6 @@ export default function GooglePropertyMap({
             defaultCenter={initialCenter}
             defaultZoom={zoom}
             mapId="DEMO_MAP_ID"
-            internalUsageAttributionIds={['gmp_mcp_codeassist_v1_aistudio']}
             gestureHandling="greedy"
             disableDefaultUI={false}
             zoomControl={true}

@@ -451,7 +451,7 @@ export default function CollapsiblePropertyCard({
                 className={toolClass}
               >
                 <Sparkles className="h-4 w-4 shrink-0 text-gold-600" />
-                <span>เครื่องมือ AI</span>
+                <span>เครื่องมือการขายและการตลาด</span>
               </Link>
               <Link
                 href={propertyHref(property.slug)}

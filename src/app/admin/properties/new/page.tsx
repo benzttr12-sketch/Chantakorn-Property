@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import React, { useState, useEffect, useRef, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -76,7 +76,7 @@ import {
 import { calculateNearbyLandmarks } from '@/lib/nearby-landmarks';
 import { calculateFengShui, formatFengShuiText, ALL_FACING_DIRECTIONS, FENG_SHUI_DIRECTIONS } from '@/lib/feng-shui';
 import { parseRawPropertyText, generateProfessionalDescription } from '@/lib/property-text-parser';
-import SmartDescriptionGeneratorModal, { PropertySpecsForAI } from '@/components/admin/SmartDescriptionGeneratorModal';
+import PropertyDescriptionTemplateModal, { PropertySpecs } from '@/components/admin/PropertyDescriptionTemplateModal';
 import VoiceDictationBar from '@/components/ui/VoiceDictationBar';
 import PropertyFormProgress, { FormValidationItem } from '@/components/admin/PropertyFormProgress';
 
@@ -202,12 +202,12 @@ function PropertyEditor() {
   const [uploadingImages, setUploadingImages] = useState(false);
   const [isDragOver, setIsDragOver] = useState(false);
 
-  // AI Smart Description Generator State
-  const [showAiDescModal, setShowAiDescModal] = useState(false);
-  const [quickAiGenerating, setQuickAiGenerating] = useState(false);
-  const [aiGenSuccessToast, setAiGenSuccessToast] = useState<string | null>(null);
+  // Description template state
+  const [showDescriptionTemplateModal, setShowDescriptionTemplateModal] = useState(false);
+  const [quickTemplateGenerating, setQuickTemplateGenerating] = useState(false);
+  const [templateSuccessToast, setTemplateSuccessToast] = useState<string | null>(null);
 
-  const getPropertySpecsForAI = (): PropertySpecsForAI => {
+  const getPropertySpecs = (): PropertySpecs => {
     const chosenAgent = eligibleStaff.find(s => s.id === selectedAgentId);
     return {
       title,
@@ -233,12 +233,12 @@ function PropertyEditor() {
     };
   };
 
-  const handleQuickAiGenerate = async () => {
-    setQuickAiGenerating(true);
-    setAiGenSuccessToast(null);
+  const handleQuickTemplateGenerate = async () => {
+    setQuickTemplateGenerating(true);
+    setTemplateSuccessToast(null);
     try {
-      const specs = getPropertySpecsForAI();
-      const res = await fetchStaffApi('/api/ai/generate-property-description', {
+      const specs = getPropertySpecs();
+      const res = await fetchStaffApi('/api/property-description', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -252,13 +252,13 @@ function PropertyEditor() {
       }
       if (data.description) {
         setDescription(data.description);
-        setAiGenSuccessToast('✨ AI ร่างคำบรรยายทรัพย์ระดับพรีเมียมเรียบร้อยแล้ว!');
-        setTimeout(() => setAiGenSuccessToast(null), 5000);
+        setTemplateSuccessToast('สร้างแบบร่างคำบรรยายจากเทมเพลตเรียบร้อยแล้ว');
+        setTimeout(() => setTemplateSuccessToast(null), 5000);
       }
     } catch (err) {
       alert(err instanceof Error ? err.message : 'เกิดข้อผิดพลาดในการสร้างคำบรรยาย');
     } finally {
-      setQuickAiGenerating(false);
+      setQuickTemplateGenerating(false);
     }
   };
 
@@ -1046,7 +1046,7 @@ function PropertyEditor() {
       isValid: description.trim().length >= 40,
       isWarning: description.trim().length > 0 && description.trim().length < 40,
       message: description.trim().length === 0 
-        ? 'ยังไม่มีคำบรรยายทรัพย์ (สามารถใช้ AI ช่วยเขียนได้ทันที)' 
+        ? 'ยังไม่มีคำบรรยายทรัพย์ (สามารถสร้างแบบร่างจากเทมเพลตได้)'
         : description.trim().length < 40 
         ? `คำบรรยายสั้นไป (${description.trim().length}/40 ตัวอักษร)` 
         : `คำบรรยายครบถ้วน (${description.trim().length} ตัวอักษร)`,
@@ -2056,7 +2056,7 @@ function PropertyEditor() {
             </div>
           </div>
 
-          {/* Description with AI Assistant Toolbar */}
+          {/* Description template toolbar */}
           <div className="space-y-2 pt-2 border-t border-gray-100">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div>
@@ -2064,53 +2064,53 @@ function PropertyEditor() {
                   คำอธิบายรายละเอียดทรัพย์
                 </label>
                 <span className="text-[11px] text-gray-500">
-                  เขียนจุดเด่น ฟังก์ชัน สิ่งอำนวยความสะดวก หรือให้ AI ร่างให้อัตโนมัติจากสเปก
+                  เขียนจุดเด่น ฟังก์ชัน สิ่งอำนวยความสะดวก หรือสร้างแบบร่างจากข้อมูลทรัพย์ด้วยเทมเพลต
                 </span>
               </div>
 
-              {/* AI Generator Action Buttons */}
+              {/* Description template actions */}
               <div className="flex items-center space-x-2">
                 <button
                   type="button"
-                  onClick={handleQuickAiGenerate}
-                  disabled={quickAiGenerating}
+                  onClick={handleQuickTemplateGenerate}
+                  disabled={quickTemplateGenerating}
                   className="px-3 py-1.5 bg-linear-to-r/srgb from-gold-400 via-gold-500 to-amber-500 hover:from-gold-300 hover:to-gold-400 text-navy-950 font-black text-xs rounded-xl shadow-xs flex items-center space-x-1.5 transition-all cursor-pointer active:scale-95 disabled:opacity-50"
-                  title="ใช้ AI วิเคราะห์สเปกปัจจุบันและร่างคำบรรยายให้อัตโนมัติทันที"
+                  title="สร้างแบบร่างคำบรรยายจากข้อมูลทรัพย์ด้วยเทมเพลต"
                 >
-                  {quickAiGenerating ? (
+                  {quickTemplateGenerating ? (
                     <>
                       <Loader2 className="w-3.5 h-3.5 animate-spin text-navy-950" />
-                      <span>AI กำลังเขียน...</span>
+                      <span>กำลังจัดรูปแบบ...</span>
                     </>
                   ) : (
                     <>
                       <Sparkles className="w-3.5 h-3.5 text-navy-950 stroke-[2.5]" />
-                      <span>✨ ให้ AI ร่างคำบรรยาย 1-Click</span>
+                      <span>สร้างคำบรรยายจากเทมเพลต</span>
                     </>
                   )}
                 </button>
 
                 <button
                   type="button"
-                  onClick={() => setShowAiDescModal(true)}
+                  onClick={() => setShowDescriptionTemplateModal(true)}
                   className="px-3 py-1.5 bg-navy-950 hover:bg-navy-900 text-gold-400 font-bold text-xs rounded-xl shadow-xs flex items-center space-x-1.5 transition-all cursor-pointer"
-                  title="ปรับแต่งโทนการเขียน (พรีเมียม / ปิดการขาย / โซเชียล / ลงทุน) หรือระบุจุดเน้นเพิ่มเติม"
+                  title="เลือกเทมเพลตคำบรรยายและระบุจุดเน้นเพิ่มเติม"
                 >
                   <Wand2 className="w-3.5 h-3.5 text-gold-400" />
-                  <span>ปรับแต่งสไตล์ AI</span>
+                  <span>เลือกเทมเพลตคำบรรยาย</span>
                 </button>
               </div>
             </div>
 
-            {aiGenSuccessToast && (
+            {templateSuccessToast && (
               <div className="p-2.5 bg-emerald-50 border border-emerald-300 text-emerald-800 text-xs rounded-xl flex items-center justify-between font-semibold animate-fadeIn">
                 <span className="flex items-center space-x-1.5">
                   <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                  <span>{aiGenSuccessToast}</span>
+                  <span>{templateSuccessToast}</span>
                 </span>
                 <button
                   type="button"
-                  onClick={() => setAiGenSuccessToast(null)}
+                  onClick={() => setTemplateSuccessToast(null)}
                   className="text-emerald-600 hover:text-emerald-900 p-0.5"
                 >
                   <X className="w-3.5 h-3.5" />
@@ -2134,7 +2134,7 @@ function PropertyEditor() {
 
             <textarea
               rows={7}
-              placeholder="จุดเด่นของทรัพย์ เส้นทางการเดินทาง สถานที่สำคัญใกล้เคียง สิ่งอำนวยความสะดวกในโครงการ... หรือกดปุ่ม '🎙️ พิมพ์ด้วยเสียง' หรือ '✨ ให้ AI ร่างคำบรรยาย 1-Click' ด้านบน"
+              placeholder="จุดเด่นของทรัพย์ เส้นทางการเดินทาง สถานที่สำคัญใกล้เคียง สิ่งอำนวยความสะดวกในโครงการ... หรือกดปุ่ม '🎙️ พิมพ์ด้วยเสียง' หรือ 'สร้างคำบรรยายจากเทมเพลต' ด้านบน"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3.5 text-xs text-gray-900 focus:bg-white focus:ring-2 focus:ring-gold-500 outline-hidden leading-relaxed font-sans"
@@ -2868,12 +2868,12 @@ function PropertyEditor() {
           </div>
         </div>
 
-        {/* AI Smart Description Generator Modal */}
-        {showAiDescModal && (
-          <SmartDescriptionGeneratorModal
-            isOpen={showAiDescModal}
-            onClose={() => setShowAiDescModal(false)}
-            specs={getPropertySpecsForAI()}
+        {/* Description template modal */}
+        {showDescriptionTemplateModal && (
+          <PropertyDescriptionTemplateModal
+            isOpen={showDescriptionTemplateModal}
+            onClose={() => setShowDescriptionTemplateModal(false)}
+            specs={getPropertySpecs()}
             currentDescription={description}
             onApplyDescription={(text, mode) => {
               if (mode === 'append') {
@@ -2881,8 +2881,8 @@ function PropertyEditor() {
               } else {
                 setDescription(text);
               }
-              setAiGenSuccessToast('✨ ติดตั้งคำบรรยายจาก AI เรียบร้อยแล้ว!');
-              setTimeout(() => setAiGenSuccessToast(null), 5000);
+              setTemplateSuccessToast('นำแบบร่างคำบรรยายมาใช้เรียบร้อยแล้ว');
+              setTimeout(() => setTemplateSuccessToast(null), 5000);
             }}
             onApplyTitle={(newTitle) => {
               setTitle(newTitle);

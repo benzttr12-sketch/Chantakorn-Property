@@ -24,7 +24,7 @@ Firebase public forms use `/api/inquiries`, with bounded types/text and server-o
 
 The submission ID binds a retry to the saved payload. LINE notifications read the saved record, claim a 90-second delivery lease, use fixed configured staff recipients and stable LINE retry keys. Provider rejection does not discard the customer's saved inquiry. The old standalone notify API now always requires staff authentication; public form callers cannot override recipients, tokens or notification settings.
 
-Shared Firestore transactions limit both a caller and the whole application, including across server instances. Rotating caller identifiers cannot bypass the global daily ceiling. Paid AI calls apply the shared budget only when a provider is configured. These application limits do not promise immunity to platform-level traffic costs. Budget documents include expiry metadata; Firestore TTL is not enabled automatically, and no paid storage/billing upgrade is provisioned.
+Shared Firestore transactions limit both a caller and the whole application, including across server instances. Rotating caller identifiers cannot bypass the global daily ceiling. These application limits do not promise immunity to platform-level traffic costs. Budget documents include expiry metadata; Firestore TTL is not enabled automatically, and no paid storage/billing upgrade is provisioned.
 
 ## Verification and release order
 

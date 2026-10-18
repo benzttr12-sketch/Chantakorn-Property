@@ -1,15 +1,10 @@
+export type FAQCategory = 'buying' | 'selling' | 'loans' | 'consignment' | 'legal';
+
 export interface FAQItem {
   id: string;
   question: string;
   answer: string;
-  category: string;
+  category: FAQCategory;
   tag: string;
   tip?: string;
-}
-
-export interface FAQCategoryData {
-  category: string;
-  categoryTitle: string;
-  faqs: FAQItem[];
-  source: 'gemini-3.8-flash' | 'curated-expert-database';
 }
