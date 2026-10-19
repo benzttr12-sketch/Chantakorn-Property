@@ -2,8 +2,9 @@ import { type ClassValue, clsx } from "clsx";
 import { twMerge } from "tailwind-merge";
 import { PropertyType, PropertyStatus, Property } from "./types";
 import { formatPropertyCode } from "./format-code";
+import { propertyHref, propertyUrl } from './property-link';
 
-export { formatPropertyCode };
+export { formatPropertyCode, propertyHref, propertyUrl };
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -258,10 +259,6 @@ export function parseGoogleMapsCoordinates(input: string): ParsedCoordinates | n
   return null;
 }
 
-export function propertyHref(slug: string): string {
-  return `/properties/${encodeURIComponent(slug)}`;
-}
-
 export const DISTRICTS_LIST = [
   'หาดใหญ่',
   'เมืองสงขลา',
@@ -323,7 +320,7 @@ export function formatFacebookUrl(facebookUrl?: string): string {
  */
 export function formatPropertySnippet(property: Property, options?: { origin?: string }): string {
   const origin = options?.origin || (typeof window !== 'undefined' ? window.location.origin : 'https://chantakornproperty.com');
-  const propertyUrl = `${origin}${propertyHref(property.slug)}`;
+  const url = propertyUrl(property, origin);
   const code = formatPropertyCode(property.id);
   const typeName = getPropertyTypeName(property.property_type);
   const statusLabel = property.status === 'rent' ? 'ให้เช่า' : 'ขาย';
@@ -394,7 +391,7 @@ ${featuresList}
   ✅ ให้คำปรึกษาและดูแลนิติกรรมสัญญาจนถึงวันโอนกรรมสิทธิ์
 
 🔗 ดูรูปถ่าย วิดีโอ และรายละเอียดทั้งหมด:
-👉 ${propertyUrl}
+👉 ${url}
 
 ━━━━━━━━━━━━━━━━━━━━
 💬 สนใจนัดชมสถานที่จริง / สอบถามเพิ่มเติม:

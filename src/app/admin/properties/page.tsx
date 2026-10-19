@@ -34,7 +34,7 @@ import {
   runSelectedOperations,
 } from '@/lib/admin-operations';
 import {
-  propertyHref,
+  propertyUrl,
   getPropertyTypeName,
   formatPropertyCode,
   formatPropertySnippet,
@@ -347,7 +347,7 @@ function PropertiesContent() {
 
   const handleCopyLink = async (prop: Property) => {
     const origin = typeof window !== 'undefined' ? window.location.origin : '';
-    const fullUrl = `${origin}${propertyHref(prop.slug)}`;
+    const fullUrl = propertyUrl(prop, origin);
     try {
       if (!navigator.clipboard) throw new Error('ไม่สามารถคัดลอกได้ กรุณาใช้เบราว์เซอร์ที่รองรับ');
       await navigator.clipboard.writeText(fullUrl);

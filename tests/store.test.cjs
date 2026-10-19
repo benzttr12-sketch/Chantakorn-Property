@@ -89,16 +89,53 @@ function loadStore({ backend = 'local', firebase = false, firebaseError = null, 
     vm.runInContext(`(function(require,module,exports){${compiled}\n})`, context)(requireModule, module, module.exports);
     return module.exports;
   }
-  return { store: load(path.join(sourceRoot, 'lib/store/properties-store.ts')), compare: load(path.join(sourceRoot, 'lib/store/compare-store.ts')), flags: load(path.join(sourceRoot, 'lib/backend.ts')), storage, deletions, mediaDocuments, submissions };
+  return { store: load(path.join(sourceRoot, 'lib/store/properties-store.ts')), compare: load(path.join(sourceRoot, 'lib/store/compare-store.ts')), flags: load(path.join(sourceRoot, 'lib/backend.ts')), formatCode: load(path.join(sourceRoot, 'lib/format-code.ts')).formatPropertyCode, storage, deletions, mediaDocuments, submissions };
 }
 
-test('local drafts remain manageable while excluded from public lists and slug lookup', async () => {
-  const { store } = loadStore();
+test('local drafts remain manageable while excluded from public lists and every public lookup key', async () => {
+  const { store, formatCode } = loadStore();
   const first = store.getLocalProperties()[0];
   await store.updateProperty(first.id, { published: false });
   assert.equal((await store.fetchAdminProperties()).some(item => item.id === first.id), true);
   assert.equal((await store.fetchProperties()).some(item => item.id === first.id), false);
-  assert.equal(await store.fetchPropertyBySlug(first.slug), null);
+  for (const key of [first.slug, first.id, formatCode(first.id)]) {
+    assert.equal(await store.fetchPropertyBySlug(key), null);
+  }
+});
+
+test('published listings resolve by short code, full id, and legacy Thai slug on both backends', async () => {
+  const sample = loadStore().store.getLocalProperties()[0];
+  const property = {
+    ...sample,
+    id: 'c89f3a5b-9d41-477e-8c3b-1e249f0a218d',
+    slug: 'ขายที่ดิน-447-ใกล้-มทักษิณสงขลา-6377',
+    published: true,
+  };
+  for (const backend of ['local', 'firebase']) {
+    const { store, storage } = loadStore({ backend, firebase: true, firebaseDocuments: [property] });
+    if (backend === 'local') storage.set('chantakorn_properties', JSON.stringify([property]));
+    for (const key of [property.slug, property.id, 'CK-C89F3A', 'ck-c89f3a']) {
+      const found = await store.fetchPropertyBySlug(key);
+      assert.equal(found?.id, property.id, `${backend}: ${key}`);
+      assert.equal(found?.title, property.title);
+    }
+    assert.equal(await store.fetchPropertyBySlug('missing-property-key'), null);
+  }
+});
+
+test('a Firebase draft stays hidden through its short code, full id, and old slug', async () => {
+  const sample = loadStore().store.getLocalProperties()[0];
+  const draft = {
+    ...sample,
+    id: 'c89f3a5b-9d41-477e-8c3b-1e249f0a218d',
+    slug: 'private-draft-6377',
+    published: false,
+  };
+  const { store } = loadStore({ backend: 'firebase', firebase: true, firebaseDocuments: [draft] });
+  assert.equal((await store.fetchAdminProperties()).some(item => item.id === draft.id), true);
+  for (const key of [draft.slug, draft.id, 'CK-C89F3A']) {
+    assert.equal(await store.fetchPropertyBySlug(key), null);
+  }
 });
 
 test('a newly created local listing can be published, viewed, and deleted', async () => {

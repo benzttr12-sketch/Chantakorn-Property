@@ -6,6 +6,7 @@ import Image from 'next/image';
 import { Images, Share2, Heart, ChevronLeft, ChevronRight, X, Check, Film, ZoomIn, ZoomOut } from 'lucide-react';
 import { toggleFavoriteId, getFavoriteIds } from '@/lib/store/properties-store';
 import { isGalleryTypingTarget, swipeImageDelta, wrapImageIndex } from '@/lib/gallery-navigation';
+import { propertyUrl } from '@/lib/property-link';
 
 interface PropertyGalleryProps { id: string; title: string; images: string[]; videoUrl?: string }
 type Gesture = { x: number; y: number; pointerId: number; left: number; top: number; pan: boolean };
@@ -96,7 +97,7 @@ export default function PropertyGallery({ id, title, images, videoUrl }: Propert
   async function handleShare() {
     setShareError('');
     try {
-      await navigator.clipboard.writeText(window.location.href);
+      await navigator.clipboard.writeText(propertyUrl({ id }, window.location.origin));
       setCopied(true);
       if (shareTimerRef.current) clearTimeout(shareTimerRef.current);
       shareTimerRef.current = setTimeout(() => setCopied(false), 2500);

@@ -1,4 +1,5 @@
 import { Property, Inquiry } from '@/lib/types';
+import { propertyUrl } from '@/lib/property-link';
 import { 
   formatPrice, 
   numberToThaiBahtWords, 
@@ -38,7 +39,7 @@ export function generateLocalSocialPost(
   const lineLink = formatLineUrl(property.agent?.line_id || '@930xzcyi');
 
   const origin = typeof window !== 'undefined' ? window.location.origin : 'https://chantakornproperty.com';
-  const propertyUrl = `${origin}/properties/${property.slug}`;
+  const url = propertyUrl(property, origin);
 
   if (channel === 'tiktok') {
     const fullPost = `🎬 [SCRIPT วิดีโอ TIKTOK / REELS สั้น 45-60 วินาที]
@@ -101,7 +102,7 @@ ${property.furniture ? `• สภาพการตกแต่ง: ${property.
 ${property.features && property.features.length > 0 ? property.features.slice(0, 4).map(f => `  ✔️ ${f}`).join('\n') : '  ✔️ ทำเลดี เดินทางสะดวก เข้าออกได้หลายเส้นทาง\n  ✔️ ดูแลยื่นสินเชื่อฟรีทุกขั้นตอนจนถึงวันโอน'}
 
 🔗 ดูรูปถ่ายและรายละเอียดทั้งหมดคลิก:
-👉 ${propertyUrl}
+👉 ${url}
 
 ━━━━━━━━━━━━━━━━━━━━
 💬 สนใจนัดชมทรัพย์จริง / ปรึกษาสินเชื่อ:
@@ -134,7 +135,7 @@ ${property.facing_direction ? `▫️ Direction: ${property.facing_direction}` :
 
 📞 Private Viewing: ${agentPhone}
 📲 LINE: ${property.agent?.line_id || '@930xzcyi'}
-🌐 Website Link in Bio: ${propertyUrl}
+🌐 Website Link in Bio: ${url}
 
 .
 .
@@ -173,7 +174,7 @@ Free consultation for foreigners, expats, and investors regarding leaseholds, co
 📞 For private inspection:
 Phone / WhatsApp: ${agentPhone}
 LINE ID: ${property.agent?.line_id || '@930xzcyi'}
-Explore full gallery: ${propertyUrl}`;
+Explore full gallery: ${url}`;
 
     return {
       headline: `Exclusive Property for ${property.status === 'sale' ? 'Sale' : 'Rent'} in ${location}`,
@@ -205,7 +206,7 @@ Explore full gallery: ${propertyUrl}`;
 如需预约实地看房或获取中文房产投资资料，欢迎随时与我们联系：
 📞 咨询热线: ${agentPhone}
 📲 微信/LINE: ${property.agent?.line_id || '@930xzcyi'}
-🌐 房源详情网址: ${propertyUrl}`;
+🌐 房源详情网址: ${url}`;
 
     return {
       headline: `泰国合艾宋卡优质房源: ${property.title}`,
@@ -237,7 +238,7 @@ ${property.features && property.features.length > 0 ? property.features.map(f =>
 ✅ ดูแลเอกสารนิติกรรมวันโอนกรรมสิทธิ์ครบวงจร
 
 📸 ชมรูปถ่าย 360° และพิกัดแผนที่:
-👉 ${propertyUrl}
+👉 ${url}
 
 ━━━━━━━━━━━━━━━━━━━━
 สนใจสอบถามข้อมูลเพิ่มเติม / นัดเข้าชมบ้านจริง:
@@ -364,7 +365,7 @@ export function matchLeadToProperties(
 
     // Construct tailored LINE message
     const origin = typeof window !== 'undefined' ? window.location.origin : 'https://chantakornproperty.com';
-    const propertyUrl = `${origin}/properties/${prop.slug}`;
+    const url = propertyUrl(prop, origin);
     const monthlyMortgage = Math.round((prop.price * 0.9 * 0.05) / 12);
 
     const recommendedLinePitch = `สวัสดีครับคุณ ${inquiry.name} 🙏
@@ -377,7 +378,7 @@ export function matchLeadToProperties(
 🛏️ ฟังก์ชัน: ${prop.bedrooms} ห้องนอน, ${prop.bathrooms} ห้องน้ำ, ที่จอดรถ ${prop.parking} คัน
 
 🔗 สามารถเปิดดูรูปถ่ายและพิกัดได้ที่นี่ครับ:
-👉 ${propertyUrl}
+👉 ${url}
 
 หากคุณ ${inquiry.name} สะดวกเปิดชมสถานที่จริง หรือต้องการให้ประเมินวงเงินสินเชื่อธนาคารฟรี แจ้งเวลาที่สะดวกได้เลยนะครับ ยินดีบริการครับ 😊`;
 
@@ -760,6 +761,8 @@ export function getQuickClosingScripts(property?: Property): QuickClosingScript[
   const location = property?.district ? `อำเภอ${property.district}, ${property.province}` : 'โซนหาดใหญ่';
   const bedrooms = property?.bedrooms ? `${property.bedrooms} ห้องนอน` : 'หลายห้องนอน';
   const agentPhone = property?.agent?.phone || '082-436-4499';
+  const origin = typeof window !== 'undefined' ? window.location.origin : 'https://chantakornproperty.com';
+  const url = property ? propertyUrl(property, origin) : origin;
 
   return [
     {
@@ -770,7 +773,7 @@ export function getQuickClosingScripts(property?: Property): QuickClosingScript[
       recommendedResponse: `สวัสดีครับ 🙏 สำหรับ ${title} ตั้งอยู่ทำเล ${location} ครับ เดินทางสะดวก ใกล้ถนนใหญ่และสิ่งอำนวยความสะดวกมากครับ 
 
 📌 พิกัด Google Maps และรายละเอียดรูปภาพ 360° สามารถแตะดูได้ที่นี่ครับ:
-👉 ${typeof window !== 'undefined' ? window.location.origin : 'https://chantakornproperty.com'}${property ? '/properties/' + property.slug : ''}
+👉 ${url}
 
 หากคุณลูกค้าสะดวกวันไหน แจ้งเวลานัดหมายให้ผมพาเข้าไปเปิดบ้านชมบรรยากาศจริงได้เลยนะครับ ยินดีบริการครับ 😊`
     },
