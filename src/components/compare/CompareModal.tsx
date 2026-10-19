@@ -146,7 +146,7 @@ export default function CompareModal({
                     </div>
 
                     <Link
-                      href={propertyHref(prop.slug || prop.id)}
+                      href={propertyHref(prop)}
                       target="_blank"
                       className="w-full py-2 bg-navy-950 hover:bg-navy-900 text-white text-xs font-bold rounded-xl text-center flex items-center justify-center space-x-1 transition-colors"
                     >

@@ -33,10 +33,16 @@ try {
   renameSync(propertyPage, propertyClient);
   pageMoved = true;
   writeFileSync(propertyPage, `import { SAMPLE_PROPERTIES } from '@/data/sample-properties';
+import { formatPropertyCode } from '@/lib/format-code';
 import PropertyPage from './pages-build-client';
 export const dynamicParams = false;
 export function generateStaticParams() {
-  return SAMPLE_PROPERTIES.filter(property => property.slug).map(property => ({ slug: property.slug }));
+  const keys = SAMPLE_PROPERTIES.flatMap(property => [
+    property.slug,
+    property.id,
+    formatPropertyCode(property.id),
+  ]).filter(Boolean);
+  return [...new Set(keys)].map(slug => ({ slug }));
 }
 export default function PropertyDetailPage() { return <PropertyPage />; }
 `);

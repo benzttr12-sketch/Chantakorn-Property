@@ -223,7 +223,7 @@ export default function CollapsiblePropertyCard({
           </div>
           <h2 className="text-lg font-bold leading-snug text-navy-950">
             <Link
-              href={propertyHref(property.slug)}
+              href={propertyHref(property)}
               target="_blank"
               rel="noreferrer"
               className="break-words hover:text-gold-700"
@@ -454,7 +454,7 @@ export default function CollapsiblePropertyCard({
                 <span>เครื่องมือ AI</span>
               </Link>
               <Link
-                href={propertyHref(property.slug)}
+                href={propertyHref(property)}
                 target="_blank"
                 rel="noreferrer"
                 className={toolClass}

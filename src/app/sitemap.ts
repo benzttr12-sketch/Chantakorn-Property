@@ -1,5 +1,6 @@
 import { MetadataRoute } from 'next';
 import { SAMPLE_PROPERTIES } from '@/data/sample-properties';
+import { propertyUrl } from '@/lib/property-link';
 
 export const dynamic = 'force-static';
 
@@ -24,7 +25,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
   }));
 
   const propertyPages = SAMPLE_PROPERTIES.map((prop) => ({
-    url: `${baseUrl}/properties/${encodeURI(prop.slug)}`,
+    url: propertyUrl(prop, baseUrl),
     lastModified: prop.updated_at || prop.created_at || new Date().toISOString(),
     changeFrequency: 'weekly' as const,
     priority: 0.9,

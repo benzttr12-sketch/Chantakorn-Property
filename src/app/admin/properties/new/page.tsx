@@ -806,7 +806,7 @@ function PropertyEditor() {
       return; 
     }
     if (!slug.trim() || /[/?#\\]/.test(slug)) { 
-      setError('Slug ต้องไม่ว่างและไม่มีอักขระพิเศษ / ? # \\'); 
+      setError('ชื่อสำรองของลิงก์ต้องไม่ว่างและไม่มีอักขระพิเศษ / ? # \\');
       handleScrollToSection('section-1-basic');
       return; 
     }
@@ -952,14 +952,14 @@ function PropertyEditor() {
       id: 'val-slug',
       fieldKey: 'slug',
       targetElementId: 'section-1-basic',
-      label: 'ลิงก์ URL (Slug)',
+      label: 'ชื่อสำรองของลิงก์ (Slug)',
       isRequired: true,
       isValid: Boolean(slug.trim() && !/[/?#\\]/.test(slug)),
       message: !slug.trim() 
-        ? 'ยังไม่ได้ระบุ Slug' 
+        ? 'ยังไม่ได้ระบุชื่อสำรองของลิงก์'
         : /[/?#\\]/.test(slug) 
         ? 'ห้ามมีอักขระพิเศษ / ? # \\' 
-        : 'URL ภาษาอังกฤษถูกต้อง',
+        : 'ชื่อสำรองของลิงก์ถูกต้อง',
       currentValuePreview: slug.trim() ? `/${slug.trim()}` : undefined,
     },
     {
@@ -1351,11 +1351,11 @@ function PropertyEditor() {
             <div>
               <div className="flex items-center justify-between mb-1">
                 <label className="text-xs font-bold text-gray-700 flex items-center gap-1.5">
-                  <span>Slug (URL ลิงก์ภาษาอังกฤษ) *</span>
+                  <span>ชื่อสำรองของลิงก์ (Slug) *</span>
                   {slug.trim() && !/[/?#\\]/.test(slug) ? (
                     <span className="text-[10px] bg-emerald-100 text-emerald-800 font-bold px-2 py-0.5 rounded-full flex items-center gap-1 border border-emerald-200">
                       <Check className="w-3 h-3 text-emerald-600" />
-                      <span>URL ถูกต้อง</span>
+                      <span>ชื่อสำรองถูกต้อง</span>
                     </span>
                   ) : (
                     <span className="text-[10px] bg-rose-100 text-rose-800 font-bold px-2 py-0.5 rounded-full border border-rose-200">
@@ -1369,7 +1369,7 @@ function PropertyEditor() {
                   className="text-[11px] text-gold-600 hover:text-gold-700 font-semibold flex items-center space-x-1 cursor-pointer"
                 >
                   <Wand2 className="w-3 h-3" />
-                  <span>สุ่มรหัส URL ใหม่</span>
+                  <span>สุ่มชื่อสำรองใหม่</span>
                 </button>
               </div>
               <input
@@ -1384,9 +1384,12 @@ function PropertyEditor() {
                     : 'bg-gray-50 border-gray-200 focus:bg-white focus:ring-2 focus:ring-gold-500'
                 }`}
               />
+              <p className="mt-1 text-[11px] text-gray-500">
+                ระบบสร้างลิงก์สั้นจากรหัสทรัพย์ให้อัตโนมัติ ช่องนี้เป็นชื่อสำรองของลิงก์ หากเป็นประกาศเดิมควรเก็บชื่อเดิมไว้เพื่อให้ลิงก์เก่ายังเปิดได้
+              </p>
               {/[/?#\\]/.test(slug) && (
                 <p className="text-[11px] text-rose-600 font-semibold mt-1">
-                  ✕ ห้ามมีเครื่องหมาย / ? # หรือ \ ใน URL
+                  ✕ ห้ามมีเครื่องหมาย / ? # หรือ \ ในชื่อสำรองของลิงก์
                 </p>
               )}
             </div>

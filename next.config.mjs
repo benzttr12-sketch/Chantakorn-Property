@@ -20,6 +20,8 @@ const nextConfig = {
   },
   poweredByHeader: false,
   env: {
+    NEXT_PUBLIC_BASE_PATH: normalizedBasePath,
+    NEXT_PUBLIC_STATIC_EXPORT: staticExport ? 'true' : 'false',
     NEXT_PUBLIC_DATA_BACKEND: process.env.NEXT_PUBLIC_DATA_BACKEND || 'firebase',
     NEXT_PUBLIC_GOOGLE_MAPS_API_KEY: process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || process.env.VITE_GOOGLE_MAPS_API_KEY || '',
   },

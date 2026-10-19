@@ -86,7 +86,7 @@ export default function PropertyCard({
     <div className="property-card group bg-white rounded-3xl overflow-hidden border border-slate-200/80 shadow-xs flex flex-col h-full">
       {/* 4:3 Image Container with Overlays */}
       <div className="relative aspect-[4/3] w-full overflow-hidden bg-slate-100">
-        <Link href={propertyHref(slug)} className="property-card-image-link relative block w-full h-full">
+        <Link href={propertyHref({ id, slug })} className="property-card-image-link relative block w-full h-full">
           {displayImage ? (
             <Image
               src={displayImage}
@@ -194,7 +194,7 @@ export default function PropertyCard({
           </div>
 
           {/* Title */}
-          <Link href={propertyHref(slug)} className="block group/link">
+          <Link href={propertyHref({ id, slug })} className="block group/link">
             <h3 className="font-bold text-navy-950 text-base leading-snug line-clamp-2 min-h-[44px] group-hover/link:text-gold-700 transition-colors">
               {title}
             </h3>
@@ -248,7 +248,7 @@ export default function PropertyCard({
           {/* Action CTA */}
           <div className="mt-4 pt-1 grid grid-cols-2 gap-2">
             <Link
-              href={propertyHref(slug)}
+              href={propertyHref({ id, slug })}
               className="property-card-cta py-2.5 px-3 bg-navy-950 hover:bg-navy-800 text-gold-400 rounded-xl text-xs font-bold flex items-center justify-center space-x-1.5 transition-colors duration-200 group/btn border border-navy-950 hover:border-navy-800"
             >
               <span>ดูรายละเอียด</span>

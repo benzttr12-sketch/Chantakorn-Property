@@ -4,6 +4,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
 const ts = require('typescript');
+const load = require('./load-ts.cjs');
 
 function compile(file) {
   return ts.transpileModule(fs.readFileSync(path.join(__dirname, '..', file), 'utf8'), {
@@ -40,12 +41,14 @@ function text(node) {
   return (Array.isArray(node) ? node : node.children).map(text).join('');
 }
 
-function gallery(initialImages = ['https://test/image-1.jpg', 'https://test/image-2.jpg']) {
+function gallery(initialImages = ['https://test/image-1.jpg', 'https://test/image-2.jpg'], env = {}) {
   const hooks = [];
   let cursor = 0;
   let effects = [];
   let props = { id: 'property-1', title: 'Real land', images: initialImages };
   let output;
+  const copiedLinks = [];
+  const links = load({}, { process: { env } })('lib/property-link.ts');
   const listeners = new Map();
   const elements = new Map();
   const document = { body: { style: { overflow: 'auto' } }, activeElement: null };
@@ -82,13 +85,16 @@ function gallery(initialImages = ['https://test/image-1.jpg', 'https://test/imag
   const module = { exports: {} };
   vm.runInNewContext(compile('src/components/properties/PropertyGallery.tsx'), {
     module, exports: module.exports, console, document, HTMLElement: Element, setTimeout, clearTimeout,
-    window: { addEventListener: (name, callback) => listeners.set(name, callback), removeEventListener: name => listeners.delete(name) },
+    process: { env },
+    navigator: { clipboard: { writeText: async value => { copiedLinks.push(value); } } },
+    window: { location: { origin: 'https://site.example', href: 'https://site.example/properties/ขายที่ดิน-ชื่อประกาศยาว' }, addEventListener: (name, callback) => listeners.set(name, callback), removeEventListener: name => listeners.delete(name) },
     require(name) {
       if (name === 'react') return react;
       if (name === 'react-dom') return { createPortal: node => node };
       if (name === 'next/image') return 'img';
       if (name === 'lucide-react') return new Proxy({}, { get: (_target, key) => key });
       if (name === '@/lib/gallery-navigation') return navigation;
+      if (name === '@/lib/property-link') return links;
       if (name === '@/lib/store/properties-store') return { getFavoriteIds: () => [], toggleFavoriteId: () => true };
       throw Error(name);
     },
@@ -112,8 +118,22 @@ function gallery(initialImages = ['https://test/image-1.jpg', 'https://test/imag
     container.props.onPointerUp({ pointerId: 1, currentTarget, clientX: end.x, clientY: end.y });
   }
   render(); render();
-  return { render, dialog, button, key, gesture, document, originalFocus, element };
+  return { render, dialog, button, key, gesture, document, originalFocus, element, copiedLinks };
 }
+
+test('sharing from a legacy detail page copies the short property link', async () => {
+  const app = gallery();
+  app.render({ id: 'ck-rp6nqm' });
+  await app.button('แชร์').props.onClick();
+  assert.deepEqual(app.copiedLinks, ['https://site.example/properties/CK-RP6NQM']);
+});
+
+test('gallery sharing keeps the static site base path and uses the new-listing fallback', async () => {
+  const app = gallery(undefined, { NEXT_PUBLIC_BASE_PATH: '/Chantakorn-Property', NEXT_PUBLIC_STATIC_EXPORT: 'true' });
+  app.render({ id: 'ck-rp6nqm' });
+  await app.button('แชร์').props.onClick();
+  assert.deepEqual(app.copiedLinks, ['https://site.example/Chantakorn-Property/properties/detail/?slug=CK-RP6NQM']);
+});
 
 test('viewer zoom resets on photo navigation and Escape restores scrolling and opener focus', () => {
   const app = gallery();

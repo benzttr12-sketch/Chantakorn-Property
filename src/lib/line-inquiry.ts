@@ -1,5 +1,5 @@
 import { formatPrice, formatPropertyCode, DEFAULT_OFFICIAL_LINE_URL } from '@/lib/utils';
-import { propertyHref } from '@/components/properties/property-link';
+import { propertyUrl } from '@/lib/property-link';
 import { Property, PropertyCardProps } from '@/lib/types';
 
 export interface PropertyLineData {
@@ -26,7 +26,7 @@ export function generatePropertyLineMessage(
   origin?: string
 ): string {
   const baseUrl = origin || (typeof window !== 'undefined' ? window.location.origin : 'https://chantakornproperty.com');
-  const propertyUrl = `${baseUrl}${propertyHref(property)}`;
+  const url = propertyUrl(property, baseUrl);
   const code = formatPropertyCode(property.id);
   const formattedPrice = formatPrice(property.price, (property.status as any) || 'sale');
   const locationText = [property.district, property.province].filter(Boolean).join(', ') || 'หาดใหญ่ สงขลา';
@@ -38,7 +38,7 @@ export function generatePropertyLineMessage(
 💰 ราคา: ${formattedPrice}
 📍 ทำเล: ${locationText}
 🔗 ดูรูปและรายละเอียดบนเว็บ:
-👉 ${propertyUrl}
+👉 ${url}
 
 รบกวนขอข้อมูลเพิ่มเติม / นัดหมายเข้าชมสถานที่จริงด้วยครับ ขอบคุณครับ`;
 }
