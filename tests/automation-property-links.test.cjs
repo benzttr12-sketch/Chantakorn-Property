@@ -25,11 +25,20 @@ function load(globals = {}) {
   return loader({}, globals)('lib/automation-engine.ts');
 }
 
+function extractUrls(text) {
+  return text.match(/https?:\/\/[^\s]+/g) || [];
+}
+
+function assertPropertyUrl(text, expectedUrl, message) {
+  const propertyUrls = extractUrls(text).filter(url => new URL(url).pathname.split('/').includes('properties'));
+  assert.deepEqual(propertyUrls, [expectedUrl], message);
+}
+
 test('social posts share a short property code for every channel that includes a property link', () => {
   const { generateLocalSocialPost } = load();
   for (const channel of ['facebook', 'line', 'instagram', 'english', 'chinese']) {
     const result = generateLocalSocialPost(property, channel);
-    assert.ok(result.fullPost.includes('https://chantakornproperty.com/properties/CK-RP6NQM'), channel);
+    assertPropertyUrl(result.fullPost, 'https://chantakornproperty.com/properties/CK-RP6NQM', channel);
     assert.ok(result.fullPost.includes(property.title), channel);
     assert.ok(!result.fullPost.includes(property.slug), channel);
     assert.ok(!result.fullPost.includes(encodeURIComponent(property.slug)), channel);
@@ -39,7 +48,7 @@ test('social posts share a short property code for every channel that includes a
 test('browser-generated social posts keep the current site origin and use the short property code', () => {
   const { generateLocalSocialPost } = load({ window: { location: { origin: 'https://preview.example.com' } } });
   const result = generateLocalSocialPost(property, 'line');
-  assert.ok(result.fullPost.includes('https://preview.example.com/properties/CK-RP6NQM'));
+  assertPropertyUrl(result.fullPost, 'https://preview.example.com/properties/CK-RP6NQM');
   assert.ok(!result.fullPost.includes(property.slug));
 });
 
@@ -49,11 +58,11 @@ test('marketing links include the static site prefix and query-based detail rout
     process: { env: { NEXT_PUBLIC_STATIC_EXPORT: 'true', NEXT_PUBLIC_BASE_PATH: '/Chantakorn-Property' } },
   });
   const expectedUrl = 'https://preview.example.com/Chantakorn-Property/properties/detail/?slug=CK-RP6NQM';
-  assert.ok(generateLocalSocialPost(property, 'facebook').fullPost.includes(expectedUrl));
+  assertPropertyUrl(generateLocalSocialPost(property, 'facebook').fullPost, expectedUrl);
   const [match] = matchLeadToProperties({ name: 'สมชาย', message: '' }, [property]);
-  assert.ok(match.recommendedLinePitch.includes(expectedUrl));
+  assertPropertyUrl(match.recommendedLinePitch, expectedUrl);
   const reply = getQuickClosingScripts(property).find(item => item.id === 'script_location');
-  assert.ok(reply.recommendedResponse.includes(expectedUrl));
+  assertPropertyUrl(reply.recommendedResponse, expectedUrl);
 });
 
 test('lead matching sends the short detail link and still excludes unpublished properties', () => {
@@ -67,7 +76,7 @@ test('lead matching sends the short detail link and still excludes unpublished p
   const matches = matchLeadToProperties(inquiry, [property, { ...property, id: 'ck-hidden', published: false }]);
   assert.equal(matches.length, 1);
   assert.equal(matches[0].property.id, property.id);
-  assert.ok(matches[0].recommendedLinePitch.includes('https://chantakornproperty.com/properties/CK-RP6NQM'));
+  assertPropertyUrl(matches[0].recommendedLinePitch, 'https://chantakornproperty.com/properties/CK-RP6NQM');
   assert.ok(matches[0].recommendedLinePitch.includes(inquiry.name));
   assert.ok(!matches[0].recommendedLinePitch.includes(property.slug));
 });
@@ -75,9 +84,9 @@ test('lead matching sends the short detail link and still excludes unpublished p
 test('location reply scripts share the short detail link and keep the homepage fallback', () => {
   const { getQuickClosingScripts } = load();
   const script = getQuickClosingScripts(property).find(item => item.id === 'script_location');
-  assert.ok(script.recommendedResponse.includes('https://chantakornproperty.com/properties/CK-RP6NQM'));
+  assertPropertyUrl(script.recommendedResponse, 'https://chantakornproperty.com/properties/CK-RP6NQM');
   assert.ok(!script.recommendedResponse.includes(property.slug));
   const fallback = getQuickClosingScripts().find(item => item.id === 'script_location');
-  assert.ok(fallback.recommendedResponse.includes('https://chantakornproperty.com'));
+  assert.deepEqual(extractUrls(fallback.recommendedResponse), ['https://chantakornproperty.com']);
   assert.ok(!fallback.recommendedResponse.includes('/properties/'));
 });
