@@ -46,7 +46,7 @@ else:
     raise AssertionError('Published flag must be constrained to 0/1')
 assert db.execute("PRAGMA foreign_key_check").fetchall() == []
 db.execute("INSERT INTO profiles (uid,full_name,created_at,updated_at) VALUES ('uid1','Staff test',?,?)", (now, now))
-assert db.execute("SELECT role, auth_disabled, tokens_valid_after FROM profiles WHERE uid='uid1'").fetchone() == ('USER', 0, 0), 'New user must start with USER role'
+assert tuple(db.execute("SELECT role, auth_disabled, tokens_valid_after FROM profiles WHERE uid='uid1'").fetchone()) == ('USER', 0, 0), 'New user must start with USER role'
 try:
     db.execute("UPDATE profiles SET role='SUPER_ADMIN' WHERE uid='uid1'")
 except sqlite3.IntegrityError:
