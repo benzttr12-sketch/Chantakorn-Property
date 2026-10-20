@@ -9,6 +9,7 @@ export type PropertyAuthEnv = {
   FIREBASE_WEB_API_KEY?: string;
   ALLOWED_ORIGIN: string;
   PROPERTY_WRITES_ENABLED?: string;
+  PROPERTY_PUBLICATION_ENABLED?: string;
 };
 export type StaffAuth = { ok: true; uid: string; role: 'ADMIN' | 'AGENT' }
   | { ok: false; status: 401 | 403 | 503; error: string };
