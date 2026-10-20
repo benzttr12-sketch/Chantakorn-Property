@@ -216,7 +216,7 @@ export function parseEditorInput(input: unknown, partial = false): ParsedPropert
 
 export function newPropertyIdentity(id: string): { id: string; code: string } {
   if (!/^[a-f0-9-]{36}$/.test(id)) throw new Error('Invalid generated UUID');
-  return { id, code: `CK-${id.replaceAll('-', '').slice(0, 10).toUpperCase()}` };
+  return { id, code: `CK-${id.replaceAll('-', '').slice(0, 6).toUpperCase()}` };
 }
 
 export async function readBoundedJson(req: Request, maxSize = 32 * 1024): Promise<unknown> {
