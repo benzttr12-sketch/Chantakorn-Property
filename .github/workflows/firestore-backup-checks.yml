@@ -1,0 +1,33 @@
+name: Firestore encrypted backup code checks
+
+on:
+  pull_request:
+    paths:
+      - 'scripts/firestore-safe-backup.mjs'
+      - 'scripts/firestore-backup-codec.mjs'
+      - 'tests/firestore-backup-codec.test.cjs'
+      - 'docs/firestore-encrypted-backup-runbook.md'
+      - '.github/workflows/firestore-backup-checks.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  offline-backup-codec:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Use Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22.19.0'
+      - name: Install pinned root dependencies
+        run: npm ci --no-audit --no-fund
+      - name: Syntax check CLI
+        run: node --check scripts/firestore-safe-backup.mjs
+      - name: Syntax check codec
+        run: node --check scripts/firestore-backup-codec.mjs
+      - name: Test offline Firestore archival data codecs
+        run: node --test tests/firestore-backup-codec.test.cjs
