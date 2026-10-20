@@ -40,7 +40,7 @@ const media = new Hono<{ Bindings: Env }>();
 
 // Browser CORS preflight for authenticated image uploads/reads.
 media.options('/v1/media/*', c => {
-  if (!validBrowserOrigin(c.req.header('Origin'), c.env.ALLOWED_ORIGIN))
+  if (!validBrowserOrigin(c.req.header('Origin') ?? null, c.env.ALLOWED_ORIGIN))
     return c.json({ error: 'Forbidden origin' }, 403);
   c.header('Access-Control-Allow-Origin', c.env.ALLOWED_ORIGIN);
   c.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
@@ -102,13 +102,13 @@ async function upload(c: Context<{ Bindings: Env }>, kind: 'property' | 'inquiry
   c.header('Cache-Control', 'private, no-store');
   // Controlled rollout: never allow production writes merely from a JWT.
   if (c.env.MEDIA_WRITES_ENABLED !== 'true') return c.json({ error: 'Media uploads are disabled' }, 503);
-  if (!validBrowserOrigin(c.req.header('Origin'), c.env.ALLOWED_ORIGIN)) {
+  if (!validBrowserOrigin(c.req.header('Origin') ?? null, c.env.ALLOWED_ORIGIN)) {
     return c.json({ error: 'Forbidden origin' }, 403);
   }
   const allowed = await requireStaff(c.env, c.req.header('Authorization'));
   if (!('staff' in allowed)) return c.json({ error: allowed.error }, allowed.status);
 
-  const ownerId = c.req.param('ownerId');
+  const ownerId = c.req.param('ownerId') ?? '';
   if (!validOwnerId(ownerId)) return c.json({ error: 'Invalid owner ID' }, 400);
   const database = drizzle(c.env.DB);
   if (kind === 'property') {
