@@ -134,19 +134,26 @@ async function upload(c: Context<{ Bindings: Env }>, kind: 'property' | 'inquiry
   if (!put) return c.json({ error: 'Could not save image' }, 503);
   try {
     const createdAt = new Date().toISOString();
-    if (kind === 'property') {
-      await database.insert(propertyMedia).values({
-        id, propertyId: ownerId, objectKey,
-        // Relative API path; PR-05 will resolve against the trusted configured API origin.
-        publicUrl: `/v1/media/properties/${id}`,
-        contentType: checked.type, byteSize: checked.bytes.byteLength,
-        sortOrder: Number(count?.total || 0), createdAt,
-      });
-    } else {
-      await database.insert(inquiryMedia).values({
-        id, inquiryId: ownerId, objectKey, contentType: checked.type,
-        byteSize: checked.bytes.byteLength, createdAt,
-      });
+    // The quota check and insert are one SQLite statement. Concurrent requests
+    // cannot both claim the last slot. Recheck parent state after the R2 write.
+    const inserted = kind === 'property'
+      ? await c.env.DB.prepare(`INSERT INTO property_media
+          (id, property_id, object_key, public_url, content_type, byte_size, sort_order, created_at)
+          SELECT ?, ?, ?, ?, ?, ?, COALESCE(MAX(sort_order), -1) + 1, ?
+          FROM property_media WHERE property_id = ? HAVING COUNT(*) < ?
+          AND EXISTS (SELECT 1 FROM properties WHERE id = ? AND deleted_at IS NULL)`)
+        .bind(id, ownerId, objectKey, `/v1/media/properties/${id}`, checked.type,
+          checked.bytes.byteLength, createdAt, ownerId, limit, ownerId).run()
+      : await c.env.DB.prepare(`INSERT INTO inquiry_media
+          (id, inquiry_id, object_key, content_type, byte_size, created_at)
+          SELECT ?, ?, ?, ?, ?, ? WHERE
+          (SELECT COUNT(*) FROM inquiry_media WHERE inquiry_id = ?) < ?
+          AND EXISTS (SELECT 1 FROM inquiries WHERE id = ?)`)
+        .bind(id, ownerId, objectKey, checked.type, checked.bytes.byteLength,
+          createdAt, ownerId, limit, ownerId).run();
+    if (!inserted.meta.changes) {
+      try { await bucket.delete(objectKey); } catch { console.warn('R2_MEDIA_ORPHAN_CLEANUP_REQUIRED'); }
+      return c.json({ error: 'Image limit reached or record no longer available' }, 409);
     }
   } catch {
     // Best-effort compensation after database failure.

@@ -172,6 +172,55 @@ test('local Worker HTTP / D1 / R2 / Firebase authorization contract', async t =>
     assert.equal((await fetchApi('/v1/media/properties/' + deletedId, { method: 'POST',
       headers: { ...headers, 'Content-Type': 'image/png', 'Content-Length': String(png.length) }, body: png })).status, 404);
   });
+  await t.test('audit failure rolls back create, update and delete', async () => {
+    await db.prepare("CREATE TRIGGER reject_audit BEFORE INSERT ON audit_events BEGIN SELECT RAISE(ABORT, 'synthetic audit failure'); END").run();
+    try {
+      const create = await fetchApi('/v1/admin/properties', { method: 'POST', headers, body: JSON.stringify({
+        title: 'Audit rollback', slug: 'audit-rollback', property_type: 'house', status: 'sale',
+        price: 123, province: 'Test', district: 'Test',
+      }) });
+      assert.equal(create.status, 503);
+      assert.equal(await db.prepare("SELECT id FROM properties WHERE slug='audit-rollback'").first(), null);
+      const endpoint = '/v1/admin/properties/' + created.id;
+      const update = await fetchApi(endpoint, { method: 'PATCH', headers, body: JSON.stringify({
+        updates: { price: 999 }, expected_updated_at: created.updated_at,
+      }) });
+      assert.equal(update.status, 503);
+      const remove = await fetchApi(endpoint, { method: 'DELETE', headers,
+        body: JSON.stringify({ expected_updated_at: created.updated_at }) });
+      assert.equal(remove.status, 503);
+      const row = await db.prepare('SELECT price,updated_at,deleted_at FROM properties WHERE id=?').bind(created.id).first();
+      assert.equal(row.price, created.price); assert.equal(row.updated_at, created.updated_at);
+      assert.equal(row.deleted_at, null);
+    } finally { await db.prepare('DROP TRIGGER reject_audit').run(); }
+  });
+  await t.test('concurrent uploads cannot exceed either quota and losing objects are cleaned', async () => {
+    for (const kind of ['properties', 'inquiries']) {
+      const property = kind === 'properties';
+      const table = property ? 'property_media' : 'inquiry_media';
+      const ownerField = property ? 'property_id' : 'inquiry_id';
+      const owner = property ? created.id : inquiryId;
+      const limit = property ? 60 : 15;
+      const bucket = property ? publicBucket : privateBucket;
+      const count = await db.prepare(`SELECT COUNT(*) AS n FROM ${table} WHERE ${ownerField}=?`).bind(owner).first();
+      for (let i = count.n; i < limit - 1; i++) {
+        const id = crypto.randomUUID();
+        const query = property
+          ? 'INSERT INTO property_media(id,property_id,object_key,public_url,content_type,byte_size,created_at) VALUES (?,?,?,?,?,?,?)'
+          : 'INSERT INTO inquiry_media(id,inquiry_id,object_key,content_type,byte_size,created_at) VALUES (?,?,?,?,?,?)';
+        const values = [id, owner, 'synthetic-quota/' + id, ...(property ? ['/v1/media/properties/' + id] : []), 'image/png', png.length, '2026-10-20'];
+        await db.prepare(query).bind(...values).run();
+      }
+      const before = (await bucket.list()).objects.length;
+      const replies = await Promise.all(Array.from({ length: 6 }, () => fetchApi('/v1/media/' + kind + '/' + owner, {
+        method: 'POST', headers: { ...headers, 'Content-Type': 'image/png', 'Content-Length': String(png.length) }, body: png,
+      })));
+      assert.equal(replies.filter(r => r.status === 201).length, 1);
+      assert.ok(replies.every(r => [201, 409, 429].includes(r.status)));
+      assert.equal((await db.prepare(`SELECT COUNT(*) AS n FROM ${table} WHERE ${ownerField}=?`).bind(owner).first()).n, limit);
+      assert.equal((await bucket.list()).objects.length, before + 1);
+    }
+  });
   await t.test('delete requires observed revision and preserves soft-deleted row', async () => {
     const endpoint = '/v1/admin/properties/' + created.id;
     assert.equal((await fetchApi(endpoint, { method: 'DELETE', headers,

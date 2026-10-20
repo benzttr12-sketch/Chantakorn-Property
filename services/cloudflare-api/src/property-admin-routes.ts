@@ -1,9 +1,10 @@
 import { Hono, type Context } from 'hono';
 import { drizzle } from 'drizzle-orm/d1';
 import { and, desc, eq, inArray, isNull, lt, or } from 'drizzle-orm';
-import { auditEvents, propertyMedia, properties } from './db/schema.ts';
+import { propertyMedia, properties } from './db/schema.ts';
 import { authorizePropertyStaff, canWriteProperties, type PropertyAuthEnv } from './property-auth.ts';
 import { newPropertyIdentity, parseEditorInput, readBoundedJson } from './property-input.ts';
+import { auditedMutation } from './audited-mutation.ts';
 import { encodeCursor, decodeCursor } from './property-query.ts';
 
 type Env = PropertyAuthEnv & { PROPERTY_MEDIA: R2Bucket; PRIVATE_MEDIA: R2Bucket };
@@ -158,17 +159,6 @@ propertyAdmin.get('/v1/admin/properties/:id', async c => {
   return c.json({ data: toEditorProperty(row, m.get(id) || [], true) });
 });
 
-async function audit(db: ReturnType<typeof drizzle>, uid: string, action: string, id: string) {
-  // Do not allow audit errors to prevent staff saving a property, but log a code
-  // to alert the operator: audit availability must be monitored prior to cutover.
-  try {
-    await db.insert(auditEvents).values({
-      id: crypto.randomUUID(), category: 'property', action, actorUid: uid,
-      targetId: id, createdAt: new Date().toISOString(),
-    });
-  } catch { console.warn('D1_PROPERTY_AUDIT_WRITE_FAILED'); }
-}
-
 propertyAdmin.post('/v1/admin/properties', async c => {
   const staff = await authorized(c, true);
   if (!staff.ok) return c.json({ error: staff.error }, staff.status);
@@ -179,14 +169,14 @@ propertyAdmin.post('/v1/admin/properties', async c => {
   const now = new Date().toISOString();
   const identity = newPropertyIdentity(crypto.randomUUID());
   try {
-    await db.insert(properties).values({
+    const mutation = db.insert(properties).values({
       ...parsed,
       id: identity.id, code: identity.code, createdAt: now, updatedAt: now,
       // Initial entry is a draft regardless of any client-supplied flag.
       // Explicit publication requires a separate reviewed PATCH action.
       published: false,
-    } as typeof properties.$inferInsert);
-    await audit(db, staff.uid, 'created', identity.id);
+    } as typeof properties.$inferInsert).toSQL();
+    await auditedMutation(c.env.DB, mutation, staff.uid, 'created', identity.id);
     const [row] = await db.select().from(properties).where(eq(properties.id, identity.id)).limit(1);
     return c.json({ data: toEditorProperty(row, [], true) }, 201);
   } catch (error) { return routeError(error, c); }
@@ -235,11 +225,11 @@ propertyAdmin.patch('/v1/admin/properties/:id', async c => {
   // Optimistic lock prevents simultaneous edits from silently overwriting one another.
   const now = nextPropertyRevision(current.updatedAt);
   try {
-    const updatedRows = await db.update(properties).set({ ...changes, updatedAt: now })
+    const mutation = db.update(properties).set({ ...changes, updatedAt: now })
       .where(and(eq(properties.id, id), eq(properties.updatedAt, expected), isNull(properties.deletedAt)))
-      .returning({ id: properties.id });
-    if (!updatedRows.length) return c.json({ error: 'Listing changed during save' }, 409);
-    await audit(db, staff.uid, 'updated', id);
+      .returning({ id: properties.id }).toSQL();
+    const result = await auditedMutation(c.env.DB, mutation, staff.uid, 'updated', id);
+    if (!result.results.length) return c.json({ error: 'Listing changed during save' }, 409);
     const [row] = await db.select().from(properties).where(eq(properties.id, id)).limit(1);
     const media = await mediaForRows(db, [row]);
     return c.json({ data: toEditorProperty(row, media.get(row.id) || [], true) });
@@ -258,13 +248,16 @@ propertyAdmin.delete('/v1/admin/properties/:id', async c => {
   const expected = (input as { expected_updated_at: unknown }).expected_updated_at;
   if (typeof expected !== 'string') return c.json({ error: 'Expected revision required' }, 400);
   const db = drizzle(c.env.DB);
-  const deleted = await db.update(properties).set({
-    deletedAt: new Date().toISOString(), published: false, updatedAt: new Date().toISOString(),
-  }).where(and(eq(properties.id, id), eq(properties.updatedAt, expected), isNull(properties.deletedAt)))
-    .returning({ id: properties.id });
-  if (!deleted.length) return c.json({ error: 'Property not found or revision changed' }, 409);
-  await audit(db, staff.uid, 'soft_deleted', id);
-  return c.json({ ok: true });
+  try {
+    const now = new Date().toISOString();
+    const mutation = db.update(properties).set({
+      deletedAt: now, published: false, updatedAt: now,
+    }).where(and(eq(properties.id, id), eq(properties.updatedAt, expected), isNull(properties.deletedAt)))
+      .returning({ id: properties.id }).toSQL();
+    const result = await auditedMutation(c.env.DB, mutation, staff.uid, 'soft_deleted', id);
+    if (!result.results.length) return c.json({ error: 'Property not found or revision changed' }, 409);
+    return c.json({ ok: true });
+  } catch (error) { return routeError(error, c); }
 });
 
 export default propertyAdmin;
