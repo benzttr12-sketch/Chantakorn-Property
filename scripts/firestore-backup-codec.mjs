@@ -40,7 +40,12 @@ export function validateEncryptedBackupManifest(data) {
       !/^[a-f0-9]{24}$/.test(data.iv ?? '') ||
       !/^[a-f0-9]{32}$/.test(data.tag ?? '') ||
       !Number.isSafeInteger(data.records) || data.records < 0 ||
-      typeof data.firestoreDatabase !== 'string' || !data.firestoreDatabase) {
+      typeof data.firestoreProject !== 'string' || !data.firestoreProject ||
+      typeof data.createdAt !== 'string' || !Number.isFinite(Date.parse(data.createdAt)) ||
+      typeof data.firestoreDatabase !== 'string' || !data.firestoreDatabase ||
+      !data.collections || typeof data.collections !== 'object' || Array.isArray(data.collections) ||
+      Object.values(data.collections).some(count => !Number.isSafeInteger(count) || count < 1) ||
+      Object.values(data.collections).reduce((total, count) => total + count, 0) !== data.records) {
     throw new Error('Invalid or incomplete encrypted backup manifest');
   }
   return data;

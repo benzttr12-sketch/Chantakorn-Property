@@ -28,12 +28,16 @@ test('encrypted archive manifest schema rejects incomplete or dangerous metadata
     version: 1, encryption: 'AES-256-GCM', compression: 'gzip',
     sha256: 'a'.repeat(64), salt: 'b'.repeat(32), iv: 'c'.repeat(24),
     tag: 'd'.repeat(32), records: 0, firestoreDatabase: 'named-db',
+    firestoreProject: 'demo-backup', createdAt: '2026-10-20T00:00:00.000Z', collections: {},
   };
   assert.deepEqual(validateEncryptedBackupManifest(valid), valid);
   assert.throws(() => validateEncryptedBackupManifest({ ...valid, tag: 'bad' }));
   assert.throws(() => validateEncryptedBackupManifest({ ...valid, records: -1 }));
   assert.throws(() => validateEncryptedBackupManifest({ ...valid, encryption: 'plaintext' }));
   assert.throws(() => validateEncryptedBackupManifest({ ...valid, sha256: 'x' }));
+  assert.throws(() => validateEncryptedBackupManifest({ ...valid, firestoreProject: '' }));
+  assert.throws(() => validateEncryptedBackupManifest({ ...valid, collections: { profiles: -1 } }));
+  assert.throws(() => validateEncryptedBackupManifest({ ...valid, collections: { profiles: 1 } }));
 });
 
 test('unknown or undefined Firestore values fail closed, never silently coerce', async () => {

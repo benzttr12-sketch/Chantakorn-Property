@@ -5,7 +5,9 @@ on:
     paths:
       - 'scripts/firestore-safe-backup.mjs'
       - 'scripts/firestore-backup-codec.mjs'
+      - 'scripts/firestore-backup-runtime.mjs'
       - 'tests/firestore-backup-codec.test.cjs'
+      - 'tests/firestore-backup-runtime.test.cjs'
       - 'docs/firestore-encrypted-backup-runbook.md'
       - '.github/workflows/firestore-backup-checks.yml'
   workflow_dispatch:
@@ -15,7 +17,10 @@ permissions:
 
 jobs:
   offline-backup-codec:
-    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -29,5 +34,7 @@ jobs:
         run: node --check scripts/firestore-safe-backup.mjs
       - name: Syntax check codec
         run: node --check scripts/firestore-backup-codec.mjs
+      - name: Syntax check backup runtime
+        run: node --check scripts/firestore-backup-runtime.mjs
       - name: Test offline Firestore archival data codecs
-        run: node --test tests/firestore-backup-codec.test.cjs
+        run: node --test tests/firestore-backup-codec.test.cjs tests/firestore-backup-runtime.test.cjs
