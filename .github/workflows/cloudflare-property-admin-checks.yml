@@ -1,0 +1,30 @@
+name: Cloudflare property Admin bridge (root checks)
+
+on:
+  pull_request:
+    paths:
+      - 'src/lib/cloudflare-properties.ts'
+      - 'src/lib/store/properties-store.ts'
+      - 'services/cloudflare-api/src/property-admin-routes.ts'
+      - '.github/workflows/cloudflare-property-admin-checks.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify-root-compatibility:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.19.0'
+      - name: Install pinned Next.js dependencies
+        run: npm ci --no-audit --no-fund
+      - name: Lint app
+        run: npm run lint
+      - name: Typecheck app
+        run: npm run typecheck
+      - name: Run existing app tests
+        run: npm test
