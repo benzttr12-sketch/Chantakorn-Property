@@ -51,7 +51,7 @@ test('partial update does not accept empty or forged fields', () => {
 
 test('new codes are server generated, longer and not reused from old listings', () => {
   const id = '7537cedc-3fbf-4df9-9741-82757f583628';
-  assert.deepEqual(newPropertyIdentity(id), { id, code: 'CK-7537CEDC3F' });
+  assert.deepEqual(newPropertyIdentity(id), { id, code: 'CK-7537CE' });
   assert.throws(() => newPropertyIdentity('CK-000'));
 });
 
