@@ -45,3 +45,8 @@ export function validateEncryptedBackupManifest(data) {
   }
   return data;
 }
+
+/** Never put Firebase UID or document IDs into an unencrypted manifest. */
+export function redactCollectionPath(collectionPath) {
+  return collectionPath.split('/').map((segment, index) => index % 2 === 0 ? segment : '{doc}').join('/');
+}
