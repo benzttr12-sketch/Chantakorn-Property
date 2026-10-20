@@ -11,3 +11,13 @@ export const dataBackend: BackendType = (() => {
   }
   return 'firebase';
 })();
+
+/**
+ * Listings may migrate independently of Firebase Auth, LINE, leads and valuation.
+ * Default remains Firestore. Unknown explicit modes fail closed.
+ */
+const configuredPropertyStorage = (process.env.NEXT_PUBLIC_PROPERTY_STORAGE_BACKEND || 'firebase').trim().toLowerCase();
+if (configuredPropertyStorage !== 'firebase' && configuredPropertyStorage !== 'cloudflare') {
+  throw new Error('NEXT_PUBLIC_PROPERTY_STORAGE_BACKEND must be firebase or cloudflare');
+}
+export const useCloudflarePropertyBackend = configuredPropertyStorage === 'cloudflare';
