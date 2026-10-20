@@ -59,5 +59,5 @@ test('explicit serializer excludes staff notes, internal storage paths and accou
   assert.equal('deleted_at' in visible, false);
   assert.equal(JSON.stringify(visible).includes('SECRET-INTERNAL-NOTE'), false);
   const privateView = toEditorProperty(record as any, media, true);
-  assert.equal(privateView.internal_notes, 'SECRET-INTERNAL-NOTE');
+  assert.equal('internal_notes' in privateView && privateView.internal_notes, 'SECRET-INTERNAL-NOTE');
 });
