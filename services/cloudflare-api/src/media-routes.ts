@@ -1,6 +1,6 @@
 import { Hono, type Context } from 'hono';
 import { drizzle } from 'drizzle-orm/d1';
-import { and, eq, sql } from 'drizzle-orm';
+import { and, eq, sql, isNull } from 'drizzle-orm';
 import { inquiryMedia, inquiries, profiles, properties, propertyMedia } from './db/schema.ts';
 import { authorizeStaffProfile, extractBearer, firebaseProjectConfigured, verifyFirebaseIdToken } from './auth.ts';
 import {
@@ -71,7 +71,7 @@ media.get('/v1/media/properties/:mediaId', async c => {
   const [row] = await drizzle(c.env.DB).select({
     key: propertyMedia.objectKey, type: propertyMedia.contentType,
   }).from(propertyMedia).innerJoin(properties, eq(propertyMedia.propertyId, properties.id))
-    .where(and(eq(propertyMedia.id, mediaId), eq(properties.published, true))).limit(1);
+    .where(and(eq(propertyMedia.id, mediaId), eq(properties.published, true), isNull(properties.deletedAt))).limit(1);
   if (!row) return c.json({ error: 'Not found' }, 404);
   const object = await c.env.PROPERTY_MEDIA.get(row.key);
   if (!object || !('body' in object)) return c.json({ error: 'Not found' }, 404);
