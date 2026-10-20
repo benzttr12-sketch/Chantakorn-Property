@@ -115,7 +115,7 @@ app.get('/v1/properties/:identifier', async c => {
   const db = drizzle(c.env.DB);
   const rows = await db.select()
     .from(properties)
-    .where(and(eq(properties.published, true), isNull(properties.deletedAt), or(eq(properties.code, identifier), eq(properties.slug, identifier))))
+    .where(and(eq(properties.published, true), isNull(properties.deletedAt), or(eq(properties.code, identifier), eq(properties.slug, identifier), eq(properties.id, identifier))))
     .limit(1);
   if (!rows.length) return c.json({ error: 'Property not found' }, 404);
   const media = await mediaForRows(db, rows);
