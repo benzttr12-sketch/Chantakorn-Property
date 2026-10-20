@@ -60,7 +60,7 @@ export async function cloudflareListProperties(admin = false): Promise<Property[
   let cursor: string | null = null;
   const visited = new Set<string>();
   // Temporary compatibility bridge for the existing unpaginated Admin UI.
-  // Cap strictly: if the data set exceeds 800 records, fail visibly rather than
+  // Cap strictly at 800 Admin listings or 300 public listings; fail visibly rather than
   // pretending that a partial listing is the whole property catalog.
   for (let page = 0; page < 10; page++) {
     const size = admin ? 80 : 30;
@@ -150,7 +150,7 @@ async function patch(id: string, expected: string, updates: Record<string, unkno
 
 export async function cloudflareCreateProperty(value: Omit<Property, 'id' | 'created_at'>): Promise<Property> {
   const requestedPublished = Boolean(value.published);
-  const rawPhotos = [...new Set((value.images || []).filter(Boolean))];
+  const rawPhotos = [...new Set([...(value.images || []), value.cover_image || ''].filter(Boolean))];
   // No mutable images or arbitrary URLs accepted in the D1 listing record.
   const input = { ...cleanOutgoing(value as unknown as Record<string, unknown>), published: false };
   const response = await request<PropertyPayload>('/v1/admin/properties', {
@@ -160,8 +160,8 @@ export async function cloudflareCreateProperty(value: Omit<Property, 'id' | 'cre
   try {
     const uploaded = await uploadPhotos(property.id, rawPhotos);
     if (uploaded.length) {
-      const coverId = mediaIdFromUrl(value.cover_image || '');
-      const selected = uploaded.find(p => p.id === coverId) || uploaded[0];
+      const chosenIndex = rawPhotos.indexOf(value.cover_image || '');
+      const selected = uploaded[chosenIndex >= 0 ? chosenIndex : 0];
       property = await patch(property.id, property.updated_at || '', { featured: Boolean(value.featured) }, selected.id);
     }
     if (requestedPublished) property = await patch(property.id, property.updated_at || '', { published: true });
@@ -174,6 +174,7 @@ export async function cloudflareCreateProperty(value: Omit<Property, 'id' | 'cre
 export async function cloudflareUpdateProperty(id: string, updates: Partial<Property>): Promise<Property> {
   let property = await cloudflareAdminDetail(id);
   const existingImageIds = new Set((property.images || []).map(mediaIdFromUrl).filter(Boolean));
+  let uploadedCoverId: string | undefined;
   if (updates.images) {
     const supplied = new Set(updates.images.map(mediaIdFromUrl).filter(Boolean));
     if ([...existingImageIds].some(x => !supplied.has(x))) {
@@ -181,13 +182,17 @@ export async function cloudflareUpdateProperty(id: string, updates: Partial<Prop
     }
     const newImages = updates.images.filter(x => !mediaIdFromUrl(x));
     const uploaded = await uploadPhotos(id, newImages);
-    if (uploaded.length) property = await cloudflareAdminDetail(id);
+    if (uploaded.length) {
+      const coverIndex = newImages.indexOf(updates.cover_image || '');
+      if (coverIndex >= 0) uploadedCoverId = uploaded[coverIndex].id;
+      property = await cloudflareAdminDetail(id);
+    }
   }
   const outgoing = cleanOutgoing(updates as Record<string, unknown>);
   if (Object.keys(outgoing).length === 0 && updates.cover_image === undefined) return property;
   let coverId: string | null | undefined;
   if (updates.cover_image !== undefined) {
-    coverId = updates.cover_image ? mediaIdFromUrl(updates.cover_image) : null;
+    coverId = updates.cover_image ? (uploadedCoverId || mediaIdFromUrl(updates.cover_image)) : null;
     if (updates.cover_image && !coverId) throw new Error('รูปปกต้องเป็นรูปที่อัปโหลดเข้า R2 แล้ว');
   }
   return await patch(id, property.updated_at || '', outgoing, coverId);
