@@ -20,15 +20,11 @@ import { createGzip, createGunzip } from 'node:zlib';
 import { Readable } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
 import { promisify } from 'node:util';
-import { encodeFirestoreValue, validateEncryptedBackupManifest } from './firestore-backup-codec.mjs';
+import { encodeFirestoreValue, validateEncryptedBackupManifest, redactCollectionPath } from './firestore-backup-codec.mjs';
 
 const scrypt = promisify(scryptCallback);
 const PAGE_SIZE = 100;
 
-// Manifest intentionally hides intermediate document IDs in subcollection paths.
-function redactedCollectionPath(collectionPath) {
-  return collectionPath.split('/').map((segment, index) => index % 2 === 0 ? segment : '{doc}').join('/');
-}
 const password = process.env.CHANTAKORN_BACKUP_PASSPHRASE;
 const command = process.argv[2];
 const filePath = process.argv[3] && resolve(process.argv[3]);
@@ -71,7 +67,7 @@ async function* walkCollection(collection, counter, maxRecords) {
     for (const snapshot of page.docs) {
       if (++counter.records > maxRecords) throw new Error('Backup document cap reached; aborting incomplete archive');
       const collectionPath = collection.path;
-      const publicCollectionPath = redactedCollectionPath(collectionPath);
+      const publicCollectionPath = redactCollectionPath(collectionPath);
       counter.collections[publicCollectionPath] = (counter.collections[publicCollectionPath] ?? 0) + 1;
       const line = {
         path: snapshot.ref.path,
@@ -172,7 +168,7 @@ async function verify() {
       }
       const parts = item.path.split('/');
       if (parts.length % 2 !== 0 || parts.some(part => !part)) throw new Error('Invalid archived document path');
-      const collPath = redactedCollectionPath(parts.slice(0, -1).join('/'));
+      const collPath = redactCollectionPath(parts.slice(0, -1).join('/'));
       collectionCounts[collPath] = (collectionCounts[collPath] ?? 0) + 1;
       count++;
     }
