@@ -1,7 +1,8 @@
 import { Hono } from 'hono';
 import mediaRoutes from './media-routes.ts';
+import propertyAdmin from './property-admin-routes.ts';
 import { drizzle } from 'drizzle-orm/d1';
-import { and, desc, eq, gte, lte, lt, or } from 'drizzle-orm';
+import { and, desc, eq, gte, lte, lt, or, isNull } from 'drizzle-orm';
 import { profiles, properties } from './db/schema.ts';
 import { authorizeStaffProfile, extractBearer, firebaseProjectConfigured, verifyFirebaseIdToken } from './auth.ts';
 import { encodeCursor, parsePropertyQuery } from './property-query.ts';
@@ -14,6 +15,8 @@ type Bindings = {
   ALLOWED_ORIGIN: string;
   FIREBASE_PROJECT_ID: string;
   MEDIA_WRITES_ENABLED?: string;
+  PROPERTY_WRITES_ENABLED?: string;
+  FIREBASE_WEB_API_KEY?: string;
 };
 
 const app = new Hono<{ Bindings: Bindings }>();
@@ -109,7 +112,7 @@ app.get('/v1/properties', async c => {
   if (!parsed.ok) return c.json({ error: parsed.error }, 400);
   const f = parsed.value;
 
-  const where = [eq(properties.published, true)];
+  const where = [eq(properties.published, true), isNull(properties.deletedAt)];
   if (f.type) where.push(eq(properties.propertyType, f.type as (typeof properties.$inferSelect)['propertyType']));
   if (f.status) where.push(eq(properties.status, f.status as (typeof properties.$inferSelect)['status']));
   if (f.province) where.push(eq(properties.province, f.province));
@@ -148,7 +151,7 @@ app.get('/v1/properties/:identifier', async c => {
   const db = drizzle(c.env.DB);
   const rows = await db.select(publicFields)
     .from(properties)
-    .where(and(eq(properties.published, true), or(eq(properties.code, identifier), eq(properties.slug, identifier))))
+    .where(and(eq(properties.published, true), isNull(properties.deletedAt), or(eq(properties.code, identifier), eq(properties.slug, identifier))))
     .limit(1);
   if (!rows.length) return c.json({ error: 'Property not found' }, 404);
   c.header('Cache-Control', 'public, max-age=30, s-maxage=60, stale-while-revalidate=60');
@@ -156,6 +159,7 @@ app.get('/v1/properties/:identifier', async c => {
 });
 
 app.route('/', mediaRoutes);
+app.route('/', propertyAdmin);
 
 app.notFound(c => c.json({ error: 'Not found' }, 404));
 app.onError((error, c) => {
