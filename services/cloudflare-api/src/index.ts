@@ -55,7 +55,7 @@ const publicFields = {
   updatedAt: properties.updatedAt,
 };
 
-function toPublicProperty(row: { featuresJson: string; [key: string]: unknown }) {
+function toPublicProperty<T extends { featuresJson: string }>(row: T) {
   const { featuresJson, ...fields } = row;
   let features: string[] = [];
   try {
@@ -73,8 +73,8 @@ app.get('/v1/properties', async c => {
   const f = parsed.value;
 
   const where = [eq(properties.published, true)];
-  if (f.type) where.push(eq(properties.propertyType, f.type as (typeof properties.propertyType._.data)));
-  if (f.status) where.push(eq(properties.status, f.status as (typeof properties.status._.data)));
+  if (f.type) where.push(eq(properties.propertyType, f.type as (typeof properties.$inferSelect)['propertyType']));
+  if (f.status) where.push(eq(properties.status, f.status as (typeof properties.$inferSelect)['status']));
   if (f.province) where.push(eq(properties.province, f.province));
   if (f.district) where.push(eq(properties.district, f.district));
   if (f.minPrice !== undefined) where.push(gte(properties.price, f.minPrice));
