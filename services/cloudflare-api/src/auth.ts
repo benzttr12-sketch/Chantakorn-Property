@@ -55,3 +55,16 @@ export async function verifyFirebaseIdToken(
     return null;
   }
 }
+
+export type StaffRole = 'ADMIN' | 'AGENT';
+
+export function authorizeStaffProfile(
+  identity: VerifiedIdentity,
+  profile: { uid: string; role: string; authDisabled: boolean; tokensValidAfter: number } | undefined,
+): StaffRole | null {
+  if (!profile || profile.uid !== identity.uid || profile.authDisabled) return null;
+  if (profile.role !== 'ADMIN' && profile.role !== 'AGENT') return null;
+  if (!Number.isFinite(profile.tokensValidAfter) || profile.tokensValidAfter < 0 ||
+      identity.authTime < profile.tokensValidAfter) return null;
+  return profile.role;
+}
