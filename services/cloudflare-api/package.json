@@ -20,7 +20,7 @@
     "@cloudflare/workers-types": "4.20260127.0",
     "drizzle-kit": "0.31.10",
     "typescript": "5.8.2",
-    "wrangler": "4.45.0",
+    "wrangler": "4.151.2",
     "@types/node": "22.15.0"
   }
 }
