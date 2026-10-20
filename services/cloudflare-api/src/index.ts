@@ -113,7 +113,7 @@ app.get('/v1/properties/:identifier', async c => {
     return c.json({ error: 'Invalid listing identifier' }, 400);
   }
   const db = drizzle(c.env.DB);
-  const rows = await db.select(publicFields)
+  const rows = await db.select()
     .from(properties)
     .where(and(eq(properties.published, true), isNull(properties.deletedAt), or(eq(properties.code, identifier), eq(properties.slug, identifier))))
     .limit(1);
