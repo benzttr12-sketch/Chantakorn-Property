@@ -1,0 +1,19 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "chantakorn-property-api",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-10-01",
+  "d1_databases": [{
+    "binding": "DB",
+    "database_name": "chantakorn-property-production",
+    "database_id": "REPLACE_WITH_PRODUCTION_D1_UUID",
+    "migrations_dir": "migrations"
+  }],
+  "r2_buckets": [
+    {"binding": "PROPERTY_MEDIA", "bucket_name": "chantakorn-property-media-production"},
+    {"binding": "PRIVATE_MEDIA", "bucket_name": "chantakorn-inquiry-private-production"}
+  ],
+  "vars": {
+    "ALLOWED_ORIGIN": "https://chantakornproperty.com"
+  }
+}
