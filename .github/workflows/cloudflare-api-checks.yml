@@ -33,3 +33,16 @@ jobs:
         run: npm test
       - name: Verify D1 migration using isolated in-memory SQLite
         run: python3 scripts/verify_schema.py
+
+      # Temporary: make npm's resolved dependency graph reviewable,
+      # without granting GitHub Actions write access to the repository.
+      - name: Emit generated npm lockfile for offline review
+        run: |
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          lock = Path('package-lock.json').read_text(encoding='utf-8')
+          for i in range(0, len(lock), 4000):
+              print(f'LOCKFILE_CHUNK:{i}:' + json.dumps(lock[i:i+4000], ensure_ascii=True))
+          print(f'LOCKFILE_LENGTH:{len(lock)}')
+          PY
