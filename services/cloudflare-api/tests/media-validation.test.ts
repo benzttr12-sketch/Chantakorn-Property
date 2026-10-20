@@ -5,11 +5,9 @@ import {
   sniffImage, validBrowserOrigin, validMediaId, validOwnerId,
 } from '../src/media-validation.ts';
 
-const jpeg = new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x00, 0xff, 0xd9]);
-const png = new Uint8Array([
-  137,80,78,71,13,10,26,10,0,0,0,13,73,72,68,82,0,0,0,1,0,0,0,1,8,6,0,0,0,
-  0,0,0,0,0,0,0,0,73,69,78,68,0,0,0,0,
-]);
+const jpeg = new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 0,0,0,0,0,0,0,0,0,0,0xff,0xd9]);
+const png = new Uint8Array(Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/lE8AAAAASUVORK5CYII=', 'base64'));
+
 const webp = new Uint8Array([
   82,73,70,70,12,0,0,0,87,69,66,80,86,80,56,32,0,0,0,0,
 ]);
