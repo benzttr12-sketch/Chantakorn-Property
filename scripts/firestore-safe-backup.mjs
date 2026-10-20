@@ -24,6 +24,11 @@ import { encodeFirestoreValue, validateEncryptedBackupManifest } from './firesto
 
 const scrypt = promisify(scryptCallback);
 const PAGE_SIZE = 100;
+
+// Manifest intentionally hides intermediate document IDs in subcollection paths.
+function redactedCollectionPath(collectionPath) {
+  return collectionPath.split('/').map((segment, index) => index % 2 === 0 ? segment : '{doc}').join('/');
+}
 const password = process.env.CHANTAKORN_BACKUP_PASSPHRASE;
 const command = process.argv[2];
 const filePath = process.argv[3] && resolve(process.argv[3]);
@@ -66,7 +71,8 @@ async function* walkCollection(collection, counter, maxRecords) {
     for (const snapshot of page.docs) {
       if (++counter.records > maxRecords) throw new Error('Backup document cap reached; aborting incomplete archive');
       const collectionPath = collection.path;
-      counter.collections[collectionPath] = (counter.collections[collectionPath] ?? 0) + 1;
+      const publicCollectionPath = redactedCollectionPath(collectionPath);
+      counter.collections[publicCollectionPath] = (counter.collections[publicCollectionPath] ?? 0) + 1;
       const line = {
         path: snapshot.ref.path,
         create_time: snapshot.createTime ? encodeFirestoreValue(snapshot.createTime) : null,
@@ -166,7 +172,7 @@ async function verify() {
       }
       const parts = item.path.split('/');
       if (parts.length % 2 !== 0 || parts.some(part => !part)) throw new Error('Invalid archived document path');
-      const collPath = parts.slice(0, -1).join('/');
+      const collPath = redactedCollectionPath(parts.slice(0, -1).join('/'));
       collectionCounts[collPath] = (collectionCounts[collPath] ?? 0) + 1;
       count++;
     }
@@ -194,6 +200,18 @@ try {
   }
 } catch (err) {
   // Never log records, passphrases or underlying stack with possible sensitive IDs.
-  console.error(`Backup ${command === 'backup' ? 'creation' : 'verification'} failed: ${err instanceof Error ? err.message : 'unknown error'}`);
+  const knownErrors = new Set([
+    'Read quota gate: set ALLOW_FIRESTORE_EXPORT_READS=I_UNDERSTAND',
+    'Explicit Firebase project and NAMED Firestore database must match committed configuration',
+    'Archive path MUST be outside the Git repository',
+    'Existing archive or manifest must never be overwritten',
+    'Backup document cap reached; aborting incomplete archive',
+    'Encrypted archive checksum mismatch',
+    'Archive document count mismatch',
+    'Collection record count mismatch',
+    'Unexpected archive collections',
+  ]);
+  const message = err instanceof Error && knownErrors.has(err.message) ? err.message : 'Check local permissions, settings, passphrase and available storage';
+  console.error(`Backup ${command === 'backup' ? 'creation' : 'verification'} failed: ${message}`);
   process.exitCode = 1;
 }
