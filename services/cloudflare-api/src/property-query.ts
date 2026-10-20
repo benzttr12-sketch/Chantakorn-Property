@@ -69,7 +69,7 @@ export function parsePropertyQuery(params: URLSearchParams): ParsedQuery {
   }
 
   const token = params.get('cursor');
-  const cursor = token ? decodeCursor(token) : undefined;
+  const cursor = token === null ? undefined : (decodeCursor(token) ?? undefined);
   if (token !== null && !cursor) return { ok: false, error: 'Invalid cursor' };
   return { ok: true, value: { limit, type, status, province, district, minPrice, maxPrice, cursor } };
 }
