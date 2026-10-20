@@ -1,4 +1,4 @@
-import { Hono } from 'hono';
+import { Hono, type Context } from 'hono';
 import { drizzle } from 'drizzle-orm/d1';
 import { and, eq, sql } from 'drizzle-orm';
 import { inquiryMedia, inquiries, profiles, properties, propertyMedia } from './db/schema.ts';
@@ -98,7 +98,7 @@ media.get('/v1/media/inquiries/:mediaId', async c => {
   return new Response(object.body, { status: 200, headers: objectHeaders(row.type, object.httpEtag, true) });
 });
 
-async function upload(c: Parameters<Parameters<typeof media.post>[1]>[0], kind: 'property' | 'inquiry') {
+async function upload(c: Context<{ Bindings: Env }>, kind: 'property' | 'inquiry') {
   c.header('Cache-Control', 'private, no-store');
   // Controlled rollout: never allow production writes merely from a JWT.
   if (c.env.MEDIA_WRITES_ENABLED !== 'true') return c.json({ error: 'Media uploads are disabled' }, 503);
@@ -120,11 +120,10 @@ async function upload(c: Parameters<Parameters<typeof media.post>[1]>[0], kind: 
       .where(eq(inquiries.id, ownerId)).limit(1);
     if (!owner) return c.json({ error: 'Inquiry not found' }, 404);
   }
-  const mediaTable = kind === 'property' ? propertyMedia : inquiryMedia;
   const limit = kind === 'property' ? MAX_PROPERTY_IMAGES : MAX_INQUIRY_IMAGES;
-  const countByOwner = kind === 'property'
-    ? eq(propertyMedia.propertyId, ownerId) : eq(inquiryMedia.inquiryId, ownerId);
-  const [count] = await database.select({ total: sql<number>`count(*)` }).from(mediaTable).where(countByOwner);
+  const [count] = kind === 'property'
+    ? await database.select({ total: sql<number>`count(*)` }).from(propertyMedia).where(eq(propertyMedia.propertyId, ownerId))
+    : await database.select({ total: sql<number>`count(*)` }).from(inquiryMedia).where(eq(inquiryMedia.inquiryId, ownerId));
   if (Number(count?.total || 0) >= limit)
     return c.json({ error: 'Too many images for this record' }, 429);
 
