@@ -48,7 +48,7 @@ export function toEditorProperty(row: DbProperty, files: MediaRecord[], includeP
   return includePrivate ? { ...fields, internal_notes: row.internalNotes ?? '' } : fields;
 }
 
-async function mediaForRows(db: ReturnType<typeof drizzle>, rows: DbProperty[]) {
+export async function mediaForRows(db: ReturnType<typeof drizzle>, rows: DbProperty[]) {
   if (!rows.length) return new Map<string, MediaRecord[]>();
   const records = await db.select({
     id: propertyMedia.id,
@@ -200,6 +200,8 @@ propertyAdmin.patch('/v1/admin/properties/:id', async c => {
     return c.json({ error: 'expected_updated_at is required' }, 400);
   const parsed = parseEditorInput(reqBody.updates, true);
   if (!parsed.ok) return c.json({ error: parsed.error }, 400);
+  if (parsed.fields.published === true && c.env.PROPERTY_PUBLICATION_ENABLED !== 'true')
+    return c.json({ error: 'Publication is disabled until public catalog cutover' }, 503);
   const db = drizzle(c.env.DB);
   const [current] = await db.select().from(properties)
     .where(and(eq(properties.id, id), isNull(properties.deletedAt))).limit(1);
