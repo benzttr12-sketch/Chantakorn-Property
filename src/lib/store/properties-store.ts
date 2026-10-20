@@ -312,11 +312,11 @@ export async function createProperty(property: Omit<Property, 'id' | 'created_at
   return newProperty;
 }
 
-export async function updateProperty(id: string, updates: Partial<Property>): Promise<Property | null> {
+export async function updateProperty(id: string, updates: Partial<Property>, expectedUpdatedAt?: string): Promise<Property | null> {
   requireStaffBackend();
   if (useCloudflarePropertyBackend) {
     const { cloudflareUpdateProperty } = await import('@/lib/cloudflare-properties');
-    return cloudflareUpdateProperty(id, updates);
+    return cloudflareUpdateProperty(id, updates, expectedUpdatedAt);
   }
   const { id: ignoredId, created_at: ignoredCreated, images, agent, ...fields } = updates;
   const changes = { ...fields, updated_at: new Date().toISOString() };
@@ -364,11 +364,11 @@ export async function updateProperty(id: string, updates: Partial<Property>): Pr
   return updated;
 }
 
-export async function deleteProperty(id: string): Promise<boolean> {
+export async function deleteProperty(id: string, expectedUpdatedAt?: string): Promise<boolean> {
   requireStaffBackend();
   if (useCloudflarePropertyBackend) {
     const { cloudflareDeleteProperty } = await import('@/lib/cloudflare-properties');
-    return cloudflareDeleteProperty(id);
+    return cloudflareDeleteProperty(id, expectedUpdatedAt);
   }
   const firestore: Firestore | null = db;
   if (dataBackend === 'firebase' && firestore) {
