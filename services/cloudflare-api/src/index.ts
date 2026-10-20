@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import mediaRoutes from './media-routes.ts';
-import propertyAdmin from './property-admin-routes.ts';
+import propertyAdmin, { mediaForRows, toEditorProperty } from './property-admin-routes.ts';
 import { drizzle } from 'drizzle-orm/d1';
 import { and, desc, eq, gte, lte, lt, or, isNull } from 'drizzle-orm';
 import { profiles, properties } from './db/schema.ts';
@@ -16,6 +16,7 @@ type Bindings = {
   FIREBASE_PROJECT_ID: string;
   MEDIA_WRITES_ENABLED?: string;
   PROPERTY_WRITES_ENABLED?: string;
+  PROPERTY_PUBLICATION_ENABLED?: string;
   FIREBASE_WEB_API_KEY?: string;
 };
 
@@ -67,46 +68,8 @@ app.get('/v1/staff/me', async c => {
   return c.json({ uid: identity.uid, full_name: profile.fullName, role });
 });
 
-// Explicit field allowlist prevents internal_notes, staff/customer contacts and other
-// future private columns becoming visible when schema changes.
-const publicFields = {
-  id: properties.id,
-  code: properties.code,
-  slug: properties.slug,
-  title: properties.title,
-  description: properties.description,
-  propertyType: properties.propertyType,
-  status: properties.status,
-  price: properties.price,
-  province: properties.province,
-  district: properties.district,
-  subdistrict: properties.subdistrict,
-  latitude: properties.latitude,
-  longitude: properties.longitude,
-  bedrooms: properties.bedrooms,
-  bathrooms: properties.bathrooms,
-  parking: properties.parking,
-  landSize: properties.landSize,
-  usableArea: properties.usableArea,
-  featuresJson: properties.featuresJson,
-  coverImage: properties.coverImage,
-  featured: properties.featured,
-  createdAt: properties.createdAt,
-  updatedAt: properties.updatedAt,
-};
-
-function toPublicProperty<T extends { featuresJson: string }>(row: T) {
-  const { featuresJson, ...fields } = row;
-  let features: string[] = [];
-  try {
-    const raw: unknown = JSON.parse(featuresJson);
-    if (Array.isArray(raw)) features = raw.filter((v): v is string => typeof v === 'string').slice(0, 30);
-  } catch {
-    // Malformed legacy JSON cannot crash a public listing page.
-  }
-  return { ...fields, features };
-}
-
+// Public serialization uses an explicit field allowlist in toEditorProperty()
+// (includePrivate=false). Drafts and soft-deleted listings are filtered in SQL.
 app.get('/v1/properties', async c => {
   const parsed = parsePropertyQuery(new URL(c.req.url).searchParams);
   if (!parsed.ok) return c.json({ error: parsed.error }, 400);
@@ -127,7 +90,7 @@ app.get('/v1/properties', async c => {
     )!);
   }
   const db = drizzle(c.env.DB);
-  const rows = await db.select(publicFields)
+  const rows = await db.select()
     .from(properties)
     .where(and(...where))
     .orderBy(desc(properties.createdAt), desc(properties.id))
@@ -136,9 +99,10 @@ app.get('/v1/properties', async c => {
   const hasMore = rows.length > f.limit;
   const visible = rows.slice(0, f.limit);
   const last = visible.at(-1);
+  const media = await mediaForRows(db, visible);
   c.header('Cache-Control', 'public, max-age=30, s-maxage=60, stale-while-revalidate=60');
   return c.json({
-    data: visible.map(toPublicProperty),
+    data: visible.map(row => toEditorProperty(row, media.get(row.id) || [], false)),
     next_cursor: hasMore && last ? encodeCursor({ createdAt: last.createdAt, id: last.id }) : null,
   });
 });
@@ -154,8 +118,9 @@ app.get('/v1/properties/:identifier', async c => {
     .where(and(eq(properties.published, true), isNull(properties.deletedAt), or(eq(properties.code, identifier), eq(properties.slug, identifier))))
     .limit(1);
   if (!rows.length) return c.json({ error: 'Property not found' }, 404);
+  const media = await mediaForRows(db, rows);
   c.header('Cache-Control', 'public, max-age=30, s-maxage=60, stale-while-revalidate=60');
-  return c.json({ data: toPublicProperty(rows[0]) });
+  return c.json({ data: toEditorProperty(rows[0], media.get(rows[0].id) || [], false) });
 });
 
 app.route('/', mediaRoutes);
