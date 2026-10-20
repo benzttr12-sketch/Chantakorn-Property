@@ -31,6 +31,8 @@ jobs:
         run: npm run typecheck
       - name: Test query validation and cursors
         run: npm test
+      - name: Exercise local Worker HTTP with D1, R2 and signed Firebase fixtures
+        run: npm run test:integration
       - name: Verify D1 migration using isolated in-memory SQLite
         run: python3 scripts/verify_schema.py
 

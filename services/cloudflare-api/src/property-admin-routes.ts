@@ -90,6 +90,14 @@ async function body(c: Ctx): Promise<unknown> {
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 function validId(id: string | undefined): id is string { return !!id && uuid.test(id); }
 
+/** A successful save must consume its observed revision, even within one clock tick. */
+export function nextPropertyRevision(previous: string, now = Date.now()): string {
+  const previousTime = Date.parse(previous);
+  if (!Number.isFinite(previousTime) || new Date(previousTime).toISOString() !== previous ||
+      !Number.isSafeInteger(now)) throw new Error('Invalid property revision timestamp');
+  return new Date(Math.max(now, previousTime + 1)).toISOString();
+}
+
 propertyAdmin.options('/v1/admin/properties/*', c => {
   if (c.req.header('Origin') !== c.env.ALLOWED_ORIGIN) return c.json({ error: 'Origin forbidden' }, 403);
   c.header('Access-Control-Allow-Origin', c.env.ALLOWED_ORIGIN);
@@ -225,7 +233,7 @@ propertyAdmin.patch('/v1/admin/properties/:id', async c => {
   const changes = { ...parsed.fields, ...(coverRequested ? { coverImage } : {}) };
   if (!Object.keys(changes).length) return c.json({ error: 'Nothing to update' }, 400);
   // Optimistic lock prevents simultaneous edits from silently overwriting one another.
-  const now = new Date().toISOString();
+  const now = nextPropertyRevision(current.updatedAt);
   try {
     const updatedRows = await db.update(properties).set({ ...changes, updatedAt: now })
       .where(and(eq(properties.id, id), eq(properties.updatedAt, expected), isNull(properties.deletedAt)))

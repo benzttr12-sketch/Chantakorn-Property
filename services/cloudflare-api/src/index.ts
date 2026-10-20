@@ -3,8 +3,8 @@ import mediaRoutes from './media-routes.ts';
 import propertyAdmin, { mediaForRows, toEditorProperty } from './property-admin-routes.ts';
 import { drizzle } from 'drizzle-orm/d1';
 import { and, desc, eq, gte, lte, lt, or, isNull } from 'drizzle-orm';
-import { profiles, properties } from './db/schema.ts';
-import { authorizeStaffProfile, extractBearer, firebaseProjectConfigured, verifyFirebaseIdToken } from './auth.ts';
+import { properties } from './db/schema.ts';
+import { authorizePropertyStaff } from './property-auth.ts';
 import { encodeCursor, parsePropertyQuery } from './property-query.ts';
 
 type Bindings = {
@@ -49,23 +49,9 @@ app.options('/v1/staff/me', c => {
 // Requires a real signed Firebase ID token plus a pre-approved D1 staff profile.
 app.get('/v1/staff/me', async c => {
   c.header('Cache-Control', 'private, no-store');
-  if (!firebaseProjectConfigured(c.env?.FIREBASE_PROJECT_ID)) {
-    return c.json({ error: 'Authentication not configured' }, 503);
-  }
-  const bearer = extractBearer(c.req.header('Authorization'));
-  if (!bearer) return c.json({ error: 'Authentication required' }, 401);
-  const identity = await verifyFirebaseIdToken(bearer, c.env.FIREBASE_PROJECT_ID);
-  if (!identity) return c.json({ error: 'Invalid or unverified Firebase token' }, 401);
-  const [profile] = await drizzle(c.env.DB).select({
-    uid: profiles.uid,
-    fullName: profiles.fullName,
-    role: profiles.role,
-    authDisabled: profiles.authDisabled,
-    tokensValidAfter: profiles.tokensValidAfter,
-  }).from(profiles).where(eq(profiles.uid, identity.uid)).limit(1);
-  const role = authorizeStaffProfile(identity, profile);
-  if (!role) return c.json({ error: 'Insufficient privileges' }, 403);
-  return c.json({ uid: identity.uid, full_name: profile.fullName, role });
+  const result = await authorizePropertyStaff(c.env, c.req.header('Authorization'), true);
+  if (!result.ok) return c.json({ error: result.error }, result.status);
+  return c.json({ uid: result.uid, full_name: result.fullName, role: result.role });
 });
 
 // Public serialization uses an explicit field allowlist in toEditorProperty()
