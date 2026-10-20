@@ -1,7 +1,8 @@
 import { Hono } from 'hono';
 import { drizzle } from 'drizzle-orm/d1';
 import { and, desc, eq, gte, lte, lt, or } from 'drizzle-orm';
-import { properties } from './db/schema.ts';
+import { profiles, properties } from './db/schema.ts';
+import { authorizeStaffProfile, extractBearer, firebaseProjectConfigured, verifyFirebaseIdToken } from './auth.ts';
 import { encodeCursor, parsePropertyQuery } from './property-query.ts';
 
 type Bindings = {
@@ -10,6 +11,7 @@ type Bindings = {
   PROPERTY_MEDIA: R2Bucket;
   PRIVATE_MEDIA: R2Bucket;
   ALLOWED_ORIGIN: string;
+  FIREBASE_PROJECT_ID: string;
 };
 
 const app = new Hono<{ Bindings: Bindings }>();
@@ -26,6 +28,39 @@ app.use('*', async (c, next) => {
 });
 
 app.get('/health', c => c.json({ ok: true, service: 'chantakorn-d1-api', version: 1 }));
+
+app.options('/v1/staff/me', c => {
+  if (!c.env?.ALLOWED_ORIGIN || c.req.header('Origin') !== c.env.ALLOWED_ORIGIN) {
+    return c.json({ error: 'Forbidden origin' }, 403);
+  }
+  c.header('Access-Control-Allow-Headers', 'Authorization, Content-Type');
+  c.header('Access-Control-Allow-Methods', 'GET, OPTIONS');
+  c.header('Access-Control-Max-Age', '300');
+  return c.body(null, 204);
+});
+
+// Preview-only private endpoint. No mutations and NO self-assigned roles.
+// Requires a real signed Firebase ID token plus a pre-approved D1 staff profile.
+app.get('/v1/staff/me', async c => {
+  c.header('Cache-Control', 'private, no-store');
+  if (!firebaseProjectConfigured(c.env?.FIREBASE_PROJECT_ID)) {
+    return c.json({ error: 'Authentication not configured' }, 503);
+  }
+  const bearer = extractBearer(c.req.header('Authorization'));
+  if (!bearer) return c.json({ error: 'Authentication required' }, 401);
+  const identity = await verifyFirebaseIdToken(bearer, c.env.FIREBASE_PROJECT_ID);
+  if (!identity) return c.json({ error: 'Invalid or unverified Firebase token' }, 401);
+  const [profile] = await drizzle(c.env.DB).select({
+    uid: profiles.uid,
+    fullName: profiles.fullName,
+    role: profiles.role,
+    authDisabled: profiles.authDisabled,
+    tokensValidAfter: profiles.tokensValidAfter,
+  }).from(profiles).where(eq(profiles.uid, identity.uid)).limit(1);
+  const role = authorizeStaffProfile(identity, profile);
+  if (!role) return c.json({ error: 'Insufficient privileges' }, 403);
+  return c.json({ uid: identity.uid, full_name: profile.fullName, role });
+});
 
 // Explicit field allowlist prevents internal_notes, staff/customer contacts and other
 // future private columns becoming visible when schema changes.
