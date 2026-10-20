@@ -2,7 +2,9 @@
 import sqlite3
 from pathlib import Path
 
-sql = (Path(__file__).parents[1] / 'migrations' / '0001_initial.sql').read_text(encoding='utf-8')
+migrations = sorted((Path(__file__).parents[1] / 'migrations').glob('*.sql'))
+assert len(migrations) >= 2, 'Expected auth-state migration after initial schema'
+sql = '\n'.join(path.read_text(encoding='utf-8') for path in migrations)
 db = sqlite3.connect(':memory:')
 db.row_factory = sqlite3.Row
 db.executescript(sql)
@@ -15,6 +17,9 @@ required = {
 }
 assert required <= tables, f'Missing tables: {required - tables}'
 assert db.execute('SELECT COUNT(*) FROM properties').fetchone()[0] == 0, 'Do not seed legacy properties'
+assert db.execute('SELECT COUNT(*) FROM profiles').fetchone()[0] == 0, 'Never seed staff roles from fixtures'
+profile_columns = {row['name'] for row in db.execute('PRAGMA table_info(profiles)')}
+assert {'auth_disabled', 'tokens_valid_after'} <= profile_columns, 'Auth state fields missing'
 
 now = '2026-10-20T05:00:00.000Z'
 def property_values(id, published, notes):
@@ -40,5 +45,13 @@ except sqlite3.IntegrityError:
 else:
     raise AssertionError('Published flag must be constrained to 0/1')
 assert db.execute("PRAGMA foreign_key_check").fetchall() == []
+db.execute("INSERT INTO profiles (uid,full_name,created_at,updated_at) VALUES ('uid1','Staff test',?,?)", (now, now))
+assert db.execute("SELECT role, auth_disabled, tokens_valid_after FROM profiles WHERE uid='uid1'").fetchone() == ('USER', 0, 0), 'New user must start with USER role'
+try:
+    db.execute("UPDATE profiles SET role='SUPER_ADMIN' WHERE uid='uid1'")
+except sqlite3.IntegrityError:
+    pass
+else:
+    raise AssertionError('Invalid staff role must be rejected by DB')
 db.close()
 print('OK: D1 fresh-start SQL creates expected tables, starts empty, bounds public queries and uses indexed ordering')
