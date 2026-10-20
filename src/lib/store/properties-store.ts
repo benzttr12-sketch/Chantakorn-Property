@@ -7,6 +7,10 @@ import { db } from '@/lib/firebase/client';
 import { dataBackend } from '@/lib/backend';
 import { fetchStaffApi } from '@/lib/staff-api';
 import { apiUrl } from '@/lib/api-url';
+import {
+  useCloudflarePropertyBackend, cloudflareListProperties, cloudflarePublicDetail,
+  cloudflareCreateProperty, cloudflareUpdateProperty, cloudflareDeleteProperty,
+} from '@/lib/cloudflare-properties';
 import { preparePropertyMedia, removeUnusedPropertyMedia } from '@/lib/property-media';
 import { submitFirebaseInquiry } from '@/lib/inquiry-submit';
 import { 
@@ -168,6 +172,7 @@ function filterProperties(properties: Property[], filters?: PropertyFilters): Pr
 
 async function loadProperties(includeUnpublished: boolean): Promise<Property[]> {
   requireConnection();
+  if (useCloudflarePropertyBackend) return (await cloudflareListProperties(includeUnpublished)).map(rowToProperty);
   const firestore: Firestore | null = db;
   if (dataBackend === 'firebase') {
     if (firestore) {
@@ -208,6 +213,10 @@ function matchesPropertyKey(property: Property, key: string): boolean {
 
 export async function fetchPropertyBySlug(slug: string): Promise<Property | null> {
   requireConnection();
+  if (useCloudflarePropertyBackend) {
+    const result = await cloudflarePublicDetail(slug);
+    return result ? rowToProperty(result) : null;
+  }
   return (await loadProperties(false)).find(property => matchesPropertyKey(property, slug)) || null;
 }
 
@@ -251,6 +260,7 @@ async function triggerLineNotification(property: Property) {
 
 export async function createProperty(property: Omit<Property, 'id' | 'created_at'>): Promise<Property> {
   requireStaffBackend();
+  if (useCloudflarePropertyBackend) return cloudflareCreateProperty(property);
   const firestore: Firestore | null = db;
   if (dataBackend === 'firebase' && firestore) {
     const newId = generateShortPropertyId();
@@ -300,6 +310,7 @@ export async function createProperty(property: Omit<Property, 'id' | 'created_at
 
 export async function updateProperty(id: string, updates: Partial<Property>): Promise<Property | null> {
   requireStaffBackend();
+  if (useCloudflarePropertyBackend) return cloudflareUpdateProperty(id, updates);
   const { id: ignoredId, created_at: ignoredCreated, images, agent, ...fields } = updates;
   const changes = { ...fields, updated_at: new Date().toISOString() };
   const firestore: Firestore | null = db;
@@ -348,6 +359,7 @@ export async function updateProperty(id: string, updates: Partial<Property>): Pr
 
 export async function deleteProperty(id: string): Promise<boolean> {
   requireStaffBackend();
+  if (useCloudflarePropertyBackend) return cloudflareDeleteProperty(id);
   const firestore: Firestore | null = db;
   if (dataBackend === 'firebase' && firestore) {
     await deleteDoc(doc(firestore, 'properties', id));
