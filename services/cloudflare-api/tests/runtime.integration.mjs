@@ -27,7 +27,7 @@ test('local Worker HTTP / D1 / R2 / Firebase authorization contract', async t =>
     d1Databases: ['DB'], r2Buckets: ['PROPERTY_MEDIA', 'PRIVATE_MEDIA'],
     bindings: { ALLOWED_ORIGIN: origin, FIREBASE_PROJECT_ID: project,
       FIREBASE_WEB_API_KEY: 'synthetic-key-for-local-tests-only',
-      PROPERTY_WRITES_ENABLED: 'true', PROPERTY_PUBLICATION_ENABLED: 'false', MEDIA_WRITES_ENABLED: 'true' },
+      PUBLIC_CATALOG_CACHE_ENABLED: 'true', PROPERTY_WRITES_ENABLED: 'true', PROPERTY_PUBLICATION_ENABLED: 'false', MEDIA_WRITES_ENABLED: 'true' },
     outboundService: async request => {
       const url = new URL(request.url);
       if (url.origin === 'https://www.googleapis.com' &&
@@ -44,8 +44,10 @@ test('local Worker HTTP / D1 / R2 / Firebase authorization contract', async t =>
   t.after(() => mf.dispose());
   const db = await mf.getD1Database('DB');
   for (const file of (await readdir('migrations')).filter(x => x.endsWith('.sql')).sort()) {
-    const sql = (await readFile('migrations/' + file, 'utf8')).replace(/^\s*--.*$/gm, '');
-    for (const statement of sql.split(';').map(x => x.trim()).filter(Boolean))
+    const source = await readFile('migrations/' + file, 'utf8');
+    const statements = source.includes('--> statement-breakpoint')
+      ? source.split('--> statement-breakpoint') : source.split(';');
+    for (const statement of statements.map(x => x.replace(/^\s*--.*$/gm, '').trim()).filter(Boolean))
       await db.prepare(statement).run();
   }
   const headers = { Authorization: 'Bearer ' + token, Origin: origin, 'Content-Type': 'application/json' };
@@ -87,7 +89,7 @@ test('local Worker HTTP / D1 / R2 / Firebase authorization contract', async t =>
 
   await t.test('public SQL filters and cursor pagination exclude private fields', async () => {
     const first = await fetchApi('/v1/properties?limit=1');
-    assert.match(first.headers.get('Cache-Control'), /s-maxage=60/);
+    assert.equal(first.headers.get('Cache-Control'), 'no-store');
     const a = await first.json();
     const b = await (await fetchApi('/v1/properties?limit=1&cursor=' + encodeURIComponent(a.next_cursor))).json();
     assert.equal(a.data.length, 1); assert.equal(b.data.length, 1);
@@ -97,6 +99,39 @@ test('local Worker HTTP / D1 / R2 / Firebase authorization contract', async t =>
     assert.equal((await fetchApi('/v1/properties/draft')).status, 404);
     assert.equal((await fetchApi('/v1/properties/deleted')).status, 404);
     assert.equal((await fetchApi('/v1/properties?limit=999')).status, 400);
+  });
+  await t.test('catalog cache hits only validated public queries and invalidates on committed writes', async () => {
+    const path = '/v1/properties?limit=30';
+    assert.equal((await fetchApi(path)).headers.get('X-Catalog-Cache'), 'MISS');
+    const hit = await fetchApi(path, { headers: { Origin: origin } });
+    assert.equal(hit.headers.get('X-Catalog-Cache'), 'HIT');
+    assert.equal(hit.headers.get('Cache-Control'), 'no-store');
+    assert.equal(hit.headers.get('Access-Control-Allow-Origin'), origin);
+    const otherOrigin = await fetchApi(path, { headers: { Origin: 'https://other.example.test' } });
+    assert.equal(otherOrigin.headers.get('X-Catalog-Cache'), 'HIT');
+    assert.equal(otherOrigin.headers.get('Access-Control-Allow-Origin'), null);
+    assert.equal((await fetchApi(path, { headers })).headers.get('X-Catalog-Cache'), 'BYPASS');
+    assert.equal((await fetchApi(path, { headers: { Cookie: 'session=synthetic' } })).headers.get('X-Catalog-Cache'), 'BYPASS');
+    assert.equal((await fetchApi(path + '&limit=30')).status, 400);
+    assert.equal((await fetchApi(path + '&__catalog_generation=forged')).status, 400);
+    assert.equal((await fetchApi(path + '&type=land')).headers.get('X-Catalog-Cache'), 'MISS');
+    await fetchApi('/v1/properties/published');
+    assert.equal((await fetchApi('/v1/properties/published')).headers.get('X-Catalog-Cache'), 'HIT');
+    const updated = await fetchApi('/v1/admin/properties/' + publicId, { method: 'PATCH', headers,
+      body: JSON.stringify({ updates: { published: false }, expected_updated_at: '2026-10-20T00:00:00.000Z' }) });
+    assert.equal(updated.status, 200);
+    const after = await fetchApi(path);
+    assert.equal(after.headers.get('X-Catalog-Cache'), 'MISS');
+    assert.ok(!(await after.json()).data.some(row => row.id === publicId));
+    assert.equal((await fetchApi('/v1/properties/published')).status, 404);
+    // Direct SQL also invalidates, for operator maintenance outside the HTTP routes.
+    await db.prepare('UPDATE properties SET published=1 WHERE id=?').bind(publicId).run();
+    assert.equal((await fetchApi('/v1/properties/published')).status, 200);
+    const version = (await db.prepare('SELECT version FROM catalog_generation WHERE id=1').first()).version;
+    await db.prepare("UPDATE catalog_generation SET version='broken' WHERE id=1").run();
+    const failed = await fetchApi(path);
+    assert.equal(failed.status, 503); assert.equal(failed.headers.get('Cache-Control'), 'no-store');
+    await db.prepare('UPDATE catalog_generation SET version=? WHERE id=1').bind(version).run();
   });
   await t.test('private R2 read requires active signed Firebase staff identity', async () => {
     const anonymous = await fetchApi('/v1/media/inquiries/' + privateId);
@@ -127,7 +162,7 @@ test('local Worker HTTP / D1 / R2 / Firebase authorization contract', async t =>
   });
   await t.test('R2 public delivery stops after unpublishing', async () => {
     const response = await fetchApi('/v1/media/properties/' + mediaId);
-    assert.equal(response.status, 200); assert.match(response.headers.get('Cache-Control'), /max-age=30/);
+    assert.equal(response.status, 200); assert.equal(response.headers.get('Cache-Control'), 'no-store');
     await db.prepare('UPDATE properties SET published=0 WHERE id=?').bind(publicId).run();
     assert.equal((await fetchApi('/v1/media/properties/' + mediaId)).status, 404);
   });

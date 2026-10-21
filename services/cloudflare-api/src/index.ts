@@ -1,4 +1,5 @@
 import { Hono } from 'hono';
+import { publicCatalogPayload } from './public-catalog-cache.ts';
 import mediaRoutes from './media-routes.ts';
 import propertyAdmin, { mediaForRows, toEditorProperty } from './property-admin-routes.ts';
 import { drizzle } from 'drizzle-orm/d1';
@@ -9,6 +10,7 @@ import { encodeCursor, parsePropertyQuery } from './property-query.ts';
 
 type Bindings = {
   DB: D1Database;
+  PUBLIC_CATALOG_CACHE_ENABLED?: string;
   // Bound but deliberately not exposed by any endpoint until authenticated upload/read PR.
   PROPERTY_MEDIA: R2Bucket;
   PRIVATE_MEDIA: R2Bucket;
@@ -28,6 +30,7 @@ app.use('*', async (c, next) => {
     c.header('Access-Control-Allow-Origin', origin);
   }
   c.header('Vary', 'Origin');
+  c.header('Cache-Control', 'no-store');
   await next();
   c.header('X-Content-Type-Options', 'nosniff');
   c.header('Referrer-Policy', 'strict-origin-when-cross-origin');
@@ -60,37 +63,41 @@ app.get('/v1/properties', async c => {
   const parsed = parsePropertyQuery(new URL(c.req.url).searchParams);
   if (!parsed.ok) return c.json({ error: parsed.error }, 400);
   const f = parsed.value;
+  const result = await publicCatalogPayload(c.env, c.req.raw, async () => {
 
-  const where = [eq(properties.published, true), isNull(properties.deletedAt)];
-  if (f.type) where.push(eq(properties.propertyType, f.type as (typeof properties.$inferSelect)['propertyType']));
-  if (f.status) where.push(eq(properties.status, f.status as (typeof properties.$inferSelect)['status']));
-  if (f.province) where.push(eq(properties.province, f.province));
-  if (f.district) where.push(eq(properties.district, f.district));
-  if (f.minPrice !== undefined) where.push(gte(properties.price, f.minPrice));
-  if (f.maxPrice !== undefined) where.push(lte(properties.price, f.maxPrice));
-  if (f.cursor) {
-    const cursor = f.cursor;
-    where.push(or(
-      lt(properties.createdAt, cursor.createdAt),
-      and(eq(properties.createdAt, cursor.createdAt), lt(properties.id, cursor.id))
-    )!);
-  }
-  const db = drizzle(c.env.DB);
-  const rows = await db.select()
-    .from(properties)
-    .where(and(...where))
-    .orderBy(desc(properties.createdAt), desc(properties.id))
-    .limit(f.limit + 1);
+    const where = [eq(properties.published, true), isNull(properties.deletedAt)];
+    if (f.type) where.push(eq(properties.propertyType, f.type as (typeof properties.$inferSelect)['propertyType']));
+    if (f.status) where.push(eq(properties.status, f.status as (typeof properties.$inferSelect)['status']));
+    if (f.province) where.push(eq(properties.province, f.province));
+    if (f.district) where.push(eq(properties.district, f.district));
+    if (f.minPrice !== undefined) where.push(gte(properties.price, f.minPrice));
+    if (f.maxPrice !== undefined) where.push(lte(properties.price, f.maxPrice));
+    if (f.cursor) {
+      const cursor = f.cursor;
+      where.push(or(
+        lt(properties.createdAt, cursor.createdAt),
+        and(eq(properties.createdAt, cursor.createdAt), lt(properties.id, cursor.id))
+      )!);
+    }
+    const db = drizzle(c.env.DB);
+    const rows = await db.select()
+      .from(properties)
+      .where(and(...where))
+      .orderBy(desc(properties.createdAt), desc(properties.id))
+      .limit(f.limit + 1);
 
-  const hasMore = rows.length > f.limit;
-  const visible = rows.slice(0, f.limit);
-  const last = visible.at(-1);
-  const media = await mediaForRows(db, visible);
-  c.header('Cache-Control', 'public, max-age=30, s-maxage=60, stale-while-revalidate=60');
-  return c.json({
-    data: visible.map(row => toEditorProperty(row, media.get(row.id) || [], false)),
-    next_cursor: hasMore && last ? encodeCursor({ createdAt: last.createdAt, id: last.id }) : null,
+    const hasMore = rows.length > f.limit;
+    const visible = rows.slice(0, f.limit);
+    const last = visible.at(-1);
+    const media = await mediaForRows(db, visible);
+    return {
+      data: visible.map(row => toEditorProperty(row, media.get(row.id) || [], false)),
+      next_cursor: hasMore && last ? encodeCursor({ createdAt: last.createdAt, id: last.id }) : null,
+    };
   });
+  c.header('Cache-Control', 'no-store');
+  c.header('X-Catalog-Cache', result.cache);
+  return c.json(result.data);
 });
 
 app.get('/v1/properties/:identifier', async c => {
@@ -98,15 +105,21 @@ app.get('/v1/properties/:identifier', async c => {
   if (!/^[\p{L}\p{N}_-]{1,120}$/u.test(identifier)) {
     return c.json({ error: 'Invalid listing identifier' }, 400);
   }
-  const db = drizzle(c.env.DB);
-  const rows = await db.select()
-    .from(properties)
-    .where(and(eq(properties.published, true), isNull(properties.deletedAt), or(eq(properties.code, identifier), eq(properties.slug, identifier), eq(properties.id, identifier))))
-    .limit(1);
-  if (!rows.length) return c.json({ error: 'Property not found' }, 404);
-  const media = await mediaForRows(db, rows);
-  c.header('Cache-Control', 'public, max-age=30, s-maxage=60, stale-while-revalidate=60');
-  return c.json({ data: toEditorProperty(rows[0], media.get(rows[0].id) || [], false) });
+  if (new URL(c.req.url).search) return c.json({ error: 'Unsupported query parameter' }, 400);
+  const result = await publicCatalogPayload(c.env, c.req.raw, async () => {
+    const db = drizzle(c.env.DB);
+    const rows = await db.select()
+      .from(properties)
+      .where(and(eq(properties.published, true), isNull(properties.deletedAt), or(eq(properties.code, identifier), eq(properties.slug, identifier), eq(properties.id, identifier))))
+      .limit(1);
+    if (!rows.length) return null;
+    const media = await mediaForRows(db, rows);
+    return { data: toEditorProperty(rows[0], media.get(rows[0].id) || [], false) };
+  });
+  c.header('Cache-Control', 'no-store');
+  c.header('X-Catalog-Cache', result.cache);
+  if (!result.data) return c.json({ error: 'Property not found' }, 404);
+  return c.json(result.data);
 });
 
 app.route('/', mediaRoutes);

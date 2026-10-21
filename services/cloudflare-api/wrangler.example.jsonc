@@ -26,6 +26,7 @@
     "FIREBASE_PROJECT_ID": "replace-with-firebase-project-id",
     "PROPERTY_WRITES_ENABLED": "false",
     "PROPERTY_PUBLICATION_ENABLED": "false",
-    "MEDIA_WRITES_ENABLED": "false"
+    "MEDIA_WRITES_ENABLED": "false",
+    "PUBLIC_CATALOG_CACHE_ENABLED": "false"
   }
 }

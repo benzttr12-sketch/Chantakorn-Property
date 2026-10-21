@@ -87,7 +87,7 @@ Related decision and backup plan: [PR #35](https://github.com/benzttr12-sketch/C
 
 ## Guarded R2 media routes (stacked PR-04)
 
-The Worker now exposes `GET /v1/media/properties/:mediaId` only for a media row associated with a **published** property. A draft/unpublished listing returns 404 even when somebody knows the R2 object ID. Media files are routed through the Worker while the bucket remains private. Set public cache to only 30 seconds on this conditional route; a published listing can be unpublished and must not remain in a long-lived cache.
+The Worker now exposes `GET /v1/media/properties/:mediaId` only for a media row associated with a **published** property. A draft/unpublished listing returns 404 even when somebody knows the R2 object ID. Media files are routed through the Worker while the bucket remains private. Responses use `no-store` so a browser or intermediary cannot bypass the publication check after unpublishing.
 
 `GET /v1/media/inquiries/:mediaId` always requires a verified Firebase ID token and an existing D1 ADMIN/AGENT role. Responses have `private, no-store`; neither the R2 private bucket nor inquiry metadata is exposed anonymously. Do NOT attach a public custom domain or public bucket URL to either of the current R2 buckets: even the listing bucket contains **draft** images.
 
@@ -100,6 +100,14 @@ Staff-only raw-image uploads are staged behind `MEDIA_WRITES_ENABLED=true`, whic
 
 Property create/update/soft-delete and their audit event now commit in one D1 batch transaction. If the audit cannot be recorded, the mutation rolls back and returns 503. A stale optimistic-lock attempt creates no audit event. Local runtime tests inject an audit failure and race uploads at both image quotas to verify rollback and cleanup.
 
-The integration suite bundles the real Worker and runs local workerd D1/R2 bindings. Locally signed RSA tokens and intercepted Google JWKS/account lookups exercise public pagination, private-file authorization, draft-first CRUD, concurrent revision conflicts and R2 bytes. It uses only synthetic records and never calls production Firebase or Cloudflare. Cache assertions verify HTTP policy, not edge cache hits or a traffic benchmark.
+The integration suite bundles the real Worker and runs local workerd D1/R2 bindings. Locally signed RSA tokens and intercepted Google JWKS/account lookups exercise public pagination, private-file authorization, draft-first CRUD, concurrent revision conflicts and R2 bytes. It uses only synthetic records and never calls production Firebase or Cloudflare. The local runtime exercises Cache API hits, query isolation, current-origin CORS and invalidation after unpublishing. This is not a multi-region traffic benchmark.
 
 **Free-tier design:** Routing every public image GET through the Worker consumes Worker requests. Before growing traffic, consider a **separate public-only, versioned R2 delivery bucket** populated after publication, with a custom domain and CDN, while keeping draft property and customer photos in private buckets. Public promotion must copy only explicitly published assets. Do not expose this mixed draft/public `PROPERTY_MEDIA` bucket directly.
+
+## Public catalog cache (opt-in staging)
+
+After applying migration `0004_catalog_generation.sql` in isolated staging, set `PUBLIC_CATALOG_CACHE_ENABLED=true` to test public list/detail caching. Examples keep it false. SQL triggers atomically rotate a random generation on property or property-media insert/update/delete, including direct maintenance SQL. Every cacheable request reads the generation from primary D1; never cache this token or read it from a lagging replica. A failure to read a valid generation fails closed with 503, never serves stale data.
+
+Only validated anonymous GET list/detail payloads enter the Cache API, keyed by URL, sorted parameters, schema namespace and generation. Authentication/cookie requests bypass the cache; errors, private/Admin routes and draft media are never stored. Cached payloads contain no request headers; CORS is recomputed for each caller. All outward catalog responses use `no-store` so intermediary/browser caches cannot bypass generation validation. Internal entries expire after 60 seconds. Mutations make earlier keys unreachable immediately for requests starting after commit; already in-flight responses can complete from their observed state.
+
+A hit costs one indexed singleton D1 read plus a Worker invocation, instead of repeating the property and media queries. It is not zero-cost or unlimited free traffic. Cache storage is data-center-local and can evict entries; errors fall back to the current origin result. Large-scale staging load tests and public-only image delivery remain necessary. See [D1 transactions](https://developers.cloudflare.com/d1/worker-api/d1-database/) and [Workers Cache API](https://developers.cloudflare.com/workers/runtime-apis/cache/).

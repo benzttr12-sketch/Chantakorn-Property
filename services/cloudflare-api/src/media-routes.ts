@@ -65,10 +65,9 @@ media.get('/v1/media/properties/:mediaId', async c => {
   if (!row) return c.json({ error: 'Not found' }, 404);
   const object = await c.env.PROPERTY_MEDIA.get(row.key);
   if (!object || !('body' in object)) return c.json({ error: 'Not found' }, 404);
-  // Don't allow a stale edge response to linger across unpublish; short TTL until
-  // asset promotion/versioned public-only bucket is implemented.
+  // Each request must recheck publication. Browser/CDN caches cannot bypass it.
   const headers = objectHeaders(row.type, object.httpEtag, false);
-  headers.set('Cache-Control', 'public, max-age=30, s-maxage=30');
+  headers.set('Cache-Control', 'no-store');
   return new Response(object.body, { status: 200, headers });
 });
 
