@@ -1,6 +1,6 @@
 'use client';
 
-import type { Property } from '@/lib/types';
+import type { Property, PropertyFilters } from '@/lib/types';
 import { auth } from '@/lib/firebase/client';
 
 const requested = (process.env.NEXT_PUBLIC_PROPERTY_STORAGE_BACKEND || 'firebase').trim().toLowerCase();
@@ -53,6 +53,24 @@ function toExistingProperty(row: Property): Property {
   const cover = row.cover_image?.startsWith('/v1/media/properties/')
     ? absoluteCloudflareMedia(row.cover_image) : row.cover_image;
   return { ...row, images, cover_image: cover || '', features: row.features || [], furniture: row.furniture || '' };
+}
+
+/** One bounded request; callers control page navigation and abort obsolete searches. */
+export async function cloudflarePropertyPage(filters: PropertyFilters = {}, cursor: string | null = null, signal?: AbortSignal) {
+  const params = new URLSearchParams({ limit: '24' });
+  for (const key of ['type', 'status', 'province', 'district', 'subdistrict', 'minPrice', 'maxPrice',
+    'bedrooms', 'bathrooms', 'searchQuery', 'hasVideo', 'featured', 'sortBy'] as const) {
+    const value = filters[key];
+    if (value !== undefined && value !== '' && value !== 'all' && value !== 'any') params.set(key, String(value));
+  }
+  if (filters.features?.length) params.set('features', JSON.stringify(filters.features));
+  if (cursor) params.set('cursor', cursor);
+  const result = await request<{ data: Property[]; next_cursor: string | null }>(
+    `/v1/properties?${params}`, { signal });
+  if (!Array.isArray(result.data) || result.data.length > 24 ||
+      (result.next_cursor !== null && (typeof result.next_cursor !== 'string' || result.next_cursor === cursor)))
+    throw new Error('Cloudflare API ส่งข้อมูลหน้าถัดไปไม่ถูกต้อง');
+  return { data: result.data.map(toExistingProperty), nextCursor: result.next_cursor };
 }
 
 export async function cloudflareListProperties(admin = false): Promise<Property[]> {

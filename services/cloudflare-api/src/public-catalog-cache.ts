@@ -20,7 +20,7 @@ export async function publicCatalogPayload<T>(
   key.searchParams.set('__catalog_generation', generation.version);
   // New serialization contracts must bump this namespace.
   let cache: Cache;
-  try { cache = await caches.open('public-catalog-v1'); }
+  try { cache = await caches.open('public-catalog-v2'); }
   catch { return { data: await load(), cache: 'BYPASS' }; }
   let hit: Response | undefined;
   try { hit = await cache.match(key.toString()); } catch { /* Origin remains available. */ }

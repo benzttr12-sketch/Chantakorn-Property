@@ -5,7 +5,7 @@ const path = require('node:path');
 const vm = require('node:vm');
 const ts = require('typescript');
 
-function loadModules({ staticExport = false, basePath = '' } = {}) {
+function loadModules({ staticExport = false, basePath = '', propertyBackend = 'firebase' } = {}) {
   const sourceRoot = path.resolve(__dirname, '../src');
   const cache = new Map();
   function load(filename) {
@@ -17,7 +17,7 @@ function loadModules({ staticExport = false, basePath = '' } = {}) {
     }).outputText;
     vm.runInNewContext(compiled, {
       module, exports: module.exports,
-      process: { env: { NEXT_PUBLIC_STATIC_EXPORT: String(staticExport), NEXT_PUBLIC_BASE_PATH: basePath } },
+      process: { env: { NEXT_PUBLIC_STATIC_EXPORT: String(staticExport), NEXT_PUBLIC_BASE_PATH: basePath, NEXT_PUBLIC_PROPERTY_STORAGE_BACKEND: propertyBackend } },
       require(name) {
         if (!name.startsWith('.') && !name.startsWith('@/')) return require(name);
         const target = name.startsWith('@/')
@@ -106,4 +106,13 @@ test('static marketing snippets and LINE messages retain the site prefix and det
       assert.deepEqual(propertyUrls(content), ['https://preview.example/Chantakorn-Property/properties/detail/?slug=CK-RP6NQM']);
     }
   }
+});
+
+test('D1 links preserve the full lookup identity instead of truncating UUIDs', () => {
+  const { links } = loadModules({ propertyBackend: 'cloudflare' });
+  const id = '00000000-0000-4000-8000-000000000001';
+  assert.equal(links.propertyHref({ id }), '/properties/' + id);
+  assert.equal(links.propertyHref({ id, code: 'CK-1234567890AB' }), '/properties/CK-1234567890AB');
+  const exported = loadModules({ propertyBackend: 'cloudflare', staticExport: true }).links;
+  assert.equal(exported.propertyHref({ id }), '/properties/detail/?slug=' + id);
 });

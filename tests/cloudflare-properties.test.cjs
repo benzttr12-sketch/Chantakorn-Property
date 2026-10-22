@@ -14,7 +14,7 @@ const source = ts.transpileModule(
   { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } },
 ).outputText;
 
-function load(handler) {
+function load(handler, staff = true) {
   const calls = [];
   const module = { exports: {} };
   const context = vm.createContext({
@@ -24,10 +24,10 @@ function load(handler) {
       NEXT_PUBLIC_CLOUDFLARE_API_ORIGIN: 'https://staging-api.example.invalid',
     } },
     fetch: async (url, options) => {
-      const call = { path: new URL(url).pathname, ...options };
+      const call = { path: new URL(url).pathname, params: new URL(url).searchParams, ...options };
       calls.push(call);
-      assert.equal(call.headers.get('Authorization'), 'Bearer signed-test-token');
-      assert.equal(call.cache, 'no-store');
+      assert.equal(call.headers.get('Authorization'), staff ? 'Bearer signed-test-token' : null);
+      assert.equal(call.cache, staff ? 'no-store' : 'default');
       return handler(call);
     },
   });
@@ -99,4 +99,30 @@ test('a stale delete sends the observed revision directly and never refreshes it
   });
   await assert.rejects(adapter.cloudflareDeleteProperty(sample.id, observed), /revision changed/);
   assert.equal(calls.length, 1);
+});
+
+test('public page makes one bounded anonymous request with filters and cancellation', async () => {
+  const controller = new AbortController();
+  const { adapter, calls } = load(call => {
+    assert.equal(call.params.get('limit'), '24');
+    assert.equal(call.params.get('cursor'), 'page-two');
+    assert.equal(call.params.get('sortBy'), 'price_asc');
+    assert.equal(call.params.get('type'), null);
+    assert.equal(call.params.get('bedrooms'), null);
+    assert.equal(call.params.get('featured'), 'false');
+    assert.deepEqual(JSON.parse(call.params.get('features')), ['สวน']);
+    assert.equal(call.signal, controller.signal);
+    return json({ data: [sample], next_cursor: 'page-three' });
+  }, false);
+  const page = await adapter.cloudflarePropertyPage({ type: 'all', bedrooms: 'any', featured: false,
+    sortBy: 'price_asc', features: ['สวน'] }, 'page-two', controller.signal);
+  assert.equal(calls.length, 1); assert.equal(page.nextCursor, 'page-three');
+});
+
+test('public page rejects repeated cursors and oversized pages without fetching more', async () => {
+  for (const body of [{ data: [sample], next_cursor: 'same' }, { data: Array(25).fill(sample), next_cursor: null }]) {
+    const { adapter, calls } = load(() => json(body), false);
+    await assert.rejects(adapter.cloudflarePropertyPage({}, 'same'), /หน้าถัดไป/);
+    assert.equal(calls.length, 1);
+  }
 });

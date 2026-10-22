@@ -44,7 +44,7 @@ test('local Worker HTTP / D1 / R2 / Firebase authorization contract', async t =>
   t.after(() => mf.dispose());
   const db = await mf.getD1Database('DB');
   for (const file of (await readdir('migrations')).filter(x => x.endsWith('.sql')).sort()) {
-    const source = await readFile('migrations/' + file, 'utf8');
+    const source = (await readFile('migrations/' + file, 'utf8')).replace(/^\s*--(?!> statement-breakpoint).*$/gm, '');
     const statements = source.includes('--> statement-breakpoint')
       ? source.split('--> statement-breakpoint') : source.split(';');
     for (const statement of statements.map(x => x.replace(/^\s*--.*$/gm, '').trim()).filter(Boolean))
@@ -99,6 +99,41 @@ test('local Worker HTTP / D1 / R2 / Firebase authorization contract', async t =>
     assert.equal((await fetchApi('/v1/properties/draft')).status, 404);
     assert.equal((await fetchApi('/v1/properties/deleted')).status, 404);
     assert.equal((await fetchApi('/v1/properties?limit=999')).status, 400);
+  });
+  await t.test('all catalog sorts paginate globally with ties and full server filters', async () => {
+    const extraIds = ['00000000-0000-4000-8000-000000000031', '00000000-0000-4000-8000-000000000032'];
+    for (const [i, id] of extraIds.entries()) {
+      await insertProperty(id, 'search-' + i, 1);
+      await db.prepare('UPDATE properties SET price=?,featured=?,bedrooms=?,bathrooms=?,features_json=?,video_url=?,subdistrict=? WHERE id=?')
+        .bind((i + 1) * 100, i, i + 1, i + 1, JSON.stringify(['สระว่ายน้ำ', 'สวน']), 'https://example.test/video', 'ทดสอบ', id).run();
+    }
+    try {
+      for (const sort of ['newest', 'price_asc', 'price_desc', 'popular']) {
+        let cursor = null;
+        const seen = [];
+        do {
+          const params = new URLSearchParams({ limit: '1', sortBy: sort });
+          if (cursor) params.set('cursor', cursor);
+          const response = await fetchApi('/v1/properties?' + params);
+          assert.equal(response.status, 200);
+          const page = await response.json();
+          seen.push(...page.data); cursor = page.next_cursor;
+          assert.ok(seen.length <= 4, 'cursor must terminate');
+        } while (cursor);
+        assert.equal(new Set(seen.map(x => x.id)).size, 4);
+        if (sort === 'price_asc') assert.deepEqual(seen.map(x => x.price), [100, 200, 500000, 500000]);
+        if (sort === 'price_desc') assert.deepEqual(seen.map(x => x.price), [500000, 500000, 200, 100]);
+        if (sort === 'popular') assert.deepEqual(seen.map(x => x.featured), [true, false, false, false]);
+      }
+      const params = new URLSearchParams({ bedrooms: '2', bathrooms: '2', hasVideo: 'true', featured: 'true',
+        subdistrict: 'ทด', searchQuery: 'search-', features: JSON.stringify(['สระ', 'สวน']) });
+      const filtered = await (await fetchApi('/v1/properties?' + params)).json();
+      assert.deepEqual(filtered.data.map(x => x.id), [extraIds[1]]);
+      const literal = await (await fetchApi('/v1/properties?searchQuery=%25')).json();
+      assert.equal(literal.data.length, 0, 'percent is literal, not a LIKE wildcard');
+    } finally {
+      for (const id of extraIds) await db.prepare('DELETE FROM properties WHERE id=?').bind(id).run();
+    }
   });
   await t.test('catalog cache hits only validated public queries and invalidates on committed writes', async () => {
     const path = '/v1/properties?limit=30';

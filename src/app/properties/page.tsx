@@ -16,7 +16,8 @@ import PropertyCard from '@/components/properties/PropertyCard';
 import PropertyFilterPanel from '@/components/properties/PropertyFilterPanel';
 import GooglePropertyMap from '@/components/properties/GooglePropertyMap';
 import { Property, PropertyFilters, PropertyType, PropertyStatus } from '@/lib/types';
-import { fetchProperties } from '@/lib/store/properties-store';
+import { fetchPropertyPage } from '@/lib/store/properties-store';
+import { useCloudflarePropertyBackend } from '@/lib/backend';
 import { LayoutGrid, Columns2, MapPin as MapPinIcon } from 'lucide-react';
 
 function filtersFromQuery(query: string): PropertyFilters {
@@ -70,27 +71,50 @@ function PropertiesContent() {
   const [mobileFilterOpen, setMobileFilterOpen] = useState(false);
   const [mobileViewMode, setMobileViewMode] = useState<'list' | 'map'>('list');
 
-  // Load properties based on current filters
+  const filterKey = JSON.stringify(filters);
+  const [navigation, setNavigation] = useState<{ key: string; cursors: (string | null)[]; index: number }>({ key: '', cursors: [null], index: 0 });
+  useEffect(() => { setNavigation({ key: filterKey, cursors: [null], index: 0 }); }, [filterKey]);
+  const pageIndex = navigation.key === filterKey ? navigation.index : 0;
+  const cursor = navigation.key === filterKey ? navigation.cursors[pageIndex] : null;
+  const requestKey = JSON.stringify([filterKey, cursor]);
+  const [pageResult, setPageResult] = useState<{ key: string; next: string | null }>({ key: '', next: null });
+  const nextCursor = pageResult.key === requestKey ? pageResult.next : null;
+
   useEffect(() => {
     let active = true;
-    async function load() {
-      setLoading(true);
-      setError('');
+    const controller = new AbortController();
+    setLoading(true);
+    setError('');
+    setProperties([]);
+    setSelectedProperty(null);
+    const timer = setTimeout(async () => {
       try {
-        const data = await fetchProperties(filters);
-        if (active) { setProperties(data); setSelectedProperty(null); }
+        const page = await fetchPropertyPage(filters, cursor, controller.signal);
+        if (active) {
+          setProperties(page.data);
+          setPageResult({ key: requestKey, next: page.nextCursor });
+        }
       } catch (err) {
-        if (active) { setProperties([]); setError(err instanceof Error ? err.message : 'ไม่สามารถโหลดข้อมูลได้ กรุณาลองอีกครั้ง'); }
-      } finally {
-        if (active) setLoading(false);
-      }
-    }
-    load();
-    return () => { active = false; };
-  }, [filters]);
+        if (active) {
+          setProperties([]);
+          setError(err instanceof Error ? err.message : 'ไม่สามารถโหลดข้อมูลได้ กรุณาลองอีกครั้ง');
+          setPageResult({ key: requestKey, next: null });
+        }
+      } finally { if (active) setLoading(false); }
+    }, useCloudflarePropertyBackend ? 300 : 0);
+    return () => { active = false; clearTimeout(timer); controller.abort(); };
+  }, [filters, cursor, requestKey]);
+
+  function changePage(forward: boolean) {
+    if (loading) return;
+    const cursors = navigation.key === filterKey ? navigation.cursors : [null];
+    if (forward && nextCursor) setNavigation({ key: filterKey, cursors: [...cursors.slice(0, pageIndex + 1), nextCursor], index: pageIndex + 1 });
+    else if (!forward && pageIndex > 0) setNavigation({ key: filterKey, cursors, index: pageIndex - 1 });
+  }
 
   // Sort properties
   const sortedProperties = useMemo(() => {
+    if (useCloudflarePropertyBackend) return properties;
     const list = [...properties];
     if (filters.sortBy === 'price_asc') {
       return list.sort((a, b) => a.price - b.price);
@@ -312,7 +336,7 @@ function PropertiesContent() {
         <div className="hidden lg:flex items-center justify-between bg-white p-3.5 rounded-2xl border border-surface-border shadow-xs mb-6">
           <div className="flex items-center space-x-3">
             <span className="text-sm font-bold text-navy-950">
-              พบ <span className="text-gold-600 font-extrabold text-base">{sortedProperties.length}</span> รายการ
+              {useCloudflarePropertyBackend ? 'หน้านี้' : 'พบ'} <span className="text-gold-600 font-extrabold text-base">{sortedProperties.length}</span> รายการ
             </span>
             {filters.district && (
               <span className="inline-flex items-center px-2.5 py-0.5 rounded-full bg-gold-50 text-gold-800 text-xs font-bold border border-gold-200">
@@ -386,6 +410,17 @@ function PropertiesContent() {
             </div>
           </div>
         </div>
+
+        {error && <p role="alert" className="mb-4 rounded-xl bg-red-50 p-4 text-sm text-red-700">{error}</p>}
+        {useCloudflarePropertyBackend && (
+          <nav aria-label="หน้ารายการทรัพย์" className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl bg-white p-4">
+            <span className="text-sm text-gray-600" aria-live="polite">หน้า {pageIndex + 1} · รายการและแผนที่แสดงเฉพาะหน้านี้</span>
+            <div className="flex gap-3">
+              <button type="button" onClick={() => changePage(false)} disabled={loading || pageIndex === 0} className="rounded-lg border px-4 py-2 text-sm disabled:opacity-40">ก่อนหน้า</button>
+              <button type="button" onClick={() => changePage(true)} disabled={loading || !nextCursor} className="rounded-lg bg-navy-950 px-4 py-2 text-sm text-white disabled:opacity-40">ถัดไป</button>
+            </div>
+          </nav>
+        )}
 
         {/* FULL MAP VIEW MODE (Desktop & Mobile) */}
         {viewMode === 'map' || mobileViewMode === 'map' ? (
@@ -515,7 +550,6 @@ function PropertiesContent() {
                 </div>
               )}
 
-              {error && <p role="alert" className="mb-4 rounded-xl bg-red-50 p-4 text-sm text-red-700">{error}</p>}
 
               {/* Listings Grid */}
               {loading ? (
