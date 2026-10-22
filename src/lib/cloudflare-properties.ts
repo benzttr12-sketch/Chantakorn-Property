@@ -87,8 +87,13 @@ export async function cloudflareListProperties(admin = false): Promise<Property[
     if (cursor) params.set('cursor', cursor);
     const response = await request<{ data: Property[]; next_cursor: string | null }>(
       `${path}?${params.toString()}`, {}, admin);
+    if (!Array.isArray(response.data) || response.data.length > size ||
+        (response.next_cursor !== null && (typeof response.next_cursor !== 'string' ||
+          response.next_cursor.length === 0 || response.next_cursor.length > 512))) {
+      throw new Error('Cloudflare API ส่งข้อมูลหน้าถัดไปไม่ถูกต้อง');
+    }
     result.push(...response.data.map(toExistingProperty));
-    if (!response.next_cursor) return result;
+    if (response.next_cursor === null) return result;
     if (visited.has(response.next_cursor)) throw new Error('Cloudflare API ส่ง cursor ซ้ำ');
     visited.add(response.next_cursor);
     cursor = response.next_cursor;
