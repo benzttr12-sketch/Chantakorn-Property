@@ -11,7 +11,11 @@ export interface CompressionOptions extends WatermarkOptions {
   initialQuality?: number; // default 0.85
   minQuality?: number; // default 0.45
   targetMaxBytes?: number; // default 450,000 bytes; enforced after encoding
-  format?: 'image/webp' | 'image/jpeg';
+  /**
+   * The Cloudflare media path fully decodes PNG and baseline JPEG, so uploads
+   * are re-encoded as JPEG here; WebP is no longer produced for new photos.
+   */
+  format?: 'image/jpeg';
 }
 
 export interface CompressedImageResult {
@@ -232,14 +236,14 @@ export async function compressImageFile(
     initialQuality = 0.85,
     minQuality = 0.45,
     targetMaxBytes = 450000,
-    format = 'image/webp',
+    format = 'image/jpeg',
     enableWatermark = true,
   } = options;
   if (!Number.isInteger(maxDimension) || maxDimension < 1 || maxDimension > 4096
     || !Number.isFinite(initialQuality) || initialQuality < 0.1 || initialQuality > 1
     || !Number.isFinite(minQuality) || minQuality < 0.1 || minQuality > initialQuality
     || !Number.isInteger(targetMaxBytes) || targetMaxBytes < 1 || targetMaxBytes > MAX_UPLOAD_IMAGE_SIZE_BYTES
-    || !['image/jpeg', 'image/webp'].includes(format)) {
+    || format !== 'image/jpeg') {
     throw new Error('การตั้งค่าบีบอัดรูปภาพไม่ถูกต้อง');
   }
   await validateImageFile(file);
@@ -273,9 +277,6 @@ export async function compressImageFile(
     let quality = initialQuality;
     while (true) {
       dataUrl = canvas.toDataURL(format, quality);
-      if (format === 'image/webp' && !dataUrl.startsWith('data:image/webp;')) {
-        dataUrl = canvas.toDataURL('image/jpeg', quality);
-      }
       finalBytes = encodedImageBytes(dataUrl);
       if (finalBytes <= targetMaxBytes) {
         return {

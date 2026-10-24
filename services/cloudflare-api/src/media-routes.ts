@@ -147,6 +147,11 @@ async function upload(c: Context<{ Bindings: Env }>, kind: 'property' | 'inquiry
 
   const checked = await readBoundedImage(c.req.raw);
   if (!checked.ok) return c.json({ error: checked.error }, checked.status);
+  // Only fully decoded formats are accepted for new uploads. PNG and baseline
+  // JPEG are decoded end-to-end; WebP VP8/VP8L pixel decoding is not available,
+  // so the browser compressor now produces JPEG and WebP is refused.
+  if (checked.type === 'image/webp')
+    return c.json({ error: 'WebP uploads are not accepted; upload JPEG or PNG' }, 415);
   // Container-level validation only; the browser canvas compressor is what
   // guarantees metadata-free pixels, direct uploads may be rejected instead.
   const structure = await validateImageStructure(checked.bytes, checked.type);
