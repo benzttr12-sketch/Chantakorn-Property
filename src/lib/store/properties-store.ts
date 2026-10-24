@@ -7,6 +7,7 @@ import { db } from '@/lib/firebase/client';
 import { dataBackend, useCloudflarePropertyBackend } from '@/lib/backend';
 import { fetchStaffApi } from '@/lib/staff-api';
 import { apiUrl } from '@/lib/api-url';
+import { collectAdminCatalogPages } from '@/lib/admin-catalog';
 
 import { preparePropertyMedia, removeUnusedPropertyMedia } from '@/lib/property-media';
 import { submitFirebaseInquiry } from '@/lib/inquiry-submit';
@@ -251,6 +252,22 @@ export async function fetchAdminPropertyById(id: string): Promise<Property | nul
     }
   }
   return (await fetchAdminProperties()).find(property => property.id === id) ?? null;
+}
+
+/**
+ * Whole-catalog helper for the dashboard/automation/map screens, which still
+ * need every listing for client-side charts and matching. It walks the native
+ * keyset pages (100 rows each) instead of the old capped bridge, and fails
+ * visibly at the shared row/page ceiling rather than silently truncating.
+ */
+export async function fetchAdminCatalog(): Promise<Property[]> {
+  requireStaffBackend();
+  if (!useCloudflarePropertyBackend) return fetchAdminProperties();
+  const { cloudflareAdminPropertyPage } = await import('@/lib/cloudflare-properties');
+  const rows = await collectAdminCatalogPages<Property>(cursor =>
+    cloudflareAdminPropertyPage({ sortBy: 'newest' }, cursor, 100)
+      .then(page => ({ data: page.data, nextCursor: page.nextCursor })));
+  return rows.map(rowToProperty);
 }
 
 function matchesPropertyKey(property: Property, key: string): boolean {

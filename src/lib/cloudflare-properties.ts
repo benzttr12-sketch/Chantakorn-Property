@@ -114,9 +114,11 @@ const ADMIN_PAGE_SIZE = 50;
 
 /** One server-filtered, keyset-paginated Admin page; no whole-catalog fallback. */
 export async function cloudflareAdminPropertyPage(
-  filters: AdminPropertyFilters = {}, cursor: string | null = null,
+  filters: AdminPropertyFilters = {}, cursor: string | null = null, pageSize = ADMIN_PAGE_SIZE,
 ): Promise<AdminPropertyPage> {
-  const params = new URLSearchParams({ limit: String(ADMIN_PAGE_SIZE) });
+  if (!Number.isInteger(pageSize) || pageSize < 1 || pageSize > 100)
+    throw new Error('ขนาดหน้าของรายการประกาศไม่ถูกต้อง');
+  const params = new URLSearchParams({ limit: String(pageSize) });
   if (filters.searchQuery?.trim()) params.set('searchQuery', filters.searchQuery.trim());
   if (filters.filter && filters.filter !== 'all') params.set('filter', filters.filter);
   if (filters.type && filters.type !== 'all') params.set('type', filters.type);
@@ -129,7 +131,7 @@ export async function cloudflareAdminPropertyPage(
   const counts = response.counts || {};
   const countKeys: (keyof AdminPropertyStatusCounts)[] =
     ['all', 'sale', 'rent', 'featured', 'draft', 'published'];
-  if (!Array.isArray(response.data) || response.data.length > ADMIN_PAGE_SIZE ||
+  if (!Array.isArray(response.data) || response.data.length > pageSize ||
       !Number.isSafeInteger(response.total) || response.total < 0 ||
       (response.next_cursor !== null && (typeof response.next_cursor !== 'string' ||
         !response.next_cursor || response.next_cursor.length > 512)) ||

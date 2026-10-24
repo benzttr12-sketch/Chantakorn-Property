@@ -43,6 +43,7 @@ function load({ backend = 'firebase', configured = true, rows = [], profiles = [
       if (name === '@/lib/staff-api') return {};
       if (name === '@/lib/api-url') return { apiUrl: value => value };
       if (name === '@/lib/property-media' || name === '@/lib/inquiry-submit') return {};
+      if (name === '@/lib/admin-catalog') return { collectAdminCatalogPages: async () => [] };
       throw Error(name);
     }
     vm.runInContext(`(function(require,module,exports){${compiled}\n})`, context)(requireModule, module, module.exports);
