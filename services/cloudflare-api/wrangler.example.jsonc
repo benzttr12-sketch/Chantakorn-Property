@@ -31,6 +31,7 @@
     "PROPERTY_PUBLICATION_ENABLED": "false",
     "MEDIA_WRITES_ENABLED": "false",
     "MEDIA_SWEEP_ENABLED": "false",
+    // Enable only after the browser client and real staging uploads are verified.
     "MEDIA_UPLOAD_SESSIONS_REQUIRED": "false",
     "PUBLIC_CATALOG_CACHE_ENABLED": "false"
   }
