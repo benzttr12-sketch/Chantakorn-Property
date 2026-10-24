@@ -82,6 +82,24 @@ test('sorts inserts by UID and counts the roles deterministically', async () => 
   assert.deepEqual(result.plan.byRole, { ADMIN: 2, AGENT: 1 });
 });
 
+test('accepts the firebase auth:export shape that omits false disabled/verified flags', async () => {
+  const input = {
+    authText: JSON.stringify({ users: [
+      { localId: adminUid, displayName: 'Admin', email: 'bancha@example.com', emailVerified: true },
+    ] }),
+    profilesText: JSON.stringify({ uid: adminUid, role: 'ADMIN', full_name: "คุณบันชา O'Brien" }),
+    approvedText: `${adminUid}\n`,
+    now,
+  };
+  const result = await buildStaffImport(input);
+  assert.equal(result.ok, true);
+  if (result.ok) assert.equal(result.plan.inserts[0]!.email, 'bancha@example.com');
+  const missingVerification = await buildStaffImport({ ...input, authText: JSON.stringify({ users: [
+    { localId: adminUid, email: 'bancha@example.com' },
+  ] }) });
+  assert.equal(missingVerification.ok, false);
+});
+
 test('fails closed on unverified, disabled or missing Firebase identities', async () => {
   await expectFailure(input => {
     input.profilesText += '\n' + JSON.stringify({ uid: 'uid-unverified-01', role: 'ADMIN', full_name: 'Unverified' });

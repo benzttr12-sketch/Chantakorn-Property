@@ -65,10 +65,18 @@ export function parseAuthExport(textValue: string): { users: Map<string, AuthUse
     if (users.has(uid)) { errors.push(`Firebase Auth export repeats UID ${uid}`); continue; }
     const email = text(user.email);
     if (email !== null && (!EMAIL_RE.test(email) || email.length > 254)) { errors.push(`Auth user ${uid} has an invalid email`); continue; }
-    if (typeof user.emailVerified !== 'boolean' || typeof user.disabled !== 'boolean') {
-      errors.push(`Auth user ${uid} is missing emailVerified/disabled flags`); continue;
+    // firebase auth:export omits `disabled` when the account is enabled and may
+    // omit `emailVerified` when false; missing values fail closed (unverified).
+    if (user.emailVerified !== undefined && typeof user.emailVerified !== 'boolean') {
+      errors.push(`Auth user ${uid} has an invalid emailVerified flag`); continue;
     }
-    users.set(uid, { uid, email: email ? email.toLowerCase() : null, emailVerified: user.emailVerified, disabled: user.disabled });
+    if (user.disabled !== undefined && typeof user.disabled !== 'boolean') {
+      errors.push(`Auth user ${uid} has an invalid disabled flag`); continue;
+    }
+    users.set(uid, {
+      uid, email: email ? email.toLowerCase() : null,
+      emailVerified: user.emailVerified === true, disabled: user.disabled === true,
+    });
   }
   return { users, errors };
 }
