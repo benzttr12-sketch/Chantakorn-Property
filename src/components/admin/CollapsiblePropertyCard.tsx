@@ -63,7 +63,7 @@ interface CollapsiblePropertyCardProps {
   onOpenLineModal?: (property: Property) => void;
   onDuplicate: (property: Property) => void;
   onDeleteConfirm: (id: string) => void;
-  onUpdateNotes?: (id: string, notes: string) => Promise<void>;
+  onUpdateNotes?: (id: string, notes: string, expectedUpdatedAt?: string) => Promise<void>;
   completionScore: number;
   busy: boolean;
 }
@@ -109,6 +109,7 @@ export default function CollapsiblePropertyCard({
   const [historyReload, setHistoryReload] = useState(0);
   const [isEditingNotes, setIsEditingNotes] = useState(false);
   const [notesInput, setNotesInput] = useState(property.internal_notes || '');
+  const [notesRevision, setNotesRevision] = useState(property.updated_at);
   const [savingNotes, setSavingNotes] = useState(false);
   const [notesSuccess, setNotesSuccess] = useState(false);
   const [notesError, setNotesError] = useState('');
@@ -145,7 +146,7 @@ export default function CollapsiblePropertyCard({
     setNotesError('');
     setNotesSuccess(false);
     try {
-      await onUpdateNotes(property.id, notesInput.trim());
+      await onUpdateNotes(property.id, notesInput.trim(), notesRevision);
       setIsEditingNotes(false);
       setNotesSuccess(true);
       setHistoryReload((value) => value + 1);
@@ -517,6 +518,7 @@ export default function CollapsiblePropertyCard({
                     type="button"
                     onClick={() => {
                       setIsEditingNotes(true);
+                      setNotesRevision(property.updated_at);
                       setNotesSuccess(false);
                       setNotesError('');
                     }}

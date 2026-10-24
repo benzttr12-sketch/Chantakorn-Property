@@ -109,11 +109,13 @@ function PropertiesContent() {
     null,
   );
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+  const [deleteConfirmRevision, setDeleteConfirmRevision] = useState<string | undefined>();
   const [duplicateSuccessMessage, setDuplicateSuccessMessage] = useState<string | null>(null);
 
   // Bulk Selection State
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [bulkConfirmDelete, setBulkConfirmDelete] = useState(false);
+  const [bulkDeleteRevisions, setBulkDeleteRevisions] = useState<Record<string, string | undefined>>({});
   const [quickModalOpen, setQuickModalOpen] = useState(false);
   const confirmationRef = useRef<HTMLDivElement>(null);
 
@@ -200,14 +202,15 @@ function PropertiesContent() {
       ),
     );
 
-  const handleUpdatePropertyNotes = async (propId: string, notes: string) => {
-    const saved = await updateProperty(propId, { internal_notes: notes });
+  const handleUpdatePropertyNotes = async (propId: string, notes: string, expectedUpdatedAt?: string) => {
+    const saved = await updateProperty(propId, { internal_notes: notes }, expectedUpdatedAt);
     if (!saved) throw new Error('ไม่พบทรัพย์ที่ต้องการบันทึก');
     setProperties((prev) => prev.map((p) => (p.id === propId ? saved : p)));
   };
 
   // Inline Edit State
   const [editingPriceId, setEditingPriceId] = useState<string | null>(null);
+  const [editingPriceRevision, setEditingPriceRevision] = useState<string | undefined>();
   const [inlinePriceInput, setInlinePriceInput] = useState<string>('');
   const [inlineUpdatingId, setInlineUpdatingId] = useState<string | null>(null);
   const [inlineSuccessToast, setInlineSuccessToast] = useState<{
@@ -218,6 +221,7 @@ function PropertiesContent() {
 
   const handleStartEditPrice = (prop: Property) => {
     setEditingPriceId(prop.id);
+    setEditingPriceRevision(prop.updated_at);
     setInlinePriceInput(String(prop.price || ''));
   };
 
@@ -237,7 +241,7 @@ function PropertiesContent() {
     setInlineUpdatingId(propId);
     setError('');
     try {
-      const saved = await updateProperty(propId, { price: numPrice });
+      const saved = await updateProperty(propId, { price: numPrice }, editingPriceRevision);
       if (!saved) throw new Error('ไม่พบทรัพย์ที่ต้องการแก้ไข');
       setProperties((previous) =>
         previous.map((property) => (property.id === propId ? saved : property)),
@@ -260,7 +264,7 @@ function PropertiesContent() {
     setInlineUpdatingId(propId);
     setError('');
     try {
-      const saved = await updateProperty(propId, { status: newStatus });
+      const saved = await updateProperty(propId, { status: newStatus }, properties.find(p => p.id === propId)?.updated_at);
       if (!saved) throw new Error('ไม่พบทรัพย์ที่ต้องการแก้ไข');
       setProperties((previous) =>
         previous.map((property) => (property.id === propId ? saved : property)),
@@ -308,7 +312,7 @@ function PropertiesContent() {
     setBusy(true);
     setError('');
     try {
-      const saved = await updateProperty(prop.id, { featured: !prop.featured });
+      const saved = await updateProperty(prop.id, { featured: !prop.featured }, prop.updated_at);
       if (!saved) throw new Error('ไม่พบทรัพย์ที่ต้องการแก้ไข');
       setProperties((previous) =>
         previous.map((property) => (property.id === prop.id ? saved : property)),
@@ -329,7 +333,7 @@ function PropertiesContent() {
     setBusy(true);
     setError('');
     try {
-      const saved = await updateProperty(prop.id, { published: !prop.published });
+      const saved = await updateProperty(prop.id, { published: !prop.published }, prop.updated_at);
       if (!saved) throw new Error('ไม่พบทรัพย์ที่ต้องการแก้ไข');
       setProperties((previous) =>
         previous.map((property) => (property.id === prop.id ? saved : property)),
@@ -417,7 +421,7 @@ function PropertiesContent() {
     setBusy(true);
     setError('');
     try {
-      const removed = await deleteProperty(id);
+      const removed = await deleteProperty(id, deleteConfirmRevision);
       if (!removed) throw new Error('ไม่พบทรัพย์หรือไม่สามารถลบรายการนี้ได้');
       setDeleteConfirmId(null);
       setSelectedIds((prev) => prev.filter((item) => item !== id));
@@ -455,7 +459,7 @@ function PropertiesContent() {
     setError('');
     try {
       const result = await runSelectedOperations(selectedIds, (id) =>
-        updateProperty(id, { published: publishStatus }),
+        updateProperty(id, { published: publishStatus }, properties.find(p => p.id === id)?.updated_at),
       );
       setSelectedIds(result.failed);
       if (result.succeeded.length > 0)
@@ -481,7 +485,7 @@ function PropertiesContent() {
     setBusy(true);
     setError('');
     try {
-      const result = await runSelectedOperations(selectedIds, (id) => deleteProperty(id));
+      const result = await runSelectedOperations(selectedIds, (id) => deleteProperty(id, bulkDeleteRevisions[id]));
       setSelectedIds(result.failed);
       setBulkConfirmDelete(false);
       if (result.succeeded.length > 0)
@@ -949,7 +953,10 @@ function PropertiesContent() {
             <button
               type="button"
               disabled={busy || loading || inlineUpdatingId !== null}
-              onClick={() => setBulkConfirmDelete(true)}
+              onClick={() => {
+                setBulkDeleteRevisions(Object.fromEntries(properties.filter(p => selectedIds.includes(p.id)).map(p => [p.id, p.updated_at])));
+                setBulkConfirmDelete(true);
+              }}
               className="min-h-11 rounded-xl px-4 text-sm font-semibold text-red-200 hover:bg-red-500/10 disabled:opacity-50"
             >
               ลบที่เลือก
@@ -1033,7 +1040,10 @@ function PropertiesContent() {
               onOpenHistoryModal={handleOpenHistory}
               onOpenLineModal={handleOpenLineModal}
               onDuplicate={handleDuplicate}
-              onDeleteConfirm={setDeleteConfirmId}
+              onDeleteConfirm={(id) => {
+                setDeleteConfirmRevision(properties.find(p => p.id === id)?.updated_at);
+                setDeleteConfirmId(id);
+              }}
               onUpdateNotes={handleUpdatePropertyNotes}
               completionScore={getCompletionScore(prop)}
               busy={busy}

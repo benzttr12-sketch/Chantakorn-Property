@@ -87,6 +87,7 @@ function PropertyEditor() {
   const [loading, setLoading] = useState(Boolean(editId));
   const [error, setError] = useState('');
   const [editorLoaded, setEditorLoaded] = useState(!editId);
+  const [editorRevision, setEditorRevision] = useState<string | undefined>();
   const [slugEdited, setSlugEdited] = useState(Boolean(editId));
   const [published, setPublished] = useState(true);
 
@@ -544,6 +545,7 @@ function PropertyEditor() {
       const photos = await loadStaffPropertyPhotos(property);
       if (!active) return;
       setTitle(property.title);
+      setEditorRevision(property.updated_at);
       setSlug(property.slug);
       setPropertyType(property.property_type);
       setStatus(property.status);
@@ -894,7 +896,7 @@ function PropertyEditor() {
       };
 
       if (editId) {
-        await updateProperty(editId, propertyData);
+        await updateProperty(editId, propertyData, editorRevision);
         router.push('/admin/properties');
       } else {
         const created = await createProperty(propertyData);

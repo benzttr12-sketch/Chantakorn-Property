@@ -171,8 +171,19 @@ export async function cloudflareCreateProperty(value: Omit<Property, 'id' | 'cre
   }
 }
 
-export async function cloudflareUpdateProperty(id: string, updates: Partial<Property>): Promise<Property> {
-  let property = await cloudflareAdminDetail(id);
+function requireObservedRevision(value: string | undefined): string {
+  if (!value || !Number.isFinite(Date.parse(value)) || new Date(value).toISOString() !== value) {
+    throw new Error('กรุณาโหลดประกาศใหม่ก่อนบันทึกหรือลบรายการ');
+  }
+  return value;
+}
+
+export async function cloudflareUpdateProperty(id: string, updates: Partial<Property>, expectedUpdatedAt?: string): Promise<Property> {
+  const expected = requireObservedRevision(expectedUpdatedAt);
+  const property = await cloudflareAdminDetail(id);
+  if (property.updated_at !== expected) {
+    throw new Error('ประกาศมีการแก้ไขแล้ว กรุณาโหลดใหม่ก่อนบันทึก');
+  }
   const existingImageIds = new Set((property.images || []).map(mediaIdFromUrl).filter(Boolean));
   let uploadedCoverId: string | undefined;
   if (updates.images) {
@@ -185,7 +196,6 @@ export async function cloudflareUpdateProperty(id: string, updates: Partial<Prop
     if (uploaded.length) {
       const coverIndex = newImages.indexOf(updates.cover_image || '');
       if (coverIndex >= 0) uploadedCoverId = uploaded[coverIndex].id;
-      property = await cloudflareAdminDetail(id);
     }
   }
   const outgoing = cleanOutgoing(updates as Record<string, unknown>);
@@ -195,15 +205,17 @@ export async function cloudflareUpdateProperty(id: string, updates: Partial<Prop
     coverId = updates.cover_image ? (uploadedCoverId || mediaIdFromUrl(updates.cover_image)) : null;
     if (updates.cover_image && !coverId) throw new Error('รูปปกต้องเป็นรูปที่อัปโหลดเข้า R2 แล้ว');
   }
-  return await patch(id, property.updated_at || '', outgoing, coverId);
+  // Keep the revision the editor actually read, including across image uploads.
+  // A later server read must never turn an old form into an accepted overwrite.
+  return await patch(id, expected, outgoing, coverId);
 }
 
-export async function cloudflareDeleteProperty(id: string): Promise<boolean> {
-  const property = await cloudflareAdminDetail(id);
+export async function cloudflareDeleteProperty(id: string, expectedUpdatedAt?: string): Promise<boolean> {
+  const expected = requireObservedRevision(expectedUpdatedAt);
   await request<{ ok: boolean }>(
     `/v1/admin/properties/${encodeURIComponent(id)}`, {
       method: 'DELETE', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ expected_updated_at: property.updated_at }),
+      body: JSON.stringify({ expected_updated_at: expected }),
     }, true);
   return true;
 }

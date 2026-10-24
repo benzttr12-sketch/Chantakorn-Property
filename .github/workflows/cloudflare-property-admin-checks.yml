@@ -5,6 +5,9 @@ on:
     paths:
       - 'src/lib/cloudflare-properties.ts'
       - 'src/lib/store/properties-store.ts'
+      - 'src/app/admin/properties/**'
+      - 'src/components/admin/CollapsiblePropertyCard.tsx'
+      - 'tests/cloudflare-properties.test.cjs'
       - 'services/cloudflare-api/src/property-admin-routes.ts'
       - '.github/workflows/cloudflare-property-admin-checks.yml'
   workflow_dispatch:
