@@ -1,4 +1,5 @@
 import { Hono } from 'hono';
+import mediaRoutes from './media-routes.ts';
 import { drizzle } from 'drizzle-orm/d1';
 import { and, desc, eq, gte, lte, lt, or } from 'drizzle-orm';
 import { profiles, properties } from './db/schema.ts';
@@ -12,6 +13,7 @@ type Bindings = {
   PRIVATE_MEDIA: R2Bucket;
   ALLOWED_ORIGIN: string;
   FIREBASE_PROJECT_ID: string;
+  MEDIA_WRITES_ENABLED?: string;
 };
 
 const app = new Hono<{ Bindings: Bindings }>();
@@ -152,6 +154,8 @@ app.get('/v1/properties/:identifier', async c => {
   c.header('Cache-Control', 'public, max-age=30, s-maxage=60, stale-while-revalidate=60');
   return c.json({ data: toPublicProperty(rows[0]) });
 });
+
+app.route('/', mediaRoutes);
 
 app.notFound(c => c.json({ error: 'Not found' }, 404));
 app.onError((error, c) => {
