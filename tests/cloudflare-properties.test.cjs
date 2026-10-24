@@ -41,6 +41,43 @@ function load(handler, staff = true) {
 
 const json = (value, status = 200) => Response.json(value, { status });
 
+test('compatibility catalog rejects malformed pagination rather than returning incomplete results', async () => {
+  for (const admin of [false, true]) {
+    for (const body of [
+      { data: [sample] }, { data: [sample], next_cursor: '' },
+      { data: [sample], next_cursor: false }, { data: [sample], next_cursor: 'x'.repeat(513) },
+      { data: Array(admin ? 81 : 31).fill(sample), next_cursor: null },
+    ]) {
+      const { adapter, calls } = load(() => json(body), admin);
+      await assert.rejects(adapter.cloudflareListProperties(admin), /หน้าถัดไป/);
+      assert.equal(calls.length, 1);
+    }
+  }
+});
+
+test('compatibility catalog follows pages and stops only at explicit null', async () => {
+  for (const admin of [false, true]) {
+    const { adapter, calls } = load(call => {
+      assert.equal(call.params.get('limit'), admin ? '80' : '30');
+      return json({ data: [sample], next_cursor: call.params.has('cursor') ? null : 'next' });
+    }, admin);
+    assert.equal((await adapter.cloudflareListProperties(admin)).length, 2);
+    assert.equal(calls.length, 2);
+  }
+});
+
+test('compatibility catalog stops cursor cycles and rejects catalogs beyond ten pages', async () => {
+  for (const admin of [false, true]) {
+    const cyclic = load(() => json({ data: [sample], next_cursor: 'repeat' }), admin);
+    await assert.rejects(cyclic.adapter.cloudflareListProperties(admin), /cursor ซ้ำ/);
+    assert.equal(cyclic.calls.length, 2);
+    let n = 0;
+    const large = load(() => json({ data: [sample], next_cursor: `next-${++n}` }), admin);
+    await assert.rejects(large.adapter.cloudflareListProperties(admin), /Pagination/);
+    assert.equal(large.calls.length, 10);
+  }
+});
+
 test('an old editor cannot overwrite a newer listing or upload images before detecting the conflict', async () => {
   const { adapter, calls } = load(call => {
     assert.equal(call.method, undefined);
