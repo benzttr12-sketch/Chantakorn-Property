@@ -1,0 +1,35 @@
+name: Cloudflare D1 API (isolated checks)
+
+on:
+  pull_request:
+    paths:
+      - 'services/cloudflare-api/**'
+      - '.github/workflows/cloudflare-api-checks.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  cloudflare-api:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: services/cloudflare-api
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Use Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22.16.0'
+      # A locked deterministic install must replace this initial bootstrap step
+      # when services/cloudflare-api/package-lock.json is generated and reviewed.
+      - name: Install isolated Worker dependencies
+        run: npm install --no-audit --no-fund
+      - name: Typecheck Worker
+        run: npm run typecheck
+      - name: Test query validation and cursors
+        run: npm test
+      - name: Verify D1 migration using isolated in-memory SQLite
+        run: python3 scripts/verify_schema.py
