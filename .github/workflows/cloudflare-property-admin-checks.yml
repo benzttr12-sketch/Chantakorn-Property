@@ -11,6 +11,10 @@ on:
       - 'tests/cloudflare-properties.test.cjs'
       - 'src/lib/property-link.ts'
       - 'tests/property-links.test.cjs'
+      - 'src/app/sitemap.ts'
+      - 'src/app/robots.ts'
+      - 'src/lib/sitemap-catalog.ts'
+      - 'tests/sitemap.test.cjs'
       - 'services/cloudflare-api/src/property-admin-routes.ts'
       - '.github/workflows/cloudflare-property-admin-checks.yml'
   workflow_dispatch:
