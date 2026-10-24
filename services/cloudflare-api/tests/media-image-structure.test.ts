@@ -9,6 +9,8 @@ const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAIAAAD91JpzAAAACXBIWXM
 const webp = Buffer.from('UklGRjoAAABXRUJQVlA4IC4AAACQAQCdASoCAAIAAUAmJaACdLoAA5gA/vFNr+LaR0KZD/7xn/9xn/9xn/yIAAAA', 'base64');
 // The 1x1 PNG used by the Worker runtime tests (RGBA, CRC-valid, with pHYs).
 const runtimePng = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAACXBIWXMAAAPoAAAD6AG1e1JrAAAADUlEQVQImWM4IafxHwAEzgIOn8aNIQAAAABJRU5ErkJggg==', 'base64');
+// Palette PNG (3x2) produced by a real encoder.
+const palettePng = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAMAAAACBAMAAABvWnspAAAAA1BMVEXIHijZMm0HAAAACXBIWXMAAAPoAAAD6AG1e1JrAAAAC0lEQVQImWNgAAEAAAYAAeaH/n8AAAAASUVORK5CYII=', 'base64');
 
 const CRC_TABLE = (() => {
   const table = new Uint32Array(256);
@@ -49,9 +51,27 @@ function buildPng(chunks: { type: string; data: Buffer }[]): Buffer {
   }
   return Buffer.concat(parts);
 }
+
+async function rawPng(options: {
+  width: number; height: number; bitDepth?: number; colorType?: number;
+  palette?: Buffer; rows: number[];
+}): Promise<Buffer> {
+  const ihdr = Buffer.alloc(13);
+  ihdr.writeUInt32BE(options.width, 0);
+  ihdr.writeUInt32BE(options.height, 4);
+  ihdr[8] = options.bitDepth ?? 8;
+  ihdr[9] = options.colorType ?? 0;
+  const stream = new Blob([Buffer.from(options.rows) as unknown as BlobPart]).stream()
+    .pipeThrough(new CompressionStream('deflate'));
+  const compressed = Buffer.from(await new Response(stream).arrayBuffer());
+  const chunks: { type: string; data: Buffer }[] = [{ type: 'IHDR', data: ihdr }];
+  if (options.palette) chunks.push({ type: 'PLTE', data: options.palette });
+  chunks.push({ type: 'IDAT', data: compressed }, { type: 'IEND', data: Buffer.alloc(0) });
+  return buildPng(chunks);
+}
+
 function pngWithChunk(type: string, data: Buffer): Buffer {
-  const chunks = pngChunks(png);
-  chunks.splice(chunks.length - 1, 0, { type, data });
+  const chunks = pngChunks(png);  chunks.splice(chunks.length - 1, 0, { type, data });
   return buildPng(chunks);
 }
 function pngWithIhdr(overrides: { width?: number; height?: number; interlace?: number; colorType?: number }): Buffer {
@@ -175,6 +195,27 @@ test('rejects PNG metadata chunks, checksum corruption, truncation and oversized
   assert.equal((await validateImageStructure(interlaced, 'image/png')).ok, false);
   const unsupportedColor = pngWithIhdr({ colorType: 7 });
   assert.equal((await validateImageStructure(unsupportedColor, 'image/png')).ok, false);
+});
+
+test('fully decodes PNG scanlines, row filters and palette indices', async () => {
+  assert.deepEqual(await validateImageStructure(palettePng, 'image/png'), { ok: true, width: 3, height: 2 });
+  // 1x2 grayscale, filter None rows.
+  const grey = await rawPng({ width: 1, height: 2, rows: [0, 0, 0, 255] });
+  assert.deepEqual(await validateImageStructure(grey, 'image/png'), { ok: true, width: 1, height: 2 });
+  // A filter byte outside 0-4 is a real decode failure, not a metadata issue.
+  const badFilter = await rawPng({ width: 1, height: 1, rows: [5, 0] });
+  assert.deepEqual(await validateImageStructure(badFilter, 'image/png'),
+    { ok: false, status: 415, error: 'PNG row filter is invalid' });
+  // A palette index that points past the PLTE entries is rejected.
+  const badPalette = await rawPng({
+    width: 2, height: 1, bitDepth: 8, colorType: 3,
+    palette: Buffer.from([200, 30, 40]), rows: [0, 0, 1],
+  });
+  assert.deepEqual(await validateImageStructure(badPalette, 'image/png'),
+    { ok: false, status: 415, error: 'PNG palette index is out of range' });
+  // Too few decoded scanlines must never be accepted as a complete image.
+  const shortRows = await rawPng({ width: 1, height: 2, rows: [0, 7] });
+  assert.equal((await validateImageStructure(shortRows, 'image/png')).ok, false);
 });
 
 test('rejects WebP metadata/animation chunks, truncation and oversized frames', async () => {

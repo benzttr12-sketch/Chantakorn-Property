@@ -135,13 +135,17 @@ const PNG_CHANNELS: Record<number, number> = { 0: 1, 2: 3, 3: 1, 4: 2, 6: 4 };
 const PNG_BIT_DEPTHS: Record<number, number[]> = {
   0: [1, 2, 4, 8, 16], 2: [8, 16], 3: [1, 2, 4, 8], 4: [8, 16], 6: [8, 16],
 };
+type PngHeader = {
+  width: number; height: number; bitDepth: number; colorType: number;
+  rowBytes: number; rawBytes: number;
+};
 
 async function validatePng(bytes: Uint8Array): Promise<ImageStructureResult> {
   const length = bytes.byteLength;
   if (length < 8 || ascii(bytes, 0, 8) !== '\x89PNG\r\n\x1a\n') return fail(415, 'Invalid PNG signature');
   let i = 8;
-  let header: { width: number; height: number; rawBytes: number } | null = null;
-  let palette = false;
+  let header: PngHeader | null = null;
+  let paletteBytes: Uint8Array | null = null;
   let seenIdat = false;
   let idatDone = false;
   const idat: Uint8Array[] = [];
@@ -170,13 +174,15 @@ async function validatePng(bytes: Uint8Array): Promise<ImageStructureResult> {
       if (!dims.ok) return dims;
       const channels = PNG_CHANNELS[colorType]!;
       const rowBytes = Math.ceil((width * channels * bitDepth) / 8);
-      header = { width, height, rawBytes: height * (1 + rowBytes) };
+      header = { width, height, bitDepth, colorType, rowBytes, rawBytes: height * (1 + rowBytes) };
     } else if (!header) {
       return fail(415, 'PNG data before header chunk');
     } else if (type === 'PLTE') {
       if (seenIdat || chunkLength === 0 || chunkLength % 3 !== 0 || chunkLength > 768)
         return fail(415, 'Invalid PNG palette chunk');
-      palette = true;
+      if (header.colorType === 3 && chunkLength / 3 > (1 << header.bitDepth))
+        return fail(415, 'PNG palette has too many entries');
+      paletteBytes = bytes.slice(dataStart, dataEnd);
     } else if (type === 'IDAT') {
       if (idatDone) return fail(415, 'PNG image data chunks are not contiguous');
       seenIdat = true;
@@ -185,10 +191,11 @@ async function validatePng(bytes: Uint8Array): Promise<ImageStructureResult> {
       idat.push(bytes.subarray(dataStart, dataEnd));
     } else if (type === 'IEND') {
       if (chunkLength !== 0 || dataEnd + 4 !== length) return fail(415, 'Invalid PNG end chunk');
-      return finishPng(header, idat, palette, seenIdat);
+      if (!seenIdat || !idat.length) return fail(415, 'PNG has no image data');
+      if (header.colorType === 3 && !paletteBytes) return fail(415, 'PNG palette is missing');
+      return decodePngRows(header, idat, paletteBytes);
     } else if (PNG_SAFE_ANCILLARY.has(type)) {
       if (seenIdat) idatDone = true;
-      if (type === 'tRNS' && palette === false && header.width === 0) return fail(415, 'Invalid PNG transparency chunk');
     } else {
       return fail(415, 'PNG metadata or unsupported chunks are not accepted');
     }
@@ -198,12 +205,32 @@ async function validatePng(bytes: Uint8Array): Promise<ImageStructureResult> {
   return fail(415, 'PNG is missing its end chunk');
 }
 
-async function finishPng(
-  header: { width: number; height: number; rawBytes: number },
-  idat: Uint8Array[], palette: boolean, seenIdat: boolean,
+function pngRowIsValid(row: Uint8Array, header: PngHeader, paletteBytes: Uint8Array | null): boolean {
+  if (header.colorType !== 3) return true;
+  const entries = paletteBytes ? paletteBytes.byteLength / 3 : 0;
+  const { width, bitDepth } = header;
+  if (bitDepth === 8) {
+    for (let x = 0; x < width; x++) if (row[x]! >= entries) return false;
+    return true;
+  }
+  const mask = (1 << bitDepth) - 1;
+  for (let x = 0; x < width; x++) {
+    const bit = x * bitDepth;
+    const value = (row[bit >> 3]! >> (8 - bitDepth - (bit & 7))) & mask;
+    if (value >= entries) return false;
+  }
+  return true;
+}
+
+/**
+ * Streams the zlib IDAT data and fully decodes every PNG scanline: row filter
+ * validation/unfiltering (None/Sub/Up/Average/Paeth), exact scanline count and
+ * palette-index range checks. Rows are processed one at a time so a 25 MP image
+ * never has to be held in memory.
+ */
+async function decodePngRows(
+  header: PngHeader, idat: Uint8Array[], paletteBytes: Uint8Array | null,
 ): Promise<ImageStructureResult> {
-  if (!seenIdat || !idat.length) return fail(415, 'PNG has no image data');
-  void palette;
   const chunks = new Uint8Array(idat.reduce((sum, part) => sum + part.byteLength, 0));
   let offset = 0;
   for (const part of idat) { chunks.set(part, offset); offset += part.byteLength; }
@@ -212,20 +239,73 @@ async function finishPng(
     stream = new Blob([chunks as BlobPart]).stream().pipeThrough(new DecompressionStream('deflate'));
   } catch { return fail(415, 'PNG image data could not be decompressed'); }
   const reader = stream.getReader();
+  const { width, height, bitDepth, colorType, rowBytes, rawBytes } = header;
+  const channels = PNG_CHANNELS[colorType]!;
+  const bytesPerPixel = Math.max(1, Math.ceil((channels * bitDepth) / 8));
+  let previous = new Uint8Array(rowBytes);
+  let current = new Uint8Array(rowBytes);
+  let filter = -1;
+  let filled = 0;
+  let rows = 0;
   let total = 0;
   try {
     for (;;) {
       const { done, value } = await reader.read();
       if (done) break;
-      total += value.byteLength;
-      if (total > header.rawBytes) { await reader.cancel(); return fail(415, 'PNG image data length does not match its header'); }
+      for (let index = 0; index < value.length; index++) {
+        const byte = value[index]!;
+        total++;
+        if (total > rawBytes) {
+          await reader.cancel().catch(() => undefined);
+          return fail(415, 'PNG image data length does not match its header');
+        }
+        if (filter === -1) {
+          if (byte > 4) {
+            await reader.cancel().catch(() => undefined);
+            return fail(415, 'PNG row filter is invalid');
+          }
+          filter = byte;
+          filled = 0;
+          continue;
+        }
+        const left = filled >= bytesPerPixel ? current[filled - bytesPerPixel]! : 0;
+        const up = previous[filled]!;
+        const upLeft = filled >= bytesPerPixel ? previous[filled - bytesPerPixel]! : 0;
+        let output: number;
+        if (filter === 0) output = byte;
+        else if (filter === 1) output = (byte + left) & 0xff;
+        else if (filter === 2) output = (byte + up) & 0xff;
+        else if (filter === 3) output = (byte + ((left + up) >> 1)) & 0xff;
+        else {
+          const estimate = left + up - upLeft;
+          const distanceLeft = Math.abs(estimate - left);
+          const distanceUp = Math.abs(estimate - up);
+          const distanceUpLeft = Math.abs(estimate - upLeft);
+          const predictor = distanceLeft <= distanceUp && distanceLeft <= distanceUpLeft
+            ? left : distanceUp <= distanceUpLeft ? up : upLeft;
+          output = (byte + predictor) & 0xff;
+        }
+        current[filled++] = output;
+        if (filled === rowBytes) {
+          if (!pngRowIsValid(current, header, paletteBytes)) {
+            await reader.cancel().catch(() => undefined);
+            return fail(415, 'PNG palette index is out of range');
+          }
+          rows++;
+          const swap = previous;
+          previous = current;
+          current = swap;
+          filter = -1;
+        }
+      }
     }
   } catch {
     await reader.cancel().catch(() => undefined);
     return fail(415, 'PNG image data could not be decompressed');
   } finally { reader.releaseLock(); }
-  if (total !== header.rawBytes) return fail(415, 'PNG image data length does not match its header');
-  return checkDimensions(header.width, header.height);
+  if (rows !== height || filter !== -1 || total !== rawBytes)
+    return fail(415, 'PNG image data length does not match its header');
+  return checkDimensions(width, height);
 }
 
 // ---------------------------------------------------------------------------
