@@ -197,6 +197,15 @@ export async function fetchProperties(filters?: PropertyFilters): Promise<Proper
   return filterProperties(await loadProperties(false), filters);
 }
 
+export async function fetchPropertyPage(filters: PropertyFilters, cursor: string | null = null, signal?: AbortSignal) {
+  if (useCloudflarePropertyBackend) {
+    const { cloudflarePropertyPage } = await import('@/lib/cloudflare-properties');
+    const page = await cloudflarePropertyPage(filters, cursor, signal);
+    return { ...page, data: page.data.map(rowToProperty) };
+  }
+  return { data: await fetchProperties(filters), nextCursor: null as string | null };
+}
+
 export async function fetchAdminProperties(filters?: PropertyFilters): Promise<Property[]> {
   requireStaffBackend();
   return filterProperties(await loadProperties(true), filters);

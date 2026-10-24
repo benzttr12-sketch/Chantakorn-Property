@@ -6,8 +6,11 @@ on:
       - 'src/lib/cloudflare-properties.ts'
       - 'src/lib/store/properties-store.ts'
       - 'src/app/admin/properties/**'
+      - 'src/app/properties/page.tsx'
       - 'src/components/admin/CollapsiblePropertyCard.tsx'
       - 'tests/cloudflare-properties.test.cjs'
+      - 'src/lib/property-link.ts'
+      - 'tests/property-links.test.cjs'
       - 'services/cloudflare-api/src/property-admin-routes.ts'
       - '.github/workflows/cloudflare-property-admin-checks.yml'
   workflow_dispatch:

@@ -53,5 +53,16 @@ except sqlite3.IntegrityError:
     pass
 else:
     raise AssertionError('Invalid staff role must be rejected by DB')
+for sort, expected_index in [
+    ('price ASC', 'idx_properties_live_price_asc'),
+    ('price DESC', 'idx_properties_live_price_desc'),
+    ('featured DESC', 'idx_properties_live_featured'),
+]:
+    plan = [r['detail'] for r in db.execute(
+        f"EXPLAIN QUERY PLAN SELECT id FROM properties WHERE published=1 AND deleted_at IS NULL ORDER BY {sort}, created_at DESC, id DESC LIMIT 24"
+    )]
+    assert any(expected_index in line for line in plan), plan
+    assert not any('TEMP B-TREE' in line for line in plan), plan
+
 db.close()
 print('OK: D1 fresh-start SQL creates expected tables, starts empty, bounds public queries and uses indexed ordering')

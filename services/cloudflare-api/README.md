@@ -111,3 +111,11 @@ After applying migration `0004_catalog_generation.sql` in isolated staging, set 
 Only validated anonymous GET list/detail payloads enter the Cache API, keyed by URL, sorted parameters, schema namespace and generation. Authentication/cookie requests bypass the cache; errors, private/Admin routes and draft media are never stored. Cached payloads contain no request headers; CORS is recomputed for each caller. All outward catalog responses use `no-store` so intermediary/browser caches cannot bypass generation validation. Internal entries expire after 60 seconds. Mutations make earlier keys unreachable immediately for requests starting after commit; already in-flight responses can complete from their observed state.
 
 A hit costs one indexed singleton D1 read plus a Worker invocation, instead of repeating the property and media queries. It is not zero-cost or unlimited free traffic. Cache storage is data-center-local and can evict entries; errors fall back to the current origin result. Large-scale staging load tests and public-only image delivery remain necessary. See [D1 transactions](https://developers.cloudflare.com/d1/worker-api/d1-database/) and [Workers Cache API](https://developers.cloudflare.com/workers/runtime-apis/cache/).
+
+## Public search pagination
+
+The Cloudflare `/properties` screen makes one request for 24 records at a time, with previous/next navigation. Search changes reset the cursor, debounce requests and abort obsolete requests. The map and counts explicitly describe the current page. Firebase mode keeps its existing behavior.
+
+The API applies every public screen filter before its result limit: type/status, location substrings, price range, rooms, features, text/code search, featured and video. Newest, price ascending/descending and featured-first sorts use stable keyset cursors with created-at/id tie breakers; a cursor for another sort is rejected. Sort indexes are in migration 0005. Substring and JSON-feature searches can still scan rows on a cache miss and need staging query-cost/load measurements; pagination alone does not guarantee cheap arbitrary searches.
+
+Other consumers using `cloudflareListProperties` (including the legacy Admin list) still use the bounded compatibility bridge. Their native pagination and real-browser staging remain open work before cutover.

@@ -1,14 +1,18 @@
 import { formatPropertyCode } from '@/lib/format-code';
 
-type PropertyLinkTarget = string | { id?: string; slug?: string };
+type PropertyLinkTarget = string | { id?: string; slug?: string; code?: string };
 
 /** Use the stable property code for new links; keep legacy slug links readable. */
 export function propertyHref(property: PropertyLinkTarget): string {
   const key = typeof property === 'string'
     ? property
-    : property?.id?.trim()
-      ? formatPropertyCode(property.id)
-      : property?.slug;
+    : property?.code && /^CK-[A-Z0-9]+$/i.test(property.code)
+      ? property.code.toUpperCase()
+      : property?.id?.trim()
+        ? process.env.NEXT_PUBLIC_PROPERTY_STORAGE_BACKEND === 'cloudflare'
+          ? property.id.trim()
+          : formatPropertyCode(property.id)
+        : property?.slug;
 
   if (!key) return '/properties';
   const encoded = encodeURIComponent(key);

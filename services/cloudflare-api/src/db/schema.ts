@@ -1,3 +1,4 @@
+import { asc, desc } from 'drizzle-orm';
 import { index, integer, real, sqliteTable, text } from 'drizzle-orm/sqlite-core';
 
 // Keep this declaration aligned with migrations/0001_initial.sql.
@@ -72,6 +73,9 @@ export const properties = sqliteTable('properties', {
   index('idx_properties_public_type_price').on(table.published, table.propertyType, table.status, table.price),
   index('idx_properties_public_price').on(table.published, table.price),
   index('idx_properties_live_published').on(table.published, table.deletedAt, table.createdAt, table.id),
+  index('idx_properties_live_price_asc').on(table.published, table.deletedAt, asc(table.price), desc(table.createdAt), desc(table.id)),
+  index('idx_properties_live_price_desc').on(table.published, table.deletedAt, desc(table.price), desc(table.createdAt), desc(table.id)),
+  index('idx_properties_live_featured').on(table.published, table.deletedAt, desc(table.featured), desc(table.createdAt), desc(table.id)),
   index('idx_properties_admin_updated').on(table.deletedAt, table.updatedAt, table.id),
 ]);
 
