@@ -1,13 +1,13 @@
 # Chantakorn Property — Cloudflare API (scaffold)
 
-**PR-02 + stacked PR-03 / staging only.** This folder does **not** replace any current Next.js/Firebase endpoints, change the domain, import old properties, or access production customer data. The initial API is **read only**.
+**Stacked migration / staging only.** This folder does **not** replace current Next.js/Firebase endpoints, change the domain, import old properties, or access production customer data. Property writes, publication and media uploads remain disabled by default.
 
 ## Stack
 
 - Cloudflare Workers + [Hono](https://github.com/honojs/hono)
 - [Drizzle ORM](https://github.com/drizzle-team/drizzle-orm) + Cloudflare D1 (SQLite)
-- R2 bindings for **separate** public property images and **private** inquiry media (no R2 HTTP routes yet)
-- Firebase Authentication remains in the existing app. PR-03 adds Firebase JWT verification and a private read-only staff self-check using D1 role authority; write operations are still disabled.
+- Separate private R2 bindings for mixed draft/published property images and customer inquiry media, delivered through authorized Worker routes.
+- Firebase Authentication remains in the existing app. Staff routes verify signed Firebase tokens, D1 role authority and live Firebase account/revocation state.
 
 ## First-time setup (developer staging only)
 
@@ -55,13 +55,14 @@ These commands touch Cloudflare resources, so they are **not executed by CI**. K
 - `GET /v1/properties` — published-only allowlisted fields, keyset cursor, maximum 30 results, filters for type/status/province/district/price. Invalid/duplicated query parameters give 400.
 - `GET /v1/properties/:identifier` — published property by new property code or slug; no draft, private notes, client contacts or sample fallback. Unknown legacy IDs return 404.
 
-No POST, PUT, PATCH or DELETE endpoints exist. No secrets are required for the public read-only API. Only one browser origin configured via `ALLOWED_ORIGIN` gets an Access-Control-Allow-Origin header. Set `FIREBASE_PROJECT_ID` to the actual trusted Firebase Authentication project ID before testing staff access; the checked-in placeholder fails closed.
+`/v1/admin/properties` implements protected list/detail/create/PATCH/soft-delete; creation is always draft-first. R2 upload/read routes are described below. Public read routes require no credentials. Only the browser origin configured via `ALLOWED_ORIGIN` receives an Access-Control-Allow-Origin header. Before testing staff routes, configure the actual trusted `FIREBASE_PROJECT_ID` and its `FIREBASE_WEB_API_KEY` in the local/staging environment. Missing account-state configuration fails closed; never substitute a service-account private key. Keep all three write/publication flags false before staging acceptance.
 
 ## Testing
 
 ```sh
 npm run typecheck
 npm test
+npm run test:integration
 python3 scripts/verify_schema.py
 ```
 
@@ -80,7 +81,7 @@ Related decision and backup plan: [PR #35](https://github.com/benzttr12-sketch/C
 - `GET /v1/staff/me` requires `Authorization: Bearer <Firebase ID token>` and responds only for a **verified** Firebase Auth email and an existing, server-controlled D1 ADMIN/AGENT profile with matching UID.
 - Google Secure Token **RS256** signature is verified against Google's rotating JWKS; project-specific issuer/audience, expiration, `iat`, `auth_time`, and `sub` are checked.
 - D1 `profiles.role` remains USER by default. Missing, disabled, unauthorized, revoked or out-of-sync staff profiles are denied (401 or 403), **never** automatically upgraded.
-- `auth_disabled` and `tokens_valid_after` in D1 must be synchronized from real Firebase Auth account state by a future approved, privileged job; this draft only verifies what is present in D1. Firebase Auth account disable/revocation changes do not automatically flow to D1 yet. Do not expose high-impact write endpoints until synchronization/revocation checks are implemented and audited.
+- D1 `auth_disabled` and `tokens_valid_after` provide an additional deny gate. Every staff self-check, Admin read/write, private inquiry-media read and upload also verifies live Firebase account state, matching UID, verified email, disabled status and `auth_time >= validSince`. Missing/malformed state and lookup failures deny access. Firebase account state never grants a D1 staff role.
 - No staff bootstrap endpoint exists. No public user can set their role. A secure manual migration after encrypted backup and UID reconciliation is required before the endpoint will grant any staff permission.
 - Test `npm test` covers valid RS256 signed local fixture tokens, forged/expired/future/wrong-issuer/wrong-audience/unverified tokens and role state denial. No real Firebase account or customer record is used.
 
@@ -91,10 +92,12 @@ The Worker now exposes `GET /v1/media/properties/:mediaId` only for a media row 
 `GET /v1/media/inquiries/:mediaId` always requires a verified Firebase ID token and an existing D1 ADMIN/AGENT role. Responses have `private, no-store`; neither the R2 private bucket nor inquiry metadata is exposed anonymously. Do NOT attach a public custom domain or public bucket URL to either of the current R2 buckets: even the listing bucket contains **draft** images.
 
 Staff-only raw-image uploads are staged behind `MEDIA_WRITES_ENABLED=true`, which is **omitted from checked-in Wrangler examples and false by default**. Routes:
-- `POST /v1/media/properties/:ownerId` — associated listing must already exist in D1, max 60 images.
+- `POST /v1/media/properties/:ownerId` — ADMIN only; associated listing must exist and not be soft-deleted, max 60 images.
 - `POST /v1/media/inquiries/:ownerId` — existing inquiry, max 15 private images.
 - An exact matching `Origin`, valid Bearer token, approved D1 role, explicit binary `Content-Type` and `Content-Length` and matching JPEG/PNG/WebP bytes are required. Max 2 MiB per image. Relative `media_path` returned after upload must be resolved with the **trusted API origin**; don't concatenate untrusted hosts.
 
-**Production write gate:** keep `MEDIA_WRITES_ENABLED` disabled until an independently verified Firebase Auth account-disable/revocation sync, staff role bootstrap/reconciliation, image full-decode validation, abuse controls and upload-rate protection exist. This PR has only low-cost header/magic-byte/integrity checks, not full image decode, AV scanning or EXIF location stripping; these must be addressed before customer upload cutover. Admin image preprocessing can strip metadata and resize before upload, but client-only validation is not a security boundary. Uploaded R2 keys are generated server-side, never from arbitrary filenames or paths. D1 metadata insert errors trigger best-effort object cleanup; an orphan sweep is still needed for rare partial failures.
+**Production write gate:** keep `MEDIA_WRITES_ENABLED` disabled until real staging account-disable/revocation tests, staff role bootstrap/reconciliation, image full-decode validation, atomic image-count quotas, abuse controls and upload-rate protection pass. Current validation checks headers and magic bytes; full image decoding and EXIF removal remain required. Client preprocessing is not a security boundary. Uploaded R2 keys are generated server-side. D1 metadata insert errors trigger best-effort object cleanup; an orphan sweep is still needed for partial failures.
+
+The integration suite bundles the real Worker and runs local workerd D1/R2 bindings. Locally signed RSA tokens and intercepted Google JWKS/account lookups exercise public pagination, private-file authorization, draft-first CRUD, concurrent revision conflicts and R2 bytes. It uses only synthetic records and never calls production Firebase or Cloudflare. Cache assertions verify HTTP policy, not edge cache hits or a traffic benchmark.
 
 **Free-tier design:** Routing every public image GET through the Worker consumes Worker requests. Before growing traffic, consider a **separate public-only, versioned R2 delivery bucket** populated after publication, with a custom domain and CDN, while keeping draft property and customer photos in private buckets. Public promotion must copy only explicitly published assets. Do not expose this mixed draft/public `PROPERTY_MEDIA` bucket directly.

@@ -10,18 +10,21 @@
     "check": "npm run typecheck && npm test",
     "db:local": "wrangler d1 migrations apply chantakorn-property-dev --local",
     "db:remote": "wrangler d1 migrations apply chantakorn-property-dev --remote",
-    "deploy": "wrangler deploy"
+    "deploy": "wrangler deploy",
+    "test:integration": "node --test tests/runtime.integration.mjs"
   },
   "dependencies": {
-    "hono": "4.13.5",
     "drizzle-orm": "0.45.2",
+    "hono": "4.13.5",
     "jose": "6.2.12"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "5.20261019.1",
+    "@types/node": "22.15.0",
     "drizzle-kit": "0.31.10",
+    "esbuild": "0.25.12",
+    "miniflare": "5.20261019.0-beta",
     "typescript": "5.8.2",
-    "wrangler": "4.151.2",
-    "@types/node": "22.15.0"
+    "wrangler": "4.151.2"
   }
 }

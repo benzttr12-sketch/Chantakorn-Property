@@ -1,8 +1,8 @@
 import { Hono, type Context } from 'hono';
 import { drizzle } from 'drizzle-orm/d1';
 import { and, eq, sql, isNull } from 'drizzle-orm';
-import { inquiryMedia, inquiries, profiles, properties, propertyMedia } from './db/schema.ts';
-import { authorizeStaffProfile, extractBearer, firebaseProjectConfigured, verifyFirebaseIdToken } from './auth.ts';
+import { inquiryMedia, inquiries, properties, propertyMedia } from './db/schema.ts';
+import { authorizePropertyStaff } from './property-auth.ts';
 import {
   MAX_INQUIRY_IMAGES, MAX_PROPERTY_IMAGES, mediaExtension,
   readBoundedImage, validBrowserOrigin, validMediaId, validOwnerId,
@@ -14,26 +14,16 @@ type Env = {
   PRIVATE_MEDIA: R2Bucket;  // NEVER enable public bucket access.
   ALLOWED_ORIGIN: string;
   FIREBASE_PROJECT_ID: string;
-  MEDIA_WRITES_ENABLED?: string; // OFF by default; staging gate until Auth revocation sync.
+  FIREBASE_WEB_API_KEY?: string;
+  MEDIA_WRITES_ENABLED?: string; // OFF by default; image and abuse validation gates remain.
 };
 type Staff = { uid: string; role: 'ADMIN' | 'AGENT' };
 type StaffCheck = { staff: Staff } | { status: 401 | 403 | 503; error: string };
 
 async function requireStaff(env: Env, auth: string | undefined): Promise<StaffCheck> {
-  if (!firebaseProjectConfigured(env.FIREBASE_PROJECT_ID)) {
-    return { status: 503, error: 'Authentication not configured' };
-  }
-  const bearer = extractBearer(auth);
-  if (!bearer) return { status: 401, error: 'Authentication required' };
-  const identity = await verifyFirebaseIdToken(bearer, env.FIREBASE_PROJECT_ID);
-  if (!identity) return { status: 401, error: 'Invalid Firebase token' };
-  const [profile] = await drizzle(env.DB).select({
-    uid: profiles.uid, role: profiles.role, authDisabled: profiles.authDisabled,
-    tokensValidAfter: profiles.tokensValidAfter,
-  }).from(profiles).where(eq(profiles.uid, identity.uid)).limit(1);
-  const role = authorizeStaffProfile(identity, profile);
-  if (!role) return { status: 403, error: 'Insufficient privileges' };
-  return { staff: { uid: identity.uid, role } };
+  const result = await authorizePropertyStaff(env, auth, true);
+  if (!result.ok) return { status: result.status, error: result.error };
+  return { staff: { uid: result.uid, role: result.role } };
 }
 
 const media = new Hono<{ Bindings: Env }>();
@@ -89,6 +79,7 @@ media.get('/v1/media/inquiries/:mediaId', async c => {
   if (!validMediaId(mediaId)) return c.json({ error: 'Not found' }, 404);
   const allowed = await requireStaff(c.env, c.req.header('Authorization'));
   if (!('staff' in allowed)) return c.json({ error: allowed.error }, allowed.status);
+
   const [row] = await drizzle(c.env.DB).select({
     key: inquiryMedia.objectKey, type: inquiryMedia.contentType,
   }).from(inquiryMedia).where(eq(inquiryMedia.id, mediaId)).limit(1);
@@ -108,12 +99,15 @@ async function upload(c: Context<{ Bindings: Env }>, kind: 'property' | 'inquiry
   const allowed = await requireStaff(c.env, c.req.header('Authorization'));
   if (!('staff' in allowed)) return c.json({ error: allowed.error }, allowed.status);
 
+  if (kind === 'property' && allowed.staff.role !== 'ADMIN')
+    return c.json({ error: 'Only approved administrators may change property images' }, 403);
+
   const ownerId = c.req.param('ownerId') ?? '';
   if (!validOwnerId(ownerId)) return c.json({ error: 'Invalid owner ID' }, 400);
   const database = drizzle(c.env.DB);
   if (kind === 'property') {
     const [owner] = await database.select({ id: properties.id }).from(properties)
-      .where(eq(properties.id, ownerId)).limit(1);
+      .where(and(eq(properties.id, ownerId), isNull(properties.deletedAt))).limit(1);
     if (!owner) return c.json({ error: 'Property not found' }, 404);
   } else {
     const [owner] = await database.select({ id: inquiries.id }).from(inquiries)
