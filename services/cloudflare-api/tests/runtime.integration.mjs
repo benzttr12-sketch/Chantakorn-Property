@@ -361,6 +361,11 @@ test('local Worker HTTP / D1 / R2 / Firebase authorization contract', async t =>
       assert.equal(first.status, 200);
       const firstPage = await first.json();
       assert.equal(firstPage.total, 2);
+      assert.equal(firstPage.counts.all, 2);
+      assert.equal(firstPage.counts.draft, 2);
+      assert.equal(firstPage.counts.published, 0);
+      assert.equal(firstPage.counts.sale, 1);
+      assert.equal(firstPage.counts.rent, 1);
       assert.deepEqual(firstPage.data.map(row => row.slug), ['admin-page-gamma']);
       assert.ok(firstPage.next_cursor);
       const second = await (await list('filter=draft&searchQuery=admin-page&sortBy=price_desc&limit=1&cursor=' +

@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import React, { useState, useEffect, useRef, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -41,7 +41,7 @@ import {
 import { 
   createProperty, 
   updateProperty, 
-  fetchAdminProperties, 
+  fetchAdminPropertyById, 
   fetchUsers 
 } from '@/lib/store/properties-store';
 import { getAgents } from '@/lib/store/agents-store';
@@ -541,9 +541,8 @@ function PropertyEditor() {
     if (!editId) return;
     let active = true;
     setLoading(true);
-    fetchAdminProperties().then(async list => {
+    fetchAdminPropertyById(editId).then(async property => {
       if (!active) return;
-      const property = list.find(item => item.id === editId);
       if (!property) throw new Error('ไม่พบรายการที่ต้องการแก้ไข');
       const photos = useCloudflarePropertyBackend ? property : await loadStaffPropertyPhotos(property);
       if (!active) return;

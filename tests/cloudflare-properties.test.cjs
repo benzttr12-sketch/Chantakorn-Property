@@ -386,3 +386,44 @@ test('public page rejects repeated cursors and oversized pages without fetching 
     assert.equal(calls.length, 1);
   }
 });
+
+test('Admin page adapter forwards server filters, counts and a single bounded request', async () => {
+  const counts = { all: 3, sale: 2, rent: 1, featured: 1, draft: 2, published: 1 };
+  const { adapter, calls } = load(call => {
+    assert.equal(call.path, '/v1/admin/properties');
+    assert.equal(call.method, undefined);
+    assert.equal(call.params.get('limit'), '50');
+    assert.equal(call.params.get('searchQuery'), 'วิลล่า');
+    assert.equal(call.params.get('filter'), 'draft');
+    assert.equal(call.params.get('type'), 'house');
+    assert.equal(call.params.get('district'), 'หาดใหญ่');
+    assert.equal(call.params.get('sortBy'), 'price_desc');
+    assert.equal(call.params.get('cursor'), null);
+    return json({ data: [sample], total: 3, next_cursor: 'next-page', counts });
+  });
+  const page = await adapter.cloudflareAdminPropertyPage({
+    searchQuery: ' วิลล่า ', filter: 'draft', type: 'house', district: 'หาดใหญ่', sortBy: 'price_desc',
+  });
+  assert.equal(page.total, 3);
+  assert.equal(page.nextCursor, 'next-page');
+  assert.deepEqual(page.counts, counts);
+  assert.equal(page.data.length, 1);
+  assert.equal(calls.length, 1);
+});
+
+test('Admin page adapter rejects malformed totals, counts, cursors and oversized pages', async () => {
+  const counts = { all: 1, sale: 1, rent: 0, featured: 0, draft: 1, published: 0 };
+  for (const body of [
+    { data: [sample], total: 1, next_cursor: null },
+    { data: [sample], total: 2, next_cursor: null, counts },
+    { data: [sample], total: 1, next_cursor: '', counts },
+    { data: [sample], total: 1, next_cursor: 'x'.repeat(513), counts },
+    { data: Array(51).fill(sample), total: 51, next_cursor: null, counts: { ...counts, all: 51 } },
+    { data: [sample], total: -1, next_cursor: null, counts: { ...counts, all: -1 } },
+    { data: 'not an array', total: 1, next_cursor: null, counts },
+    { data: [sample], total: 1, next_cursor: null, counts: { ...counts, featured: '1' } },
+  ]) {
+    const { adapter } = load(() => json(body));
+    await assert.rejects(adapter.cloudflareAdminPropertyPage(), /หน้าถัดไป/);
+  }
+});

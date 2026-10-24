@@ -55,7 +55,7 @@ async function editor(existing, backend = 'firebase') {
     'next/link': 'Link', 'next/image': 'Image',
     'lucide-react': new Proxy({}, { get: (_target, key) => key }),
     '@/lib/store/properties-store': {
-      fetchUsers: async () => [{ ...staff }], fetchAdminProperties: async () => existing ? [existing] : [],
+      fetchUsers: async () => [{ ...staff }], fetchAdminPropertyById: async () => existing ?? null,
       createProperty: async property => { saved.push(property); return { ...property, id: 'created' }; },
       updateProperty: async (_id, property) => { saved.push(property); },
     },
