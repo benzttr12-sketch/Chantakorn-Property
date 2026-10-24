@@ -2,30 +2,24 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { 
-  Layers, 
-  PlusCircle, 
-  Search, 
-  Filter, 
-  CheckCircle2, 
-  Clock, 
-  User, 
-  Phone, 
-  Building2, 
-  Calendar, 
-  ArrowRight, 
-  Sparkles, 
-  ChevronDown, 
-  ChevronUp, 
-  FileText, 
+import {
+  Layers,
+  PlusCircle,
+  Search,
+  CheckCircle2,
+  Clock,
+  User,
+  ChevronDown,
+  ChevronUp,
+  FileText,
   Image as ImageIcon,
-  AlertCircle,
-  RotateCcw,
   Trash2,
-  ExternalLink
+  ExternalLink,
+  Zap,
+  ClipboardList
 } from 'lucide-react';
 import { WorkJob, WorkPhase } from '@/lib/types';
-import { fetchWorkJobs, createWorkJob, deleteWorkJob, DEFAULT_7_PHASES } from '@/lib/store/work-jobs-store';
+import { fetchWorkJobs, createWorkJob, deleteWorkJob, completeCurrentPhaseAndAdvance, DEFAULT_7_PHASES } from '@/lib/store/work-jobs-store';
 import { formatThaiDate } from '@/lib/utils';
 import WorkPhaseQuickTransitionModal from '@/components/admin/WorkPhaseQuickTransitionModal';
 
@@ -49,6 +43,11 @@ export default function WorkPhasesAdminPage() {
   const [newAssignedAgent, setNewAssignedAgent] = useState('คุณจันทรกร (Admin)');
   const [newInitialNotes, setNewInitialNotes] = useState('');
   const [creating, setCreating] = useState(false);
+
+  // Quick create (single line) & quick one-click phase log states
+  const [quickTitle, setQuickTitle] = useState('');
+  const [quickCreating, setQuickCreating] = useState(false);
+  const [quickLogJobId, setQuickLogJobId] = useState<string | null>(null);
 
   const loadData = async () => {
     setLoading(true);
@@ -80,6 +79,43 @@ export default function WorkPhasesAdminPage() {
     setExpandedJobIds(prev => ({ ...prev, [id]: !prev[id] }));
   };
 
+  const handleQuickCreate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const title = quickTitle.trim();
+    if (!title) {
+      alert('กรุณากรอกชื่อรายการงานก่อนกด Enter');
+      return;
+    }
+    setQuickCreating(true);
+    try {
+      const created = await createWorkJob({ title });
+      setJobs(prev => [created, ...prev]);
+      setQuickTitle('');
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'ไม่สามารถสร้างงานใหม่ได้');
+    } finally {
+      setQuickCreating(false);
+    }
+  };
+
+  const handleQuickLog = async (job: WorkJob) => {
+    const isFinal = job.current_phase_number >= job.total_phases;
+    const phase = job.phases.find(p => p.phase_number === job.current_phase_number);
+    const confirmMsg = isFinal
+      ? `ยืนยัน "ลงงานด่วน" ปิดงาน "${job.title}" (${job.job_code}) ให้เสร็จสิ้นครบทุกเฟส?`
+      : `ยืนยัน "ลงงานด่วน" จบเฟส ${job.current_phase_number} [${phase?.phase_title || ''}]\nของงาน "${job.title}" (${job.job_code})\nแล้วส่งต่อเข้าเฟส ${job.current_phase_number + 1} ทันที?`;
+    if (!window.confirm(confirmMsg)) return;
+    setQuickLogJobId(job.id);
+    try {
+      const updated = await completeCurrentPhaseAndAdvance({ jobId: job.id });
+      handleJobUpdated(updated);
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'ลงงานไม่สำเร็จ');
+    } finally {
+      setQuickLogJobId(null);
+    }
+  };
+
   const handleCreateJob = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newTitle.trim()) {
@@ -102,9 +138,6 @@ export default function WorkPhasesAdminPage() {
       setNewCustomerName('');
       setNewCustomerPhone('');
       setNewInitialNotes('');
-      // Open transition modal for immediate action!
-      setSelectedJob(created);
-      setModalOpen(true);
     } catch (err) {
       alert(err instanceof Error ? err.message : 'ไม่สามารถสร้างงานใหม่ได้');
     } finally {
@@ -159,19 +192,45 @@ export default function WorkPhasesAdminPage() {
             ระบบติดตามและลงงานตามเฟส
           </h1>
           <p className="text-xs sm:text-sm text-navy-200 mt-1 max-w-2xl">
-            บันทึกความคืบหน้างานฝากขายและพัฒนาทรัพย์ พร้อมระบบ <strong>&quot;ลงงานเสร็จ ➔ ต่อเฟสใหม่ทันที&quot;</strong> เพื่อการทำงานที่รวดเร็วและต่อเนื่อง
+            บันทึกความคืบหน้างานฝากขายและพัฒนาทรัพย์ พร้อมระบบ <strong>&quot;ลงงานด่วน 1 คลิก ➔ ต่อเฟสใหม่ทันที&quot;</strong> เพื่อการทำงานที่รวดเร็วและต่อเนื่อง
           </p>
         </div>
-
-        <button
-          type="button"
-          onClick={() => setCreateModalOpen(true)}
-          className="px-5 py-3 rounded-2xl bg-linear-to-r/srgb from-gold-400 to-gold-500 hover:from-gold-500 hover:to-gold-600 text-navy-950 font-extrabold text-xs shadow-lg flex items-center justify-center gap-2 transition-all active:scale-95 shrink-0"
-        >
-          <PlusCircle className="w-4 h-4" />
-          <span>ลงทะเบียนงานเฟสใหม่</span>
-        </button>
       </div>
+
+      {/* Quick Create Bar: ชื่องานช่องเดียว + Enter = สร้าง & เริ่มเฟส 1 ทันที */}
+      <form
+        onSubmit={handleQuickCreate}
+        className="bg-white rounded-2xl border-2 border-gold-300 shadow-xs p-3.5 flex flex-col sm:flex-row items-stretch sm:items-center gap-2"
+      >
+        <div className="flex items-center gap-2 flex-1">
+          <Zap className="w-4 h-4 text-gold-600 shrink-0" />
+          <input
+            type="text"
+            value={quickTitle}
+            onChange={(e) => setQuickTitle(e.target.value)}
+            placeholder="ลงทะเบียนงานใหม่แบบด่วน — พิมพ์ชื่องาน/ทรัพย์ที่รับฝากขาย แล้วกด Enter (เริ่มเฟส 1 ให้อัตโนมัติ)"
+            className="w-full text-xs font-medium outline-hidden bg-transparent placeholder:text-gray-400"
+          />
+        </div>
+        <div className="flex items-center gap-2 shrink-0">
+          <button
+            type="submit"
+            disabled={quickCreating}
+            className="px-4 py-2.5 rounded-xl bg-linear-to-r/srgb from-gold-400 to-gold-500 hover:from-gold-500 hover:to-gold-600 text-navy-950 font-extrabold text-xs shadow-md transition-all active:scale-95 disabled:opacity-50 whitespace-nowrap"
+          >
+            {quickCreating ? 'กำลังสร้าง...' : '⚡ สร้างงาน & เริ่มเฟส 1'}
+          </button>
+          <button
+            type="button"
+            onClick={() => setCreateModalOpen(true)}
+            className="px-3 py-2.5 rounded-xl border border-gray-300 text-gray-600 hover:bg-gray-50 font-bold text-[11px] transition-colors whitespace-nowrap flex items-center gap-1"
+            title="สร้างงานพร้อมกรอกชื่อลูกค้า เบอร์โทร ผู้รับผิดชอบ"
+          >
+            <ClipboardList className="w-3.5 h-3.5" />
+            <span>แบบละเอียด</span>
+          </button>
+        </div>
+      </form>
 
       {/* KPI Stats & Filters */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
@@ -308,16 +367,31 @@ export default function WorkPhasesAdminPage() {
                       </div>
                     </div>
 
-                    {/* Quick Instant Transition Button */}
+                    {/* Quick one-click log + detailed-log buttons */}
                     {!isDone && (
-                      <button
-                        type="button"
-                        onClick={() => handleOpenTransitionModal(job)}
-                        className="px-5 py-3 rounded-2xl bg-linear-to-r/srgb from-emerald-600 to-emerald-700 hover:from-emerald-700 hover:to-emerald-800 text-white font-extrabold text-xs shadow-md flex items-center justify-center gap-2 transition-all active:scale-95 shrink-0"
-                      >
-                        <Sparkles className="w-4 h-4 text-gold-300" />
-                        <span>✅ ลงงานเสร็จ & ต่อเฟสถัดไปทันที</span>
-                      </button>
+                      <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 shrink-0">
+                        <button
+                          type="button"
+                          onClick={() => handleQuickLog(job)}
+                          disabled={quickLogJobId === job.id}
+                          className="px-5 py-3 rounded-2xl bg-linear-to-r/srgb from-emerald-600 to-emerald-700 hover:from-emerald-700 hover:to-emerald-800 text-white font-extrabold text-xs shadow-md flex items-center justify-center gap-2 transition-all active:scale-95 disabled:opacity-50"
+                        >
+                          <Zap className="w-4 h-4 text-gold-300" />
+                          <span>
+                            {quickLogJobId === job.id
+                              ? 'กำลังบันทึก...'
+                              : `⚡ ลงงานด่วน จบเฟส ${activePhaseNum}${activePhaseNum < job.total_phases ? ` → เฟส ${activePhaseNum + 1}` : ' (ปิดงาน)'}`}
+                          </span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleOpenTransitionModal(job)}
+                          className="px-4 py-3 rounded-2xl border border-gray-300 text-navy-900 hover:bg-gray-50 font-bold text-xs transition-colors flex items-center justify-center gap-1.5"
+                        >
+                          <ClipboardList className="w-4 h-4 text-gold-600" />
+                          <span>ลงแบบละเอียด</span>
+                        </button>
+                      </div>
                     )}
                   </div>
 
@@ -338,15 +412,6 @@ export default function WorkPhasesAdminPage() {
                           </p>
                         )}
                       </div>
-
-                      <button
-                        type="button"
-                        onClick={() => handleOpenTransitionModal(job)}
-                        className="px-4 py-2 rounded-xl bg-gold-400 hover:bg-gold-500 text-navy-950 font-extrabold text-xs transition-colors shrink-0 flex items-center justify-center gap-1"
-                      >
-                        <span>อัปเดตเฟสนี้</span>
-                        <ArrowRight className="w-3.5 h-3.5" />
-                      </button>
                     </div>
                   )}
 
