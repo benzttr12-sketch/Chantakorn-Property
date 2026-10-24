@@ -57,6 +57,38 @@ test('cross-origin preflight is not silently granted', async () => {
   }, env());
   assert.equal(valid.status, 204);
   assert.match(valid.headers.get('Access-Control-Allow-Methods') || '', /DELETE/);
+  assert.match(valid.headers.get('Access-Control-Allow-Headers') || '', /X-Upload-Session/);
+});
+
+test('upload sessions are off by default and cannot be forged past origin or auth', async () => {
+  const path = '/v1/media/properties/' + uuid + '/sessions?uploads=2';
+  const disabled = await app.request(path, {
+    method: 'POST', headers: { Origin: 'https://chantakornproperty.com' },
+  }, env());
+  assert.equal(disabled.status, 503);
+  const forged = await app.request(path, {
+    method: 'POST', headers: { Origin: 'https://evil.invalid' },
+  }, env({ MEDIA_WRITES_ENABLED: 'true' }));
+  assert.equal(forged.status, 403);
+  const anonymous = await app.request(path, {
+    method: 'POST', headers: { Origin: 'https://chantakornproperty.com' },
+  }, env({ MEDIA_WRITES_ENABLED: 'true' }));
+  assert.equal(anonymous.status, 401);
+  assert.equal(anonymous.headers.get('Cache-Control'), 'private, no-store');
+});
+
+test('required upload sessions reject session-less property uploads before authentication', async () => {
+  const response = await app.request('/v1/media/properties/' + uuid, {
+    method: 'POST',
+    headers: { Origin: 'https://chantakornproperty.com', 'Content-Type': 'image/png' },
+  }, env({ MEDIA_WRITES_ENABLED: 'true', MEDIA_UPLOAD_SESSIONS_REQUIRED: 'true' }));
+  assert.equal(response.status, 400);
+  assert.deepEqual(await response.json(), { error: 'Upload session required' });
+  const malformed = await app.request('/v1/media/properties/' + uuid, {
+    method: 'POST',
+    headers: { Origin: 'https://chantakornproperty.com', 'Content-Type': 'image/png', 'X-Upload-Session': 'not-a-uuid' },
+  }, env({ MEDIA_WRITES_ENABLED: 'true' }));
+  assert.equal(malformed.status, 400);
 });
 
 test('photo deletion is disabled by default and cannot be forged past origin or auth', async () => {

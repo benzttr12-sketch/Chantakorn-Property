@@ -41,10 +41,13 @@ export async function readBoundedImage(req: Request): Promise<ImageReadResult> {
   if (declaredType !== 'image/jpeg' && declaredType !== 'image/png' && declaredType !== 'image/webp')
     return { ok: false, status: 415, error: 'Unsupported image format' };
   const contentLength = req.headers.get('Content-Length');
-  if (!contentLength || !/^[1-9][0-9]{0,7}$/.test(contentLength))
-    return { ok: false, status: 400, error: 'Content-Length required' };
-  const intendedSize = Number(contentLength);
-  if (intendedSize > MAX_MEDIA_BYTES) return { ok: false, status: 413, error: 'Image exceeds 2 MiB limit' };
+  // Browsers or proxies may forward a chunked body without Content-Length; the
+  // stream cap below is the real limit. A declared length must still be sane and
+  // match the bytes actually received.
+  if (contentLength !== null && !/^[1-9][0-9]{0,7}$/.test(contentLength))
+    return { ok: false, status: 400, error: 'Invalid Content-Length' };
+  const intendedSize = contentLength === null ? null : Number(contentLength);
+  if (intendedSize !== null && intendedSize > MAX_MEDIA_BYTES) return { ok: false, status: 413, error: 'Image exceeds 2 MiB limit' };
   if (!req.body) return { ok: false, status: 400, error: 'Missing body' };
   const chunks: Uint8Array[] = [];
   let total = 0;
@@ -65,7 +68,7 @@ export async function readBoundedImage(req: Request): Promise<ImageReadResult> {
   } finally {
     reader.releaseLock();
   }
-  if (total !== intendedSize) return { ok: false, status: 400, error: 'Content-Length mismatch' };
+  if (intendedSize !== null && total !== intendedSize) return { ok: false, status: 400, error: 'Content-Length mismatch' };
   const bytes = new Uint8Array(total);
   let offset = 0;
   for (const chunk of chunks) { bytes.set(chunk, offset); offset += chunk.length; }

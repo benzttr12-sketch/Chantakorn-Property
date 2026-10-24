@@ -60,5 +60,7 @@ test('bounds image streams and rejects type forgery', async () => {
   const missingLength = new Request('https://example.test/upload', {
     method: 'POST', headers: { 'Content-Type': 'image/jpeg' }, body: jpeg as unknown as BodyInit,
   });
-  assert.equal((await readBoundedImage(missingLength)).ok, false);
+  const streamed = await readBoundedImage(missingLength);
+  assert.equal(streamed.ok, true);
+  if (streamed.ok) assert.deepEqual(streamed.bytes, jpeg);
 });

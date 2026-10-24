@@ -61,7 +61,7 @@ test('local Worker HTTP / D1 / R2 / Firebase authorization contract', async t =>
     bindings: { ALLOWED_ORIGIN: origin, FIREBASE_PROJECT_ID: project,
       FIREBASE_WEB_API_KEY: 'synthetic-key-for-local-tests-only',
       PUBLIC_CATALOG_CACHE_ENABLED: 'true', PROPERTY_WRITES_ENABLED: 'true', PROPERTY_PUBLICATION_ENABLED: 'false',
-      MEDIA_WRITES_ENABLED: 'true', MEDIA_SWEEP_ENABLED: 'true' },
+      MEDIA_WRITES_ENABLED: 'true', MEDIA_SWEEP_ENABLED: 'true', MEDIA_UPLOAD_SESSIONS_REQUIRED: 'false' },
     outboundService: async request => {
       const url = new URL(request.url);
       if (url.origin === 'https://local-r2-test.invalid' && url.pathname === '/after-put') {
@@ -390,6 +390,53 @@ test('local Worker HTTP / D1 / R2 / Firebase authorization contract', async t =>
     } finally {
       for (const fixture of fixtures)
         await db.prepare('DELETE FROM properties WHERE id=?').bind(fixture.id).run();
+    }
+  });
+  await t.test('property upload sessions are owner-scoped, bounded and consumed per file', async () => {
+    const createSession = (owner, uploads) =>
+      fetchApi(`/v1/media/properties/${owner}/sessions?uploads=${uploads}`, { method: 'POST', headers });
+    const uploadWith = (owner, sessionId) => fetchApi('/v1/media/properties/' + owner, { method: 'POST',
+      headers: { ...headers, 'X-Upload-Session': sessionId, 'Content-Type': 'image/png',
+        'Content-Length': String(png.length) }, body: png });
+    const sessions = [];
+    try {
+      const response = await createSession(created.id, 2);
+      assert.equal(response.status, 201);
+      const session = await response.json();
+      sessions.push(session.session_id);
+      assert.equal(session.max_uploads, 2);
+      assert.equal(session.owner_id, created.id);
+      assert.ok(Date.parse(session.expires_at) > Date.now());
+      assert.equal((await uploadWith(created.id, session.session_id)).status, 201);
+      assert.equal((await uploadWith(created.id, session.session_id)).status, 201);
+      assert.equal((await uploadWith(created.id, session.session_id)).status, 409);
+      // Unknown ids and sessions bound to another draft cannot be reused.
+      assert.equal((await uploadWith(created.id, '00000000-0000-4000-8000-000000000099')).status, 409);
+      const otherResponse = await createSession(draftId, 1);
+      assert.equal(otherResponse.status, 201);
+      const other = await otherResponse.json();
+      sessions.push(other.session_id);
+      assert.equal((await uploadWith(created.id, other.session_id)).status, 409);
+      // Sessions need a draft, existing property and bounded batch size.
+      assert.equal((await createSession('00000000-0000-4000-8000-000000000004', 1)).status, 409);
+      assert.equal((await createSession(deletedId, 1)).status, 404);
+      assert.equal((await createSession(created.id, 21)).status, 400);
+      assert.equal((await createSession(created.id, 0)).status, 400);
+      // Expired rows are rejected and swept by the next session creation.
+      const expiredId = '00000000-0000-4000-8000-000000000098';
+      await db.prepare(`INSERT INTO media_upload_sessions
+          (id, owner_id, created_by, created_at, expires_at, max_uploads, used_uploads)
+          VALUES (?,?,?,?,?,?,0)`).bind(expiredId, created.id, uid,
+        '2026-10-20T00:00:00.000Z', '2026-10-20T00:00:01.000Z', 1).run();
+      assert.equal((await uploadWith(created.id, expiredId)).status, 409);
+      const sweep = await createSession(created.id, 1);
+      assert.equal(sweep.status, 201);
+      sessions.push((await sweep.json()).session_id);
+      assert.equal(await db.prepare('SELECT id FROM media_upload_sessions WHERE id=?').bind(expiredId).first(), null);
+    } finally {
+      for (const sessionId of sessions)
+        await db.prepare('DELETE FROM media_upload_sessions WHERE id=?').bind(sessionId).run();
+      await db.prepare("DELETE FROM media_upload_sessions WHERE owner_id=?").bind(created.id).run();
     }
   });
   await t.test('R2 writes enforce ADMIN, live state, origin and undeleted owner', async () => {
