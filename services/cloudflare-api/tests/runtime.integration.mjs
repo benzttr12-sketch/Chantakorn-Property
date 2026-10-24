@@ -123,7 +123,21 @@ test('local Worker HTTP / D1 / R2 / Firebase authorization contract', async t =>
     .bind(uid, 'Synthetic staff', 'ADMIN', '2026-10-20', '2026-10-20').run();
   await db.prepare('INSERT INTO inquiries(id,name,created_at,updated_at) VALUES (?,?,?,?)')
     .bind(inquiryId, 'SYNTHETIC CUSTOMER', '2026-10-20', '2026-10-20').run();
-  const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/lE8AAAAASUVORK5CYII=', 'base64');
+  const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAACXBIWXMAAAPoAAAD6AG1e1JrAAAADUlEQVQImWM4IafxHwAEzgIOn8aNIQAAAABJRU5ErkJggg==', 'base64');
+  // A structurally valid PNG carrying a private tEXt chunk: the upload must be
+  // rejected before any R2 write instead of storing camera/editor metadata.
+  const metadataPng = (() => {
+    const table = new Uint32Array(256);
+    for (let n = 0; n < 256; n++) { let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1; table[n] = c >>> 0; }
+    const crc = buffer => { let c = 0xffffffff; for (const byte of buffer) c = table[(c ^ byte) & 0xff] ^ (c >>> 8); return (c ^ 0xffffffff) >>> 0; };
+    const parts = []; let i = 8;
+    while (i + 12 <= png.length) { const length = png.readUInt32BE(i); parts.push(png.subarray(i, i + 12 + length)); i += 12 + length; }
+    const data = Buffer.from('Comment\0synthetic metadata', 'latin1'); const type = Buffer.from('tEXt', 'ascii');
+    const chunk = Buffer.alloc(12 + data.length);
+    chunk.writeUInt32BE(data.length, 0); type.copy(chunk, 4); data.copy(chunk, 8);
+    chunk.writeUInt32BE(crc(Buffer.concat([type, data])), 8 + data.length);
+    return Buffer.concat([png.subarray(0, 8), ...parts.slice(0, -1), chunk, parts[parts.length - 1]]);
+  })();
   const publicBucket = await mf.getR2Bucket('PROPERTY_MEDIA');
   const privateBucket = await mf.getR2Bucket('PRIVATE_MEDIA');
   await publicBucket.put('properties/published/test.png', png);
@@ -336,6 +350,17 @@ test('local Worker HTTP / D1 / R2 / Firebase authorization contract', async t =>
     assert.equal((await fetchApi('/v1/media/properties/' + media_id)).status, 404);
     assert.equal((await fetchApi('/v1/media/properties/' + deletedId, { method: 'POST',
       headers: { ...headers, 'Content-Type': 'image/png', 'Content-Length': String(png.length) }, body: png })).status, 404);
+  });
+  await t.test('uploads reject embedded image metadata before writing an R2 object', async () => {
+    const beforePuts = observedPropertyPuts;
+    const beforeObjects = (await publicBucket.list()).objects.length;
+    const response = await fetchApi('/v1/media/properties/' + created.id, { method: 'POST',
+      headers: { ...headers, 'X-Test-Observe-Property-Put': 'true', 'Content-Type': 'image/png',
+        'Content-Length': String(metadataPng.length) }, body: metadataPng });
+    assert.equal(response.status, 415);
+    assert.equal((await response.json()).error, 'PNG metadata or unsupported chunks are not accepted');
+    assert.equal(observedPropertyPuts, beforePuts, 'metadata must be rejected before any R2 put');
+    assert.equal((await publicBucket.list()).objects.length, beforeObjects);
   });
   await t.test('draft photo removal requires live ADMIN, draft state and a non-cover photo', async () => {
     const upload = await fetchApi('/v1/media/properties/' + created.id, { method: 'POST',

@@ -7,6 +7,7 @@ import {
   MAX_INQUIRY_IMAGES, MAX_PROPERTY_IMAGES, mediaExtension,
   readBoundedImage, validBrowserOrigin, validMediaId, validOwnerId,
 } from './media-validation.ts';
+import { validateImageStructure } from './media-image-structure.ts';
 
 type Env = {
   DB: D1Database;
@@ -125,6 +126,10 @@ async function upload(c: Context<{ Bindings: Env }>, kind: 'property' | 'inquiry
 
   const checked = await readBoundedImage(c.req.raw);
   if (!checked.ok) return c.json({ error: checked.error }, checked.status);
+  // Container-level validation only; the browser canvas compressor is what
+  // guarantees metadata-free pixels, direct uploads may be rejected instead.
+  const structure = await validateImageStructure(checked.bytes, checked.type);
+  if (!structure.ok) return c.json({ error: structure.error }, structure.status);
 
   const id = crypto.randomUUID();
   const objectKey = `${kind === 'property' ? 'properties' : 'inquiries'}/${ownerId}/${id}.${mediaExtension(checked.type)}`;
