@@ -334,6 +334,59 @@ test('local Worker HTTP / D1 / R2 / Firebase authorization contract', async t =>
     assert.deepEqual(competing.map(r => r.status).sort(), [200, 409]);
     created = (await (await fetchApi('/v1/admin/properties/' + created.id, { headers })).json()).data;
   });
+  await t.test('admin listing supports filters, sorting, totals and keyset pagination', async () => {
+    const fixtures = [
+      { id: '00000000-0000-4000-8000-000000000051', slug: 'admin-page-alpha', price: 900000, area: 50,
+        district: 'หาดใหญ่', type: 'house', status: 'sale', published: 0, createdAt: '2026-10-24T00:00:01.000Z' },
+      { id: '00000000-0000-4000-8000-000000000052', slug: 'admin-page-beta', price: 300000, area: 200,
+        district: 'เมืองสงขลา', type: 'land', status: 'sale', published: 1, createdAt: '2026-10-24T00:00:02.000Z' },
+      { id: '00000000-0000-4000-8000-000000000053', slug: 'admin-page-gamma', price: 900000, area: 90,
+        district: 'หาดใหญ่', type: 'condo', status: 'rent', published: 0, createdAt: '2026-10-24T00:00:03.000Z' },
+    ];
+    for (const fixture of fixtures) {
+      await db.prepare(`INSERT INTO properties
+          (id,code,slug,title,property_type,status,price,province,district,published,usable_area,created_at,updated_at)
+          VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`)
+        .bind(fixture.id, 'CK-' + fixture.slug.slice(-5).toUpperCase(), fixture.slug, 'Admin page ' + fixture.slug,
+          fixture.type, fixture.status, fixture.price, 'สงขลา', fixture.district, fixture.published, fixture.area,
+          fixture.createdAt, fixture.createdAt).run();
+    }
+    const list = async query => {
+      const response = await fetchApi('/v1/admin/properties?' + query, { headers });
+      assert.equal(response.headers.get('Cache-Control'), 'private, no-store');
+      return response;
+    };
+    try {
+      const first = await list('filter=draft&searchQuery=admin-page&sortBy=price_desc&limit=1');
+      assert.equal(first.status, 200);
+      const firstPage = await first.json();
+      assert.equal(firstPage.total, 2);
+      assert.deepEqual(firstPage.data.map(row => row.slug), ['admin-page-gamma']);
+      assert.ok(firstPage.next_cursor);
+      const second = await (await list('filter=draft&searchQuery=admin-page&sortBy=price_desc&limit=1&cursor=' +
+        encodeURIComponent(firstPage.next_cursor))).json();
+      assert.deepEqual(second.data.map(row => row.slug), ['admin-page-alpha']);
+      assert.equal(second.next_cursor, null);
+      const published = await (await list('filter=published&searchQuery=admin-page')).json();
+      assert.deepEqual(published.data.map(row => row.slug), ['admin-page-beta']);
+      const typed = await (await list('searchQuery=admin-page&district=' + encodeURIComponent('หาดใหญ่') +
+        '&type=house&filter=sale')).json();
+      assert.deepEqual(typed.data.map(row => row.slug), ['admin-page-alpha']);
+      const oldest = await (await list('searchQuery=admin-page&sortBy=oldest&limit=2')).json();
+      assert.deepEqual(oldest.data.map(row => row.slug), ['admin-page-alpha', 'admin-page-beta']);
+      const area = await (await list('searchQuery=admin-page&sortBy=area_desc')).json();
+      assert.deepEqual(area.data.map(row => row.slug), ['admin-page-beta', 'admin-page-gamma', 'admin-page-alpha']);
+      // A cursor is bound to its sort; malformed or ambiguous queries fail closed.
+      assert.equal((await list('searchQuery=admin-page&sortBy=price_asc&cursor=' +
+        encodeURIComponent(firstPage.next_cursor))).status, 400);
+      assert.equal((await list('limit=1&limit=2')).status, 400);
+      assert.equal((await list('unknown=1')).status, 400);
+      assert.equal((await list('limit=101')).status, 400);
+    } finally {
+      for (const fixture of fixtures)
+        await db.prepare('DELETE FROM properties WHERE id=?').bind(fixture.id).run();
+    }
+  });
   await t.test('R2 writes enforce ADMIN, live state, origin and undeleted owner', async () => {
     const upload = () => fetchApi('/v1/media/properties/' + created.id, { method: 'POST',
       headers: { ...headers, 'Content-Type': 'image/png', 'Content-Length': String(png.length) }, body: png });

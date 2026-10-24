@@ -1,11 +1,11 @@
 import { Hono, type Context } from 'hono';
 import { drizzle } from 'drizzle-orm/d1';
-import { and, desc, eq, inArray, isNull, lt, or } from 'drizzle-orm';
+import { and, asc, desc, eq, gt, inArray, isNull, lt, or, sql } from 'drizzle-orm';
 import { propertyMedia, properties } from './db/schema.ts';
 import { authorizePropertyStaff, canWriteProperties, type PropertyAuthEnv } from './property-auth.ts';
 import { newPropertyIdentity, parseEditorInput, readBoundedJson } from './property-input.ts';
 import { auditedMutation } from './audited-mutation.ts';
-import { encodeCursor, decodeCursor } from './property-query.ts';
+import { adminCursor, parseAdminQuery } from './admin-query.ts';
 import { SWEEP_STATUS_KEY } from './media-orphan-sweep.ts';
 
 type Env = PropertyAuthEnv & {
@@ -176,29 +176,58 @@ propertyAdmin.get('/v1/admin/properties/:id/media/:mediaId', async c => {
 propertyAdmin.get('/v1/admin/properties', async c => {
   const staff = await authorized(c);
   if (!staff.ok) return c.json({ error: staff.error }, staff.status);
-  const url = new URL(c.req.url);
-  if ([...url.searchParams.keys()].some(k => k !== 'cursor' && k !== 'limit'))
-    return c.json({ error: 'Unknown query field' }, 400);
-  const rawLimit = url.searchParams.get('limit') ?? '50';
-  if (!/^\d{1,2}$/.test(rawLimit) || +rawLimit < 1 || +rawLimit > 80)
-    return c.json({ error: 'Invalid limit' }, 400);
-  const cursorText = url.searchParams.get('cursor');
-  const cursor = cursorText === null ? undefined : decodeCursor(cursorText);
-  if (cursorText !== null && !cursor) return c.json({ error: 'Invalid cursor' }, 400);
-  const predicates = [isNull(properties.deletedAt)];
-  if (cursor) predicates.push(or(lt(properties.createdAt, cursor.createdAt),
-    and(eq(properties.createdAt, cursor.createdAt), lt(properties.id, cursor.id)))!);
+  const parsed = parseAdminQuery(new URL(c.req.url).searchParams);
+  if (!parsed.ok) return c.json({ error: parsed.error }, 400);
+  const query = parsed.value;
+  const base = [isNull(properties.deletedAt)];
+  if (query.type) base.push(eq(properties.propertyType, query.type as (typeof properties.$inferSelect)['propertyType']));
+  if (query.filter === 'sale' || query.filter === 'rent') base.push(eq(properties.status, query.filter));
+  if (query.filter === 'featured') base.push(eq(properties.featured, true));
+  if (query.filter === 'draft') base.push(eq(properties.published, false));
+  if (query.filter === 'published') base.push(eq(properties.published, true));
+  if (query.district) base.push(eq(properties.district, query.district));
+  if (query.searchQuery) {
+    const needle = query.searchQuery.toLowerCase();
+    base.push(or(
+      sql`instr(lower(${properties.title}), ${needle}) > 0`,
+      sql`instr(lower(${properties.district}), ${needle}) > 0`,
+      sql`instr(lower(${properties.id}), ${needle}) > 0`,
+      sql`instr(lower(${properties.code}), ${needle}) > 0`,
+    )!);
+  }
+  const predicates = [...base];
+  if (query.cursor) {
+    const cursor = query.cursor;
+    const newestAfter = or(lt(properties.createdAt, cursor.createdAt),
+      and(eq(properties.createdAt, cursor.createdAt), lt(properties.id, cursor.id)))!;
+    const oldestAfter = or(gt(properties.createdAt, cursor.createdAt),
+      and(eq(properties.createdAt, cursor.createdAt), gt(properties.id, cursor.id)))!;
+    if (query.sortBy === 'newest') predicates.push(newestAfter);
+    else if (query.sortBy === 'oldest') predicates.push(oldestAfter);
+    else if (query.sortBy === 'price_desc') predicates.push(
+      or(lt(properties.price, query.sortValue!), and(eq(properties.price, query.sortValue!), newestAfter))!);
+    else if (query.sortBy === 'price_asc') predicates.push(
+      or(gt(properties.price, query.sortValue!), and(eq(properties.price, query.sortValue!), newestAfter))!);
+    else predicates.push(
+      or(lt(properties.usableArea, query.sortValue!), and(eq(properties.usableArea, query.sortValue!), newestAfter))!);
+  }
+  const order = query.sortBy === 'newest' ? [desc(properties.createdAt), desc(properties.id)]
+    : query.sortBy === 'oldest' ? [asc(properties.createdAt), asc(properties.id)]
+    : query.sortBy === 'price_desc' ? [desc(properties.price), desc(properties.createdAt), desc(properties.id)]
+    : query.sortBy === 'price_asc' ? [asc(properties.price), desc(properties.createdAt), desc(properties.id)]
+    : [desc(properties.usableArea), desc(properties.createdAt), desc(properties.id)];
   const db = drizzle(c.env.DB);
-  const limit = Number(rawLimit);
   const rows = await db.select().from(properties)
-    .where(and(...predicates)).orderBy(desc(properties.createdAt), desc(properties.id))
-    .limit(limit + 1);
-  const visible = rows.slice(0, limit);
+    .where(and(...predicates)).orderBy(...order).limit(query.limit + 1);
+  const visible = rows.slice(0, query.limit);
+  // Total matching rows (before the cursor) lets the Admin UI show a page-independent count.
+  const [count] = await db.select({ total: sql<number>`count(*)` }).from(properties).where(and(...base));
   const m = await mediaForRows(db, visible);
   const last = visible.at(-1);
   return c.json({
     data: visible.map(row => toEditorProperty(row, m.get(row.id) || [], true)),
-    next_cursor: rows.length > limit && last ? encodeCursor({ createdAt: last.createdAt, id: last.id }) : null,
+    next_cursor: rows.length > query.limit && last ? adminCursor(last, query.sortBy) : null,
+    total: Number(count?.total ?? 0),
   });
 });
 
