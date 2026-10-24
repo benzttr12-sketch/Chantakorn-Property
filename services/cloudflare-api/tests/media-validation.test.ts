@@ -6,7 +6,7 @@ import {
 } from '../src/media-validation.ts';
 
 const jpeg = new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 0,0,0,0,0,0,0,0,0,0,0xff,0xd9]);
-const png = new Uint8Array(Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/lE8AAAAASUVORK5CYII=', 'base64'));
+const png = new Uint8Array(Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAACXBIWXMAAAPoAAAD6AG1e1JrAAAADUlEQVQImWM4IafxHwAEzgIOn8aNIQAAAABJRU5ErkJggg==', 'base64'));
 
 const webp = new Uint8Array([
   82,73,70,70,12,0,0,0,87,69,66,80,86,80,56,32,0,0,0,0,
