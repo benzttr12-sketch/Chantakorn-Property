@@ -1,0 +1,262 @@
+import { Hono, type Context } from 'hono';
+import { drizzle } from 'drizzle-orm/d1';
+import { and, desc, eq, inArray, isNull, lt, or } from 'drizzle-orm';
+import { auditEvents, propertyMedia, properties } from './db/schema.ts';
+import { authorizePropertyStaff, canWriteProperties, type PropertyAuthEnv } from './property-auth.ts';
+import { newPropertyIdentity, parseEditorInput, readBoundedJson } from './property-input.ts';
+import { encodeCursor, decodeCursor } from './property-query.ts';
+
+type Env = PropertyAuthEnv & { PROPERTY_MEDIA: R2Bucket; PRIVATE_MEDIA: R2Bucket };
+type DbProperty = typeof properties.$inferSelect;
+type MediaRecord = { propertyId: string; id: string; sortOrder: number };
+
+export const propertyAdmin = new Hono<{ Bindings: Env }>();
+type Ctx = Context<{ Bindings: Env }>;
+
+const publicMediaPath = (id: string) => `/v1/media/properties/${id}`;
+const jsonList = (value: string): string[] => {
+  try {
+    const items: unknown = JSON.parse(value);
+    return Array.isArray(items) ? items.filter((v): v is string => typeof v === 'string').slice(0, 60) : [];
+  } catch { return []; }
+};
+const jsonObject = (value: string | null): Record<string, unknown> | undefined => {
+  if (!value) return undefined;
+  try {
+    const item: unknown = JSON.parse(value);
+    return item && typeof item === 'object' && !Array.isArray(item) ? item as Record<string, unknown> : undefined;
+  } catch { return undefined; }
+};
+export function toEditorProperty(row: DbProperty, files: MediaRecord[], includePrivate: boolean) {
+  const images = files.sort((a, b) => a.sortOrder - b.sortOrder).map(x => publicMediaPath(x.id));
+  const fields = {
+    id: row.id, code: row.code, title: row.title, slug: row.slug, description: row.description,
+    property_type: row.propertyType, status: row.status, price: row.price,
+    province: row.province, district: row.district, subdistrict: row.subdistrict || '',
+    address: row.address || '', latitude: row.latitude ?? 0, longitude: row.longitude ?? 0,
+    coordinates_available: row.latitude != null && row.longitude != null &&
+      (row.latitude !== 0 || row.longitude !== 0),
+    facing_direction: row.facingDirection || undefined, feng_shui: jsonObject(row.fengShuiJson),
+    bedrooms: row.bedrooms, bathrooms: row.bathrooms, parking: row.parking,
+    land_size: row.landSize, usable_area: row.usableArea, year_built: row.yearBuilt ?? undefined,
+    furniture: row.furniture, features: jsonList(row.featuresJson),
+    cover_image: row.coverImage || images[0] || '', images,
+    video_url: row.videoUrl || '', videos: jsonList(row.videosJson),
+    featured: row.featured, published: row.published,
+    agent_id: row.agentId || undefined, created_at: row.createdAt, updated_at: row.updatedAt,
+  };
+  return includePrivate ? { ...fields, internal_notes: row.internalNotes ?? '' } : fields;
+}
+
+export async function mediaForRows(db: ReturnType<typeof drizzle>, rows: DbProperty[]) {
+  if (!rows.length) return new Map<string, MediaRecord[]>();
+  const records = await db.select({
+    id: propertyMedia.id,
+    propertyId: propertyMedia.propertyId,
+    sortOrder: propertyMedia.sortOrder,
+  }).from(propertyMedia).where(inArray(propertyMedia.propertyId, rows.map(r => r.id)))
+    .orderBy(propertyMedia.sortOrder, propertyMedia.id);
+  const map = new Map<string, MediaRecord[]>();
+  for (const r of records) map.set(r.propertyId, [...(map.get(r.propertyId) || []), r]);
+  return map;
+}
+
+function setPrivateHeaders(c: Ctx) {
+  c.header('Cache-Control', 'private, no-store');
+  c.header('Pragma', 'no-cache');
+}
+
+async function authorized(c: Ctx, write = false) {
+  setPrivateHeaders(c);
+  if (write && !canWriteProperties(c.env, c.req.header('Origin')))
+    return { ok: false as const, status: 503 as const, error: 'Property mutations are disabled' };
+  const result = await authorizePropertyStaff(c.env, c.req.header('Authorization'), true);
+  if (!result.ok) return result;
+  if (write && result.role !== 'ADMIN')
+    return { ok: false as const, status: 403 as const, error: 'Only approved administrators may change properties' };
+  return result;
+}
+function routeError(e: unknown, c: Ctx) {
+  const type = e && typeof e === 'object' && 'message' in e ? String(e.message) : '';
+  if (/UNIQUE constraint failed|SQLITE_CONSTRAINT_UNIQUE/i.test(type)) return c.json({ error: 'Property code or slug is already used' }, 409);
+  if (/FOREIGN KEY constraint failed|SQLITE_CONSTRAINT_FOREIGNKEY/i.test(type)) return c.json({ error: 'Selected agent is not registered' }, 400);
+  console.warn('D1_PROPERTY_MUTATION_FAILED');
+  return c.json({ error: 'Could not save property' }, 503);
+}
+async function body(c: Ctx): Promise<unknown> {
+  try { return await readBoundedJson(c.req.raw); }
+  catch { return null; }
+}
+const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+function validId(id: string | undefined): id is string { return !!id && uuid.test(id); }
+
+propertyAdmin.options('/v1/admin/properties/*', c => {
+  if (c.req.header('Origin') !== c.env.ALLOWED_ORIGIN) return c.json({ error: 'Origin forbidden' }, 403);
+  c.header('Access-Control-Allow-Origin', c.env.ALLOWED_ORIGIN);
+  c.header('Access-Control-Allow-Headers', 'Authorization, Content-Type');
+  c.header('Access-Control-Allow-Methods', 'GET, POST, PATCH, DELETE, OPTIONS');
+  c.header('Access-Control-Max-Age', '300');
+  c.header('Vary', 'Origin');
+  return c.body(null, 204);
+});
+propertyAdmin.options('/v1/admin/properties', c => {
+  if (c.req.header('Origin') !== c.env.ALLOWED_ORIGIN) return c.json({ error: 'Origin forbidden' }, 403);
+  c.header('Access-Control-Allow-Origin', c.env.ALLOWED_ORIGIN);
+  c.header('Access-Control-Allow-Headers', 'Authorization, Content-Type');
+  c.header('Access-Control-Allow-Methods', 'GET, POST, PATCH, DELETE, OPTIONS');
+  c.header('Access-Control-Max-Age', '300');
+  return c.body(null, 204);
+});
+
+propertyAdmin.get('/v1/admin/properties', async c => {
+  const staff = await authorized(c);
+  if (!staff.ok) return c.json({ error: staff.error }, staff.status);
+  const url = new URL(c.req.url);
+  if ([...url.searchParams.keys()].some(k => k !== 'cursor' && k !== 'limit'))
+    return c.json({ error: 'Unknown query field' }, 400);
+  const rawLimit = url.searchParams.get('limit') ?? '50';
+  if (!/^\d{1,2}$/.test(rawLimit) || +rawLimit < 1 || +rawLimit > 80)
+    return c.json({ error: 'Invalid limit' }, 400);
+  const cursorText = url.searchParams.get('cursor');
+  const cursor = cursorText === null ? undefined : decodeCursor(cursorText);
+  if (cursorText !== null && !cursor) return c.json({ error: 'Invalid cursor' }, 400);
+  const predicates = [isNull(properties.deletedAt)];
+  if (cursor) predicates.push(or(lt(properties.createdAt, cursor.createdAt),
+    and(eq(properties.createdAt, cursor.createdAt), lt(properties.id, cursor.id)))!);
+  const db = drizzle(c.env.DB);
+  const limit = Number(rawLimit);
+  const rows = await db.select().from(properties)
+    .where(and(...predicates)).orderBy(desc(properties.createdAt), desc(properties.id))
+    .limit(limit + 1);
+  const visible = rows.slice(0, limit);
+  const m = await mediaForRows(db, visible);
+  const last = visible.at(-1);
+  return c.json({
+    data: visible.map(row => toEditorProperty(row, m.get(row.id) || [], true)),
+    next_cursor: rows.length > limit && last ? encodeCursor({ createdAt: last.createdAt, id: last.id }) : null,
+  });
+});
+
+propertyAdmin.get('/v1/admin/properties/:id', async c => {
+  const staff = await authorized(c);
+  if (!staff.ok) return c.json({ error: staff.error }, staff.status);
+  const id = c.req.param('id');
+  if (!validId(id)) return c.json({ error: 'Property not found' }, 404);
+  const db = drizzle(c.env.DB);
+  const [row] = await db.select().from(properties)
+    .where(and(eq(properties.id, id), isNull(properties.deletedAt))).limit(1);
+  if (!row) return c.json({ error: 'Property not found' }, 404);
+  const m = await mediaForRows(db, [row]);
+  return c.json({ data: toEditorProperty(row, m.get(id) || [], true) });
+});
+
+async function audit(db: ReturnType<typeof drizzle>, uid: string, action: string, id: string) {
+  // Do not allow audit errors to prevent staff saving a property, but log a code
+  // to alert the operator: audit availability must be monitored prior to cutover.
+  try {
+    await db.insert(auditEvents).values({
+      id: crypto.randomUUID(), category: 'property', action, actorUid: uid,
+      targetId: id, createdAt: new Date().toISOString(),
+    });
+  } catch { console.warn('D1_PROPERTY_AUDIT_WRITE_FAILED'); }
+}
+
+propertyAdmin.post('/v1/admin/properties', async c => {
+  const staff = await authorized(c, true);
+  if (!staff.ok) return c.json({ error: staff.error }, staff.status);
+  const input = parseEditorInput(await body(c));
+  if (!input.ok) return c.json({ error: input.error }, 400);
+  const parsed = input.fields;
+  const db = drizzle(c.env.DB);
+  const now = new Date().toISOString();
+  const identity = newPropertyIdentity(crypto.randomUUID());
+  try {
+    await db.insert(properties).values({
+      ...parsed,
+      id: identity.id, code: identity.code, createdAt: now, updatedAt: now,
+      // Initial entry is a draft regardless of any client-supplied flag.
+      // Explicit publication requires a separate reviewed PATCH action.
+      published: false,
+    } as typeof properties.$inferInsert);
+    await audit(db, staff.uid, 'created', identity.id);
+    const [row] = await db.select().from(properties).where(eq(properties.id, identity.id)).limit(1);
+    return c.json({ data: toEditorProperty(row, [], true) }, 201);
+  } catch (error) { return routeError(error, c); }
+});
+
+propertyAdmin.patch('/v1/admin/properties/:id', async c => {
+  const staff = await authorized(c, true);
+  if (!staff.ok) return c.json({ error: staff.error }, staff.status);
+  const id = c.req.param('id');
+  if (!validId(id)) return c.json({ error: 'Invalid property ID' }, 400);
+  const input = await body(c);
+  if (!input || typeof input !== 'object' || Array.isArray(input))
+    return c.json({ error: 'Invalid property update payload' }, 400);
+  const reqBody = input as Record<string, unknown>;
+  if (Object.keys(reqBody).some(k => !['updates', 'expected_updated_at', 'cover_media_id'].includes(k)))
+    return c.json({ error: 'Unexpected update field' }, 400);
+  const expected = reqBody.expected_updated_at;
+  if (typeof expected !== 'string' || !/^\d{4}-\d\d-\d\dT.*Z$/.test(expected))
+    return c.json({ error: 'expected_updated_at is required' }, 400);
+  const parsed = parseEditorInput(reqBody.updates, true);
+  if (!parsed.ok) return c.json({ error: parsed.error }, 400);
+  if (parsed.fields.published === true && c.env.PROPERTY_PUBLICATION_ENABLED !== 'true')
+    return c.json({ error: 'Publication is disabled until public catalog cutover' }, 503);
+  const db = drizzle(c.env.DB);
+  const [current] = await db.select().from(properties)
+    .where(and(eq(properties.id, id), isNull(properties.deletedAt))).limit(1);
+  if (!current) return c.json({ error: 'Property not found' }, 404);
+  if (current.updatedAt !== expected)
+    return c.json({ error: 'This listing has changed; reload before editing' }, 409);
+  const coverRequested = Object.prototype.hasOwnProperty.call(reqBody, 'cover_media_id');
+  let coverImage: string | null | undefined;
+  if (coverRequested) {
+    const mid = reqBody.cover_media_id;
+    if (mid !== null && (typeof mid !== 'string' || !uuid.test(mid)))
+      return c.json({ error: 'Invalid cover_media_id' }, 400);
+    if (mid === null) coverImage = null;
+    else {
+      const [image] = await db.select({ id: propertyMedia.id }).from(propertyMedia)
+        .where(and(eq(propertyMedia.id, mid as string), eq(propertyMedia.propertyId, id))).limit(1);
+      if (!image) return c.json({ error: 'Cover image does not belong to this property' }, 400);
+      coverImage = publicMediaPath(image.id);
+    }
+  }
+  const changes = { ...parsed.fields, ...(coverRequested ? { coverImage } : {}) };
+  if (!Object.keys(changes).length) return c.json({ error: 'Nothing to update' }, 400);
+  // Optimistic lock prevents simultaneous edits from silently overwriting one another.
+  const now = new Date().toISOString();
+  try {
+    const updatedRows = await db.update(properties).set({ ...changes, updatedAt: now })
+      .where(and(eq(properties.id, id), eq(properties.updatedAt, expected), isNull(properties.deletedAt)))
+      .returning({ id: properties.id });
+    if (!updatedRows.length) return c.json({ error: 'Listing changed during save' }, 409);
+    await audit(db, staff.uid, 'updated', id);
+    const [row] = await db.select().from(properties).where(eq(properties.id, id)).limit(1);
+    const media = await mediaForRows(db, [row]);
+    return c.json({ data: toEditorProperty(row, media.get(row.id) || [], true) });
+  } catch (error) { return routeError(error, c); }
+});
+
+propertyAdmin.delete('/v1/admin/properties/:id', async c => {
+  const staff = await authorized(c, true);
+  if (!staff.ok) return c.json({ error: staff.error }, staff.status);
+  const id = c.req.param('id');
+  if (!validId(id)) return c.json({ error: 'Invalid property ID' }, 400);
+  const input = await body(c);
+  if (!input || typeof input !== 'object' || Array.isArray(input) ||
+      Object.keys(input).length !== 1 || !('expected_updated_at' in input))
+    return c.json({ error: 'Expected revision required' }, 400);
+  const expected = (input as { expected_updated_at: unknown }).expected_updated_at;
+  if (typeof expected !== 'string') return c.json({ error: 'Expected revision required' }, 400);
+  const db = drizzle(c.env.DB);
+  const deleted = await db.update(properties).set({
+    deletedAt: new Date().toISOString(), published: false, updatedAt: new Date().toISOString(),
+  }).where(and(eq(properties.id, id), eq(properties.updatedAt, expected), isNull(properties.deletedAt)))
+    .returning({ id: properties.id });
+  if (!deleted.length) return c.json({ error: 'Property not found or revision changed' }, 409);
+  await audit(db, staff.uid, 'soft_deleted', id);
+  return c.json({ ok: true });
+});
+
+export default propertyAdmin;

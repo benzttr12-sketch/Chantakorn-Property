@@ -56,6 +56,13 @@ export const properties = sqliteTable('properties', {
   agentId: text('agent_id').references(() => agents.id, { onDelete: 'set null' }),
   featured: integer('featured', { mode: 'boolean' }).notNull().default(false),
   published: integer('published', { mode: 'boolean' }).notNull().default(false),
+  deletedAt: text('deleted_at'),
+  yearBuilt: integer('year_built'),
+  furniture: text('furniture').notNull().default(''),
+  facingDirection: text('facing_direction'),
+  fengShuiJson: text('feng_shui_json'),
+  videoUrl: text('video_url'),
+  videosJson: text('videos_json').notNull().default('[]'),
   internalNotes: text('internal_notes'),
   createdAt: text('created_at').notNull(),
   updatedAt: text('updated_at').notNull(),
@@ -64,6 +71,8 @@ export const properties = sqliteTable('properties', {
   index('idx_properties_public_location').on(table.published, table.province, table.district, table.createdAt),
   index('idx_properties_public_type_price').on(table.published, table.propertyType, table.status, table.price),
   index('idx_properties_public_price').on(table.published, table.price),
+  index('idx_properties_live_published').on(table.published, table.deletedAt, table.createdAt, table.id),
+  index('idx_properties_admin_updated').on(table.deletedAt, table.updatedAt, table.id),
 ]);
 
 export const propertyMedia = sqliteTable('property_media', {
