@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Structural validation for stored property/customer images.
  *
  * The browser compressor already re-encodes photos through a canvas, so normal
@@ -43,17 +43,138 @@ const ascii = (bytes: Uint8Array, start: number, length: number) =>
   String.fromCharCode(...bytes.subarray(start, start + length));
 
 // ---------------------------------------------------------------------------
-// JPEG: walk markers, reject APPn (except JFIF APP0) and comments, and verify
-// that every scan's entropy data terminates with a real marker and one EOI.
+// JPEG: walk markers, reject APPn (except JFIF APP0) and comments, then fully
+// Huffman-decode the baseline entropy data. Progressive, arithmetic-coded,
+// multi-scan and restart-interval JPEGs are rejected rather than guessed at.
 // ---------------------------------------------------------------------------
-const JPEG_SOF = new Set([0xc0, 0xc1, 0xc2, 0xc3, 0xc5, 0xc6, 0xc7, 0xc9, 0xca, 0xcb, 0xcd, 0xce, 0xcf]);
+type JpegHuffman = {
+  maxCode: Int32Array; minCode: Int32Array; valueIndex: Int32Array; values: Uint8Array;
+};
+type JpegComponent = { id: number; h: number; v: number; tq: number };
+
+function buildJpegHuffman(bits: Uint8Array, values: Uint8Array): JpegHuffman | null {
+  const maxCode = new Int32Array(17).fill(-1);
+  const minCode = new Int32Array(17).fill(-1);
+  const valueIndex = new Int32Array(17);
+  let code = 0;
+  let index = 0;
+  for (let length = 1; length <= 16; length++) {
+    const count = bits[length]!;
+    if (code + count > (1 << length)) return null; // oversubscribed table
+    minCode[length] = code;
+    valueIndex[length] = index;
+    code += count;
+    index += count;
+    maxCode[length] = code - 1;
+    code <<= 1;
+  }
+  if (index !== values.length) return null;
+  return { maxCode, minCode, valueIndex, values };
+}
+
+/** Decode one interleaved baseline scan; returns an error message or null. */
+function decodeJpegScan(
+  bytes: Uint8Array, start: number, end: number,
+  frameComponents: JpegComponent[],
+  scan: { component: JpegComponent; dc: JpegHuffman; ac: JpegHuffman }[],
+  width: number, height: number,
+  quantTables: Set<number>,
+): string | null {
+  try {
+    if (scan.length !== frameComponents.length) return 'JPEG multi-scan files are not accepted';
+    for (const item of scan) if (!quantTables.has(item.component.tq)) return 'JPEG quantization table is missing';
+    const maxH = Math.max(...frameComponents.map(component => component.h));
+    const maxV = Math.max(...frameComponents.map(component => component.v));
+    const mcuColumns = Math.ceil(width / (8 * maxH));
+    const mcuRows = Math.ceil(height / (8 * maxV));
+    if (mcuColumns < 1 || mcuRows < 1) return 'JPEG dimensions are invalid';
+    if (mcuColumns * mcuRows > 1_000_000) return 'JPEG MCU count is too large';
+
+    let position = start;
+    let bitBuffer = 0;
+    let bitCount = 0;
+    const readBit = (): number => {
+      if (bitCount === 0) {
+        if (position >= end) throw new Error('entropy exhausted');
+        let byte = bytes[position++]!;
+        if (byte === 0xff) {
+          if (position >= end) throw new Error('entropy exhausted');
+          if (bytes[position] !== 0x00) throw new Error('unexpected marker in entropy data');
+          position++;
+          byte = 0xff;
+        }
+        bitBuffer = byte;
+        bitCount = 8;
+      }
+      bitCount--;
+      return (bitBuffer >> bitCount) & 1;
+    };
+    const readBits = (count: number): number => {
+      let value = 0;
+      for (let bit = 0; bit < count; bit++) value = (value << 1) | readBit();
+      return value;
+    };
+    const extend = (size: number): number => {
+      if (size === 0) return 0;
+      const value = readBits(size);
+      const threshold = 1 << (size - 1);
+      return value < threshold ? value - (1 << size) + 1 : value;
+    };
+    const decodeHuffman = (table: JpegHuffman): number => {
+      let code = 0;
+      for (let length = 1; length <= 16; length++) {
+        code = (code << 1) | readBit();
+        const max = table.maxCode[length]!;
+        if (max >= 0 && code <= max) {
+          const index = table.valueIndex[length]! + (code - table.minCode[length]!);
+          if (index < 0 || index >= table.values.length) throw new Error('bad huffman index');
+          return table.values[index]!;
+        }
+      }
+      throw new Error('bad huffman code');
+    };
+
+    const previousDc = new Int32Array(scan.length).fill(0);
+    for (let row = 0; row < mcuRows; row++) {
+      for (let column = 0; column < mcuColumns; column++) {
+        for (let ci = 0; ci < scan.length; ci++) {
+          const { component, dc: dcTable, ac: acTable } = scan[ci]!;
+          for (let block = 0; block < component.h * component.v; block++) {
+            const dcSize = decodeHuffman(dcTable);
+            if (dcSize > 11) return 'JPEG DC category is invalid';
+            previousDc[ci] = previousDc[ci]! + extend(dcSize);
+            let coefficient = 1;
+            while (coefficient < 64) {
+              const symbol = decodeHuffman(acTable);
+              const run = symbol >> 4;
+              const size = symbol & 15;
+              if (size === 0) {
+                if (run !== 15) break; // end of block
+                coefficient += 16;
+                continue;
+              }
+              if (size > 10) return 'JPEG AC category is invalid';
+              coefficient += run;
+              if (coefficient > 63) return 'JPEG AC run is invalid';
+              extend(size);
+              coefficient++;
+            }
+          }
+        }
+      }
+    }
+    return null;
+  } catch { return 'JPEG entropy data is invalid'; }
+}
 
 function validateJpeg(bytes: Uint8Array): ImageStructureResult {
   const length = bytes.byteLength;
   if (length < 4 || bytes[0] !== 0xff || bytes[1] !== 0xd8) return fail(415, 'Invalid JPEG header');
   let i = 2;
-  let frame: { width: number; height: number } | null = null;
+  let frame: { width: number; height: number; components: JpegComponent[] } | null = null;
   let scans = 0;
+  const quantTables = new Set<number>();
+  const huffmanTables = new Map<number, JpegHuffman>();
   while (i < length) {
     if (bytes[i] !== 0xff) return fail(415, 'Invalid JPEG marker stream');
     const marker = bytes[i + 1]!;
@@ -62,8 +183,8 @@ function validateJpeg(bytes: Uint8Array): ImageStructureResult {
     i += 2;
     if (marker === 0xd8) return fail(415, 'Nested JPEG image');
     if (marker === 0xd9) {
-      if (!scans) return fail(415, 'JPEG has no image data');
-      return i === length ? checkDimensions(frame!.width, frame!.height)
+      if (!frame || scans !== 1) return fail(415, 'JPEG has no decodable baseline image');
+      return i === length ? checkDimensions(frame.width, frame.height)
         : fail(415, 'Unexpected data after JPEG end marker');
     }
     if (marker >= 0xd0 && marker <= 0xd7) return fail(415, 'Unexpected restart marker');
@@ -71,42 +192,117 @@ function validateJpeg(bytes: Uint8Array): ImageStructureResult {
     if (i + 2 > length) return fail(415, 'Truncated JPEG segment');
     const segmentLength = u16be(bytes, i);
     if (segmentLength < 2 || i + segmentLength > length) return fail(415, 'Invalid JPEG segment length');
+    const segmentEnd = i + segmentLength;
     if (marker >= 0xe1 && marker <= 0xef)
       return fail(415, 'JPEG metadata (EXIF/XMP/IPTC/ICC) is not accepted');
     if (marker === 0xfe) return fail(415, 'JPEG comments are not accepted');
     if (marker === 0xe0) {
       if (segmentLength < 8 || ascii(bytes, i + 2, 5) !== 'JFIF\0')
         return fail(415, 'Only a JFIF JPEG APP0 segment is accepted');
-    } else if (JPEG_SOF.has(marker)) {
+    } else if (marker === 0xc0) {
       if (frame) return fail(415, 'JPEG contains multiple frames');
       if (segmentLength < 8) return fail(415, 'Invalid JPEG frame header');
-      const components = bytes[i + 7]!;
-      if (components < 1 || components > 4 || segmentLength !== 8 + components * 3)
-        return fail(415, 'Invalid JPEG frame header');
-      frame = { height: u16be(bytes, i + 3), width: u16be(bytes, i + 5) };
-      const dims = checkDimensions(frame.width, frame.height);
+      const precision = bytes[i + 2]!;
+      const height = u16be(bytes, i + 3);
+      const width = u16be(bytes, i + 5);
+      const count = bytes[i + 7]!;
+      if (precision !== 8 || count < 1 || count > 4 || segmentLength !== 8 + count * 3)
+        return fail(415, 'Only 8-bit baseline JPEG frames are accepted');
+      const dims = checkDimensions(width, height);
       if (!dims.ok) return dims;
+      const components: JpegComponent[] = [];
+      for (let c = 0; c < count; c++) {
+        const id = bytes[i + 8 + c * 3]!;
+        const sampling = bytes[i + 9 + c * 3]!;
+        const h = sampling >> 4;
+        const v = sampling & 15;
+        const tq = bytes[i + 10 + c * 3]!;
+        if (h < 1 || h > 4 || v < 1 || v > 4 || tq > 3 || components.some(item => item.id === id))
+          return fail(415, 'Invalid JPEG frame component');
+        components.push({ id, h, v, tq });
+      }
+      if (components.reduce((sum, item) => sum + item.h * item.v, 0) > 10)
+        return fail(415, 'JPEG sampling factors are too large');
+      frame = { width, height, components };
+    } else if (marker === 0xc2 || (marker >= 0xc3 && marker <= 0xcf && marker !== 0xc4 && marker !== 0xc8 && marker !== 0xcc)) {
+      return fail(415, 'Only baseline JPEG is accepted');
+    } else if (marker === 0xdd) {
+      return fail(415, 'JPEG restart intervals are not accepted');
+    } else if (marker === 0xcc) {
+      return fail(415, 'JPEG arithmetic coding is not accepted');
+    } else if (marker === 0xc4) {
+      let p = i + 2;
+      while (p < segmentEnd) {
+        if (p + 17 > segmentEnd) return fail(415, 'Invalid JPEG Huffman table');
+        const tableClass = bytes[p]! >> 4;
+        const tableId = bytes[p]! & 15;
+        if (tableClass > 1 || tableId > 3) return fail(415, 'Invalid JPEG Huffman table');
+        const bits = new Uint8Array(17);
+        bits.set(bytes.subarray(p + 1, p + 17), 1);
+        let symbols = 0;
+        for (let len = 1; len <= 16; len++) symbols += bits[len]!;
+        p += 17;
+        if (symbols === 0 || p + symbols > segmentEnd) return fail(415, 'Invalid JPEG Huffman table');
+        const table = buildJpegHuffman(bits, bytes.subarray(p, p + symbols));
+        if (!table) return fail(415, 'Invalid JPEG Huffman table');
+        huffmanTables.set(tableClass * 4 + tableId, table);
+        p += symbols;
+      }
+      if (p !== segmentEnd || huffmanTables.size === 0) return fail(415, 'Invalid JPEG Huffman table');
+    } else if (marker === 0xdb) {
+      let p = i + 2;
+      while (p < segmentEnd) {
+        const precision = bytes[p]! >> 4;
+        const tableId = bytes[p]! & 15;
+        if (precision > 1 || tableId > 3) return fail(415, 'Invalid JPEG quantization table');
+        const bytesPerValue = precision ? 2 : 1;
+        p += 1;
+        if (p + 64 * bytesPerValue > segmentEnd) return fail(415, 'Invalid JPEG quantization table');
+        p += 64 * bytesPerValue;
+        quantTables.add(tableId);
+      }
+      if (p !== segmentEnd || quantTables.size === 0) return fail(415, 'Invalid JPEG quantization table');
     } else if (marker === 0xda) {
       if (!frame) return fail(415, 'JPEG scan data before frame header');
-      const components = bytes[i + 2]!;
-      if (components < 1 || components > 4 || segmentLength !== 6 + components * 2)
+      const count = bytes[i + 2]!;
+      if (count < 1 || count > 4 || segmentLength !== 6 + count * 2)
         return fail(415, 'Invalid JPEG scan header');
+      if (scans !== 0) return fail(415, 'JPEG multi-scan files are not accepted');
+      const ss = bytes[i + 3 + count * 2]!;
+      const se = bytes[i + 4 + count * 2]!;
+      const approximation = bytes[i + 5 + count * 2]!;
+      if (ss !== 0 || se !== 63 || approximation !== 0)
+        return fail(415, 'Only baseline sequential JPEG is accepted');
+      const scan: { component: JpegComponent; dc: JpegHuffman; ac: JpegHuffman }[] = [];
+      for (let c = 0; c < count; c++) {
+        const id = bytes[i + 3 + c * 2]!;
+        const selectors = bytes[i + 4 + c * 2]!;
+        const component = frame.components.find(item => item.id === id);
+        if (!component) return fail(415, 'Invalid JPEG scan component');
+        const dc = huffmanTables.get(selectors >> 4);
+        const ac = huffmanTables.get(4 + (selectors & 15));
+        if (!dc || !ac) return fail(415, 'JPEG scan references a missing Huffman table');
+        if (scan.some(item => item.component === component)) return fail(415, 'Invalid JPEG scan component');
+        scan.push({ component, dc, ac });
+      }
       scans++;
-      i += segmentLength;
-      // Entropy-coded data: every 0xFF must be stuffed (00), a restart marker,
-      // a fill byte, or the marker that closes this scan.
+      i = segmentEnd;
+      // Find the marker that closes this entropy-coded segment.
       let closed = false;
       while (i < length) {
         if (bytes[i] !== 0xff) { i++; continue; }
         const next = bytes[i + 1]!;
-        if (next === 0x00 || (next >= 0xd0 && next <= 0xd7) || next === 0xff) { i += 2; continue; }
+        if (next === 0x00 || next === 0xff || (next >= 0xd0 && next <= 0xd7)) { i += 2; continue; }
         closed = true;
         break;
       }
       if (!closed) return fail(415, 'JPEG scan data is truncated');
+      const decodeError = decodeJpegScan(bytes, segmentEnd, i, frame.components, scan,
+        frame.width, frame.height, quantTables);
+      if (decodeError) return fail(415, decodeError);
       continue;
     }
-    i += segmentLength;
+    i = segmentEnd;
   }
   return fail(415, 'JPEG is missing its end marker');
 }
