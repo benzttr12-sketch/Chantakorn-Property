@@ -47,6 +47,8 @@ import {
 import { getAgents } from '@/lib/store/agents-store';
 import { fetchStaffApi } from '@/lib/staff-api';
 import { loadStaffPropertyPhotos } from '@/lib/property-media';
+import { useCloudflarePropertyBackend } from '@/lib/cloudflare-properties';
+import StaffPropertyImage from '@/components/admin/StaffPropertyImage';
 import { propertyHref } from '@/components/properties/property-link';
 import { PropertyType, PropertyStatus, UserProfile, Agent, AgentRank, FacingDirection } from '@/lib/types';
 
@@ -88,6 +90,7 @@ function PropertyEditor() {
   const [error, setError] = useState('');
   const [editorLoaded, setEditorLoaded] = useState(!editId);
   const [editorRevision, setEditorRevision] = useState<string | undefined>();
+  const [editorPropertyId, setEditorPropertyId] = useState<string | null>(null);
   const [slugEdited, setSlugEdited] = useState(Boolean(editId));
   const [published, setPublished] = useState(true);
 
@@ -542,9 +545,10 @@ function PropertyEditor() {
       if (!active) return;
       const property = list.find(item => item.id === editId);
       if (!property) throw new Error('ไม่พบรายการที่ต้องการแก้ไข');
-      const photos = await loadStaffPropertyPhotos(property);
+      const photos = useCloudflarePropertyBackend ? property : await loadStaffPropertyPhotos(property);
       if (!active) return;
       setTitle(property.title);
+      setEditorPropertyId(property.id);
       setEditorRevision(property.updated_at);
       setSlug(property.slug);
       setPropertyType(property.property_type);
@@ -2394,13 +2398,11 @@ function PropertyEditor() {
                         isCover ? 'border-gold-500 ring-2 ring-gold-400/40 shadow-md' : 'border-gray-200 hover:border-gray-400'
                       }`}
                     >
-                      <Image
+                      <StaffPropertyImage
                         src={img} 
+                        propertyId={editorPropertyId}
                         alt={`Property ${i + 1}`} 
-                        fill
-                        unoptimized
                         className="object-cover"
-                        referrerPolicy="no-referrer"
                       />
                       
                       {isCover ? (

@@ -117,6 +117,34 @@ propertyAdmin.options('/v1/admin/properties', c => {
   return c.body(null, 204);
 });
 
+// Staff can preview a draft without granting anonymous access to the R2 object.
+// Keep the property/media pairing explicit so an editor cannot reuse another
+// property's image URL. Every read checks live Firebase account and D1 role state.
+propertyAdmin.get('/v1/admin/properties/:id/media/:mediaId', async c => {
+  const staff = await authorized(c);
+  if (!staff.ok) return c.json({ error: staff.error }, staff.status);
+  const id = c.req.param('id'), mediaId = c.req.param('mediaId');
+  if (!validId(id) || !validId(mediaId)) return c.json({ error: 'Not found' }, 404);
+  const [file] = await drizzle(c.env.DB).select({
+    key: propertyMedia.objectKey, type: propertyMedia.contentType,
+  }).from(propertyMedia).innerJoin(properties, eq(propertyMedia.propertyId, properties.id))
+    .where(and(eq(properties.id, id), eq(propertyMedia.id, mediaId), isNull(properties.deletedAt))).limit(1);
+  if (!file || !['image/png', 'image/jpeg', 'image/webp'].includes(file.type))
+    return c.json({ error: 'Not found' }, 404);
+  const object = await c.env.PROPERTY_MEDIA.get(file.key);
+  if (!object || !('body' in object)) return c.json({ error: 'Not found' }, 404);
+  return new Response(object.body, { headers: {
+    'Content-Type': file.type,
+    'Content-Disposition': 'inline',
+    'Content-Length': String(object.size),
+    'Cache-Control': 'private, no-store',
+    'Pragma': 'no-cache',
+    'X-Content-Type-Options': 'nosniff',
+    'Cross-Origin-Resource-Policy': 'same-site',
+    'Content-Security-Policy': "default-src 'none'; sandbox",
+  } });
+});
+
 propertyAdmin.get('/v1/admin/properties', async c => {
   const staff = await authorized(c);
   if (!staff.ok) return c.json({ error: staff.error }, staff.status);
