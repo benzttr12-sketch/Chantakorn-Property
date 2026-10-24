@@ -49,7 +49,7 @@
 
 - The UI's existing unpaginated lists use a temporary capped compatibility adapter (up to **800 Admin or 300 public** records). Beyond that, the adapter throws visibly. Implement proper infinite pagination/filter API before meaningful growth.
 - The R2 data validation in PR #38 checks headers, magic bytes and size, but **does not fully decode and sanitize images or strip EXIF**. It also needs upload rate limits and an eventual public-only CDN/media bucket for low-cost high-volume delivery.
-- The mixed public/draft property-image R2 bucket must remain private. Draft thumbnails in Admin need a separate authorized preview proxy/Blob URL path to display correctly. Never make the whole mixed bucket public.
+- The mixed public/draft property-image R2 bucket must remain private. Draft thumbnails in Admin are displayed through the authenticated `GET /v1/admin/properties/:id/media/:mediaId` proxy, which rechecks the live Firebase account and D1 role on every request and hands the browser a short-lived Blob URL. Keep the bucket private and never bypass the proxy with a direct URL.
 - The frontend does not delete old R2 images when a user removes them from a draft; removal is rejected until a guarded media-delete endpoint and orphan cleanup exist.
 - Client-side R2 media uploading may need verifying `Content-Length` behavior across supported browsers and/or switching to an upload-session API.
 - D1 staff role profiles must be securely imported from a verified Auth/Firestore roster; customer, LINE and work-job migration are **not** part of this PR.

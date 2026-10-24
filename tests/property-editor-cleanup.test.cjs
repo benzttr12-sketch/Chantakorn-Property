@@ -30,8 +30,8 @@ function button(tree, label) {
   assert.ok(result, `Expected button: ${label}`);
   return result;
 }
-async function editor(existing) {
-  const saved = [], hooks = [], effectQueue = [], elements = new Map();
+async function editor(existing, backend = 'firebase') {
+  const saved = [], hydrated = [], hooks = [], effectQueue = [], elements = new Map();
   let cursor = 0;
   const router = { push() {} };
   const react = {
@@ -61,7 +61,9 @@ async function editor(existing) {
     },
     '@/lib/store/agents-store': { getAgents: () => [] },
     '@/lib/staff-api': { fetchStaffApi: async () => Response.json({}) },
-    '@/lib/property-media': { loadStaffPropertyPhotos: async property => property },
+    '@/lib/property-media': { loadStaffPropertyPhotos: async property => { hydrated.push(property); return property; } },
+    '@/lib/cloudflare-properties': { useCloudflarePropertyBackend: backend === 'cloudflare' },
+    '@/components/admin/StaffPropertyImage': 'StaffPropertyImage',
     '@/components/properties/property-link': { propertyHref: () => '/property-fixture' },
     '@/lib/auth-helpers': { getStoredUser: () => staff },
     '@/lib/utils': load('lib/utils.ts'),
@@ -94,7 +96,7 @@ async function editor(existing) {
     return render();
   }
   await settle();
-  return { render, settle, saved, elements };
+  return { render, settle, saved, hydrated, elements };
 }
 const existingProperty = optional => ({
   id: 'listing-fixture', title: 'บ้านทดสอบข้อมูลจริง', slug: 'real-property', price: 2500000,
@@ -174,4 +176,23 @@ test('clearing an existing build year sends an explicit removal intent', async (
   assert.equal(ui.saved.length, 1);
   assert.equal(Object.hasOwn(ui.saved[0], 'year_built'), true);
   assert.equal(ui.saved[0].year_built, undefined);
+});
+
+test('D1 editor previews saved media without Firestore hydration and saves original URLs', async () => {
+  const id = 'c1c00000-0000-4000-8000-000000000001';
+  const image = 'https://staging-api.example.invalid/v1/media/properties/c1c00000-0000-4000-8000-000000000002';
+  const property = existingProperty({ id, images: [image], cover_image: image });
+  const ui = await editor(property, 'cloudflare');
+  assert.equal(ui.hydrated.length, 0);
+  const tree = ui.render();
+  const preview = nodes(tree).find(node => node.type === 'StaffPropertyImage');
+  assert.ok(preview);
+  assert.equal(preview.props.src, image);
+  assert.equal(preview.props.propertyId, id);
+  await nodes(tree).find(node => node.type === 'form').props.onSubmit({ preventDefault() {} });
+  assert.equal(ui.saved.length, 1);
+  assert.deepEqual(Array.from(ui.saved[0].images), [image]);
+  assert.equal(ui.saved[0].cover_image, image);
+  const firebase = await editor(property);
+  assert.equal(firebase.hydrated.length, 1);
 });

@@ -232,6 +232,55 @@ test('local Worker HTTP / D1 / R2 / Firebase authorization contract', async t =>
     await db.prepare('INSERT INTO profiles(uid,full_name,role,created_at,updated_at) VALUES (?,?,?,?,?)')
       .bind(uid, 'Synthetic staff', 'ADMIN', '2026-10-20', '2026-10-20').run();
   });
+  await t.test('staff preview keeps draft media private and rechecks live identity and parent', async () => {
+    const previewMedia = '00000000-0000-4000-8000-000000000012';
+    const key = 'properties/private-draft/preview.png';
+    await publicBucket.put(key, png);
+    await db.prepare('INSERT INTO property_media(id,property_id,object_key,public_url,content_type,byte_size,created_at) VALUES (?,?,?,?,?,?,?)')
+      .bind(previewMedia, draftId, key, '/v1/media/properties/' + previewMedia, 'image/png', png.length, '2026-10-20').run();
+    const path = `/v1/admin/properties/${draftId}/media/${previewMedia}`;
+    const preview = () => fetchApi(path, { headers });
+    try {
+      assert.equal((await fetchApi('/v1/media/properties/' + previewMedia)).status, 404);
+      assert.equal((await fetchApi(path)).status, 401);
+      const response = await preview();
+      assert.equal(response.status, 200);
+      assert.equal(response.headers.get('Cache-Control'), 'private, no-store');
+      assert.equal(response.headers.get('Content-Type'), 'image/png');
+      assert.equal(response.headers.get('Cross-Origin-Resource-Policy'), 'same-site');
+      assert.deepEqual(Buffer.from(await response.arrayBuffer()), png);
+      assert.equal((await fetchApi(`/v1/admin/properties/${publicId}/media/${previewMedia}`, { headers })).status, 404);
+      await db.prepare('UPDATE profiles SET role=? WHERE uid=?').bind('AGENT', uid).run();
+      assert.equal((await preview()).status, 200);
+      account.disabled = true;
+      assert.equal((await preview()).status, 403);
+      account.disabled = false; account.emailVerified = false;
+      assert.equal((await preview()).status, 403);
+      account.emailVerified = true; account.validSince = String(now);
+      assert.equal((await preview()).status, 403);
+      account.validSince = '0'; lookupFailure = true;
+      assert.equal((await preview()).status, 401);
+      lookupFailure = false;
+      await db.prepare('UPDATE profiles SET role=? WHERE uid=?').bind('USER', uid).run();
+      assert.equal((await preview()).status, 403);
+      await db.prepare('UPDATE profiles SET role=? WHERE uid=?').bind('ADMIN', uid).run();
+      await db.prepare('UPDATE properties SET deleted_at=? WHERE id=?').bind('2026-10-20', draftId).run();
+      assert.equal((await preview()).status, 404);
+      const badOrigin = await fetchApi(path, { method: 'OPTIONS', headers: { Origin: 'https://untrusted.invalid' } });
+      assert.equal(badOrigin.status, 403);
+      assert.equal(badOrigin.headers.get('Access-Control-Allow-Origin'), null);
+      const allowedOrigin = await fetchApi(path, { method: 'OPTIONS', headers: { Origin: origin } });
+      assert.equal(allowedOrigin.status, 204);
+      assert.equal(allowedOrigin.headers.get('Access-Control-Allow-Origin'), origin);
+    } finally {
+      account = { localId: uid, disabled: false, emailVerified: true, validSince: '0' };
+      lookupFailure = false;
+      await db.prepare('UPDATE profiles SET role=? WHERE uid=?').bind('ADMIN', uid).run();
+      await db.prepare('UPDATE properties SET deleted_at=NULL WHERE id=?').bind(draftId).run();
+      await db.prepare('DELETE FROM property_media WHERE id=?').bind(previewMedia).run();
+      await publicBucket.delete(key);
+    }
+  });
   await t.test('R2 public delivery stops after unpublishing', async () => {
     const response = await fetchApi('/v1/media/properties/' + mediaId);
     assert.equal(response.status, 200); assert.equal(response.headers.get('Cache-Control'), 'no-store');

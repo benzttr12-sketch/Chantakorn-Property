@@ -4,11 +4,14 @@ on:
   pull_request:
     paths:
       - 'src/lib/cloudflare-properties.ts'
+      - 'src/lib/cloudflare-property-preview.ts'
+      - 'src/components/admin/StaffPropertyImage.tsx'
       - 'src/lib/store/properties-store.ts'
       - 'src/app/admin/properties/**'
       - 'src/app/properties/page.tsx'
       - 'src/components/admin/CollapsiblePropertyCard.tsx'
       - 'tests/cloudflare-properties.test.cjs'
+      - 'tests/cloudflare-property-preview.test.cjs'
       - 'src/lib/property-link.ts'
       - 'tests/property-links.test.cjs'
       - 'src/app/sitemap.ts'
