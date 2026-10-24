@@ -1,12 +1,20 @@
 # Cloudflare D1/R2 property catalog — code-side release readiness
 
-**Status: all code-side gates closed** by stacked PRs #51–#65 (media lifecycle, Admin catalog pagination, image decode/metadata sanitization, verified staff import). **No production deployment, production database migration, cutover, or real-data change has been performed.** Remaining work is operator-only: staging provisioning, flag rollout, reviewed staff import, backup/restore verification and cutover approval (see the ordered list below).
+**Status: all code-side gates closed** by stacked PRs #51–#67 (media lifecycle, Admin catalog pagination, image decode/metadata sanitization, verified staff import), and a **staging preview is deployed and usable** (see below). **No production database migration, production cutover, or destructive real-data change has been performed.** Production hosting is unchanged; remaining work is operator review/verification, backup gate and cutover approval.
+
+## Current staging environment (deployed 2026-10-24)
+
+- Worker `chantakorn-property-api-dev` → `https://chantakorn-property-api-dev.chantakorn-property.workers.dev`, bound to D1 `chantakorn-property-dev`, R2 `chantakorn-property-media-dev` / `chantakorn-inquiry-private-dev`, with the six-hourly Cron trigger.
+- Migrations 0001–0007 applied to staging D1; `FIREBASE_WEB_API_KEY` stored as a Worker secret; staging flags (`PROPERTY_WRITES_ENABLED`, `PROPERTY_PUBLICATION_ENABLED`, `MEDIA_WRITES_ENABLED`, `MEDIA_SWEEP_ENABLED`, `MEDIA_UPLOAD_SESSIONS_REQUIRED`) enabled; `ALLOWED_ORIGIN=http://localhost:3000`.
+- One verified ADMIN profile (the repo owner's Firebase account) was imported with the offline planner from the Firebase `auth:export`. The exporter omits `disabled` when it is false; the planner now treats a missing flag as enabled while still failing closed on missing `emailVerified` (#67).
+- Local preview: `.env.local` sets `NEXT_PUBLIC_PROPERTY_STORAGE_BACKEND=cloudflare` + `NEXT_PUBLIC_CLOUDFLARE_API_ORIGIN`; `npm run dev` serves http://localhost:3000. Firebase remains the backend for Auth/users, inquiries, LINE and other business data.
 
 ## Evidence
 
-- All PRs #51–#65 are open **draft** PRs with chained bases (each based on the previous branch) and green required CI (`Cloudflare D1 API (isolated checks)` and, where root files changed, `Cloudflare property Admin bridge (root checks)`).
-- Final local verification on the head branch: app lint, app typecheck, root tests (344), Worker typecheck, Worker unit tests (58), local workerd runtime tests with real D1/R2 bindings (22), and `scripts/verify_schema.py` against migrations 0001–0007.
-- Tests use synthetic records only. No Firebase project, Cloudflare account, LINE credentials or customer data were accessed.
+- All PRs #51–#67 are open **draft** PRs with chained bases (each based on the previous branch) and green required CI (`Cloudflare D1 API (isolated checks)` and, where root files changed, `Cloudflare property Admin bridge (root checks)`).
+- Final local verification on the head branch: app lint, app typecheck, root tests (344), Worker typecheck, Worker unit tests (59), local workerd runtime tests with real D1/R2 bindings (22), and `scripts/verify_schema.py` against migrations 0001–0007.
+- Deployed-staging smoke checks: `/health` 200, public `/v1/properties` returns `{"data":[],"next_cursor":null}`, Admin routes return 401 without a token, allowed-origin CORS preflight 204 and a foreign origin 403.
+- Tests use synthetic records only. No Firebase customer data, LINE credentials or production Cloudflare resources were accessed.
 
 ## Gate matrix
 
@@ -33,13 +41,13 @@ The only accepted upload formats are now **PNG and baseline JPEG**, both of whic
 
 ## Operator gates before production (in order)
 
-1. Create isolated staging D1 (fresh, unseeded), private property-media R2 bucket and private inquiry R2 bucket; apply migrations 0001–0007 to staging only.
-2. Configure the Worker: real `FIREBASE_PROJECT_ID`, `FIREBASE_WEB_API_KEY` as a secret, exact `ALLOWED_ORIGIN`, six-hourly Cron trigger; keep every feature flag `false`.
-3. Run `npm run staff:import` dry-run → reviewed SQL outside the repo → apply via `wrangler d1 execute`. Verify `GET /v1/staff/me` with a real staff account.
-4. Enable staging flags one at a time and execute `docs/cloudflare-d1-property-preview.md` §Staged verification: draft create/edit, image upload with sessions, metadata rejection, delete, publication, public search/detail/image delivery, stale-revision 409s, disabled-flag fallbacks.
-5. Enable `MEDIA_SWEEP_ENABLED` and verify `GET /v1/admin/media/sweep` + log output; route `R2_MEDIA_SWEEP`, `R2_MEDIA_SWEEP_FAILED` and `R2_MEDIA_ORPHAN_CLEANUP_REQUIRED` to an external alert.
-6. Complete the encrypted Firestore backup gate, Firebase Auth/profile reconciliation and LINE/customer inventory in `docs/firestore-encrypted-backup-runbook.md`; test a restricted restore.
-7. Only then plan cutover. Rollback is switching the preview `NEXT_PUBLIC_PROPERTY_STORAGE_BACKEND` back to `firebase`; never delete Firebase Auth or Firestore during this migration.
+1. Create isolated staging D1 (fresh, unseeded), private property-media R2 bucket and private inquiry R2 bucket; apply migrations 0001–0007 to staging only. ✅ staging done.
+2. Configure the Worker: real `FIREBASE_PROJECT_ID`, `FIREBASE_WEB_API_KEY` as a secret, exact `ALLOWED_ORIGIN`, six-hourly Cron trigger. ✅ staging done (flags enabled for preview).
+3. Run `npm run staff:import` dry-run → reviewed SQL outside the repo → apply via `wrangler d1 execute`. ✅ staging done for the owner ADMIN account; verify `GET /v1/staff/me` in the browser.
+4. Execute `docs/cloudflare-d1-property-preview.md` §Staged verification in the browser: draft create/edit, image upload with sessions, metadata rejection, delete, publication, public search/detail/image delivery, stale-revision 409s, disabled-flag fallbacks. ⏳ owner review pending.
+5. `MEDIA_SWEEP_ENABLED` and status endpoint are live; route `R2_MEDIA_SWEEP`, `R2_MEDIA_SWEEP_FAILED` and `R2_MEDIA_ORPHAN_CLEANUP_REQUIRED` to an external alert. ⏳ alert routing pending.
+6. Complete the encrypted Firestore backup gate, Firebase Auth/profile reconciliation and LINE/customer inventory in `docs/firestore-encrypted-backup-runbook.md`; test a restricted restore. ⏳ pending.
+7. Only then plan production cutover. Rollback is switching the preview `NEXT_PUBLIC_PROPERTY_STORAGE_BACKEND` back to `firebase`; never delete Firebase Auth or Firestore during this migration.
 
 ## Remaining non-decoding release risks
 
