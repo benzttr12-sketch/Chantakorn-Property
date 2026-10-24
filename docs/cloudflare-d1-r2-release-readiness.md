@@ -1,11 +1,11 @@
 # Cloudflare D1/R2 property catalog — code-side release readiness
 
-**Status:** code-side gate review after stacked PRs #51–#62. **No production deployment, database migration to production, cutover, or real-data change has been performed.** All evidence below is from local tests and CI on draft stacked PRs; final acceptance still requires the operator gates at the end.
+**Status: all code-side gates closed** by stacked PRs #51–#65 (media lifecycle, Admin catalog pagination, image decode/metadata sanitization, verified staff import). **No production deployment, production database migration, cutover, or real-data change has been performed.** Remaining work is operator-only: staging provisioning, flag rollout, reviewed staff import, backup/restore verification and cutover approval (see the ordered list below).
 
 ## Evidence
 
-- All PRs #51–#62 are open **draft** PRs with chained bases (each based on the previous branch) and green required CI (`Cloudflare D1 API (isolated checks)` and, where root files changed, `Cloudflare property Admin bridge (root checks)`).
-- Local verification used for the latest branch: app lint, app typecheck, root tests (344), Worker typecheck, Worker unit tests (57), local workerd runtime tests with real D1/R2 bindings (21), and `scripts/verify_schema.py` against migrations 0001–0007.
+- All PRs #51–#65 are open **draft** PRs with chained bases (each based on the previous branch) and green required CI (`Cloudflare D1 API (isolated checks)` and, where root files changed, `Cloudflare property Admin bridge (root checks)`).
+- Final local verification on the head branch: app lint, app typecheck, root tests (344), Worker typecheck, Worker unit tests (58), local workerd runtime tests with real D1/R2 bindings (22), and `scripts/verify_schema.py` against migrations 0001–0007.
 - Tests use synthetic records only. No Firebase project, Cloudflare account, LINE credentials or customer data were accessed.
 
 ## Gate matrix
