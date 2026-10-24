@@ -2,6 +2,8 @@
 
 **Scope:** New listings ONLY. The existing three Firestore listings are intentionally **not copied** to D1. Other business data (Firebase Auth accounts, active customers, LINE OA followers, work jobs, service settings) stays on Firebase until the encrypted backup + reconciliation gate in PR #39 is completed. **No production database was changed by this PR.**
 
+**Release readiness:** [cloudflare-d1-r2-release-readiness.md](cloudflare-d1-r2-release-readiness.md) tracks the code-side gate matrix (#51–#62), the open JPEG/WebP pixel-decoding decision, and the ordered operator gates.
+
 ## Architecture and rollout defaults
 
 - The current Next.js site remains on its existing host with `NEXT_PUBLIC_DATA_BACKEND=firebase`. Only the listing store can be switched independently.

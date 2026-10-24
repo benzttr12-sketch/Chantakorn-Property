@@ -1,6 +1,6 @@
 # Chantakorn Property — Cloudflare API (scaffold)
 
-**Stacked migration / staging only.** This folder does **not** replace current Next.js/Firebase endpoints, change the domain, import old properties, or access production customer data. Property writes, publication and media uploads remain disabled by default.
+**Stacked migration / staging only.** This folder does **not** replace current Next.js/Firebase endpoints, change the domain, import old properties, or access production customer data. Property writes, publication and media uploads remain disabled by default. See the repo-level [Cloudflare D1/R2 release readiness](../../docs/cloudflare-d1-r2-release-readiness.md) for the code-gate matrix (#51–#62), the remaining JPEG/WebP pixel-decoding decision and the operator sequence.
 
 ## Stack
 
