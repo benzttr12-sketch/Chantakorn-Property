@@ -132,6 +132,19 @@ export const mediaUploadSessions = sqliteTable('media_upload_sessions', {
   index('idx_media_upload_sessions_expiry').on(table.expiresAt),
 ]);
 
+/** Accepted property uploads, used for bounded per-staff rate limiting (0007). */
+export const mediaUploadEvents = sqliteTable('media_upload_events', {
+  id: text('id').primaryKey(),
+  ownerId: text('owner_id').notNull().references(() => properties.id, { onDelete: 'cascade' }),
+  staffUid: text('staff_uid').notNull(),
+  kind: text('kind').notNull(),
+  byteSize: integer('byte_size').notNull(),
+  createdAt: text('created_at').notNull(),
+}, (table) => [
+  index('idx_media_upload_events_staff_time').on(table.staffUid, table.createdAt),
+  index('idx_media_upload_events_owner_time').on(table.ownerId, table.createdAt),
+]);
+
 export const lineFollowers = sqliteTable('line_followers', {
   userId: text('user_id').primaryKey(),
   isActive: integer('is_active', { mode: 'boolean' }).notNull().default(true),

@@ -14,7 +14,7 @@ tables = {row['name'] for row in db.execute("SELECT name FROM sqlite_master WHER
 required = {
     'properties', 'property_media', 'profiles', 'agents', 'inquiries',
     'inquiry_media', 'line_followers', 'work_jobs', 'settings', 'audit_events',
-    'media_upload_sessions',
+    'media_upload_sessions', 'media_upload_events',
 }
 assert required <= tables, f'Missing tables: {required - tables}'
 session_columns = {row['name'] for row in db.execute('PRAGMA table_info(media_upload_sessions)')}
@@ -49,6 +49,22 @@ except sqlite3.IntegrityError:
 else:
     raise AssertionError('Upload session max_uploads must be bounded')
 db.execute("DELETE FROM media_upload_sessions WHERE id = 's1'")
+try:
+    db.execute("""INSERT INTO media_upload_events
+        (id, owner_id, staff_uid, kind, byte_size, created_at)
+        VALUES ('e1', 'new1', 'staff', 'property', 100, ?)""", (now,))
+except sqlite3.IntegrityError:
+    raise AssertionError('A valid upload event must be insertable')
+for bad in [("e2", 'inquiry', 100), ("e3", 'property', 0), ("e4", 'property', 2 * 1024 * 1024 + 1)]:
+    try:
+        db.execute("""INSERT INTO media_upload_events
+            (id, owner_id, staff_uid, kind, byte_size, created_at)
+            VALUES (?, 'new1', 'staff', ?, ?, ?)""", (bad[0], bad[1], bad[2], now))
+    except sqlite3.IntegrityError:
+        pass
+    else:
+        raise AssertionError(f'Upload event constraints must reject {bad}')
+db.execute("DELETE FROM media_upload_events WHERE id = 'e1'")
 rows = db.execute("SELECT id, title, price FROM properties WHERE published = 1 ORDER BY created_at DESC, id DESC LIMIT ?", (12,)).fetchall()
 assert [r['id'] for r in rows] == ['new1'], 'Public selection must exclude drafts'
 assert all('internal_notes' not in r.keys() for r in rows), 'Public field allowlist regression'

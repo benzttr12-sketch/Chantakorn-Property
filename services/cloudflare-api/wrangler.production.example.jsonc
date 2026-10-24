@@ -33,6 +33,8 @@
     "MEDIA_SWEEP_ENABLED": "false",
     // Enable only after the browser client and real staging uploads are verified.
     "MEDIA_UPLOAD_SESSIONS_REQUIRED": "false",
+    "MEDIA_UPLOAD_HOURLY_LIMIT": "120",
+    "MEDIA_SESSION_HOURLY_LIMIT": "60",
     "PUBLIC_CATALOG_CACHE_ENABLED": "false"
   }
 }
