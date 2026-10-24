@@ -220,14 +220,31 @@ propertyAdmin.get('/v1/admin/properties', async c => {
   const rows = await db.select().from(properties)
     .where(and(...predicates)).orderBy(...order).limit(query.limit + 1);
   const visible = rows.slice(0, query.limit);
-  // Total matching rows (before the cursor) lets the Admin UI show a page-independent count.
-  const [count] = await db.select({ total: sql<number>`count(*)` }).from(properties).where(and(...base));
+  // Per-tab counts use the same search/type/district scope but ignore the active
+  // tab and cursor, so the Admin UI can render badge numbers without loading all rows.
+  const countRows = await db.select({
+    published: properties.published,
+    status: properties.status,
+    featured: properties.featured,
+    total: sql<number>`count(*)`,
+  }).from(properties).where(and(...base))
+    .groupBy(properties.published, properties.status, properties.featured);
+  const counts = { all: 0, sale: 0, rent: 0, featured: 0, draft: 0, published: 0 };
+  for (const row of countRows) {
+    const amount = Number(row.total);
+    counts.all += amount;
+    counts[row.status] += amount;
+    if (row.featured) counts.featured += amount;
+    if (row.published) counts.published += amount;
+    else counts.draft += amount;
+  }
   const m = await mediaForRows(db, visible);
   const last = visible.at(-1);
   return c.json({
     data: visible.map(row => toEditorProperty(row, m.get(row.id) || [], true)),
     next_cursor: rows.length > query.limit && last ? adminCursor(last, query.sortBy) : null,
-    total: Number(count?.total ?? 0),
+    total: counts.all,
+    counts,
   });
 });
 

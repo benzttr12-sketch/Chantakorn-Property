@@ -211,6 +211,48 @@ export async function fetchAdminProperties(filters?: PropertyFilters): Promise<P
   return filterProperties(await loadProperties(true), filters);
 }
 
+type AdminPageFilters = {
+  searchQuery?: string; filter?: string; type?: string; district?: string; sortBy?: string;
+};
+
+/** Native Admin pagination on the Cloudflare backend; Firebase/local keep their full list. */
+export async function fetchAdminPropertiesPage(
+  filters: AdminPageFilters = {}, cursor: string | null = null,
+) {
+  requireStaffBackend();
+  if (useCloudflarePropertyBackend) {
+    const { cloudflareAdminPropertyPage } = await import('@/lib/cloudflare-properties');
+    const page = await cloudflareAdminPropertyPage(filters, cursor);
+    return {
+      data: page.data.map(rowToProperty), total: page.total,
+      nextCursor: page.nextCursor, counts: page.counts, paginated: true as const,
+    };
+  }
+  const data = await fetchAdminProperties();
+  const counts = { all: data.length, sale: 0, rent: 0, featured: 0, draft: 0, published: 0 };
+  for (const property of data) {
+    if (property.status === 'sale') counts.sale += 1; else counts.rent += 1;
+    if (property.featured) counts.featured += 1;
+    if (property.published) counts.published += 1; else counts.draft += 1;
+  }
+  return { data, total: data.length, nextCursor: null as string | null, counts, paginated: false as const };
+}
+
+/** Direct editor load: one detail request instead of scanning the whole Admin list. */
+export async function fetchAdminPropertyById(id: string): Promise<Property | null> {
+  requireStaffBackend();
+  if (useCloudflarePropertyBackend) {
+    const { cloudflareAdminDetail } = await import('@/lib/cloudflare-properties');
+    try {
+      return rowToProperty(await cloudflareAdminDetail(id));
+    } catch (error) {
+      if (error instanceof Error && /not found/i.test(error.message)) return null;
+      throw error;
+    }
+  }
+  return (await fetchAdminProperties()).find(property => property.id === id) ?? null;
+}
+
 function matchesPropertyKey(property: Property, key: string): boolean {
   const normalized = key.trim().toLowerCase();
   if (!normalized) return false;

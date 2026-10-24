@@ -101,6 +101,50 @@ export async function cloudflareListProperties(admin = false): Promise<Property[
   throw new Error('รายการประกาศเกินขีดจำกัดของหน้าเดิม ต้องเปลี่ยนไปใช้ Pagination');
 }
 
+export type AdminPropertyStatusCounts = {
+  all: number; sale: number; rent: number; featured: number; draft: number; published: number;
+};
+export type AdminPropertyFilters = {
+  searchQuery?: string; filter?: string; type?: string; district?: string; sortBy?: string;
+};
+export type AdminPropertyPage = {
+  data: Property[]; total: number; nextCursor: string | null; counts: AdminPropertyStatusCounts;
+};
+const ADMIN_PAGE_SIZE = 50;
+
+/** One server-filtered, keyset-paginated Admin page; no whole-catalog fallback. */
+export async function cloudflareAdminPropertyPage(
+  filters: AdminPropertyFilters = {}, cursor: string | null = null,
+): Promise<AdminPropertyPage> {
+  const params = new URLSearchParams({ limit: String(ADMIN_PAGE_SIZE) });
+  if (filters.searchQuery?.trim()) params.set('searchQuery', filters.searchQuery.trim());
+  if (filters.filter && filters.filter !== 'all') params.set('filter', filters.filter);
+  if (filters.type && filters.type !== 'all') params.set('type', filters.type);
+  if (filters.district && filters.district !== 'all') params.set('district', filters.district);
+  if (filters.sortBy) params.set('sortBy', filters.sortBy);
+  if (cursor) params.set('cursor', cursor);
+  const response = await request<{ data: Property[]; total: number; next_cursor: string | null;
+    counts: Partial<AdminPropertyStatusCounts> }>(
+    `/v1/admin/properties?${params.toString()}`, {}, true);
+  const counts = response.counts || {};
+  const countKeys: (keyof AdminPropertyStatusCounts)[] =
+    ['all', 'sale', 'rent', 'featured', 'draft', 'published'];
+  if (!Array.isArray(response.data) || response.data.length > ADMIN_PAGE_SIZE ||
+      !Number.isSafeInteger(response.total) || response.total < 0 ||
+      (response.next_cursor !== null && (typeof response.next_cursor !== 'string' ||
+        !response.next_cursor || response.next_cursor.length > 512)) ||
+      countKeys.some(key => !Number.isSafeInteger(counts[key]) || counts[key]! < 0) ||
+      counts.all !== response.total) {
+    throw new Error('Cloudflare API ส่งข้อมูลหน้าถัดไปไม่ถูกต้อง');
+  }
+  return {
+    data: response.data.map(toExistingProperty),
+    total: response.total,
+    nextCursor: response.next_cursor,
+    counts: counts as AdminPropertyStatusCounts,
+  };
+}
+
 export async function cloudflarePublicDetail(identifier: string): Promise<Property | null> {
   if (!/^[\p{L}\p{N}_-]{1,120}$/u.test(identifier)) return null;
   try {

@@ -23,10 +23,12 @@ import {
 import CollapsiblePropertyCard from '@/components/admin/CollapsiblePropertyCard';
 import {
   fetchAdminProperties,
+  fetchAdminPropertiesPage,
   updateProperty,
   deleteProperty,
   createProperty,
 } from '@/lib/store/properties-store';
+import { useCloudflarePropertyBackend } from '@/lib/cloudflare-properties';
 import { Property, PropertyStatus } from '@/lib/types';
 import {
   parseAdminPrice,
@@ -91,6 +93,12 @@ function PropertiesContent() {
   const searchParams = useSearchParams();
   const [properties, setProperties] = useState<Property[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [adminPage, setAdminPage] = useState<{
+    nextCursor: string | null;
+    total: number;
+    counts: Record<StatusFilter, number>;
+  }>({ nextCursor: null, total: 0, counts: { all: 0, sale: 0, rent: 0, featured: 0, draft: 0, published: 0 } });
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -283,7 +291,35 @@ function PropertiesContent() {
     }
   };
 
+  const loadPage = async (cursor: string | null = null, append = false) => {
+    if (append) setLoadingMore(true); else setLoading(true);
+    setError('');
+    try {
+      const page = await fetchAdminPropertiesPage({
+        searchQuery,
+        filter: statusFilter,
+        type: typeFilter,
+        district: districtFilter,
+        sortBy,
+      }, cursor);
+      setProperties(previous => append
+        ? [...previous, ...page.data.filter(row => !previous.some(item => item.id === row.id))]
+        : page.data);
+      if (!append) setSelectedIds(previous => previous.filter(id => page.data.some(row => row.id === id)));
+      setAdminPage({ nextCursor: page.nextCursor, total: page.total, counts: page.counts });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'โหลดข้อมูลไม่สำเร็จ');
+    } finally {
+      setLoading(false);
+      setLoadingMore(false);
+    }
+  };
+
   const loadData = async (clearError = true) => {
+    if (useCloudflarePropertyBackend) {
+      await loadPage(null, false);
+      return;
+    }
     setLoading(true);
     if (clearError) setError('');
     try {
@@ -300,8 +336,15 @@ function PropertiesContent() {
   };
 
   useEffect(() => {
-    loadData();
-  }, []);
+    if (!useCloudflarePropertyBackend) {
+      loadData();
+      return;
+    }
+    // Server-side filters: debounce text search, reset the cursor on any change.
+    const timer = setTimeout(() => { void loadPage(null, false); }, searchQuery.trim() ? 300 : 0);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- loadPage/loadData intentionally read the current filters
+  }, [searchQuery, statusFilter, districtFilter, typeFilter, sortBy]);
 
   useEffect(() => {
     setStatusFilter(readStatusFilter(searchParams?.get('filter') || searchParams?.get('status')));
@@ -503,7 +546,9 @@ function PropertiesContent() {
     }
   };
 
-  const filteredProperties = properties.filter((p) => {
+  // Cloudflare rows are already filtered and sorted by the Worker; only the
+  // legacy Firebase/local catalog needs the client-side compatibility pass.
+  const filteredProperties = useCloudflarePropertyBackend ? properties : properties.filter((p) => {
     if (statusFilter === 'sale' && p.status !== 'sale') return false;
     if (statusFilter === 'rent' && p.status !== 'rent') return false;
     if (statusFilter === 'featured' && !p.featured) return false;
@@ -523,7 +568,9 @@ function PropertiesContent() {
     return true;
   });
 
-  const sortedProperties = [...filteredProperties].sort((a, b) => {
+  const sortedProperties = useCloudflarePropertyBackend
+    ? properties
+    : [...filteredProperties].sort((a, b) => {
     if (sortBy === 'newest') {
       return (b.created_at || '').localeCompare(a.created_at || '');
     }
@@ -627,17 +674,19 @@ function PropertiesContent() {
     setTypeFilter('all');
   };
   const statusCount = (id: StatusFilter) =>
-    properties.filter(
-      (property) =>
-        id === 'all' ||
-        (id === 'draft'
-          ? !property.published
-          : id === 'published'
-            ? property.published
-            : id === 'featured'
-              ? property.featured
-              : property.status === id),
-    ).length;
+    useCloudflarePropertyBackend
+      ? adminPage.counts[id]
+      : properties.filter(
+          (property) =>
+            id === 'all' ||
+            (id === 'draft'
+              ? !property.published
+              : id === 'published'
+                ? property.published
+                : id === 'featured'
+                  ? property.featured
+                  : property.status === id),
+        ).length;
 
   return (
     <div className="space-y-5 pb-8">
@@ -824,17 +873,32 @@ function PropertiesContent() {
           <p aria-live="polite" className="text-sm text-slate-500">
             {loading
               ? 'กำลังโหลดข้อมูล…'
-              : `แสดง ${filteredProperties.length} จาก ${properties.length} รายการ`}
+              : useCloudflarePropertyBackend
+                ? `แสดง ${filteredProperties.length} จาก ${adminPage.total} รายการ (โหลดแล้ว)`
+                : `แสดง ${filteredProperties.length} จาก ${properties.length} รายการ`}
           </p>
-          {hasFilters && (
-            <button
-              type="button"
-              onClick={resetFilters}
-              className="min-h-9 rounded-lg px-2 text-sm font-semibold text-navy-950 underline underline-offset-4"
-            >
-              ล้างตัวกรอง
-            </button>
-          )}
+          <div className="flex flex-wrap items-center gap-2">
+            {useCloudflarePropertyBackend && adminPage.nextCursor && (
+              <button
+                type="button"
+                onClick={() => void loadPage(adminPage.nextCursor, true)}
+                disabled={loadingMore || loading}
+                className="inline-flex min-h-9 items-center gap-1.5 rounded-lg bg-navy-950 px-3 text-sm font-semibold text-white disabled:opacity-50"
+              >
+                {loadingMore ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
+                {loadingMore ? 'กำลังโหลด…' : `โหลดเพิ่ม (เหลือ ${Math.max(adminPage.total - properties.length, 0)})`}
+              </button>
+            )}
+            {hasFilters && (
+              <button
+                type="button"
+                onClick={resetFilters}
+                className="min-h-9 rounded-lg px-2 text-sm font-semibold text-navy-950 underline underline-offset-4"
+              >
+                ล้างตัวกรอง
+              </button>
+            )}
+          </div>
         </div>
       </section>
 
