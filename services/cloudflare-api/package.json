@@ -11,6 +11,7 @@
     "db:local": "wrangler d1 migrations apply chantakorn-property-dev --local",
     "db:remote": "wrangler d1 migrations apply chantakorn-property-dev --remote",
     "deploy": "wrangler deploy",
+    "staff:import": "node --experimental-strip-types scripts/import_staff_roles.ts",
     "test:integration": "node --test tests/runtime.integration.mjs"
   },
   "dependencies": {

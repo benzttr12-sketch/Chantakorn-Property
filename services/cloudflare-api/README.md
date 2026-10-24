@@ -85,6 +85,22 @@ Related decision and backup plan: [PR #35](https://github.com/benzttr12-sketch/C
 - No staff bootstrap endpoint exists. No public user can set their role. A secure manual migration after encrypted backup and UID reconciliation is required before the endpoint will grant any staff permission.
 - Test `npm test` covers valid RS256 signed local fixture tokens, forged/expired/future/wrong-issuer/wrong-audience/unverified tokens and role state denial. No real Firebase account or customer record is used.
 
+## Verified staff-role bootstrap (operator-only, offline)
+
+No endpoint can create a staff role, and the repo intentionally contains no seed/admin SQL. `src/staff-import.ts` plus `scripts/import_staff_roles.ts` turn three local exports into a reviewed insert-only SQL file:
+
+1. Firebase Authentication user export (`firebase auth:export users.json`) — read as `users[].localId`, `email`, `emailVerified`, `disabled`.
+2. Firestore `profiles` export as NDJSON or a JSON array — flat documents or `{ id, data: { ...fields } }` records are accepted (`role`, `full_name`, `email`).
+3. An explicit approved-UID list (one UID per line, `#` comments allowed) that must exactly match the ADMIN/AGENT profiles being imported.
+
+Every candidate is rejected unless it is ADMIN/AGENT, exists in Auth, is email-verified and enabled, its profile email agrees with Auth, its full name is printable, and the UID is on the approved list. Approved UIDs without a staff profile, duplicate records, unknown roles and imports above 500 entries fail closed before any SQL exists. Dry-run first:
+
+```
+npm run staff:import -- --auth /secure/users.json --profiles /secure/profiles.ndjson --approved /secure/approved-uids.txt
+```
+
+With `--write --sql-out FILE --manifest-out FILE`, both output paths **must be outside the Git repository**; files are created owner-only and never overwritten. The SQL is a single `INSERT ... ON CONFLICT(uid) DO NOTHING` statement, so an existing D1 profile is never modified. The manifest records input SHA-256 hashes, counts and UID/role only — no names or emails. Apply the reviewed SQL with a staging D1 operator command such as `npx wrangler d1 execute chantakorn-property-dev --remote --file /secure/staff-import.sql` only after the backup/reconciliation gates in `docs/firestore-encrypted-backup-runbook.md`, then verify every imported UID still passes the live Firebase account check. The tool has no network or database access and is covered by offline unit tests with synthetic records. Note the documented JSON/NDJSON shape is the expected operator format; converting the encrypted backup archive itself into these exports is a separate, reviewed step.
+
 ## Guarded R2 media routes (stacked PR-04)
 
 The Worker now exposes `GET /v1/media/properties/:mediaId` only for a media row associated with a **published** property. A draft/unpublished listing returns 404 even when somebody knows the R2 object ID. Media files are routed through the Worker while the bucket remains private. Responses use `no-store` so a browser or intermediary cannot bypass the publication check after unpublishing.
