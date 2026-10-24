@@ -553,9 +553,24 @@ function PropertiesContent() {
 
               {/* Listings Grid */}
               {loading ? (
-                <div className={`grid gap-4 ${viewMode === 'grid' ? 'grid-cols-1 sm:grid-cols-2 xl:grid-cols-3' : 'grid-cols-1 sm:grid-cols-2'}`}>
+                <div className={`grid gap-5 ${viewMode === 'grid' ? 'grid-cols-1 sm:grid-cols-2 xl:grid-cols-3' : 'grid-cols-1 sm:grid-cols-2'}`}>
                   {[...Array(6)].map((_, i) => (
-                    <div key={i} className="bg-white rounded-2xl h-80 animate-pulse" />
+                    <div key={i} className="bg-white rounded-3xl overflow-hidden border border-slate-200/80 shadow-xs flex flex-col" aria-hidden="true">
+                      <div className="relative aspect-[4/3] skeleton-block rounded-none">
+                        <span className="absolute left-3.5 top-3.5 skeleton-block h-6 w-16 !rounded-full" />
+                        <span className="absolute right-3.5 top-3.5 skeleton-block h-9 w-9 !rounded-full" />
+                        <span className="absolute bottom-3 left-3.5 skeleton-block h-6 w-20 !rounded-lg" />
+                      </div>
+                      <div className="p-5 sm:p-6 space-y-3.5">
+                        <span className="skeleton-block block h-3.5 w-2/5" />
+                        <span className="skeleton-block block h-5 w-11/12" />
+                        <span className="skeleton-block block h-5 w-3/5" />
+                        <div className="flex items-center gap-2 pt-1">
+                          <span className="skeleton-block h-7 w-24 !rounded-full" />
+                          <span className="skeleton-block h-7 w-16 !rounded-full" />
+                        </div>
+                      </div>
+                    </div>
                   ))}
                 </div>
               ) : sortedProperties.length === 0 ? (

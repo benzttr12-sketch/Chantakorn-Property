@@ -190,7 +190,7 @@ export default function WorkPhaseQuickTransitionModal({
                     isDone
                       ? 'bg-emerald-50 border-emerald-300 text-emerald-900'
                       : isCurrent
-                      ? 'bg-navy-950 border-navy-900 text-white shadow-md ring-2 ring-gold-400/50'
+                      ? 'bg-navy-950 border-navy-900 text-white shadow-md ring-2 ring-gold-400/50 phase-step-active'
                       : 'bg-white border-gray-200 text-gray-400'
                   }`}
                 >
