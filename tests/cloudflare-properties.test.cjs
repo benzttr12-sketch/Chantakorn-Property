@@ -485,3 +485,21 @@ test('Admin page adapter rejects malformed totals, counts, cursors and oversized
     await assert.rejects(adapter.cloudflareAdminPropertyPage(), /หน้าถัดไป/);
   }
 });
+
+test('Admin page adapter supports a bounded custom page size for whole-catalog iteration', async () => {
+  const counts = { all: 1, sale: 1, rent: 0, featured: 0, draft: 1, published: 0 };
+  const { adapter, calls } = load(call => {
+    assert.equal(call.params.get('limit'), '100');
+    return json({ data: [sample], total: 1, next_cursor: null, counts });
+  });
+  const page = await adapter.cloudflareAdminPropertyPage({}, null, 100);
+  assert.equal(page.data.length, 1);
+  assert.equal(calls.length, 1);
+  for (const size of [0, 101, 2.5, '50']) {
+    await assert.rejects(adapter.cloudflareAdminPropertyPage({}, null, size), /ขนาดหน้า/);
+  }
+  const oversize = load(() => json({
+    data: Array(101).fill(sample), total: 101, next_cursor: null, counts: { ...counts, all: 101 },
+  }));
+  await assert.rejects(oversize.adapter.cloudflareAdminPropertyPage({}, null, 100), /หน้าถัดไป/);
+});

@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Calculator, Copy, ExternalLink, MapPin, Save, Search } from 'lucide-react';
 import { Property } from '@/lib/types';
 import { dataBackend } from '@/lib/backend';
-import { fetchAdminProperties } from '@/lib/store/properties-store';
+import { fetchAdminCatalog } from '@/lib/store/properties-store';
 import { loadLandValuation, saveLandValuation } from '@/lib/store/land-valuation-store';
 import {
   EMPTY_LAND_VALUATION, LANDSMAPS_URL, TREASURY_APPRAISAL_URL,
@@ -73,7 +73,7 @@ export default function AutoPinLandsMapsValuation({ initialProperty = null, prop
   useEffect(() => {
     if (properties?.length) { setCatalog(properties); return; }
     let active = true;
-    fetchAdminProperties().then(items => { if (active) setCatalog(items); }).catch(() => {
+    fetchAdminCatalog().then(items => { if (active) setCatalog(items); }).catch(() => {
       if (active) setCatalogError('โหลดรายการทรัพย์ไม่สำเร็จ คุณยังค้นจากเลขโฉนดและพิกัดเองได้');
     });
     return () => { active = false; };

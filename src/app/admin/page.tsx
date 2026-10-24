@@ -5,7 +5,7 @@ import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import StaffPropertyImage from '@/components/admin/StaffPropertyImage';
 import { ArrowRight, Building2, Check, CheckCircle2, ChevronDown, Copy, Edit3, ExternalLink, FileText, Layers, LoaderCircle, MapPin, MessageCircle, MessageSquare, Phone, Plus, RefreshCw, Sparkles, Users, Wand2 } from 'lucide-react';
-import { fetchAdminProperties, fetchInquiries, updateInquiryStatus } from '@/lib/store/properties-store';
+import { fetchAdminCatalog, fetchInquiries, updateInquiryStatus } from '@/lib/store/properties-store';
 import type { Inquiry, Property } from '@/lib/types';
 import { formatPrice, formatPropertyCode, formatThaiDate, propertyHref } from '@/lib/utils';
 import AdminMonthlyActivity from '@/components/admin/AdminMonthlyActivity';
@@ -44,7 +44,7 @@ export default function AdminDashboardPage() {
     setLoading(true);
     setError('');
     try {
-      const [propertyData, inquiryData] = await Promise.all([fetchAdminProperties(), fetchInquiries()]);
+      const [propertyData, inquiryData] = await Promise.all([fetchAdminCatalog(), fetchInquiries()]);
       if (revision !== requestRevision.current) return;
       setProperties(propertyData);
       setInquiries(inquiryData);

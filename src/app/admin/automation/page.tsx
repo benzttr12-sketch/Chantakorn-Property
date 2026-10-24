@@ -44,7 +44,7 @@ import {
   Bell,
   Activity
 } from 'lucide-react';
-import { fetchAdminProperties, fetchInquiries } from '@/lib/store/properties-store';
+import { fetchAdminCatalog, fetchInquiries } from '@/lib/store/properties-store';
 import { Property, Inquiry } from '@/lib/types';
 import { formatPrice, getPropertyTypeName, formatLineUrl } from '@/lib/utils';
 import { propertyHref } from '@/components/properties/property-link';
@@ -139,7 +139,7 @@ function AutomationContent() {
     const load = async () => {
       try {
         const [props, inqs] = await Promise.all([
-          fetchAdminProperties(),
+          fetchAdminCatalog(),
           fetchInquiries()
         ]);
         setProperties(props);
