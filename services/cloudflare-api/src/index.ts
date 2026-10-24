@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import { publicCatalogPayload } from './public-catalog-cache.ts';
 import mediaRoutes from './media-routes.ts';
 import propertyAdmin, { mediaForRows, toEditorProperty } from './property-admin-routes.ts';
+import { sweepPropertyMediaOrphans } from './media-orphan-sweep.ts';
 import { drizzle } from 'drizzle-orm/d1';
 import { and, asc, desc, eq, gte, lte, lt, or, isNull, sql } from 'drizzle-orm';
 import { properties } from './db/schema.ts';
@@ -17,6 +18,7 @@ type Bindings = {
   ALLOWED_ORIGIN: string;
   FIREBASE_PROJECT_ID: string;
   MEDIA_WRITES_ENABLED?: string;
+  MEDIA_SWEEP_ENABLED?: string;
   PROPERTY_WRITES_ENABLED?: string;
   PROPERTY_PUBLICATION_ENABLED?: string;
   FIREBASE_WEB_API_KEY?: string;
@@ -147,4 +149,25 @@ app.onError((error, c) => {
   return c.json({ error: 'Service temporarily unavailable' }, 503);
 });
 
-export default app;
+/** Scheduled Workers Cron runs a bounded orphan sweep only when opted in. */
+async function runScheduledMediaSweep(env: Bindings): Promise<void> {
+  try {
+    const result = await sweepPropertyMediaOrphans(env);
+    if (result && (result.deleted > 0 || result.orphans > 0))
+      console.warn('R2_MEDIA_SWEEP', JSON.stringify({
+        scanned: result.scanned, orphans: result.orphans, deleted: result.deleted,
+        skipped_recent: result.skipped_recent, truncated: result.truncated,
+      }));
+  } catch (error) {
+    // Never throw from a scheduled invocation; surface a stable alert code.
+    console.error('R2_MEDIA_SWEEP_FAILED', { kind: error instanceof Error ? error.name : 'unknown' });
+  }
+}
+
+export { app };
+export default {
+  fetch: (request: Request, env: Bindings, ctx: ExecutionContext) => app.fetch(request, env, ctx),
+  scheduled: (_controller: ScheduledController, env: Bindings, ctx: ExecutionContext) => {
+    ctx.waitUntil(runScheduledMediaSweep(env));
+  },
+} satisfies ExportedHandler<Bindings>;

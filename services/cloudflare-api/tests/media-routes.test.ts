@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import app from '../src/index.ts';
+import { app } from '../src/index.ts';
 
 function env(overrides: Record<string, unknown> = {}) {
   return {

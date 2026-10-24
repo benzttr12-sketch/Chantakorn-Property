@@ -6,8 +6,11 @@ import { authorizePropertyStaff, canWriteProperties, type PropertyAuthEnv } from
 import { newPropertyIdentity, parseEditorInput, readBoundedJson } from './property-input.ts';
 import { auditedMutation } from './audited-mutation.ts';
 import { encodeCursor, decodeCursor } from './property-query.ts';
+import { SWEEP_STATUS_KEY } from './media-orphan-sweep.ts';
 
-type Env = PropertyAuthEnv & { PROPERTY_MEDIA: R2Bucket; PRIVATE_MEDIA: R2Bucket };
+type Env = PropertyAuthEnv & {
+  PROPERTY_MEDIA: R2Bucket; PRIVATE_MEDIA: R2Bucket; MEDIA_SWEEP_ENABLED?: string;
+};
 type DbProperty = typeof properties.$inferSelect;
 type MediaRecord = { propertyId: string; id: string; sortOrder: number };
 
@@ -115,6 +118,31 @@ propertyAdmin.options('/v1/admin/properties', c => {
   c.header('Access-Control-Allow-Methods', 'GET, POST, PATCH, DELETE, OPTIONS');
   c.header('Access-Control-Max-Age', '300');
   return c.body(null, 204);
+});
+propertyAdmin.options('/v1/admin/media/*', c => {
+  if (c.req.header('Origin') !== c.env.ALLOWED_ORIGIN) return c.json({ error: 'Origin forbidden' }, 403);
+  c.header('Access-Control-Allow-Origin', c.env.ALLOWED_ORIGIN);
+  c.header('Access-Control-Allow-Headers', 'Authorization, Content-Type');
+  c.header('Access-Control-Allow-Methods', 'GET, OPTIONS');
+  c.header('Access-Control-Max-Age', '300');
+  c.header('Vary', 'Origin');
+  return c.body(null, 204);
+});
+
+// Read-only status of the scheduled R2 orphan sweep. Maintenance insight only:
+// it never accepts a request to run or delete anything.
+propertyAdmin.get('/v1/admin/media/sweep', async c => {
+  const staff = await authorized(c);
+  if (!staff.ok) return c.json({ error: staff.error }, staff.status);
+  if (staff.role !== 'ADMIN')
+    return c.json({ error: 'Only approved administrators may inspect media maintenance' }, 403);
+  const row = await c.env.DB.prepare('SELECT value_json FROM settings WHERE key = ?')
+    .bind(SWEEP_STATUS_KEY).first<{ value_json: string }>();
+  let status: unknown = null;
+  if (row && typeof row.value_json === 'string') {
+    try { status = JSON.parse(row.value_json); } catch { status = null; }
+  }
+  return c.json({ data: status, enabled: c.env.MEDIA_SWEEP_ENABLED === 'true' });
 });
 
 // Staff can preview a draft without granting anonymous access to the R2 object.
