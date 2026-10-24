@@ -428,7 +428,7 @@ export default function WorkPhasesAdminPage() {
                             isCompleted
                               ? 'bg-emerald-50 border-emerald-300 text-emerald-900'
                               : isActive
-                              ? 'bg-navy-950 border-navy-900 text-white shadow-xs ring-1 ring-gold-400/50'
+                              ? 'bg-navy-950 border-navy-900 text-white shadow-xs ring-1 ring-gold-400/50 phase-step-active'
                               : 'bg-gray-50 border-gray-200 text-gray-400'
                           }`}
                         >

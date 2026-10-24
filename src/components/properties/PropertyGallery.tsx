@@ -156,7 +156,7 @@ export default function PropertyGallery({ id, title, images, videoUrl }: Propert
 
       <div {...gestures} style={{ touchAction: 'pan-y' }} className="relative aspect-[16/9] md:aspect-[21/9] w-full rounded-2xl overflow-hidden bg-navy-900 shadow-card group">
         {photo ? <button type="button" className={`absolute inset-0 w-full h-full ${controls}`} aria-label={`เปิดภาพ ${activeIndex + 1} แบบเต็มจอ`} onClick={() => { if (swipedRef.current) { swipedRef.current = false; return; } setLightboxOpen(true); }}>
-          <Image key={photo} src={photo} alt={`${title} - รูปที่ ${activeIndex + 1}`} fill priority unoptimized={photo.startsWith('data:')} className="object-cover gallery-image-enter motion-safe:transition-transform motion-safe:duration-500 motion-safe:group-hover:scale-[1.025]" draggable={false} />
+          <Image key={photo} src={photo} alt={`${title} - รูปที่ ${activeIndex + 1}`} fill priority sizes="(max-width: 768px) 100vw, 80vw" unoptimized={photo.startsWith('data:')} className="object-cover gallery-image-enter motion-safe:transition-transform motion-safe:duration-500 motion-safe:group-hover:scale-[1.025]" draggable={false} />
         </button> : <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 text-slate-300"><Images className="w-10 h-10" /><p className="text-sm">ยังไม่มีภาพทรัพย์</p></div>}
         {total > 1 && <>
           <button type="button" data-gallery-control aria-label="ภาพก่อนหน้า" onClick={() => changeImage(-1)} className={`absolute z-10 left-3 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-black/50 hover:bg-black/80 text-white flex items-center justify-center backdrop-blur-xs ${controls}`}><ChevronLeft className="w-6 h-6" /></button>
@@ -165,7 +165,7 @@ export default function PropertyGallery({ id, title, images, videoUrl }: Propert
         {!!total && <div className="absolute bottom-3 right-3 pointer-events-none px-3 py-1.5 bg-navy-950/80 backdrop-blur-md rounded-lg text-xs font-bold text-white border border-white/10">{activeIndex + 1} / {total}</div>}
       </div>
       {total > 1 && <div ref={thumbnailsRef} className="relative flex gap-2.5 overflow-x-auto py-1 no-scrollbar" aria-label="เลือกภาพทรัพย์">
-        {photoList.map((image, index) => <button type="button" key={`${id}-${index}`} data-photo-index={index} aria-label={`ดูภาพที่ ${index + 1}`} aria-pressed={activeIndex === index} onClick={() => choosePhoto(index)} className={`relative w-24 h-16 sm:w-28 sm:h-20 rounded-xl overflow-hidden shrink-0 ${controls} ${activeIndex === index ? 'ring-2 ring-gold-500 opacity-100' : 'opacity-60 hover:opacity-100'}`}><Image src={image} alt="" fill unoptimized={image.startsWith('data:')} className="object-cover" /></button>)}
+        {photoList.map((image, index) => <button type="button" key={`${id}-${index}`} data-photo-index={index} aria-label={`ดูภาพที่ ${index + 1}`} aria-pressed={activeIndex === index} onClick={() => choosePhoto(index)} className={`relative w-24 h-16 sm:w-28 sm:h-20 rounded-xl overflow-hidden shrink-0 ${controls} ${activeIndex === index ? 'ring-2 ring-gold-500 opacity-100' : 'opacity-60 hover:opacity-100'}`}><Image src={image} alt="" fill sizes="112px" unoptimized={image.startsWith('data:')} className="object-cover" /></button>)}
       </div>}
       {total > 1 && <p className="text-[11px] text-gray-500 sm:hidden">ปัดภาพไปทางซ้ายหรือขวาเพื่อดูรูปถัดไป</p>}
 

@@ -85,7 +85,7 @@ export default function PropertyCard({
   return (
     <div className="property-card group bg-white rounded-3xl overflow-hidden border border-slate-200/80 shadow-xs flex flex-col h-full">
       {/* 4:3 Image Container with Overlays */}
-      <div className="relative aspect-[4/3] w-full overflow-hidden bg-slate-100">
+      <div className="relative aspect-[4/3] w-full overflow-hidden bg-slate-100 image-loading-shimmer">
         <Link href={propertyHref({ id, slug })} className="property-card-image-link relative block w-full h-full">
           {displayImage ? (
             <Image
