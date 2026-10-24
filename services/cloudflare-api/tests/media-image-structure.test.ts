@@ -94,6 +94,23 @@ function jfifApp0(): Buffer {
     Buffer.from('JFIF\0', 'latin1'), Buffer.from([1, 2, 0, 0, 1, 0, 1, 0, 0]),
   ]);
 }
+function patchJpegMarker(base: Buffer, from: number, to: number): Buffer {
+  const patched = Buffer.from(base);
+  for (let i = 2; i + 1 < patched.length; i++) {
+    if (patched[i] === 0xff && patched[i + 1] === from) { patched[i + 1] = to; return patched; }
+  }
+  throw new Error('fixture has no matching JPEG marker');
+}
+function jpegEntropyStart(base: Buffer): number {
+  let i = 2;
+  while (i + 4 <= base.length) {
+    const marker = base[i + 1]!;
+    if (marker === 0xda) return i + 2 + base.readUInt16BE(i + 2);
+    if (marker === 0xd9) break;
+    i += 2 + base.readUInt16BE(i + 2);
+  }
+  throw new Error('fixture has no JPEG scan');
+}
 function patchJpegFrameDimensions(base: Buffer, width: number, height: number): Buffer {
   const patched = Buffer.from(base);
   let i = 2;
@@ -177,6 +194,24 @@ test('rejects JPEG EXIF/XMP/comments, trailing bytes, truncation and oversized f
   assert.equal(rejected.ok ? 0 : rejected.status, 413);
   const tooManyPixels = patchJpegFrameDimensions(jpeg, 6000, 6000);
   assert.equal((await validateImageStructure(tooManyPixels, 'image/jpeg')).ok, false);
+});
+
+test('fully Huffman-decodes baseline JPEG entropy data and rejects unsupported forms', async () => {
+  assert.deepEqual(await validateImageStructure(jpeg, 'image/jpeg'), { ok: true, width: 2, height: 2 });
+  const progressive = patchJpegMarker(jpeg, 0xc0, 0xc2);
+  assert.deepEqual(await validateImageStructure(progressive, 'image/jpeg'),
+    { ok: false, status: 415, error: 'Only baseline JPEG is accepted' });
+  const restart = insertJpegSegment(jpeg, 0xdd, Buffer.from([0, 1]));
+  assert.deepEqual(await validateImageStructure(restart, 'image/jpeg'),
+    { ok: false, status: 415, error: 'JPEG restart intervals are not accepted' });
+  // Cut the entropy segment off at its first byte: the MCU decoder cannot
+  // produce the expected blocks and must reject the file.
+  const corrupted = Buffer.from(jpeg);
+  const start = jpegEntropyStart(jpeg);
+  corrupted[start] = 0xff;
+  corrupted[start + 1] = 0xfe;
+  assert.deepEqual(await validateImageStructure(corrupted, 'image/jpeg'),
+    { ok: false, status: 415, error: 'JPEG entropy data is invalid' });
 });
 
 test('rejects PNG metadata chunks, checksum corruption, truncation and oversized headers', async () => {
