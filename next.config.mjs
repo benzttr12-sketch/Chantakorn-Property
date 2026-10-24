@@ -30,9 +30,10 @@ const csp = [
   "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
   "font-src 'self' data: https://fonts.gstatic.com",
   `img-src 'self' data: blob: https://maps.gstatic.com https://*.googleapis.com ${remotePatterns.map((p) => `https://${p.hostname}`).join(' ')}`,
-  "connect-src 'self' https://*.googleapis.com https://*.firebaseio.com wss://*.firebaseio.com https://*.firebasestorage.app https://*.workers.dev https://api.line.me",
-  // Video tours embed YouTube (privacy-enhanced domain); the map embeds Google Maps.
-  "frame-src 'self' https://www.youtube-nocookie.com https://www.youtube.com https://maps.google.com",
+  "connect-src 'self' https://*.googleapis.com https://*.firebaseio.com wss://*.firebaseio.com https://*.firebasestorage.app https://*.firebaseapp.com https://*.workers.dev https://api.line.me",
+  // Video tours embed YouTube (privacy-enhanced domain); the map embeds Google Maps;
+  // Firebase Auth completes the Google popup through a *.firebaseapp.com iframe.
+  "frame-src 'self' https://www.youtube-nocookie.com https://www.youtube.com https://maps.google.com https://*.firebaseapp.com",
   "media-src 'self' data: blob: https:",
   "worker-src 'self' blob:",
   "object-src 'none'",
