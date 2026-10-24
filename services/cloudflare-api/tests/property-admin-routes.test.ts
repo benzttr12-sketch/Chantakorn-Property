@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import app from '../src/index.ts';
+import { app } from '../src/index.ts';
 import { toEditorProperty } from '../src/property-admin-routes.ts';
 
 const id = '7537cedc-3fbf-4df9-9741-82757f583628';
@@ -36,6 +36,18 @@ test('property Admin requires identity before any DB query; wrong origin is reje
     body: '{}',
   }, { ...env, PROPERTY_WRITES_ENABLED: 'true' });
   assert.equal(forged.status, 503);
+});
+
+test('media sweep status requires identity and only exposes CORS to the trusted origin', async () => {
+  assert.equal((await app.request('/v1/admin/media/sweep', {}, env)).status, 401);
+  const allowed = await app.request('/v1/admin/media/sweep', {
+    method: 'OPTIONS', headers: { Origin: 'https://chantakornproperty.com' },
+  }, env);
+  assert.equal(allowed.status, 204);
+  assert.equal(allowed.headers.get('Access-Control-Allow-Methods'), 'GET, OPTIONS');
+  assert.equal((await app.request('/v1/admin/media/sweep', {
+    method: 'OPTIONS', headers: { Origin: 'https://evil.invalid' },
+  }, env)).status, 403);
 });
 
 test('explicit serializer excludes staff notes, internal storage paths and account details from public output', () => {

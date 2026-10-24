@@ -47,12 +47,21 @@ test('local Worker HTTP / D1 / R2 / Firebase authorization contract', async t =>
     } };
   ` }, bundle: true, write: false,
     format: 'esm', platform: 'browser', target: 'es2022' });
+  // The pure sweep module is bundled separately so the test can call it with the
+  // real local D1/R2 bindings; the scheduled wrapper only adds opt-in/logging.
+  const sweepBundle = await build({ stdin: { resolveDir: process.cwd(),
+    contents: "export { sweepPropertyMediaOrphans } from './src/media-orphan-sweep.ts';" },
+    bundle: true, write: false, format: 'esm', platform: 'neutral', target: 'es2022' });
+  const { sweepPropertyMediaOrphans: sweep } = await import('data:text/javascript;base64,' +
+    Buffer.from(sweepBundle.outputFiles[0].text).toString('base64'));
+  assert.equal(typeof sweep, 'function', 'sweep module must load from its esbuild bundle');
   const mf = new Miniflare(convertV4MiniflareOptions({
     modules: true, script: bundled.outputFiles[0].text, compatibilityDate: '2026-10-01',
     d1Databases: ['DB'], r2Buckets: ['PROPERTY_MEDIA', 'PRIVATE_MEDIA'],
     bindings: { ALLOWED_ORIGIN: origin, FIREBASE_PROJECT_ID: project,
       FIREBASE_WEB_API_KEY: 'synthetic-key-for-local-tests-only',
-      PUBLIC_CATALOG_CACHE_ENABLED: 'true', PROPERTY_WRITES_ENABLED: 'true', PROPERTY_PUBLICATION_ENABLED: 'false', MEDIA_WRITES_ENABLED: 'true' },
+      PUBLIC_CATALOG_CACHE_ENABLED: 'true', PROPERTY_WRITES_ENABLED: 'true', PROPERTY_PUBLICATION_ENABLED: 'false',
+      MEDIA_WRITES_ENABLED: 'true', MEDIA_SWEEP_ENABLED: 'true' },
     outboundService: async request => {
       const url = new URL(request.url);
       if (url.origin === 'https://local-r2-test.invalid' && url.pathname === '/after-put') {
@@ -92,7 +101,7 @@ test('local Worker HTTP / D1 / R2 / Firebase authorization contract', async t =>
   const insertProperty = async (id, slug, published, deleted = null) => db.prepare(
     'INSERT INTO properties (id,code,slug,title,property_type,status,price,province,district,published,deleted_at,internal_notes,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)'
   ).bind(id, 'CK-' + slug, slug, 'Synthetic listing ' + slug, 'house', 'sale', 500000,
-    'กรุงเทพมหานคร', 'บางรัก', published, deleted, 'PRIVATE-SYNTHETIC-NOTE',
+    'เธเธฃเธธเธเน€เธ—เธเธกเธซเธฒเธเธเธฃ', 'เธเธฒเธเธฃเธฑเธ', published, deleted, 'PRIVATE-SYNTHETIC-NOTE',
     '2026-10-20T00:00:00.000Z', '2026-10-20T00:00:00.000Z').run();
   const publicId = '00000000-0000-4000-8000-000000000001';
   const draftId = '00000000-0000-4000-8000-000000000002';
@@ -142,7 +151,7 @@ test('local Worker HTTP / D1 / R2 / Firebase authorization contract', async t =>
     for (const [i, id] of extraIds.entries()) {
       await insertProperty(id, 'search-' + i, 1);
       await db.prepare('UPDATE properties SET price=?,featured=?,bedrooms=?,bathrooms=?,features_json=?,video_url=?,subdistrict=? WHERE id=?')
-        .bind((i + 1) * 100, i, i + 1, i + 1, JSON.stringify(['สระว่ายน้ำ', 'สวน']), 'https://example.test/video', 'ทดสอบ', id).run();
+        .bind((i + 1) * 100, i, i + 1, i + 1, JSON.stringify(['เธชเธฃเธฐเธงเนเธฒเธขเธเนเธณ', 'เธชเธงเธ']), 'https://example.test/video', 'เธ—เธ”เธชเธญเธ', id).run();
     }
     try {
       for (const sort of ['newest', 'price_asc', 'price_desc', 'popular']) {
@@ -163,7 +172,7 @@ test('local Worker HTTP / D1 / R2 / Firebase authorization contract', async t =>
         if (sort === 'popular') assert.deepEqual(seen.map(x => x.featured), [true, false, false, false]);
       }
       const params = new URLSearchParams({ bedrooms: '2', bathrooms: '2', hasVideo: 'true', featured: 'true',
-        subdistrict: 'ทด', searchQuery: 'search-', features: JSON.stringify(['สระ', 'สวน']) });
+        subdistrict: 'เธ—เธ”', searchQuery: 'search-', features: JSON.stringify(['เธชเธฃเธฐ', 'เธชเธงเธ']) });
       const filtered = await (await fetchApi('/v1/properties?' + params)).json();
       assert.deepEqual(filtered.data.map(x => x.id), [extraIds[1]]);
       const literal = await (await fetchApi('/v1/properties?searchQuery=%25')).json();
@@ -290,8 +299,8 @@ test('local Worker HTTP / D1 / R2 / Firebase authorization contract', async t =>
   let created;
   await t.test('admin creates draft, refuses publication and stale revision', async () => {
     const response = await fetchApi('/v1/admin/properties', { method: 'POST', headers, body: JSON.stringify({
-      title: 'ทรัพย์ทดสอบใหม่', slug: 'new-local', property_type: 'house', status: 'sale',
-      price: 100000, province: 'กรุงเทพมหานคร', district: 'บางรัก', published: true,
+      title: 'เธ—เธฃเธฑเธเธขเนเธ—เธ”เธชเธญเธเนเธซเธกเน', slug: 'new-local', property_type: 'house', status: 'sale',
+      price: 100000, province: 'เธเธฃเธธเธเน€เธ—เธเธกเธซเธฒเธเธเธฃ', district: 'เธเธฒเธเธฃเธฑเธ', published: true,
     }) });
     assert.equal(response.status, 201); created = (await response.json()).data;
     assert.equal(created.published, false);
@@ -471,5 +480,55 @@ test('local Worker HTTP / D1 / R2 / Firebase authorization contract', async t =>
       body: JSON.stringify({ expected_updated_at: created.updated_at }) })).status, 200);
     assert.equal((await fetchApi(endpoint, { headers })).status, 404);
     assert.ok((await db.prepare('SELECT deleted_at FROM properties WHERE id=?').bind(created.id).first()).deleted_at);
+  });
+  await t.test('bounded orphan sweep deletes only unreferenced aged media and reports status', async () => {
+    const agedOrphanA = 'properties/orphan-sweep/aged-a.png';
+    const agedOrphanB = 'properties/orphan-sweep/aged-b.png';
+    const keptKey = 'properties/orphan-sweep/kept.png';
+    const keptMedia = '00000000-0000-4000-8000-000000000014';
+    const recentKey = 'properties/orphan-sweep/recent.png';
+    await publicBucket.put(agedOrphanA, png);
+    await publicBucket.put(agedOrphanB, png);
+    await publicBucket.put(keptKey, png);
+    await db.prepare('INSERT INTO property_media(id,property_id,object_key,public_url,content_type,byte_size,created_at) VALUES (?,?,?,?,?,?,?)')
+      .bind(keptMedia, draftId, keptKey, '/v1/media/properties/' + keptMedia, 'image/png', png.length, '2026-10-20').run();
+    try {
+      // The sweep is opt-in and does nothing without MEDIA_SWEEP_ENABLED.
+      assert.equal(await sweep({ DB: db, PROPERTY_MEDIA: publicBucket }), null);
+      // A future clock simulates objects older than the one-hour safety window.
+      const future = Date.now() + 24 * 60 * 60 * 1000;
+      const aged = await sweep({ DB: db, PROPERTY_MEDIA: publicBucket, MEDIA_SWEEP_ENABLED: 'true' },
+        { force: true, now: future });
+      assert.ok(aged.deleted >= 2);
+      assert.equal(await publicBucket.head(agedOrphanA), null);
+      assert.equal(await publicBucket.head(agedOrphanB), null);
+      assert.ok(await publicBucket.head(keptKey), 'referenced media must never be swept');
+      assert.ok(aged.referenced >= 1);
+      const stored = await db.prepare('SELECT value_json FROM settings WHERE key=?')
+        .bind('media_orphan_sweep_status').first();
+      assert.ok(stored?.value_json);
+      assert.equal(JSON.parse(stored.value_json).deleted, aged.deleted);
+      // With the real clock, freshly uploaded objects are never touched.
+      await publicBucket.put(recentKey, png);
+      const fresh = await sweep({ DB: db, PROPERTY_MEDIA: publicBucket, MEDIA_SWEEP_ENABLED: 'true' }, { force: true });
+      assert.ok(fresh.skipped_recent >= 1);
+      assert.ok(await publicBucket.head(recentKey));
+      // Status is staff-only and never exposes maintenance data anonymously.
+      assert.equal((await fetchApi('/v1/admin/media/sweep')).status, 401);
+      await db.prepare('UPDATE profiles SET role=? WHERE uid=?').bind('AGENT', uid).run();
+      assert.equal((await fetchApi('/v1/admin/media/sweep', { headers })).status, 403);
+      await db.prepare('UPDATE profiles SET role=? WHERE uid=?').bind('ADMIN', uid).run();
+      const status = await fetchApi('/v1/admin/media/sweep', { headers });
+      assert.equal(status.status, 200);
+      const payload = await status.json();
+      assert.equal(payload.enabled, true);
+      assert.equal(payload.data.deleted, fresh.deleted);
+    } finally {
+      await db.prepare('UPDATE profiles SET role=? WHERE uid=?').bind('ADMIN', uid).run();
+      await db.prepare('DELETE FROM property_media WHERE id=?').bind(keptMedia).run();
+      for (const key of [agedOrphanA, agedOrphanB, keptKey, recentKey])
+        await publicBucket.delete(key);
+      await db.prepare("DELETE FROM settings WHERE key LIKE 'media_orphan_sweep%'").run();
+    }
   });
 });
