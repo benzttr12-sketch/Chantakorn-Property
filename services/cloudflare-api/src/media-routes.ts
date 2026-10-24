@@ -17,6 +17,7 @@ type Env = {
   FIREBASE_PROJECT_ID: string;
   FIREBASE_WEB_API_KEY?: string;
   MEDIA_WRITES_ENABLED?: string; // OFF by default; image and abuse validation gates remain.
+  MEDIA_UPLOAD_SESSIONS_REQUIRED?: string; // Require a short-lived session header for property uploads.
 };
 type Staff = { uid: string; role: 'ADMIN' | 'AGENT' };
 type StaffCheck = { staff: Staff } | { status: 401 | 403 | 503; error: string };
@@ -35,7 +36,7 @@ media.options('/v1/media/*', c => {
     return c.json({ error: 'Forbidden origin' }, 403);
   c.header('Access-Control-Allow-Origin', c.env.ALLOWED_ORIGIN);
   c.header('Access-Control-Allow-Methods', 'GET, POST, DELETE, OPTIONS');
-  c.header('Access-Control-Allow-Headers', 'Authorization, Content-Type, Content-Length');
+  c.header('Access-Control-Allow-Headers', 'Authorization, Content-Type, Content-Length, X-Upload-Session');
   c.header('Access-Control-Max-Age', '300');
   c.header('Vary', 'Origin');
   return c.body(null, 204);
@@ -96,6 +97,15 @@ async function upload(c: Context<{ Bindings: Env }>, kind: 'property' | 'inquiry
   if (!validBrowserOrigin(c.req.header('Origin') ?? null, c.env.ALLOWED_ORIGIN)) {
     return c.json({ error: 'Forbidden origin' }, 403);
   }
+  const sessionId = kind === 'property' ? c.req.header('X-Upload-Session') : undefined;
+  if (kind === 'property') {
+    if (sessionId === undefined) {
+      if (c.env.MEDIA_UPLOAD_SESSIONS_REQUIRED === 'true')
+        return c.json({ error: 'Upload session required' }, 400);
+    } else if (!validMediaId(sessionId)) {
+      return c.json({ error: 'Invalid upload session' }, 400);
+    }
+  }
   const allowed = await requireStaff(c.env, c.req.header('Authorization'));
   if (!('staff' in allowed)) return c.json({ error: allowed.error }, allowed.status);
 
@@ -131,6 +141,27 @@ async function upload(c: Context<{ Bindings: Env }>, kind: 'property' | 'inquiry
   const structure = await validateImageStructure(checked.bytes, checked.type);
   if (!structure.ok) return c.json({ error: structure.error }, structure.status);
 
+  // Property uploads may bind to a short-lived session so a leaked bearer token
+  // cannot upload unbounded files to an unrelated draft. Consume one slot before
+  // the R2 write and release it if the upload is rejected afterwards.
+  let consumedSession = false;
+  const releaseSession = async () => {
+    if (!consumedSession || !sessionId) return;
+    consumedSession = false;
+    try {
+      await c.env.DB.prepare(`UPDATE media_upload_sessions SET used_uploads = MAX(used_uploads - 1, 0) WHERE id = ?`)
+        .bind(sessionId).run();
+    } catch { /* the expired-session sweep removes the row anyway */ }
+  };
+  if (kind === 'property' && sessionId) {
+    const consumed = await c.env.DB.prepare(`UPDATE media_upload_sessions SET used_uploads = used_uploads + 1
+        WHERE id = ? AND owner_id = ? AND created_by = ? AND expires_at > ? AND used_uploads < max_uploads`)
+      .bind(sessionId, ownerId, allowed.staff.uid, new Date().toISOString()).run();
+    if (!consumed.meta.changes)
+      return c.json({ error: 'Upload session is invalid, expired or exhausted' }, 409);
+    consumedSession = true;
+  }
+
   const id = crypto.randomUUID();
   const objectKey = `${kind === 'property' ? 'properties' : 'inquiries'}/${ownerId}/${id}.${mediaExtension(checked.type)}`;
   const bucket = kind === 'property' ? c.env.PROPERTY_MEDIA : c.env.PRIVATE_MEDIA;
@@ -138,7 +169,10 @@ async function upload(c: Context<{ Bindings: Env }>, kind: 'property' | 'inquiry
   const put = await bucket.put(objectKey, checked.bytes, {
     httpMetadata: { contentType: checked.type },
   });
-  if (!put) return c.json({ error: 'Could not save image' }, 503);
+  if (!put) {
+    await releaseSession();
+    return c.json({ error: 'Could not save image' }, 503);
+  }
   try {
     const createdAt = new Date().toISOString();
     // The quota check and insert are one SQLite statement. Concurrent requests
@@ -160,10 +194,12 @@ async function upload(c: Context<{ Bindings: Env }>, kind: 'property' | 'inquiry
         .bind(id, ownerId, objectKey, checked.type, checked.bytes.byteLength,
           createdAt, ownerId, limit, ownerId).run();
     if (!inserted.meta.changes) {
+      await releaseSession();
       try { await bucket.delete(objectKey); } catch { console.warn('R2_MEDIA_ORPHAN_CLEANUP_REQUIRED'); }
       return c.json({ error: 'Image limit reached or record no longer available' }, 409);
     }
   } catch {
+    await releaseSession();
     // Best-effort compensation after database failure.
     try { await bucket.delete(objectKey); } catch { console.warn('R2_MEDIA_ORPHAN_CLEANUP_REQUIRED'); }
     return c.json({ error: 'Could not record image metadata' }, 503);
@@ -173,6 +209,53 @@ async function upload(c: Context<{ Bindings: Env }>, kind: 'property' | 'inquiry
     media_path: `/v1/media/${kind === 'property' ? 'properties' : 'inquiries'}/${id}`,
   }, 201);
 }
+
+const UPLOAD_SESSION_TTL_MS = 10 * 60 * 1000;
+const UPLOAD_SESSION_MAX_FILES = 20;
+
+// Short-lived, property-scoped upload intent. The client requests one session for
+// a batch of photos instead of holding a broad bearer-only upload path; each
+// accepted upload consumes one slot (see upload()). Sessions never contain bytes.
+media.post('/v1/media/properties/:ownerId/sessions', async c => {
+  c.header('Cache-Control', 'private, no-store');
+  if (c.env.MEDIA_WRITES_ENABLED !== 'true') return c.json({ error: 'Media uploads are disabled' }, 503);
+  if (!validBrowserOrigin(c.req.header('Origin') ?? null, c.env.ALLOWED_ORIGIN))
+    return c.json({ error: 'Forbidden origin' }, 403);
+  const allowed = await requireStaff(c.env, c.req.header('Authorization'));
+  if (!('staff' in allowed)) return c.json({ error: allowed.error }, allowed.status);
+  if (allowed.staff.role !== 'ADMIN')
+    return c.json({ error: 'Only approved administrators may change property images' }, 403);
+
+  const ownerId = c.req.param('ownerId') ?? '';
+  if (!validOwnerId(ownerId)) return c.json({ error: 'Invalid owner ID' }, 400);
+  const rawUploads = new URL(c.req.url).searchParams.get('uploads');
+  if (rawUploads === null || !/^\d{1,2}$/.test(rawUploads) ||
+      Number(rawUploads) < 1 || Number(rawUploads) > UPLOAD_SESSION_MAX_FILES)
+    return c.json({ error: `Uploads must be from 1 to ${UPLOAD_SESSION_MAX_FILES}` }, 400);
+  const requested = Number(rawUploads);
+  const database = drizzle(c.env.DB);
+  const [owner] = await database.select({ published: properties.published }).from(properties)
+    .where(and(eq(properties.id, ownerId), isNull(properties.deletedAt))).limit(1);
+  if (!owner) return c.json({ error: 'Property not found' }, 404);
+  if (owner.published) return c.json({ error: 'Unpublish the property before uploading images' }, 409);
+  const [count] = await database.select({ total: sql<number>`count(*)` }).from(propertyMedia)
+    .where(eq(propertyMedia.propertyId, ownerId));
+  const remaining = MAX_PROPERTY_IMAGES - Number(count?.total || 0);
+  if (remaining <= 0) return c.json({ error: 'Too many images for this record' }, 429);
+  if (requested > remaining) return c.json({ error: `Only ${remaining} image slots remain` }, 400);
+
+  const now = new Date();
+  const id = crypto.randomUUID();
+  const expiresAt = new Date(now.getTime() + UPLOAD_SESSION_TTL_MS).toISOString();
+  await c.env.DB.batch([
+    c.env.DB.prepare('DELETE FROM media_upload_sessions WHERE expires_at <= ?').bind(now.toISOString()),
+    c.env.DB.prepare(`INSERT INTO media_upload_sessions
+        (id, owner_id, created_by, created_at, expires_at, max_uploads, used_uploads)
+        VALUES (?, ?, ?, ?, ?, ?, 0)`)
+      .bind(id, ownerId, allowed.staff.uid, now.toISOString(), expiresAt, requested),
+  ]);
+  return c.json({ session_id: id, owner_id: ownerId, expires_at: expiresAt, max_uploads: requested }, 201);
+});
 
 // Staging-only writes, opt-in via MEDIA_WRITES_ENABLED=true and server-controlled D1 roles.
 // No customer-origin anonymous uploads are provided in this PR.

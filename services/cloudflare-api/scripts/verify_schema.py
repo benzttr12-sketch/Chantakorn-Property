@@ -14,8 +14,11 @@ tables = {row['name'] for row in db.execute("SELECT name FROM sqlite_master WHER
 required = {
     'properties', 'property_media', 'profiles', 'agents', 'inquiries',
     'inquiry_media', 'line_followers', 'work_jobs', 'settings', 'audit_events',
+    'media_upload_sessions',
 }
 assert required <= tables, f'Missing tables: {required - tables}'
+session_columns = {row['name'] for row in db.execute('PRAGMA table_info(media_upload_sessions)')}
+assert {'owner_id', 'created_by', 'expires_at', 'max_uploads', 'used_uploads'} <= session_columns
 assert db.execute('SELECT COUNT(*) FROM properties').fetchone()[0] == 0, 'Do not seed legacy properties'
 assert db.execute('SELECT COUNT(*) FROM profiles').fetchone()[0] == 0, 'Never seed staff roles from fixtures'
 profile_columns = {row['name'] for row in db.execute('PRAGMA table_info(profiles)')}
@@ -31,6 +34,21 @@ insert = """INSERT INTO properties
     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)"""
 db.execute(insert, property_values('new1', 1, 'PRIVATE internal note'))
 db.execute(insert, property_values('new2', 0, 'UNPUBLISHED'))
+try:
+    db.execute("""INSERT INTO media_upload_sessions
+        (id, owner_id, created_by, created_at, expires_at, max_uploads, used_uploads)
+        VALUES ('s1', 'new1', 'staff', ?, ?, 1, 0)""", (now, now))
+except sqlite3.IntegrityError:
+    raise AssertionError('A valid upload session must be insertable')
+try:
+    db.execute("""INSERT INTO media_upload_sessions
+        (id, owner_id, created_by, created_at, expires_at, max_uploads, used_uploads)
+        VALUES ('s2', 'new1', 'staff', ?, ?, 21, 0)""", (now, now))
+except sqlite3.IntegrityError:
+    pass
+else:
+    raise AssertionError('Upload session max_uploads must be bounded')
+db.execute("DELETE FROM media_upload_sessions WHERE id = 's1'")
 rows = db.execute("SELECT id, title, price FROM properties WHERE published = 1 ORDER BY created_at DESC, id DESC LIMIT ?", (12,)).fetchall()
 assert [r['id'] for r in rows] == ['new1'], 'Public selection must exclude drafts'
 assert all('internal_notes' not in r.keys() for r in rows), 'Public field allowlist regression'

@@ -118,6 +118,20 @@ export const inquiryMedia = sqliteTable('inquiry_media', {
   createdAt: text('created_at').notNull(),
 }, (table) => [index('idx_inquiry_media_owner').on(table.inquiryId)]);
 
+/** Temporary, property-scoped photo upload intents (see migration 0006). */
+export const mediaUploadSessions = sqliteTable('media_upload_sessions', {
+  id: text('id').primaryKey(),
+  ownerId: text('owner_id').notNull().references(() => properties.id, { onDelete: 'cascade' }),
+  createdBy: text('created_by').notNull(),
+  createdAt: text('created_at').notNull(),
+  expiresAt: text('expires_at').notNull(),
+  maxUploads: integer('max_uploads').notNull(),
+  usedUploads: integer('used_uploads').notNull().default(0),
+}, (table) => [
+  index('idx_media_upload_sessions_scope').on(table.ownerId, table.createdBy, table.expiresAt),
+  index('idx_media_upload_sessions_expiry').on(table.expiresAt),
+]);
+
 export const lineFollowers = sqliteTable('line_followers', {
   userId: text('user_id').primaryKey(),
   isActive: integer('is_active', { mode: 'boolean' }).notNull().default(true),
