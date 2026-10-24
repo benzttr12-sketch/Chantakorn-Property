@@ -20,7 +20,32 @@ test('local Worker HTTP / D1 / R2 / Firebase authorization contract', async t =>
     .setSubject(uid).setIssuedAt(now - 30).setExpirationTime(now + 600).sign(privateKey);
   let account = { localId: uid, disabled: false, emailVerified: true, validSince: '0' };
   let lookupFailure = false;
-  const bundled = await build({ entryPoints: ['src/index.ts'], bundle: true, write: false,
+  let publicationRace = null;
+  let observedPropertyPuts = 0;
+  // The wrapper changes only this local test's binding. Its callback pauses the
+  // real R2 put before the app's conditional metadata insert, allowing a precise
+  // publication race without adding test-only hooks to production routes.
+  const bundled = await build({ stdin: { resolveDir: process.cwd(), contents: `
+    import app from './src/index.ts';
+    export default { async fetch(request, env, context) {
+      if (request.headers.get('X-Test-Observe-Property-Put') === 'true') {
+        const bucket = env.PROPERTY_MEDIA;
+        const wrapped = new Proxy(bucket, { get(target, name) {
+          if (name === 'put') return async (...args) => {
+            const result = await target.put(...args);
+            await fetch('https://local-r2-test.invalid/after-put', {
+              method: 'POST', body: JSON.stringify({ key: args[0] }),
+            });
+            return result;
+          };
+          const value = Reflect.get(target, name, target);
+          return typeof value === 'function' ? value.bind(target) : value;
+        } });
+        return app.fetch(request, { ...env, PROPERTY_MEDIA: wrapped }, context);
+      }
+      return app.fetch(request, env, context);
+    } };
+  ` }, bundle: true, write: false,
     format: 'esm', platform: 'browser', target: 'es2022' });
   const mf = new Miniflare(convertV4MiniflareOptions({
     modules: true, script: bundled.outputFiles[0].text, compatibilityDate: '2026-10-01',
@@ -30,6 +55,18 @@ test('local Worker HTTP / D1 / R2 / Firebase authorization contract', async t =>
       PUBLIC_CATALOG_CACHE_ENABLED: 'true', PROPERTY_WRITES_ENABLED: 'true', PROPERTY_PUBLICATION_ENABLED: 'false', MEDIA_WRITES_ENABLED: 'true' },
     outboundService: async request => {
       const url = new URL(request.url);
+      if (url.origin === 'https://local-r2-test.invalid' && url.pathname === '/after-put') {
+        assert.equal(request.method, 'POST');
+        const { key } = await request.json();
+        assert.ok(await publicBucket.head(key), 'the R2 object must exist before the callback');
+        observedPropertyPuts++;
+        if (publicationRace) {
+          assert.ok(key.startsWith('properties/' + publicationRace.ownerId + '/'));
+          await db.prepare('UPDATE properties SET published=1 WHERE id=?').bind(publicationRace.ownerId).run();
+          publicationRace.objectKey = key;
+        }
+        return new Response(null, { status: 204 });
+      }
       if (url.origin === 'https://www.googleapis.com' &&
           url.pathname === '/service_accounts/v1/jwk/securetoken@system.gserviceaccount.com')
         return Response.json({ keys: [jwk] });
@@ -241,6 +278,42 @@ test('local Worker HTTP / D1 / R2 / Firebase authorization contract', async t =>
     assert.equal((await fetchApi('/v1/media/properties/' + media_id)).status, 404);
     assert.equal((await fetchApi('/v1/media/properties/' + deletedId, { method: 'POST',
       headers: { ...headers, 'Content-Type': 'image/png', 'Content-Length': String(png.length) }, body: png })).status, 404);
+  });
+  await t.test('published properties reject image uploads before validation or R2 writes', async () => {
+    const owner = '00000000-0000-4000-8000-000000000004';
+    const beforePuts = observedPropertyPuts;
+    const beforeObjects = (await publicBucket.list()).objects.map(row => row.key).sort();
+    const beforeMedia = await db.prepare('SELECT COUNT(*) AS n FROM property_media WHERE property_id=?').bind(owner).first();
+    for (const contentType of ['image/png', 'application/octet-stream']) {
+      const response = await fetchApi('/v1/media/properties/' + owner, { method: 'POST',
+        headers: { ...headers, 'X-Test-Observe-Property-Put': 'true', 'Content-Type': contentType,
+          'Content-Length': String(png.length) }, body: png });
+      assert.equal(response.status, 409);
+      assert.equal((await response.json()).error, 'Unpublish the property before uploading images');
+    }
+    assert.equal(observedPropertyPuts, beforePuts, 'published parents must be rejected before any R2 put');
+    assert.deepEqual((await publicBucket.list()).objects.map(row => row.key).sort(), beforeObjects);
+    assert.deepEqual(await db.prepare('SELECT COUNT(*) AS n FROM property_media WHERE property_id=?').bind(owner).first(), beforeMedia);
+  });
+  await t.test('publication after R2 put rejects attachment and cleans the new object', async () => {
+    const owner = '00000000-0000-4000-8000-000000000040';
+    await insertProperty(owner, 'publication-race', 0);
+    publicationRace = { ownerId: owner, objectKey: null };
+    const beforeObjects = (await publicBucket.list()).objects.map(row => row.key).sort();
+    try {
+      const response = await fetchApi('/v1/media/properties/' + owner, { method: 'POST',
+        headers: { ...headers, 'X-Test-Observe-Property-Put': 'true', 'Content-Type': 'image/png',
+          'Content-Length': String(png.length) }, body: png });
+      assert.equal(response.status, 409);
+      assert.equal((await db.prepare('SELECT published FROM properties WHERE id=?').bind(owner).first()).published, 1);
+      assert.ok(publicationRace.objectKey, 'publication must occur after the real R2 write');
+      assert.equal(await publicBucket.head(publicationRace.objectKey), null);
+      assert.equal((await db.prepare('SELECT COUNT(*) AS n FROM property_media WHERE property_id=?').bind(owner).first()).n, 0);
+      assert.deepEqual((await publicBucket.list()).objects.map(row => row.key).sort(), beforeObjects);
+    } finally {
+      publicationRace = null;
+      await db.prepare('DELETE FROM properties WHERE id=?').bind(owner).run();
+    }
   });
   await t.test('audit failure rolls back create, update and delete', async () => {
     await db.prepare("CREATE TRIGGER reject_audit BEFORE INSERT ON audit_events BEGIN SELECT RAISE(ABORT, 'synthetic audit failure'); END").run();

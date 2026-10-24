@@ -105,9 +105,12 @@ async function upload(c: Context<{ Bindings: Env }>, kind: 'property' | 'inquiry
   if (!validOwnerId(ownerId)) return c.json({ error: 'Invalid owner ID' }, 400);
   const database = drizzle(c.env.DB);
   if (kind === 'property') {
-    const [owner] = await database.select({ id: properties.id }).from(properties)
+    const [owner] = await database.select({ id: properties.id, published: properties.published }).from(properties)
       .where(and(eq(properties.id, ownerId), isNull(properties.deletedAt))).limit(1);
     if (!owner) return c.json({ error: 'Property not found' }, 404);
+    // Uploads attach to the gallery immediately. Require an unpublished parent
+    // so a later failed editor save cannot expose unreviewed images publicly.
+    if (owner.published) return c.json({ error: 'Unpublish the property before uploading images' }, 409);
   } else {
     const [owner] = await database.select({ id: inquiries.id }).from(inquiries)
       .where(eq(inquiries.id, ownerId)).limit(1);
@@ -134,13 +137,14 @@ async function upload(c: Context<{ Bindings: Env }>, kind: 'property' | 'inquiry
   try {
     const createdAt = new Date().toISOString();
     // The quota check and insert are one SQLite statement. Concurrent requests
-    // cannot both claim the last slot. Recheck parent state after the R2 write.
+    // cannot both claim the last slot. Recheck draft/parent state after the R2
+    // write so publication racing with this upload cannot expose the new image.
     const inserted = kind === 'property'
       ? await c.env.DB.prepare(`INSERT INTO property_media
           (id, property_id, object_key, public_url, content_type, byte_size, sort_order, created_at)
           SELECT ?, ?, ?, ?, ?, ?, COALESCE(MAX(sort_order), -1) + 1, ?
           FROM property_media WHERE property_id = ? HAVING COUNT(*) < ?
-          AND EXISTS (SELECT 1 FROM properties WHERE id = ? AND deleted_at IS NULL)`)
+          AND EXISTS (SELECT 1 FROM properties WHERE id = ? AND deleted_at IS NULL AND published = 0)`)
         .bind(id, ownerId, objectKey, `/v1/media/properties/${id}`, checked.type,
           checked.bytes.byteLength, createdAt, ownerId, limit, ownerId).run()
       : await c.env.DB.prepare(`INSERT INTO inquiry_media

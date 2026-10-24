@@ -128,6 +128,111 @@ test('an edit racing with an image upload keeps its old revision and surfaces 40
   assert.deepEqual(calls.map(call => call.method || 'GET'), ['GET', 'POST', 'PATCH']);
 });
 
+test('the complete photo batch is validated before creating a draft or uploading the first image', async () => {
+  const good = 'data:image/jpeg;base64,/9j/';
+  for (const bad of [
+    'https://unrelated.example.invalid/photo.jpg',
+    'data:image/jpeg;base64,A',
+    'data:image/jpeg;base64,AA=A',
+    'data:image/png;base64,' + Buffer.alloc(2 * 1024 * 1024 + 1).toString('base64'),
+  ]) {
+    const updating = load(call => {
+      assert.equal(call.method, undefined);
+      return json({ data: sample });
+    });
+    await assert.rejects(updating.adapter.cloudflareUpdateProperty(sample.id, { images: [good, bad] }, observed), /รูป/);
+    assert.deepEqual(updating.calls.map(call => call.method || 'GET'), ['GET']);
+    const creating = load(() => { throw new Error('Unexpected request'); });
+    await assert.rejects(creating.adapter.cloudflareCreateProperty({ ...sample, images: [good, bad] }), /รูป/);
+    assert.equal(creating.calls.length, 0);
+  }
+});
+
+test('an unrelated cover is rejected before uploading valid new photos', async () => {
+  for (const cover of [
+    'data:image/png;base64,aGVsbG8=',
+    'https://staging-api.example.invalid/v1/media/properties/' + imageId,
+    'https://unrelated.example.invalid/cover.jpg',
+  ]) {
+    const { adapter, calls } = load(call => {
+      assert.equal(call.method, undefined);
+      return json({ data: sample });
+    });
+    await assert.rejects(adapter.cloudflareUpdateProperty(sample.id, {
+      images: ['data:image/jpeg;base64,/9j/'], cover_image: cover,
+    }, observed), /รูปปก/);
+    assert.equal(calls.length, 1);
+  }
+});
+
+test('new photos require a separately saved unpublished listing before upload', async () => {
+  for (const extra of [{}, { published: false }]) {
+    const { adapter, calls } = load(call => {
+      assert.equal(call.method, undefined);
+      return json({ data: { ...sample, published: true } });
+    });
+    await assert.rejects(adapter.cloudflareUpdateProperty(sample.id, {
+      ...extra, images: ['data:image/jpeg;base64,/9j/'],
+    }, observed), /ยกเลิกการเผยแพร่ประกาศและโหลดใหม่/);
+    assert.equal(calls.length, 1);
+  }
+});
+
+test('images-only edits deduplicate uploads and return refreshed media instead of stale detail', async () => {
+  const photo = 'data:image/jpeg;base64,/9j/';
+  let uploaded = false;
+  const { adapter, calls } = load(call => {
+    if (call.method === 'POST') {
+      uploaded = true;
+      return json({ media_id: imageId, media_path: '/v1/media/properties/' + imageId }, 201);
+    }
+    assert.equal(call.method, undefined);
+    return json({ data: { ...sample, images: uploaded ? ['/v1/media/properties/' + imageId] : [] } });
+  });
+  const saved = await adapter.cloudflareUpdateProperty(sample.id, { images: [photo, photo] }, observed);
+  assert.deepEqual(calls.map(call => call.method || 'GET'), ['GET', 'POST', 'GET']);
+  assert.equal(saved.images.length, 1);
+  assert.equal(saved.images[0], 'https://staging-api.example.invalid/v1/media/properties/' + imageId);
+});
+
+test('deduplicated uploads keep the selected cover and observed revision in the final patch', async () => {
+  const first = 'data:image/jpeg;base64,/9j/', second = 'data:image/png;base64,aGVsbG8=';
+  const secondId = '7537cedc-3fbf-4df9-9741-82757f583629';
+  let uploaded = 0;
+  const { adapter, calls } = load(call => {
+    if (!call.method) return json({ data: sample });
+    if (call.method === 'POST') {
+      const id = ++uploaded === 1 ? imageId : secondId;
+      return json({ media_id: id, media_path: '/v1/media/properties/' + id }, 201);
+    }
+    assert.equal(call.method, 'PATCH');
+    assert.deepEqual(JSON.parse(call.body), {
+      updates: { price: 900000 }, expected_updated_at: observed, cover_media_id: secondId,
+    });
+    return json({ data: { ...sample, cover_image: '/v1/media/properties/' + secondId, updated_at: newer } });
+  });
+  const saved = await adapter.cloudflareUpdateProperty(sample.id, {
+    price: 900000, images: [first, first, second], cover_image: second,
+  }, observed);
+  assert.equal(uploaded, 2);
+  assert.deepEqual(calls.map(call => call.method || 'GET'), ['GET', 'POST', 'POST', 'PATCH']);
+  assert.equal(saved.cover_image, 'https://staging-api.example.invalid/v1/media/properties/' + secondId);
+});
+
+test('existing R2 photos may remain or become the cover without uploading them again', async () => {
+  const path = '/v1/media/properties/' + imageId;
+  const imageUrl = 'https://staging-api.example.invalid' + path;
+  const { adapter, calls } = load(call => {
+    if (!call.method) return json({ data: { ...sample, images: [path], published: true } });
+    assert.equal(call.method, 'PATCH');
+    assert.deepEqual(JSON.parse(call.body), { updates: {}, expected_updated_at: observed, cover_media_id: imageId });
+    return json({ data: { ...sample, images: [path], cover_image: path, updated_at: newer } });
+  });
+  const saved = await adapter.cloudflareUpdateProperty(sample.id, { images: [imageUrl], cover_image: imageUrl }, observed);
+  assert.equal(saved.cover_image, imageUrl);
+  assert.deepEqual(calls.map(call => call.method || 'GET'), ['GET', 'PATCH']);
+});
+
 test('a stale delete sends the observed revision directly and never refreshes it to bypass a conflict', async () => {
   const { adapter, calls } = load(call => {
     assert.equal(call.method, 'DELETE');
