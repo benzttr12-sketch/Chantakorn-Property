@@ -328,6 +328,56 @@ test('local Worker HTTP / D1 / R2 / Firebase authorization contract', async t =>
     assert.equal((await fetchApi('/v1/media/properties/' + deletedId, { method: 'POST',
       headers: { ...headers, 'Content-Type': 'image/png', 'Content-Length': String(png.length) }, body: png })).status, 404);
   });
+  await t.test('draft photo removal requires live ADMIN, draft state and a non-cover photo', async () => {
+    const upload = await fetchApi('/v1/media/properties/' + created.id, { method: 'POST',
+      headers: { ...headers, 'Content-Type': 'image/png', 'Content-Length': String(png.length) }, body: png });
+    assert.equal(upload.status, 201);
+    const { media_id: removable, media_path: removablePath } = await upload.json();
+    const stored = await db.prepare('SELECT object_key FROM property_media WHERE id=?').bind(removable).first();
+    const endpoint = '/v1/media/properties/' + created.id + '/' + removable;
+    const remove = () => fetchApi(endpoint, { method: 'DELETE', headers });
+    const publishedTwo = '00000000-0000-4000-8000-000000000004';
+    const publishedMedia = '00000000-0000-4000-8000-000000000013';
+    const publishedKey = 'properties/published-two/delete-guard.png';
+    await publicBucket.put(publishedKey, png);
+    await db.prepare('INSERT INTO property_media(id,property_id,object_key,public_url,content_type,byte_size,created_at) VALUES (?,?,?,?,?,?,?)')
+      .bind(publishedMedia, publishedTwo, publishedKey, '/v1/media/properties/' + publishedMedia, 'image/png', png.length, '2026-10-20').run();
+    try {
+      assert.equal((await fetchApi(endpoint, { method: 'DELETE', headers: { Origin: origin } })).status, 401);
+      assert.equal((await fetchApi(endpoint, { method: 'DELETE',
+        headers: { ...headers, Origin: 'https://evil.example.test' } })).status, 403);
+      await db.prepare('UPDATE profiles SET role=? WHERE uid=?').bind('AGENT', uid).run();
+      assert.equal((await remove()).status, 403);
+      await db.prepare('UPDATE profiles SET role=? WHERE uid=?').bind('ADMIN', uid).run();
+      account.disabled = true;
+      assert.equal((await remove()).status, 403);
+      account.disabled = false;
+      // A published listing must be unpublished before its gallery can shrink.
+      assert.equal((await fetchApi('/v1/media/properties/' + publishedTwo + '/' + publishedMedia,
+        { method: 'DELETE', headers })).status, 409);
+      // The photo must belong to the property named in the path.
+      assert.equal((await fetchApi('/v1/media/properties/' + publicId + '/' + removable,
+        { method: 'DELETE', headers })).status, 404);
+      // The current cover is protected until another cover is chosen.
+      await db.prepare('UPDATE properties SET cover_image=? WHERE id=?').bind(removablePath, created.id).run();
+      assert.equal((await remove()).status, 409);
+      await db.prepare('UPDATE properties SET cover_image=NULL WHERE id=?').bind(created.id).run();
+      const removed = await remove();
+      assert.equal(removed.status, 200);
+      assert.deepEqual(await removed.json(), { ok: true, media_id: removable, object_deleted: true });
+      assert.equal(await db.prepare('SELECT id FROM property_media WHERE id=?').bind(removable).first(), null);
+      assert.equal(await publicBucket.head(stored.object_key), null);
+      assert.equal((await fetchApi('/v1/media/properties/' + removable)).status, 404);
+      assert.equal((await fetchApi('/v1/admin/properties/' + created.id + '/media/' + removable, { headers })).status, 404);
+    } finally {
+      account = { localId: uid, disabled: false, emailVerified: true, validSince: '0' };
+      await db.prepare('UPDATE profiles SET role=? WHERE uid=?').bind('ADMIN', uid).run();
+      await db.prepare('UPDATE properties SET cover_image=NULL WHERE id=?').bind(created.id).run();
+      await db.prepare('DELETE FROM property_media WHERE id IN (?,?)').bind(removable, publishedMedia).run();
+      if (stored) await publicBucket.delete(stored.object_key);
+      await publicBucket.delete(publishedKey);
+    }
+  });
   await t.test('published properties reject image uploads before validation or R2 writes', async () => {
     const owner = '00000000-0000-4000-8000-000000000004';
     const beforePuts = observedPropertyPuts;

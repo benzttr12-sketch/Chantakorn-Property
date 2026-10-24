@@ -56,4 +56,22 @@ test('cross-origin preflight is not silently granted', async () => {
     method: 'OPTIONS', headers: { Origin: 'https://chantakornproperty.com' },
   }, env());
   assert.equal(valid.status, 204);
+  assert.match(valid.headers.get('Access-Control-Allow-Methods') || '', /DELETE/);
+});
+
+test('photo deletion is disabled by default and cannot be forged past origin or auth', async () => {
+  const path = '/v1/media/properties/' + uuid + '/' + uuid;
+  const disabled = await app.request(path, {
+    method: 'DELETE', headers: { Origin: 'https://chantakornproperty.com' },
+  }, env());
+  assert.equal(disabled.status, 503);
+  const forged = await app.request(path, {
+    method: 'DELETE', headers: { Origin: 'https://evil.invalid' },
+  }, env({ MEDIA_WRITES_ENABLED: 'true' }));
+  assert.equal(forged.status, 403);
+  const anonymous = await app.request(path, {
+    method: 'DELETE', headers: { Origin: 'https://chantakornproperty.com' },
+  }, env({ MEDIA_WRITES_ENABLED: 'true' }));
+  assert.equal(anonymous.status, 401);
+  assert.equal(anonymous.headers.get('Cache-Control'), 'private, no-store');
 });
