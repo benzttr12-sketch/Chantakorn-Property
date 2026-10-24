@@ -18,6 +18,8 @@ type Env = {
   FIREBASE_WEB_API_KEY?: string;
   MEDIA_WRITES_ENABLED?: string; // OFF by default; image and abuse validation gates remain.
   MEDIA_UPLOAD_SESSIONS_REQUIRED?: string; // Require a short-lived session header for property uploads.
+  MEDIA_UPLOAD_HOURLY_LIMIT?: string; // Accepted property uploads per staff member per hour.
+  MEDIA_SESSION_HOURLY_LIMIT?: string; // New upload sessions per staff member per hour.
 };
 type Staff = { uid: string; role: 'ADMIN' | 'AGENT' };
 type StaffCheck = { staff: Staff } | { status: 401 | 403 | 503; error: string };
@@ -26,6 +28,15 @@ async function requireStaff(env: Env, auth: string | undefined): Promise<StaffCh
   const result = await authorizePropertyStaff(env, auth, true);
   if (!result.ok) return { status: result.status, error: result.error };
   return { staff: { uid: result.uid, role: result.role } };
+}
+
+/** Abuse bounds are configurable only within a small, validated range. */
+const DEFAULT_UPLOAD_HOURLY_LIMIT = 120;
+const DEFAULT_SESSION_HOURLY_LIMIT = 60;
+const CLOCK_HOUR_MS = 60 * 60 * 1000;
+function boundedLimit(value: string | undefined, fallback: number, max = 1000): number {
+  return value !== undefined && /^\d{1,4}$/.test(value) && Number(value) >= 1 && Number(value) <= max
+    ? Number(value) : fallback;
 }
 
 const media = new Hono<{ Bindings: Env }>();
@@ -141,6 +152,18 @@ async function upload(c: Context<{ Bindings: Env }>, kind: 'property' | 'inquiry
   const structure = await validateImageStructure(checked.bytes, checked.type);
   if (!structure.ok) return c.json({ error: structure.error }, structure.status);
 
+  // Per-staff hourly rate limit before any R2 write; accepted uploads are
+  // recorded atomically with their metadata row below.
+  if (kind === 'property') {
+    const hourlyLimit = boundedLimit(c.env.MEDIA_UPLOAD_HOURLY_LIMIT, DEFAULT_UPLOAD_HOURLY_LIMIT);
+    const recent = await c.env.DB.prepare(
+      'SELECT COUNT(*) AS n FROM media_upload_events WHERE staff_uid = ? AND created_at > ?')
+      .bind(allowed.staff.uid, new Date(Date.now() - CLOCK_HOUR_MS).toISOString())
+      .first<{ n: number }>();
+    if (Number(recent?.n || 0) >= hourlyLimit)
+      return c.json({ error: 'Upload rate limit reached' }, 429);
+  }
+
   // Property uploads may bind to a short-lived session so a leaked bearer token
   // cannot upload unbounded files to an unrelated draft. Consume one slot before
   // the R2 write and release it if the upload is rejected afterwards.
@@ -179,13 +202,21 @@ async function upload(c: Context<{ Bindings: Env }>, kind: 'property' | 'inquiry
     // cannot both claim the last slot. Recheck draft/parent state after the R2
     // write so publication racing with this upload cannot expose the new image.
     const inserted = kind === 'property'
-      ? await c.env.DB.prepare(`INSERT INTO property_media
-          (id, property_id, object_key, public_url, content_type, byte_size, sort_order, created_at)
-          SELECT ?, ?, ?, ?, ?, ?, COALESCE(MAX(sort_order), -1) + 1, ?
-          FROM property_media WHERE property_id = ? HAVING COUNT(*) < ?
-          AND EXISTS (SELECT 1 FROM properties WHERE id = ? AND deleted_at IS NULL AND published = 0)`)
-        .bind(id, ownerId, objectKey, `/v1/media/properties/${id}`, checked.type,
-          checked.bytes.byteLength, createdAt, ownerId, limit, ownerId).run()
+      ? (await c.env.DB.batch([
+          c.env.DB.prepare(`INSERT INTO property_media
+            (id, property_id, object_key, public_url, content_type, byte_size, sort_order, created_at)
+            SELECT ?, ?, ?, ?, ?, ?, COALESCE(MAX(sort_order), -1) + 1, ?
+            FROM property_media WHERE property_id = ? HAVING COUNT(*) < ?
+            AND EXISTS (SELECT 1 FROM properties WHERE id = ? AND deleted_at IS NULL AND published = 0)`)
+            .bind(id, ownerId, objectKey, `/v1/media/properties/${id}`, checked.type,
+              checked.bytes.byteLength, createdAt, ownerId, limit, ownerId),
+          // Same transaction as the metadata row: an event is only recorded when
+          // the photo row exists, so the rate limit cannot drift from reality.
+          c.env.DB.prepare(`INSERT INTO media_upload_events
+            (id, owner_id, staff_uid, kind, byte_size, created_at)
+            SELECT ?, ?, ?, 'property', ?, ? WHERE EXISTS (SELECT 1 FROM property_media WHERE id = ?)`)
+            .bind(crypto.randomUUID(), ownerId, allowed.staff.uid, checked.bytes.byteLength, createdAt, id),
+        ]))[0]!
       : await c.env.DB.prepare(`INSERT INTO inquiry_media
           (id, inquiry_id, object_key, content_type, byte_size, created_at)
           SELECT ?, ?, ?, ?, ?, ? WHERE
@@ -243,6 +274,13 @@ media.post('/v1/media/properties/:ownerId/sessions', async c => {
   const remaining = MAX_PROPERTY_IMAGES - Number(count?.total || 0);
   if (remaining <= 0) return c.json({ error: 'Too many images for this record' }, 429);
   if (requested > remaining) return c.json({ error: `Only ${remaining} image slots remain` }, 400);
+  const sessionLimit = boundedLimit(c.env.MEDIA_SESSION_HOURLY_LIMIT, DEFAULT_SESSION_HOURLY_LIMIT);
+  const recentSessions = await c.env.DB.prepare(
+    'SELECT COUNT(*) AS n FROM media_upload_sessions WHERE created_by = ? AND created_at > ?')
+    .bind(allowed.staff.uid, new Date(Date.now() - CLOCK_HOUR_MS).toISOString())
+    .first<{ n: number }>();
+  if (Number(recentSessions?.n || 0) >= sessionLimit)
+    return c.json({ error: 'Upload session rate limit reached' }, 429);
 
   const now = new Date();
   const id = crypto.randomUUID();

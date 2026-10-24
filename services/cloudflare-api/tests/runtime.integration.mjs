@@ -602,6 +602,53 @@ test('local Worker HTTP / D1 / R2 / Firebase authorization contract', async t =>
       assert.equal((await bucket.list()).objects.length, before + 1);
     }
   });
+  await t.test('property uploads and sessions are rate limited per staff member', async () => {
+    const nowIso = new Date().toISOString();
+    const futureIso = new Date(Date.now() + 10 * 60 * 1000).toISOString();
+    const rateId = '00000000-0000-4000-8000-000000000071';
+    await db.prepare(`INSERT INTO properties
+        (id,code,slug,title,property_type,status,price,province,district,published,created_at,updated_at)
+        VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`).bind(rateId, 'CK-RATELIMIT', 'rate-limit-draft',
+      'Rate limit draft', 'house', 'sale', 100000, 'สงขลา', 'หาดใหญ่', 0, nowIso, nowIso).run();
+    const insertRows = async (rows, columns) => {
+      for (let offset = 0; offset < rows.length; offset += 10) {
+        const chunk = rows.slice(offset, offset + 10);
+        await db.prepare(`INSERT INTO ${columns.table} (${columns.fields})
+            VALUES ${chunk.map(() => '(' + columns.placeholders + ')').join(',')}`)
+          .bind(...chunk.flat()).run();
+      }
+    };
+    try {
+      const sessionResponse = await fetchApi('/v1/media/properties/' + rateId + '/sessions?uploads=1',
+        { method: 'POST', headers });
+      assert.equal(sessionResponse.status, 201);
+      const session = await sessionResponse.json();
+      await insertRows(Array.from({ length: 130 }, () =>
+        [crypto.randomUUID(), rateId, uid, 'property', 100, nowIso]), {
+        table: 'media_upload_events',
+        fields: 'id, owner_id, staff_uid, kind, byte_size, created_at',
+        placeholders: '?,?,?,?,?,?',
+      });
+      const blocked = await fetchApi('/v1/media/properties/' + rateId, { method: 'POST',
+        headers: { ...headers, 'X-Upload-Session': session.session_id,
+          'Content-Type': 'image/png', 'Content-Length': String(png.length) }, body: png });
+      assert.equal(blocked.status, 429);
+      assert.equal((await blocked.json()).error, 'Upload rate limit reached');
+      await insertRows(Array.from({ length: 60 }, () =>
+        [crypto.randomUUID(), rateId, uid, nowIso, futureIso, 1, 0]), {
+        table: 'media_upload_sessions',
+        fields: 'id, owner_id, created_by, created_at, expires_at, max_uploads, used_uploads',
+        placeholders: '?,?,?,?,?,?,?',
+      });
+      const sessionBlocked = await fetchApi('/v1/media/properties/' + rateId + '/sessions?uploads=1',
+        { method: 'POST', headers });
+      assert.equal(sessionBlocked.status, 429);
+      assert.equal((await sessionBlocked.json()).error, 'Upload session rate limit reached');
+    } finally {
+      // Cascades remove this draft's upload events and sessions.
+      await db.prepare('DELETE FROM properties WHERE id=?').bind(rateId).run();
+    }
+  });
   await t.test('delete requires observed revision and preserves soft-deleted row', async () => {
     const endpoint = '/v1/admin/properties/' + created.id;
     assert.equal((await fetchApi(endpoint, { method: 'DELETE', headers,
