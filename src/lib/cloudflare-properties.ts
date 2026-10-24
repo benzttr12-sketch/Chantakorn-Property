@@ -202,13 +202,37 @@ function preparePhotos(photos: string[]): Blob[] {
   });
 }
 
+const UPLOAD_BATCH_SIZE = 20;
+const uploadSessionIdPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+/** Short-lived, property-scoped intent; the Worker consumes one slot per file. */
+async function createUploadSession(propertyId: string, uploads: number): Promise<string> {
+  const response = await request<{
+    session_id?: unknown; owner_id?: unknown; expires_at?: unknown; max_uploads?: unknown;
+  }>(`/v1/media/properties/${encodeURIComponent(propertyId)}/sessions?uploads=${uploads}`, { method: 'POST' }, true);
+  const expires = typeof response.expires_at === 'string' ? Date.parse(response.expires_at) : NaN;
+  if (typeof response.session_id !== 'string' || !uploadSessionIdPattern.test(response.session_id) ||
+      response.owner_id !== propertyId || typeof response.max_uploads !== 'number' ||
+      !Number.isInteger(response.max_uploads) || response.max_uploads < uploads ||
+      !Number.isFinite(expires) || expires <= Date.now()) {
+    throw new Error('Cloudflare API ส่งข้อมูล upload session ไม่ถูกต้อง');
+  }
+  return response.session_id;
+}
+
 async function uploadPhotos(propertyId: string, photos: Blob[]) {
   const paths: { id: string; path: string }[] = [];
-  for (const blob of photos) {
-    const response = await request<{ media_id: string; media_path: string }>(
-      `/v1/media/properties/${encodeURIComponent(propertyId)}`,
-      { method: 'POST', headers: { 'Content-Type': blob.type }, body: blob }, true);
-    paths.push({ id: response.media_id, path: response.media_path });
+  // One bounded session per batch; each file must present that session header.
+  for (let offset = 0; offset < photos.length; offset += UPLOAD_BATCH_SIZE) {
+    const batch = photos.slice(offset, offset + UPLOAD_BATCH_SIZE);
+    if (!batch.length) continue;
+    const sessionId = await createUploadSession(propertyId, batch.length);
+    for (const blob of batch) {
+      const response = await request<{ media_id: string; media_path: string }>(
+        `/v1/media/properties/${encodeURIComponent(propertyId)}`,
+        { method: 'POST', headers: { 'Content-Type': blob.type, 'X-Upload-Session': sessionId }, body: blob }, true);
+      paths.push({ id: response.media_id, path: response.media_path });
+    }
   }
   return paths;
 }

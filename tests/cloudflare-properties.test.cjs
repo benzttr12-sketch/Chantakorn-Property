@@ -40,6 +40,12 @@ function load(handler, staff = true) {
 }
 
 const json = (value, status = 200) => Response.json(value, { status });
+const uploadSessionId = '7537cedc-3fbf-4df9-9741-82757f5836aa';
+const isSessionCall = call => call.method === 'POST' && call.path.endsWith('/sessions');
+const sessionResponse = (ownerId, uploads) => json({
+  session_id: uploadSessionId, owner_id: ownerId,
+  expires_at: new Date(Date.now() + 10 * 60 * 1000).toISOString(), max_uploads: uploads,
+}, 201);
 
 test('compatibility catalog rejects malformed pagination rather than returning incomplete results', async () => {
   for (const admin of [false, true]) {
@@ -114,6 +120,7 @@ test('a successful edit sends the revision originally observed by the caller', a
 test('an edit racing with an image upload keeps its old revision and surfaces 409 without retrying', async () => {
   const { adapter, calls } = load(call => {
     if (!call.method) return json({ data: sample });
+    if (isSessionCall(call)) return sessionResponse(sample.id, 1);
     if (call.method === 'POST') {
       assert.equal(call.path, '/v1/media/properties/' + sample.id);
       return json({ media_id: imageId, media_path: '/v1/media/properties/' + imageId }, 201);
@@ -125,7 +132,7 @@ test('an edit racing with an image upload keeps its old revision and surfaces 40
   await assert.rejects(adapter.cloudflareUpdateProperty(sample.id, {
     title: 'Old form', images: ['data:image/jpeg;base64,/9j/'],
   }, observed), /listing has changed/);
-  assert.deepEqual(calls.map(call => call.method || 'GET'), ['GET', 'POST', 'PATCH']);
+  assert.deepEqual(calls.map(call => call.method || 'GET'), ['GET', 'POST', 'POST', 'PATCH']);
 });
 
 test('the complete photo batch is validated before creating a draft or uploading the first image', async () => {
@@ -182,15 +189,18 @@ test('images-only edits deduplicate uploads and return refreshed media instead o
   const photo = 'data:image/jpeg;base64,/9j/';
   let uploaded = false;
   const { adapter, calls } = load(call => {
+    if (!call.method) {
+      return json({ data: { ...sample, images: uploaded ? ['/v1/media/properties/' + imageId] : [] } });
+    }
+    if (isSessionCall(call)) return sessionResponse(sample.id, 1);
     if (call.method === 'POST') {
       uploaded = true;
       return json({ media_id: imageId, media_path: '/v1/media/properties/' + imageId }, 201);
     }
-    assert.equal(call.method, undefined);
-    return json({ data: { ...sample, images: uploaded ? ['/v1/media/properties/' + imageId] : [] } });
+    throw new Error('Unexpected request');
   });
   const saved = await adapter.cloudflareUpdateProperty(sample.id, { images: [photo, photo] }, observed);
-  assert.deepEqual(calls.map(call => call.method || 'GET'), ['GET', 'POST', 'GET']);
+  assert.deepEqual(calls.map(call => call.method || 'GET'), ['GET', 'POST', 'POST', 'GET']);
   assert.equal(saved.images.length, 1);
   assert.equal(saved.images[0], 'https://staging-api.example.invalid/v1/media/properties/' + imageId);
 });
@@ -201,6 +211,10 @@ test('deduplicated uploads keep the selected cover and observed revision in the 
   let uploaded = 0;
   const { adapter, calls } = load(call => {
     if (!call.method) return json({ data: sample });
+    if (isSessionCall(call)) {
+      assert.equal(call.params.get('uploads'), '2');
+      return sessionResponse(sample.id, 2);
+    }
     if (call.method === 'POST') {
       const id = ++uploaded === 1 ? imageId : secondId;
       return json({ media_id: id, media_path: '/v1/media/properties/' + id }, 201);
@@ -215,7 +229,7 @@ test('deduplicated uploads keep the selected cover and observed revision in the 
     price: 900000, images: [first, first, second], cover_image: second,
   }, observed);
   assert.equal(uploaded, 2);
-  assert.deepEqual(calls.map(call => call.method || 'GET'), ['GET', 'POST', 'POST', 'PATCH']);
+  assert.deepEqual(calls.map(call => call.method || 'GET'), ['GET', 'POST', 'POST', 'POST', 'PATCH']);
   assert.equal(saved.cover_image, 'https://staging-api.example.invalid/v1/media/properties/' + secondId);
 });
 
@@ -295,6 +309,7 @@ test('adding and removing photos in one save uploads first, patches, then delete
   const uploadedId = '7537cedc-3fbf-4df9-9741-82757f583630';
   const { adapter, calls } = load(call => {
     if (!call.method) return json({ data: { ...sample, images: ['/v1/media/properties/' + removedId] } });
+    if (isSessionCall(call)) return sessionResponse(sample.id, 1);
     if (call.method === 'POST') {
       return json({ media_id: uploadedId, media_path: '/v1/media/properties/' + uploadedId }, 201);
     }
@@ -312,8 +327,51 @@ test('adding and removing photos in one save uploads first, patches, then delete
   const saved = await adapter.cloudflareUpdateProperty(sample.id, {
     images: [newPhoto], cover_image: newPhoto,
   }, observed);
-  assert.deepEqual(calls.map(call => call.method || 'GET'), ['GET', 'POST', 'PATCH', 'DELETE', 'GET']);
+  assert.deepEqual(calls.map(call => call.method || 'GET'), ['GET', 'POST', 'POST', 'PATCH', 'DELETE', 'GET']);
   assert.equal(saved.images.length, 1);
+});
+
+test('uploads request one bounded session and send its header on every file', async () => {
+  const first = 'data:image/jpeg;base64,/9j/', second = 'data:image/png;base64,aGVsbG8=';
+  const secondId = '7537cedc-3fbf-4df9-9741-82757f583629';
+  let uploads = 0;
+  const { adapter, calls } = load(call => {
+    if (!call.method) return json({ data: sample });
+    if (isSessionCall(call)) {
+      assert.equal(call.path, '/v1/media/properties/' + sample.id + '/sessions');
+      assert.equal(call.params.get('uploads'), '2');
+      return sessionResponse(sample.id, 2);
+    }
+    if (call.method === 'POST') {
+      assert.equal(call.headers.get('X-Upload-Session'), uploadSessionId);
+      const id = ++uploads === 1 ? imageId : secondId;
+      return json({ media_id: id, media_path: '/v1/media/properties/' + id }, 201);
+    }
+    assert.equal(call.method, 'PATCH');
+    return json({ data: { ...sample, cover_image: '/v1/media/properties/' + secondId, updated_at: newer } });
+  });
+  await adapter.cloudflareUpdateProperty(sample.id, { images: [first, second], cover_image: second }, observed);
+  assert.equal(calls.filter(isSessionCall).length, 1);
+  assert.equal(calls.filter(call => call.method === 'POST' && !isSessionCall(call)).length, 2);
+  assert.equal(uploads, 2);
+});
+
+test('a rejected or malformed upload session stops the batch before any upload', async () => {
+  for (const [body, pattern] of [
+    [{ error: 'Only 0 image slots remain' }, /image slots/],
+    [{ session_id: uploadSessionId, owner_id: 'other-property', expires_at: new Date(Date.now() + 600000).toISOString(), max_uploads: 1 }, /upload session ไม่ถูกต้อง/],
+    [{ session_id: uploadSessionId, owner_id: sample.id, expires_at: '2000-01-01T00:00:00.000Z', max_uploads: 1 }, /upload session ไม่ถูกต้อง/],
+  ]) {
+    const { adapter, calls } = load(call => {
+      if (!call.method) return json({ data: sample });
+      assert.ok(isSessionCall(call));
+      return body.error ? json(body, 400) : json(body, 201);
+    });
+    await assert.rejects(adapter.cloudflareUpdateProperty(sample.id, {
+      images: ['data:image/jpeg;base64,/9j/'],
+    }, observed), pattern);
+    assert.equal(calls.filter(call => call.method === 'POST' && !isSessionCall(call)).length, 0);
+  }
 });
 
 test('removing photos from a published listing fails before uploading replacements', async () => {
