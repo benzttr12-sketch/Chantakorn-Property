@@ -180,6 +180,13 @@ async function patch(id: string, expected: string, updates: Record<string, unkno
   return toExistingProperty(response.data);
 }
 
+/** Draft-only removal; the Worker deletes the D1 row before the R2 object. */
+async function removePhoto(propertyId: string, mediaId: string) {
+  await request<{ ok: boolean }>(
+    `/v1/media/properties/${encodeURIComponent(propertyId)}/${encodeURIComponent(mediaId)}`,
+    { method: 'DELETE' }, true);
+}
+
 export async function cloudflareCreateProperty(value: Omit<Property, 'id' | 'created_at'>): Promise<Property> {
   const requestedPublished = Boolean(value.published);
   const rawPhotos = [...new Set([...(value.images || []), value.cover_image || ''].filter(Boolean))];
@@ -217,14 +224,14 @@ export async function cloudflareUpdateProperty(id: string, updates: Partial<Prop
   if (property.updated_at !== expected) {
     throw new Error('ประกาศมีการแก้ไขแล้ว กรุณาโหลดใหม่ก่อนบันทึก');
   }
-  const existingImageIds = new Set((property.images || []).map(mediaIdFromUrl).filter(Boolean));
+  const existingImageIds = new Set((property.images || []).map(mediaIdFromUrl).filter((x): x is string => Boolean(x)));
+  let removedIds: string[] = [];
   if (updates.images) {
-    const supplied = new Set(updates.images.map(mediaIdFromUrl).filter(Boolean));
-    if ([...existingImageIds].some(x => !supplied.has(x))) {
-      throw new Error('การลบรูป R2 ยังไม่เปิดใช้งาน กรุณาคงรูปเดิมไว้ก่อน');
-    }
+    const supplied = new Set(updates.images.map(mediaIdFromUrl).filter((x): x is string => Boolean(x)));
     if ([...supplied].some(x => !existingImageIds.has(x)))
       throw new Error('รูปภาพต้องเป็นรูป R2 ของประกาศนี้หรือรูปที่อัปโหลดใหม่');
+    // Only saved photos can be removed; data URLs below are new uploads.
+    removedIds = [...existingImageIds].filter(x => !supplied.has(x));
   }
   const newImages = [...new Set((updates.images || []).filter(x => !mediaIdFromUrl(x)))];
   let coverId: string | null | undefined;
@@ -235,18 +242,37 @@ export async function cloudflareUpdateProperty(id: string, updates: Partial<Prop
     if (updates.cover_image && !(coverId && existingImageIds.has(coverId)) && uploadedCoverIndex < 0)
       throw new Error('รูปปกต้องเป็นรูป R2 ของประกาศนี้หรือรูปใหม่ในรายการอัปโหลด');
   }
-  if (newImages.length && property.published)
-    throw new Error('กรุณายกเลิกการเผยแพร่ประกาศและโหลดใหม่ก่อนเพิ่มรูปภาพ แล้วเผยแพร่อีกครั้งหลังตรวจรูป');
+  if ((newImages.length || removedIds.length) && property.published)
+    throw new Error('กรุณายกเลิกการเผยแพร่ประกาศและโหลดใหม่ก่อนเพิ่มหรือลบรูปภาพ แล้วเผยแพร่อีกครั้งหลังตรวจรูป');
+  if (removedIds.length) {
+    // The Worker refuses to delete the current cover, so fail before uploading.
+    const nextCover = updates.cover_image !== undefined
+      ? coverId
+      : mediaIdFromUrl(property.cover_image || property.images?.[0] || '');
+    if (nextCover && removedIds.includes(nextCover))
+      throw new Error('รูปปกต้องไม่ใช่รูปที่จะลบ กรุณาเลือกปกใหม่ก่อนบันทึก');
+  }
   // Validate the whole batch and cover before the first upload can persist a file.
   const preparedPhotos = preparePhotos(newImages);
   const outgoing = cleanOutgoing(updates as Record<string, unknown>);
   const uploaded = await uploadPhotos(id, preparedPhotos);
   if (uploadedCoverIndex >= 0) coverId = uploaded[uploadedCoverIndex].id;
-  if (Object.keys(outgoing).length === 0 && updates.cover_image === undefined)
-    return uploaded.length ? await cloudflareAdminDetail(id) : property;
+  const needsPatch = Object.keys(outgoing).length > 0 || updates.cover_image !== undefined;
+  const saved = needsPatch ? await patch(id, expected, outgoing, coverId) : null;
+  if (removedIds.length) {
+    for (const mediaId of removedIds) {
+      try {
+        await removePhoto(id, mediaId);
+      } catch (error) {
+        throw new Error(`บันทึกข้อมูลแล้ว แต่ลบรูปภาพไม่สำเร็จ กรุณาโหลดใหม่และลบรูปที่เหลือ: ${error instanceof Error ? error.message : 'โปรดลองอีกครั้ง'}`);
+      }
+    }
+    return await cloudflareAdminDetail(id);
+  }
+  if (saved) return saved;
   // Keep the revision the editor actually read, including across image uploads.
   // A later server read must never turn an old form into an accepted overwrite.
-  return await patch(id, expected, outgoing, coverId);
+  return uploaded.length ? await cloudflareAdminDetail(id) : property;
 }
 
 export async function cloudflareDeleteProperty(id: string, expectedUpdatedAt?: string): Promise<boolean> {

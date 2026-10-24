@@ -233,6 +233,124 @@ test('existing R2 photos may remain or become the cover without uploading them a
   assert.deepEqual(calls.map(call => call.method || 'GET'), ['GET', 'PATCH']);
 });
 
+test('removing saved photos patches the new cover before deleting only the removed media', async () => {
+  const origin = 'https://staging-api.example.invalid';
+  const coverId = imageId, removedId = '7537cedc-3fbf-4df9-9741-82757f583629';
+  const removedPath = '/v1/media/properties/' + removedId;
+  let deleted = false;
+  const { adapter, calls } = load(call => {
+    if (!call.method) {
+      return json({ data: deleted
+        ? { ...sample, images: ['/v1/media/properties/' + coverId], cover_image: '/v1/media/properties/' + coverId, updated_at: newer }
+        : { ...sample, images: ['/v1/media/properties/' + coverId, removedPath],
+          cover_image: '/v1/media/properties/' + coverId } });
+    }
+    if (call.method === 'PATCH') {
+      assert.deepEqual(JSON.parse(call.body), {
+        updates: { price: 800000 }, expected_updated_at: observed, cover_media_id: coverId,
+      });
+      return json({ data: { ...sample, images: ['/v1/media/properties/' + coverId, removedPath],
+        cover_image: '/v1/media/properties/' + coverId, updated_at: newer } });
+    }
+    assert.equal(call.method, 'DELETE');
+    assert.equal(call.path, '/v1/media/properties/' + sample.id + '/' + removedId);
+    deleted = true;
+    return json({ ok: true, media_id: removedId, object_deleted: true });
+  });
+  const saved = await adapter.cloudflareUpdateProperty(sample.id, {
+    price: 800000, images: [origin + '/v1/media/properties/' + coverId],
+    cover_image: origin + '/v1/media/properties/' + coverId,
+  }, observed);
+  assert.deepEqual(calls.map(call => call.method || 'GET'), ['GET', 'PATCH', 'DELETE', 'GET']);
+  assert.equal(saved.images.length, 1);
+  assert.equal(saved.cover_image, origin + '/v1/media/properties/' + coverId);
+});
+
+test('removal-only saves delete media without a redundant patch or upload', async () => {
+  const origin = 'https://staging-api.example.invalid';
+  const keptId = imageId, removedId = '7537cedc-3fbf-4df9-9741-82757f583629';
+  let deleted = false;
+  const { adapter, calls } = load(call => {
+    if (!call.method) {
+      return json({ data: deleted
+        ? { ...sample, images: ['/v1/media/properties/' + keptId], cover_image: '/v1/media/properties/' + keptId, updated_at: newer }
+        : { ...sample, images: ['/v1/media/properties/' + keptId, '/v1/media/properties/' + removedId],
+          cover_image: '/v1/media/properties/' + keptId } });
+    }
+    assert.equal(call.method, 'DELETE');
+    deleted = true;
+    return json({ ok: true, media_id: removedId, object_deleted: true });
+  });
+  const saved = await adapter.cloudflareUpdateProperty(sample.id, {
+    images: [origin + '/v1/media/properties/' + keptId],
+  }, observed);
+  assert.deepEqual(calls.map(call => call.method || 'GET'), ['GET', 'DELETE', 'GET']);
+  assert.equal(saved.images.length, 1);
+});
+
+test('adding and removing photos in one save uploads first, patches, then deletes', async () => {
+  const origin = 'https://staging-api.example.invalid';
+  const removedId = imageId;
+  const newPhoto = 'data:image/jpeg;base64,/9j/';
+  const uploadedId = '7537cedc-3fbf-4df9-9741-82757f583630';
+  const { adapter, calls } = load(call => {
+    if (!call.method) return json({ data: { ...sample, images: ['/v1/media/properties/' + removedId] } });
+    if (call.method === 'POST') {
+      return json({ media_id: uploadedId, media_path: '/v1/media/properties/' + uploadedId }, 201);
+    }
+    if (call.method === 'PATCH') {
+      assert.deepEqual(JSON.parse(call.body), {
+        updates: {}, expected_updated_at: observed, cover_media_id: uploadedId,
+      });
+      return json({ data: { ...sample, images: ['/v1/media/properties/' + uploadedId],
+        cover_image: '/v1/media/properties/' + uploadedId, updated_at: newer } });
+    }
+    assert.equal(call.method, 'DELETE');
+    assert.equal(call.path, '/v1/media/properties/' + sample.id + '/' + removedId);
+    return json({ ok: true, media_id: removedId, object_deleted: true });
+  });
+  const saved = await adapter.cloudflareUpdateProperty(sample.id, {
+    images: [newPhoto], cover_image: newPhoto,
+  }, observed);
+  assert.deepEqual(calls.map(call => call.method || 'GET'), ['GET', 'POST', 'PATCH', 'DELETE', 'GET']);
+  assert.equal(saved.images.length, 1);
+});
+
+test('removing photos from a published listing fails before uploading replacements', async () => {
+  const path = '/v1/media/properties/' + imageId;
+  const { adapter, calls } = load(() => json({ data: {
+    ...sample, images: [path], cover_image: path, published: true,
+  } }));
+  await assert.rejects(adapter.cloudflareUpdateProperty(sample.id, {
+    images: ['data:image/jpeg;base64,/9j/'],
+  }, observed), /ยกเลิกการเผยแพร่ประกาศและโหลดใหม่ก่อนเพิ่มหรือลบรูปภาพ/);
+  assert.equal(calls.length, 1);
+});
+
+test('removing the photo that stays selected as cover is rejected before any write', async () => {
+  const origin = 'https://staging-api.example.invalid';
+  const path = '/v1/media/properties/' + imageId;
+  const { adapter, calls } = load(() => json({ data: { ...sample, images: [path], cover_image: path } }));
+  await assert.rejects(adapter.cloudflareUpdateProperty(sample.id, {
+    images: [], cover_image: origin + path,
+  }, observed), /รูปปกต้องไม่ใช่รูปที่จะลบ/);
+  assert.equal(calls.length, 1);
+});
+
+test('a failed media delete reports that the listing itself was already saved', async () => {
+  const path = '/v1/media/properties/' + imageId;
+  const { adapter, calls } = load(call => {
+    if (!call.method) return json({ data: { ...sample, images: [path], cover_image: path } });
+    if (call.method === 'PATCH') return json({ data: { ...sample, images: [path], cover_image: '', updated_at: newer } });
+    assert.equal(call.method, 'DELETE');
+    return json({ error: 'Listing changed; reload before removing photos' }, 409);
+  });
+  await assert.rejects(adapter.cloudflareUpdateProperty(sample.id, {
+    images: [], cover_image: '',
+  }, observed), /บันทึกข้อมูลแล้ว แต่ลบรูปภาพไม่สำเร็จ/);
+  assert.deepEqual(calls.map(call => call.method || 'GET'), ['GET', 'PATCH', 'DELETE']);
+});
+
 test('a stale delete sends the observed revision directly and never refreshes it to bypass a conflict', async () => {
   const { adapter, calls } = load(call => {
     assert.equal(call.method, 'DELETE');

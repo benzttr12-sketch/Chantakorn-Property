@@ -33,7 +33,7 @@ media.options('/v1/media/*', c => {
   if (!validBrowserOrigin(c.req.header('Origin') ?? null, c.env.ALLOWED_ORIGIN))
     return c.json({ error: 'Forbidden origin' }, 403);
   c.header('Access-Control-Allow-Origin', c.env.ALLOWED_ORIGIN);
-  c.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  c.header('Access-Control-Allow-Methods', 'GET, POST, DELETE, OPTIONS');
   c.header('Access-Control-Allow-Headers', 'Authorization, Content-Type, Content-Length');
   c.header('Access-Control-Max-Age', '300');
   c.header('Vary', 'Origin');
@@ -173,5 +173,54 @@ async function upload(c: Context<{ Bindings: Env }>, kind: 'property' | 'inquiry
 // No customer-origin anonymous uploads are provided in this PR.
 media.post('/v1/media/properties/:ownerId', c => upload(c, 'property'));
 media.post('/v1/media/inquiries/:ownerId', c => upload(c, 'inquiry'));
+
+// Draft-only photo removal. The metadata row is deleted first so a failed R2
+// delete can never leave a listing pointing at a missing object; the leftover
+// object is recorded for the bounded orphan sweep instead.
+media.delete('/v1/media/properties/:ownerId/:mediaId', async c => {
+  c.header('Cache-Control', 'private, no-store');
+  if (c.env.MEDIA_WRITES_ENABLED !== 'true') return c.json({ error: 'Media writes are disabled' }, 503);
+  if (!validBrowserOrigin(c.req.header('Origin') ?? null, c.env.ALLOWED_ORIGIN)) {
+    return c.json({ error: 'Forbidden origin' }, 403);
+  }
+  const allowed = await requireStaff(c.env, c.req.header('Authorization'));
+  if (!('staff' in allowed)) return c.json({ error: allowed.error }, allowed.status);
+  if (allowed.staff.role !== 'ADMIN')
+    return c.json({ error: 'Only approved administrators may change property images' }, 403);
+
+  const ownerId = c.req.param('ownerId') ?? '';
+  const mediaId = c.req.param('mediaId') ?? '';
+  if (!validOwnerId(ownerId) || !validMediaId(mediaId))
+    return c.json({ error: 'Invalid media reference' }, 400);
+
+  const publicPath = `/v1/media/properties/${mediaId}`;
+  const [row] = await drizzle(c.env.DB).select({
+    key: propertyMedia.objectKey, published: properties.published, coverImage: properties.coverImage,
+  }).from(propertyMedia).innerJoin(properties, eq(propertyMedia.propertyId, properties.id))
+    .where(and(eq(propertyMedia.id, mediaId), eq(propertyMedia.propertyId, ownerId),
+      isNull(properties.deletedAt))).limit(1);
+  if (!row) return c.json({ error: 'Image not found' }, 404);
+  if (row.published) return c.json({ error: 'Unpublish the property before removing images' }, 409);
+  if (row.coverImage === publicPath)
+    return c.json({ error: 'Choose a different cover before removing the cover photo' }, 409);
+
+  // Re-check the draft state and cover in the deleting statement itself so a
+  // concurrent publication or cover change cannot remove a now-public photo.
+  const deleted = await c.env.DB.prepare(`DELETE FROM property_media
+      WHERE id = ? AND property_id = ?
+      AND EXISTS (SELECT 1 FROM properties WHERE id = ? AND deleted_at IS NULL
+        AND published = 0 AND (cover_image IS NULL OR cover_image <> ?))`)
+    .bind(mediaId, ownerId, ownerId, publicPath).run();
+  if (!deleted.meta.changes)
+    return c.json({ error: 'Listing changed; reload before removing photos' }, 409);
+
+  try {
+    await c.env.PROPERTY_MEDIA.delete(row.key);
+  } catch {
+    console.warn('R2_MEDIA_ORPHAN_CLEANUP_REQUIRED');
+    return c.json({ ok: true, media_id: mediaId, object_deleted: false }, 202);
+  }
+  return c.json({ ok: true, media_id: mediaId, object_deleted: true });
+});
 
 export default media;
