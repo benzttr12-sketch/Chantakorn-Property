@@ -229,7 +229,7 @@ export async function completeCurrentPhaseAndAdvance(params: {
   const now = new Date().toISOString();
   const currentPhaseNum = targetJob.current_phase_number;
   const currentPhaseIdx = currentPhaseNum - 1;
-  const actor = params.actorName || 'เจ้าหน้าที่ผู้ดูแลระบบ';
+  const actor = params.actorName || targetJob.assigned_agent || 'เจ้าหน้าที่ผู้ดูแลระบบ';
 
   // Copy phases array
   const updatedPhases = [...targetJob.phases];
