@@ -15,7 +15,10 @@
 | Draft-media staff preview | #51 | ✅ | none known |
 | Guarded R2 media deletion | #52 | ✅ | delete is D1-row-first, R2 best-effort; leftovers handled by sweep |
 | Bounded R2 orphan sweep + status | #53 | ✅ | external log-alert routing still required |
-| Image container validation + metadata rejection | #54 | ✅ | JPEG/WebP pixel decode open (below) |
+| Image container validation + metadata rejection | #54 | ✅ | all formats metadata-free |
+| PNG full pixel decode | #62 | ✅ | interlaced PNG rejected |
+| Baseline JPEG full entropy decode | #64 | ✅ | progressive/multi-scan/restart JPEGs rejected |
+| WebP uploads refused; client produces JPEG | #65 | ✅ | no new WebP delivery (revisit if needed) |
 | Verified staff-role import planner | #55 | ✅ | actual roster import is operator-only |
 | Filtered keyset Admin listing API | #56 | ✅ | search is substring/scan on cache miss |
 | Admin list/editor native pagination | #57 | ✅ | CSV export covers loaded rows only |
@@ -23,17 +26,10 @@
 | Upload sessions (browser client) | #59 | ✅ | real-browser staging verification pending |
 | Whole-catalog screens off the 800-row bridge | #60 | ✅ | dashboard/automation still materialise the catalog |
 | Per-staff upload/session rate limits | #61 | ✅ | complements, not replaces, edge/WAF controls |
-| PNG full pixel decode | #62 | ✅ | JPEG/WebP pixel decode open |
 
-## Open decision: JPEG/WebP pixel decoding
+## Image decoding gate (closed)
 
-Accepted containers are still structurally validated and metadata-free, but JPEG entropy data and WebP VP8/VP8L image data are not pixel-decoded inside the Worker. This is the only remaining **image-decoding** gate. Options for the owner:
-
-1. **WASM decoder in the Worker** (e.g. `@jsquash/jpeg`, `@jsquash/webp`): full decode for both formats, but adds WASM bundling config, dependency-audit surface and CPU cost per upload. Highest assurance.
-2. **Accept the current boundary**: only the app's canvas re-encoder is a supported client, uploads are rate-limited/metadata-free/container-validated, and edge/WAF abuse controls stay enabled. Requires explicit risk sign-off.
-3. **Narrow the accepted formats**: implement a baseline-JPEG decoder and switch the client compressor to JPEG (reject lossy VP8 WebP, keep lossless WebP). Full pixel decode with no new dependency, but changes delivered image format/quality.
-
-Do not enable `MEDIA_WRITES_ENABLED` in production until one option is chosen.
+The only accepted upload formats are now **PNG and baseline JPEG**, both of which are fully decoded before any R2 write (#62, #64). The browser canvas compressor produces JPEG instead of WebP and the Worker refuses WebP uploads (#65) because a VP8/VP8L pixel decoder is not available without a WASM dependency. Progressive, arithmetic-coded, multi-scan and restart-interval JPEGs are rejected with explicit 415s; the app compressor always emits baseline JPEG, so this only affects direct API callers. If WebP delivery becomes a product requirement, revisit the WASM-decoder or CDN-transcode options before enabling production writes.
 
 ## Operator gates before production (in order)
 

@@ -467,6 +467,13 @@ test('local Worker HTTP / D1 / R2 / Firebase authorization contract', async t =>
     assert.equal(observedPropertyPuts, beforePuts, 'metadata must be rejected before any R2 put');
     assert.equal((await publicBucket.list()).objects.length, beforeObjects);
   });
+  await t.test('WebP uploads are rejected because only PNG and baseline JPEG are fully decoded', async () => {
+    const webp = Buffer.from('UklGRjoAAABXRUJQVlA4IC4AAACQAQCdASoCAAIAAUAmJaACdLoAA5gA/vFNr+LaR0KZD/7xn/9xn/9xn/yIAAAA', 'base64');
+    const response = await fetchApi('/v1/media/properties/' + created.id, { method: 'POST',
+      headers: { ...headers, 'Content-Type': 'image/webp', 'Content-Length': String(webp.length) }, body: webp });
+    assert.equal(response.status, 415);
+    assert.equal((await response.json()).error, 'WebP uploads are not accepted; upload JPEG or PNG');
+  });
   await t.test('draft photo removal requires live ADMIN, draft state and a non-cover photo', async () => {
     const upload = await fetchApi('/v1/media/properties/' + created.id, { method: 'POST',
       headers: { ...headers, 'Content-Type': 'image/png', 'Content-Length': String(png.length) }, body: png });
