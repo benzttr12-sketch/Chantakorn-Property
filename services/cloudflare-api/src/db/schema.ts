@@ -8,6 +8,8 @@ export const profiles = sqliteTable('profiles', {
   email: text('email'),
   phone: text('phone'),
   role: text('role', { enum: ['USER', 'AGENT', 'ADMIN'] }).notNull().default('USER'),
+  authDisabled: integer('auth_disabled', { mode: 'boolean' }).notNull().default(false),
+  tokensValidAfter: integer('tokens_valid_after').notNull().default(0),
   avatarUrl: text('avatar_url'),
   createdAt: text('created_at').notNull(),
   updatedAt: text('updated_at').notNull(),

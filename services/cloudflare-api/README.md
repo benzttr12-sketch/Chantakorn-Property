@@ -1,13 +1,13 @@
 # Chantakorn Property — Cloudflare API (scaffold)
 
-**PR-02 / staging only.** This folder does **not** replace any current Next.js/Firebase endpoints, change the domain, import old properties, or access production customer data. The initial API is **read only**.
+**PR-02 + stacked PR-03 / staging only.** This folder does **not** replace any current Next.js/Firebase endpoints, change the domain, import old properties, or access production customer data. The initial API is **read only**.
 
 ## Stack
 
 - Cloudflare Workers + [Hono](https://github.com/honojs/hono)
 - [Drizzle ORM](https://github.com/drizzle-team/drizzle-orm) + Cloudflare D1 (SQLite)
 - R2 bindings for **separate** public property images and **private** inquiry media (no R2 HTTP routes yet)
-- Firebase Authentication remains in the existing app; JWT/role verification will be added before any write/private endpoints in a later PR.
+- Firebase Authentication remains in the existing app. PR-03 adds Firebase JWT verification and a private read-only staff self-check using D1 role authority; write operations are still disabled.
 
 ## First-time setup (developer staging only)
 
@@ -55,7 +55,7 @@ These commands touch Cloudflare resources, so they are **not executed by CI**. K
 - `GET /v1/properties` — published-only allowlisted fields, keyset cursor, maximum 30 results, filters for type/status/province/district/price. Invalid/duplicated query parameters give 400.
 - `GET /v1/properties/:identifier` — published property by new property code or slug; no draft, private notes, client contacts or sample fallback. Unknown legacy IDs return 404.
 
-No POST, PUT, PATCH or DELETE endpoints exist. No secrets are required for the public read-only API. Only one browser origin configured via `ALLOWED_ORIGIN` gets an Access-Control-Allow-Origin header. Configure the deployed frontend's actual origin when ready.
+No POST, PUT, PATCH or DELETE endpoints exist. No secrets are required for the public read-only API. Only one browser origin configured via `ALLOWED_ORIGIN` gets an Access-Control-Allow-Origin header. Set `FIREBASE_PROJECT_ID` to the actual trusted Firebase Authentication project ID before testing staff access; the checked-in placeholder fails closed.
 
 ## Testing
 
@@ -71,6 +71,15 @@ The initial isolated package has no committed lockfile because it could not be g
 
 ## Next PR sequence
 
-PR-03 adds verified Firebase ID tokens and server-maintained D1 ADMIN/AGENT roles. PR-04 implements public/private R2 upload/download with size validation and authorization. PR-05 implements new property CRUD and connects the existing UI. PR-06/07 migrate **selected active** customer/LINE data only after encrypted backup + restore verification. No existing Firestore collection should be deleted until all active dependencies are identified and retired; **never delete Firebase Auth**.
+PR-03 (stacked on PR-02) adds verified Firebase ID tokens and D1 ADMIN/AGENT role **reads**; approved staff records must be imported by privileged code only after backup reconciliation. PR-04 implements public/private R2 upload/download with size validation and authorization. PR-05 implements new property CRUD and connects the existing UI. PR-06/07 migrate **selected active** customer/LINE data only after encrypted backup + restore verification. No existing Firestore collection should be deleted until all active dependencies are identified and retired; **never delete Firebase Auth**.
 
 Related decision and backup plan: [PR #35](https://github.com/benzttr12-sketch/Chantakorn-Property/pull/35). Its document is a separate draft and does not modify this branch.
+
+## Authentication bridge added in stacked PR-03
+
+- `GET /v1/staff/me` requires `Authorization: Bearer <Firebase ID token>` and responds only for a **verified** Firebase Auth email and an existing, server-controlled D1 ADMIN/AGENT profile with matching UID.
+- Google Secure Token **RS256** signature is verified against Google's rotating JWKS; project-specific issuer/audience, expiration, `iat`, `auth_time`, and `sub` are checked.
+- D1 `profiles.role` remains USER by default. Missing, disabled, unauthorized, revoked or out-of-sync staff profiles are denied (401 or 403), **never** automatically upgraded.
+- `auth_disabled` and `tokens_valid_after` in D1 must be synchronized from real Firebase Auth account state by a future approved, privileged job; this draft only verifies what is present in D1. Firebase Auth account disable/revocation changes do not automatically flow to D1 yet. Do not expose high-impact write endpoints until synchronization/revocation checks are implemented and audited.
+- No staff bootstrap endpoint exists. No public user can set their role. A secure manual migration after encrypted backup and UID reconciliation is required before the endpoint will grant any staff permission.
+- Test `npm test` covers valid RS256 signed local fixture tokens, forged/expired/future/wrong-issuer/wrong-audience/unverified tokens and role state denial. No real Firebase account or customer record is used.
