@@ -2,6 +2,7 @@ import { drizzle } from 'drizzle-orm/d1';
 import { eq } from 'drizzle-orm';
 import { profiles } from './db/schema.ts';
 import { authorizeStaffProfile, extractBearer, firebaseProjectConfigured, verifyFirebaseIdToken, type VerifiedIdentity } from './auth.ts';
+import { matchAllowedOrigin } from './media-validation.ts';
 
 export type PropertyAuthEnv = {
   DB: D1Database;
@@ -57,8 +58,7 @@ export async function verifyFirebaseAccountState(
 
 export function canWriteProperties(env: PropertyAuthEnv, origin: string | undefined): boolean {
   return env.PROPERTY_WRITES_ENABLED === 'true' &&
-    origin === env.ALLOWED_ORIGIN &&
-    !!origin && /^https?:\/\//.test(origin);
+    matchAllowedOrigin(origin ?? null, env.ALLOWED_ORIGIN) !== null;
 }
 
 /**

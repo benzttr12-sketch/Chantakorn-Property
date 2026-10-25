@@ -6,6 +6,7 @@ import { authorizePropertyStaff, canWriteProperties, type PropertyAuthEnv } from
 import { newPropertyIdentity, parseEditorInput, readBoundedJson } from './property-input.ts';
 import { auditedMutation } from './audited-mutation.ts';
 import { adminCursor, parseAdminQuery } from './admin-query.ts';
+import { matchAllowedOrigin } from './media-validation.ts';
 import { SWEEP_STATUS_KEY } from './media-orphan-sweep.ts';
 
 type Env = PropertyAuthEnv & {
@@ -103,8 +104,9 @@ export function nextPropertyRevision(previous: string, now = Date.now()): string
 }
 
 propertyAdmin.options('/v1/admin/properties/*', c => {
-  if (c.req.header('Origin') !== c.env.ALLOWED_ORIGIN) return c.json({ error: 'Origin forbidden' }, 403);
-  c.header('Access-Control-Allow-Origin', c.env.ALLOWED_ORIGIN);
+  const origin = matchAllowedOrigin(c.req.header('Origin') ?? null, c.env.ALLOWED_ORIGIN);
+  if (!origin) return c.json({ error: 'Origin forbidden' }, 403);
+  c.header('Access-Control-Allow-Origin', origin);
   c.header('Access-Control-Allow-Headers', 'Authorization, Content-Type');
   c.header('Access-Control-Allow-Methods', 'GET, POST, PATCH, DELETE, OPTIONS');
   c.header('Access-Control-Max-Age', '300');
@@ -112,16 +114,18 @@ propertyAdmin.options('/v1/admin/properties/*', c => {
   return c.body(null, 204);
 });
 propertyAdmin.options('/v1/admin/properties', c => {
-  if (c.req.header('Origin') !== c.env.ALLOWED_ORIGIN) return c.json({ error: 'Origin forbidden' }, 403);
-  c.header('Access-Control-Allow-Origin', c.env.ALLOWED_ORIGIN);
+  const origin = matchAllowedOrigin(c.req.header('Origin') ?? null, c.env.ALLOWED_ORIGIN);
+  if (!origin) return c.json({ error: 'Origin forbidden' }, 403);
+  c.header('Access-Control-Allow-Origin', origin);
   c.header('Access-Control-Allow-Headers', 'Authorization, Content-Type');
   c.header('Access-Control-Allow-Methods', 'GET, POST, PATCH, DELETE, OPTIONS');
   c.header('Access-Control-Max-Age', '300');
   return c.body(null, 204);
 });
 propertyAdmin.options('/v1/admin/media/*', c => {
-  if (c.req.header('Origin') !== c.env.ALLOWED_ORIGIN) return c.json({ error: 'Origin forbidden' }, 403);
-  c.header('Access-Control-Allow-Origin', c.env.ALLOWED_ORIGIN);
+  const origin = matchAllowedOrigin(c.req.header('Origin') ?? null, c.env.ALLOWED_ORIGIN);
+  if (!origin) return c.json({ error: 'Origin forbidden' }, 403);
+  c.header('Access-Control-Allow-Origin', origin);
   c.header('Access-Control-Allow-Headers', 'Authorization, Content-Type');
   c.header('Access-Control-Allow-Methods', 'GET, OPTIONS');
   c.header('Access-Control-Max-Age', '300');
