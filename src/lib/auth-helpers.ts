@@ -1,6 +1,5 @@
 import { auth, db, googleProvider } from '@/lib/firebase/client';
 import {
-  signInWithPopup,
   signInWithRedirect,
   getRedirectResult,
   signOut as firebaseSignOut,
@@ -115,29 +114,17 @@ export async function updateCurrentUserProfile(updates: ProfileUpdates): Promise
   return updatedProfile;
 }
 
-// Popup is the fast path; in-app browsers (LINE, iOS Safari with blockers)
-// forbid popups entirely — window.open returns null there and the SDK reports
-// it as internal-error instead of popup-blocked. Any of these means the popup
-// mechanism itself failed, so fall back to a full-page redirect.
-const POPUP_FALLBACK_CODES = new Set([
-  'auth/popup-blocked',
-  'auth/operation-not-supported-in-this-environment',
-  'auth/cancelled-popup-request',
-  'auth/internal-error',
-]);
-
+// Google sign-in uses the full-page redirect flow exclusively. The popup
+// variant is unreliable across the environments this site runs in: in-app
+// browsers (LINE etc.) and popup-blocking mobile browsers either throw
+// internal-error or leave the popup promise hanging silently forever. The
+// redirect flow works everywhere and the login page consumes the returning
+// result on mount (getCurrentUserProfile) to forward the user onward.
 export async function signInWithGoogle(): Promise<UserProfile> {
   if (dataBackend !== 'firebase' || !auth) throw new Error('ระบบ Google Sign-In ยังไม่ได้ตั้งค่า');
-  try {
-    const result = await signInWithPopup(auth, googleProvider);
-    return syncFirebaseUserProfile(result.user);
-  } catch (err) {
-    const code = (err as { code?: string })?.code || '';
-    if (!POPUP_FALLBACK_CODES.has(code)) throw err;
-    await signInWithRedirect(auth, googleProvider);
-    // The browser is navigating to Google; if it somehow did not, tell the user.
-    throw new Error('กำลังพาไปหน้าล็อกอิน Google ถ้าหน้าไม่เปลี่ยน กรุณากดปุ่มเข้าสู่ระบบอีกครั้ง');
-  }
+  await signInWithRedirect(auth, googleProvider);
+  // The browser is navigating to Google; if it somehow did not, tell the user.
+  throw new Error('กำลังพาไปหน้าล็อกอิน Google ถ้าหน้าไม่เปลี่ยน กรุณากดปุ่มเข้าสู่ระบบอีกครั้ง');
 }
 
 export async function loginWithEmail(email: string, password: string): Promise<UserProfile> {
