@@ -56,6 +56,9 @@ const AdminLandsMapsOverlayModal = dynamic(
 const PropertyBroadcastModal = dynamic(() => import('@/components/admin/PropertyBroadcastModal'), {
   ssr: false,
 });
+const FacebookPostModal = dynamic(() => import('@/components/admin/FacebookPostModal'), {
+  ssr: false,
+});
 
 const getCompletionScore = (prop: Property) => {
   let score = 0;
@@ -177,10 +180,17 @@ function PropertiesContent() {
   const [lineModalProperty, setLineModalProperty] = useState<Property | null>(null);
   const [isLineModalOpen, setIsLineModalOpen] = useState(false);
 
+  // Ready-to-paste Facebook page post for one listing.
+  const [facebookModalProperty, setFacebookModalProperty] = useState<Property | null>(null);
+
   const handleOpenLineModal = (prop: Property) => {
     if (!prop.published) return;
     setLineModalProperty(prop);
     setIsLineModalOpen(true);
+  };
+
+  const handleOpenFacebookModal = (prop: Property) => {
+    setFacebookModalProperty(prop);
   };
 
   const handleOpenHistory = (prop: Property) => {
@@ -1103,6 +1113,7 @@ function PropertiesContent() {
               onOpenLandsMaps={handleOpenLandsMapsOverlay}
               onOpenHistoryModal={handleOpenHistory}
               onOpenLineModal={handleOpenLineModal}
+              onOpenFacebookModal={handleOpenFacebookModal}
               onDuplicate={handleDuplicate}
               onDeleteConfirm={(id) => {
                 setDeleteConfirmRevision(properties.find(p => p.id === id)?.updated_at);
@@ -1241,6 +1252,15 @@ function PropertiesContent() {
             setLineModalProperty(null);
           }}
           propertyId={lineModalProperty.id}
+        />
+      )}
+
+      {/* Ready-to-paste Facebook page post. */}
+      {facebookModalProperty && (
+        <FacebookPostModal
+          isOpen={Boolean(facebookModalProperty)}
+          property={facebookModalProperty}
+          onClose={() => setFacebookModalProperty(null)}
         />
       )}
     </div>

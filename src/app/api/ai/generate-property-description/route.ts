@@ -1,9 +1,7 @@
-﻿import { NextRequest, NextResponse } from 'next/server';
-import { GoogleGenAI, Type } from '@google/genai';
+import { NextRequest, NextResponse } from 'next/server';
 import { PropertyType, PropertyStatus } from '@/lib/types';
 import { requireStaff } from '@/lib/server-auth';
 import { readJsonBody } from '@/lib/server-request';
-import { enforceRequestBudget } from '@/lib/server-budget';
 
 interface GenerateDescriptionRequest {
   title?: string;
@@ -92,12 +90,10 @@ export async function POST(req: NextRequest) {
       furniture = '',
       facingDirection = '',
       features = [],
-      landmarks = [],
       agentName = 'คุณฉันทากร (เบนซ์)',
       agentPhone = '081-604-0097',
       agentLine = '@930xzcyi',
       agentFacebook = 'Chantakorn Property รับฝากขายบ้าน ที่ดิน คอนโด หาดใหญ่ สงขลา',
-      tone = 'high_converting',
       customHighlights = '',
     } = body;
 
@@ -110,134 +106,13 @@ export async function POST(req: NextRequest) {
       consignment: 'ทรัพย์รับขายฝาก-จำนอง',
     };
 
-    const toneDescriptions = {
-      luxury: 'ระดับพรีเมียม หรูหรา สง่างาม เน้นภาพลักษณ์ชีวิตที่ดี สถาปัตยกรรม และความคุ้มค่าระดับมาสเตอร์พีซ',
-      high_converting: 'กระตุ้นการตัดสินใจ ปิดการขายไว ชี้จุดเด่นและราคาคุ้มค่า มี Call-to-Action ชวนนัดชมทันที',
-      social_media: 'เหมาะสำหรับโพสต์ Facebook และ LINE อ่านง่าย แบ่งข้อย่อยชัดเจน มีอิโมจิสวยงามสะดุดตา',
-      investor: 'เจาะกลุ่มนักลงทุน เน้นผลตอบแทน Yield ค่าเช่า ความต้องการของผู้เช่า และศักยภาพการเติบโตของทำเล',
-    };
-
     const actionText = status === 'rent' ? 'ให้เช่า' : 'เสนอขาย';
     const numPrice = Number(price);
     const formattedPrice = numPrice > 0
       ? `${numPrice.toLocaleString('th-TH')} บาท${status === 'rent' ? '/เดือน' : ''}`
       : 'ราคาพิเศษ (ติดต่อสอบถาม)';
 
-    // Check if Gemini API key exists
-    const apiKey = process.env.GEMINI_API_KEY;
-
-    let providerEnabled = Boolean(apiKey);
-    if (apiKey) {
-      const limited = await enforceRequestBudget(req, 'property-description', { perMinute: 10, perDay: 200 });
-      if (limited) {
-        if (process.env.NEXT_PUBLIC_DATA_BACKEND === 'local' && limited.status === 503) providerEnabled = false;
-        else return limited;
-      }
-    }
-    if (providerEnabled && apiKey) {
-      try {
-        const ai = new GoogleGenAI({
-          apiKey,
-          httpOptions: {
-            headers: {
-              'User-Agent': 'aistudio-build',
-            },
-          },
-        });
-
-        const prompt = `คุณคือนักเขียนคำโฆษณาอสังหาริมทรัพย์มืออาชีพ (Senior Real Estate Copywriter) ประจำบริษัท "Chantakorn Property" (ฉันทากร พร็อพเพอร์ตี้) ศูนย์กลางซื้อ ขาย เช่า อสังหาริมทรัพย์หาดใหญ่–สงขลา
-
-กรุณาเขียนบทความและคำบรรยายประกาศอสังหาริมทรัพย์ภาษาไทยที่ดึงดูดใจ น่าเชื่อถือ และสร้างยอดขายได้จริง (High-Converting) โดยใช้ข้อมูลสเปกของทรัพย์ต่อไปนี้:
-
-ข้อมูลทรัพย์สิน:
-- ชื่อทรัพย์ปัจจุบัน: ${title || 'ยังไม่ระบุ'}
-- ประเภททรัพย์: ${typeNames[propertyType] || propertyType}
-- สถานะประกาศ: ${actionText}
-- ราคา: ${formattedPrice}
-- ทำเลที่ตั้ง: ${subdistrict ? `ต.${subdistrict} ` : ''}อ.${district} จ.สงขลา ${address ? `(ที่อยู่: ${address})` : ''}
-- จำนวนห้องนอน: ${Number(bedrooms) > 0 ? `${bedrooms} ห้องนอน` : 'ไม่ระบุ'}
-- จำนวนห้องน้ำ: ${Number(bathrooms) > 0 ? `${bathrooms} ห้องน้ำ` : 'ไม่ระบุ'}
-- ที่จอดรถ: ${Number(parking) > 0 ? `${parking} คัน` : 'ไม่ระบุ'}
-- ขนาดที่ดิน: ${Number(landSize) > 0 ? `${landSize} ตร.ว.` : 'ไม่ระบุ'}
-- พื้นที่ใช้สอย: ${Number(usableArea) > 0 ? `${usableArea} ตร.ม.` : 'ไม่ระบุ'}
-- สภาพเฟอร์นิเจอร์/การตกแต่ง: ${furniture || 'ไม่ระบุ'}
-- ทิศหน้าทรัพย์: ${facingDirection || 'ไม่ระบุ'}
-- จุดเด่นและสิ่งอำนวยความสะดวก: ${features.length > 0 ? features.join(', ') : 'ทำเลดี เดินทางสะดวก'}
-- แลนด์มาร์กสำคัญใกล้เคียง: ${landmarks.length > 0 ? landmarks.join(', ') : 'ใกล้ ม.อ. หาดใหญ่, เซ็นทรัลหาดใหญ่, สนามบินหาดใหญ่'}
-- ข้อมูลเพิ่มเติม/จุดเน้นจากนายหน้า: ${customHighlights || 'ไม่มี'}
-
-ข้อมูลผู้ดูแลและติดต่อ (ต้องใส่ท้ายประกาศ):
-- นายหน้าที่ปรึกษา: ${agentName}
-- เบอร์โทรศัพท์: ${agentPhone}
-- LINE ID: ${agentLine}
-- Facebook: ${agentFacebook}
-
-โทนการเขียนที่ต้องการ:
-- โทน: ${toneDescriptions[tone] || toneDescriptions.high_converting}
-
-ข้อกำหนดและมาตรฐานของ Chantakorn Property:
-1. ภาษาไทยไพเราะ สละสลวย ชัดเจน ไม่มีคำกำกวม ไม่ใช้ AI Slop
-2. มีพาดหัวที่ดึงดูดสายตา (Hook Headline)
-3. แยกหมวดหมู่ให้อ่านง่าย เช่น 📍 ทำเลและจุดเด่น, 📐 ฟังก์ชันตัวทรัพย์, 🌟 สิ่งอำนวยความสะดวก, 🛡️ มาตรฐานความปลอดภัย (ตรวจสอบโฉนด 100% ดูแลสินเชื่อธนาคารฟรี 100%), 📞 ช่องทางติดต่อ
-4. สื่อถึงความจริงใจและผลประโยชน์ของผู้ซื้อเป็นสำคัญ`;
-
-        const response = await ai.models.generateContent({
-          model: 'gemini-3.8-flash',
-          contents: prompt,
-          config: {
-            maxOutputTokens: 4096,
-            systemInstruction:
-              'คุณคือผู้เชี่ยวชาญการเขียนประกาศอสังหาริมทรัพย์ระดับพรีเมียมในจังหวัดสงขลาและหาดใหญ่ ตอบกลับเป็น JSON ตามสคีมาที่กำหนดเท่านั้น',
-            responseMimeType: 'application/json',
-            responseSchema: {
-              type: Type.OBJECT,
-              properties: {
-                headline: {
-                  type: Type.STRING,
-                  description: 'พาดหัวประกาศที่ดึงดูดใจและกระตุ้นยอดคลิก สั้น กระชับ ทรงพลัง',
-                },
-                description: {
-                  type: Type.STRING,
-                  description: 'เนื้อหาคำบรรยายทรัพย์ฉบับเต็ม พร้อมจัดหมวดหมู่ ข้อย่อย และช่องทางติดต่อ',
-                },
-                keyPoints: {
-                  type: Type.ARRAY,
-                  items: { type: Type.STRING },
-                  description: 'จุดเด่นสรุปย่อ 3-5 ข้อ สำหรับอ่านด่วน',
-                },
-                socialCaption: {
-                  type: Type.STRING,
-                  description: 'ข้อความสั้นพร้อมอิโมจิ สำหรับแชร์ลง Facebook หรือส่งในห้อง LINE',
-                },
-                hashtags: {
-                  type: Type.ARRAY,
-                  items: { type: Type.STRING },
-                  description: 'แฮชแท็กภาษาไทยที่เกี่ยวข้อง',
-                },
-              },
-              required: ['headline', 'description', 'keyPoints', 'socialCaption', 'hashtags'],
-            },
-          },
-        });
-
-        const text = response.text?.trim() || '';
-        if (text) {
-          const parsed = JSON.parse(text);
-          return NextResponse.json({
-            success: true,
-            source: 'gemini-3.8-flash',
-            ...parsed,
-          });
-        }
-      } catch (geminiError: any) {
-        const isQuota = geminiError?.status === 429 || geminiError?.message?.includes('429') || geminiError?.message?.includes('quota');
-        if (!isQuota) {
-          console.info('Using intelligent template engine for property description');
-        }
-      }
-    }
-
-    // Intelligent Fallback Generator (Ensures 100% reliability even if offline or key not yet configured)
+    // Smart template engine: deterministic, always available.
     const fallbackHeadline = `✨ ${actionText}${typeNames[propertyType] || 'บ้าน'} ${subdistrict ? `ทำเล ${subdistrict}` : `ทำเล ${district}`} ${formattedPrice !== 'ราคาพิเศษ (ติดต่อสอบถาม)' ? `เพียง ${formattedPrice}` : ''} จ.สงขลา`.trim();
 
     const specBullets: string[] = [];

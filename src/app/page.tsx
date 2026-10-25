@@ -50,7 +50,7 @@ export default function HomePage() {
       {/* 9: PRIVATE VIEWING APPOINTMENT (จองคิวนัดชมทรัพย์ส่วนตัว) */}
       <div data-home-reveal><ViewingBookingSection /></div>
 
-      {/* 10: REAL ESTATE FAQ (คำถามที่พบบ่อย ขับเคลื่อนด้วย Gemini AI) */}
+      {/* 10: REAL ESTATE FAQ (คำถามที่พบบ่อย) */}
       <div data-home-reveal><RealEstateFAQ /></div>
 
       {/* 10.1: CONSIGNMENT & PROPERTY VALUATION CALCULATOR (เครื่องมือประเมินมูลค่าทรัพย์สิน & วงเงินขายฝาก-จำนอง) */}
