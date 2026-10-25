@@ -21,6 +21,17 @@ const firebaseConfig = {
   appId: getValidConfigValue(process.env.NEXT_PUBLIC_FIREBASE_APP_ID, appletConfig.appId) || appletConfig.appId,
 };
 
+// Storage-partitioned browsers (Safari ITP, Brave, in-app webviews) block the
+// cross-origin firebaseapp.com handler, killing both popup and redirect
+// sign-in with "missing initial state". Serving the auth handler first-party
+// through the main site's proxy (see vercel.json rewrites /__/auth/*) fixes
+// it: run the handshake on the site's own origin when we are on it.
+const AUTH_HANDLER_HOSTS = new Set(['chantakornproperty.com', 'www.chantakornproperty.com']);
+const sameOriginAuthDomain = typeof window !== 'undefined'
+  && AUTH_HANDLER_HOSTS.has(window.location.hostname)
+  ? window.location.hostname
+  : '';
+
 const databaseId = appletConfig.firestoreDatabaseId || '(default)';
 
 export const isFirebaseConfigured = Boolean(
@@ -36,7 +47,10 @@ const googleProvider = new GoogleAuthProvider();
 
 if (isFirebaseConfigured) {
   try {
-    app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
+    app = getApps().length > 0 ? getApp() : initializeApp({
+      ...firebaseConfig,
+      ...(sameOriginAuthDomain ? { authDomain: sameOriginAuthDomain } : {}),
+    });
     db = getFirestore(app, databaseId);
     auth = getAuth(app);
   } catch (error) {
