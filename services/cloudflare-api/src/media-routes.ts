@@ -5,7 +5,7 @@ import { inquiryMedia, inquiries, properties, propertyMedia } from './db/schema.
 import { authorizePropertyStaff } from './property-auth.ts';
 import {
   MAX_INQUIRY_IMAGES, MAX_PROPERTY_IMAGES, mediaExtension,
-  readBoundedImage, validBrowserOrigin, validMediaId, validOwnerId,
+  readBoundedImage, validBrowserOrigin, validMediaId, validOwnerId, matchAllowedOrigin,
 } from './media-validation.ts';
 import { validateImageStructure } from './media-image-structure.ts';
 
@@ -43,9 +43,9 @@ const media = new Hono<{ Bindings: Env }>();
 
 // Browser CORS preflight for authenticated image uploads/reads.
 media.options('/v1/media/*', c => {
-  if (!validBrowserOrigin(c.req.header('Origin') ?? null, c.env.ALLOWED_ORIGIN))
-    return c.json({ error: 'Forbidden origin' }, 403);
-  c.header('Access-Control-Allow-Origin', c.env.ALLOWED_ORIGIN);
+  const origin = matchAllowedOrigin(c.req.header('Origin') ?? null, c.env.ALLOWED_ORIGIN);
+  if (!origin) return c.json({ error: 'Forbidden origin' }, 403);
+  c.header('Access-Control-Allow-Origin', origin);
   c.header('Access-Control-Allow-Methods', 'GET, POST, DELETE, OPTIONS');
   c.header('Access-Control-Allow-Headers', 'Authorization, Content-Type, Content-Length, X-Upload-Session');
   c.header('Access-Control-Max-Age', '300');

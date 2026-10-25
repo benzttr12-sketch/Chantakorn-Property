@@ -78,7 +78,18 @@ export async function readBoundedImage(req: Request): Promise<ImageReadResult> {
   return { ok: true, bytes, type: actualType };
 }
 
+/** ALLOWED_ORIGIN accepts a comma-separated list (local dev + public site). */
+export function allowedOriginsList(raw: string | null | undefined): string[] {
+  return (raw || '').split(',').map(s => s.trim()).filter(s => /^https?:\/\//.test(s));
+}
+
+/** Returns the configured origin that matches, or null. Echo the match in ACAO. */
+export function matchAllowedOrigin(origin: string | null | undefined, raw: string | null | undefined): string | null {
+  if (!origin) return null;
+  return allowedOriginsList(raw).find(allowed => allowed === origin) || null;
+}
+
 /** Require a browser origin for write routes, never mistake CORS for authentication. */
-export function validBrowserOrigin(origin: string | null, allowed: string | undefined): boolean {
-  return !!origin && !!allowed && origin === allowed && /^https?:\/\//.test(allowed);
+export function validBrowserOrigin(origin: string | null | undefined, allowed: string | null | undefined): boolean {
+  return matchAllowedOrigin(origin, allowed) !== null;
 }

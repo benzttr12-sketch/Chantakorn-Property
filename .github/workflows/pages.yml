@@ -49,6 +49,8 @@ jobs:
           NEXT_PUBLIC_BASE_PATH: ${{ github.event_name == 'pull_request' && format('/{0}', github.event.repository.name) || steps.pages.outputs.base_path }}
           NEXT_PUBLIC_SITE_URL: ${{ steps.pages.outputs.base_url || format('https://{0}.github.io/{1}', github.repository_owner, github.event.repository.name) }}
           DEPLOY_DATA_BACKEND: ${{ vars.DEPLOY_DATA_BACKEND || 'local' }}
+          DEPLOY_PROPERTY_BACKEND: ${{ vars.DEPLOY_PROPERTY_BACKEND || 'firebase' }}
+          DEPLOY_CLOUDFLARE_API_ORIGIN: ${{ vars.DEPLOY_CLOUDFLARE_API_ORIGIN || '' }}
       - uses: actions/upload-pages-artifact@v3
         with:
           path: .next-pages

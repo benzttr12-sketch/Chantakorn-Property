@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   MAX_MEDIA_BYTES, mediaExtension, readBoundedImage,
-  sniffImage, validBrowserOrigin, validMediaId, validOwnerId,
+  sniffImage, validBrowserOrigin, validMediaId, validOwnerId, matchAllowedOrigin,
 } from '../src/media-validation.ts';
 
 const jpeg = new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 0,0,0,0,0,0,0,0,0,0,0xff,0xd9]);
@@ -42,6 +42,19 @@ test('only explicitly allowed browser origin can upload; origin is not auth', ()
   assert.equal(validBrowserOrigin('https://attacker.example', 'https://chantakornproperty.com'), false);
   assert.equal(validBrowserOrigin(null, 'https://chantakornproperty.com'), false);
   assert.equal(validBrowserOrigin('https://chantakornproperty.com.evil.test', 'https://chantakornproperty.com'), false);
+});
+
+test('ALLOWED_ORIGIN accepts a comma-separated list and echoes only the exact match', () => {
+  const list = 'http://localhost:3000,https://benzttr12-sketch.github.io';
+  assert.equal(validBrowserOrigin('https://benzttr12-sketch.github.io', list), true);
+  assert.equal(validBrowserOrigin('http://localhost:3000', list), true);
+  assert.equal(matchAllowedOrigin('https://benzttr12-sketch.github.io', list), 'https://benzttr12-sketch.github.io');
+  assert.equal(matchAllowedOrigin('https://evil.example', list), null);
+  assert.equal(matchAllowedOrigin(null, list), null);
+  // Suffix/prefix tricks must not match a list entry either.
+  assert.equal(validBrowserOrigin('https://benzttr12-sketch.github.io.evil.test', list), false);
+  assert.equal(validBrowserOrigin(undefined, list), false);
+  assert.equal(validBrowserOrigin('https://site.test', 'https://site.test, not-a-url ,http://ok.test'), true);
 });
 
 test('bounds image streams and rejects type forgery', async () => {

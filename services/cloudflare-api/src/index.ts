@@ -7,6 +7,7 @@ import { drizzle } from 'drizzle-orm/d1';
 import { and, asc, desc, eq, gte, lte, lt, or, isNull, sql } from 'drizzle-orm';
 import { properties } from './db/schema.ts';
 import { authorizePropertyStaff } from './property-auth.ts';
+import { matchAllowedOrigin } from './media-validation.ts';
 import { catalogCursor, parseCatalogQuery } from './catalog-query.ts';
 
 type Bindings = {
@@ -31,8 +32,9 @@ const app = new Hono<{ Bindings: Bindings }>();
 
 app.use('*', async (c, next) => {
   const origin = c.req.header('Origin');
-  if (origin && origin === c.env?.ALLOWED_ORIGIN) {
-    c.header('Access-Control-Allow-Origin', origin);
+  const allowed = matchAllowedOrigin(origin, c.env?.ALLOWED_ORIGIN);
+  if (allowed) {
+    c.header('Access-Control-Allow-Origin', allowed);
   }
   c.header('Vary', 'Origin');
   c.header('Cache-Control', 'no-store');
@@ -44,7 +46,7 @@ app.use('*', async (c, next) => {
 app.get('/health', c => c.json({ ok: true, service: 'chantakorn-d1-api', version: 1 }));
 
 app.options('/v1/staff/me', c => {
-  if (!c.env?.ALLOWED_ORIGIN || c.req.header('Origin') !== c.env.ALLOWED_ORIGIN) {
+  if (!matchAllowedOrigin(c.req.header('Origin') ?? null, c.env?.ALLOWED_ORIGIN)) {
     return c.json({ error: 'Forbidden origin' }, 403);
   }
   c.header('Access-Control-Allow-Headers', 'Authorization, Content-Type');
