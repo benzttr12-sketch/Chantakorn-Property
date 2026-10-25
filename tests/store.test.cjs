@@ -28,7 +28,7 @@ function loadStore({ backend = 'local', firebase = false, firebaseError = null, 
       }
       throw new Error('Unexpected API request');
     },
-    process: { env: { NEXT_PUBLIC_DATA_BACKEND: backend } },
+    process: { env: { NEXT_PUBLIC_DATA_BACKEND: backend, NEXT_PUBLIC_PROPERTY_STORAGE_BACKEND: 'firebase' } },
     localStorage,
     window: {
       location: { origin: 'https://example.com' },
