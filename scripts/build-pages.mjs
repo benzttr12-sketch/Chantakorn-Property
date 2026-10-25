@@ -105,7 +105,7 @@ export const BUILT_PROPERTY_ROUTES: readonly string[] = ${JSON.stringify(allKeys
 import { formatPropertyCode } from '@/lib/format-code';
 import PropertyPage from './pages-build-client';
 export const dynamicParams = false;
-const D1_KEYS = ${JSON.stringify(extraKeys)};
+const D1_KEYS: string[] = ${JSON.stringify(extraKeys)};
 export function generateStaticParams() {
   const keys = SAMPLE_PROPERTIES.flatMap(property => [
     property.slug,

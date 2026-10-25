@@ -116,11 +116,14 @@ export async function updateCurrentUserProfile(updates: ProfileUpdates): Promise
 }
 
 // Popup is the fast path; in-app browsers (LINE, iOS Safari with blockers)
-// forbid popups entirely, so fall back to a full-page redirect there.
+// forbid popups entirely — window.open returns null there and the SDK reports
+// it as internal-error instead of popup-blocked. Any of these means the popup
+// mechanism itself failed, so fall back to a full-page redirect.
 const POPUP_FALLBACK_CODES = new Set([
   'auth/popup-blocked',
   'auth/operation-not-supported-in-this-environment',
   'auth/cancelled-popup-request',
+  'auth/internal-error',
 ]);
 
 export async function signInWithGoogle(): Promise<UserProfile> {
