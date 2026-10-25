@@ -5,7 +5,7 @@ const path = require('node:path');
 const vm = require('node:vm');
 const ts = require('typescript');
 
-function loadModules({ staticExport = false, basePath = '', propertyBackend = 'firebase' } = {}) {
+function loadModules({ staticExport = false, basePath = '', propertyBackend = 'firebase', builtRoutes = null } = {}) {
   const sourceRoot = path.resolve(__dirname, '../src');
   const cache = new Map();
   function load(filename) {
@@ -19,6 +19,9 @@ function loadModules({ staticExport = false, basePath = '', propertyBackend = 'f
       module, exports: module.exports,
       process: { env: { NEXT_PUBLIC_STATIC_EXPORT: String(staticExport), NEXT_PUBLIC_BASE_PATH: basePath, NEXT_PUBLIC_PROPERTY_STORAGE_BACKEND: propertyBackend } },
       require(name) {
+        if (builtRoutes !== null && name === '@/lib/generated-static-routes') {
+          return { BUILT_PROPERTY_ROUTES: builtRoutes };
+        }
         if (!name.startsWith('.') && !name.startsWith('@/')) return require(name);
         const target = name.startsWith('@/')
           ? path.join(sourceRoot, name.slice(2))
@@ -70,6 +73,21 @@ test('static hosting links use the detail fallback for property codes and legacy
   assert.equal(links.propertyHref(property), '/properties/detail/?slug=CK-RP6NQM');
   assert.equal(links.propertyHref({ slug: property.slug }), `/properties/detail/?slug=${encodeURIComponent(property.slug)}`);
   assert.equal(links.propertyHref(property.slug), `/properties/detail/?slug=${encodeURIComponent(property.slug)}`);
+});
+
+test('static hosting links use the pretty path only when the build generated that page', () => {
+  const d1 = { id: '9d2983ae-ff5a-4e56-895d-ff994beaaebb', slug: 'ขายที่ดิน-44-7-ตรว-หาดใหญ่', code: 'CK-9D2983' };
+  const built = ['CK-RP6NQM', property.slug, property.id, d1.id, d1.slug, d1.code];
+  const { links } = loadModules({ staticExport: true, propertyBackend: 'cloudflare', builtRoutes: built });
+  // A code always wins the key; its page exists, so the link is the pretty path.
+  assert.equal(links.propertyHref(d1), '/properties/CK-9D2983');
+  assert.equal(links.propertyHref({ slug: d1.slug }), `/properties/${encodeURIComponent(d1.slug)}`);
+  assert.equal(links.propertyHref({ id: d1.id }), `/properties/${d1.id}`);
+  // In cloudflare mode a Firestore-shaped row (no code) keys on its raw id.
+  assert.equal(links.propertyHref(property), `/properties/${property.id}`);
+  // A listing added after the deploy has no generated page yet: keep the query route.
+  const fresh = { id: '11111111-2222-4333-8444-555555555555', slug: 'ทรัพย์ใหม่หลัง-deploy' };
+  assert.equal(links.propertyHref(fresh), `/properties/detail/?slug=${fresh.id}`);
 });
 
 test('absolute property URLs trim the origin and retain the configured hosting prefix once', () => {
