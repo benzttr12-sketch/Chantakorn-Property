@@ -2,6 +2,8 @@ import { auth, db, googleProvider } from '@/lib/firebase/client';
 import {
   signInWithRedirect,
   getRedirectResult,
+  signInWithCredential,
+  GoogleAuthProvider,
   signOut as firebaseSignOut,
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
@@ -125,6 +127,16 @@ export async function signInWithGoogle(): Promise<UserProfile> {
   await signInWithRedirect(auth, googleProvider);
   // The browser is navigating to Google; if it somehow did not, tell the user.
   throw new Error('กำลังพาไปหน้าล็อกอิน Google ถ้าหน้าไม่เปลี่ยน กรุณากดปุ่มเข้าสู่ระบบอีกครั้ง');
+}
+
+/** Complete a Google Identity Services sign-in: verify the ID token client-side
+ * and sign in to Firebase with it. Works in storage-partitioned browsers
+ * because GIS does not depend on the authDomain handler handshake. */
+export async function signInWithGoogleIdToken(idToken: string): Promise<UserProfile> {
+  if (dataBackend !== 'firebase' || !auth) throw new Error('ระบบ Google Sign-In ยังไม่ได้ตั้งค่า');
+  const credential = GoogleAuthProvider.credential(idToken);
+  const result = await signInWithCredential(auth, credential);
+  return syncFirebaseUserProfile(result.user);
 }
 
 export async function loginWithEmail(email: string, password: string): Promise<UserProfile> {
