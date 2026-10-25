@@ -1,0 +1,13 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "rewrites": [
+    {
+      "source": "/__/auth/:path*",
+      "destination": "https://project-d417918c-0e3b-4185-812.firebaseapp.com/__/auth/:path*"
+    },
+    {
+      "source": "/__/auth",
+      "destination": "https://project-d417918c-0e3b-4185-812.firebaseapp.com/__/auth"
+    }
+  ]
+}
