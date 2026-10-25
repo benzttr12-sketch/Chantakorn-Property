@@ -3,7 +3,7 @@
 import type { Property, PropertyFilters } from '@/lib/types';
 import { auth } from '@/lib/firebase/client';
 
-const requested = (process.env.NEXT_PUBLIC_PROPERTY_STORAGE_BACKEND || 'firebase').trim().toLowerCase();
+const requested = (process.env.NEXT_PUBLIC_PROPERTY_STORAGE_BACKEND || 'cloudflare').trim().toLowerCase();
 if (requested !== 'firebase' && requested !== 'cloudflare') {
   throw new Error('NEXT_PUBLIC_PROPERTY_STORAGE_BACKEND must be firebase or cloudflare');
 }

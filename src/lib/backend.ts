@@ -14,9 +14,11 @@ export const dataBackend: BackendType = (() => {
 
 /**
  * Listings may migrate independently of Firebase Auth, LINE, leads and valuation.
- * Default remains Firestore. Unknown explicit modes fail closed.
+ * Since the 2026-10-25 cutover the default is the Cloudflare D1 catalog; an
+ * explicit NEXT_PUBLIC_PROPERTY_STORAGE_BACKEND=firebase override (dev shell or
+ * hosting dashboard) still selects Firestore. Unknown explicit modes fail closed.
  */
-const configuredPropertyStorage = (process.env.NEXT_PUBLIC_PROPERTY_STORAGE_BACKEND || 'firebase').trim().toLowerCase();
+const configuredPropertyStorage = (process.env.NEXT_PUBLIC_PROPERTY_STORAGE_BACKEND || 'cloudflare').trim().toLowerCase();
 if (configuredPropertyStorage !== 'firebase' && configuredPropertyStorage !== 'cloudflare') {
   throw new Error('NEXT_PUBLIC_PROPERTY_STORAGE_BACKEND must be firebase or cloudflare');
 }

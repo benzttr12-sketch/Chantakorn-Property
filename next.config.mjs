@@ -71,6 +71,13 @@ const nextConfig = {
     NEXT_PUBLIC_BASE_PATH: normalizedBasePath,
     NEXT_PUBLIC_STATIC_EXPORT: staticExport ? 'true' : 'false',
     NEXT_PUBLIC_DATA_BACKEND: process.env.NEXT_PUBLIC_DATA_BACKEND || 'firebase',
+    // Cutover (2026-10-25): the property catalog now defaults to Cloudflare
+    // D1/R2. A Vercel/dashboard env var still overrides either value, so
+    // rollback = setting NEXT_PUBLIC_PROPERTY_STORAGE_BACKEND=firebase there
+    // (or reverting these defaults) and redeploying.
+    NEXT_PUBLIC_PROPERTY_STORAGE_BACKEND: process.env.NEXT_PUBLIC_PROPERTY_STORAGE_BACKEND || 'cloudflare',
+    NEXT_PUBLIC_CLOUDFLARE_API_ORIGIN: process.env.NEXT_PUBLIC_CLOUDFLARE_API_ORIGIN
+      || 'https://chantakorn-property-api.chantakorn-property.workers.dev',
     NEXT_PUBLIC_GOOGLE_MAPS_API_KEY: process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || process.env.VITE_GOOGLE_MAPS_API_KEY || '',
   },
   images: {
