@@ -306,7 +306,10 @@ test('local Worker HTTP / D1 / R2 / Firebase authorization contract', async t =>
   });
   await t.test('R2 public delivery stops after unpublishing', async () => {
     const response = await fetchApi('/v1/media/properties/' + mediaId);
-    assert.equal(response.status, 200); assert.equal(response.headers.get('Cache-Control'), 'no-store');
+    assert.equal(response.status, 200);
+    // Published photos use a short browser-only cache: repeat views skip the
+    // network, and no shared cache can serve an unpublished photo later.
+    assert.equal(response.headers.get('Cache-Control'), 'private, max-age=180');
     await db.prepare('UPDATE properties SET published=0 WHERE id=?').bind(publicId).run();
     assert.equal((await fetchApi('/v1/media/properties/' + mediaId)).status, 404);
   });

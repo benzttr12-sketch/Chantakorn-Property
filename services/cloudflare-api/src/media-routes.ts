@@ -78,13 +78,14 @@ media.get('/v1/media/properties/:mediaId', async c => {
   if (!row) return c.json({ error: 'Not found' }, 404);
   const object = await c.env.PROPERTY_MEDIA.get(row.key);
   if (!object || !('body' in object)) return c.json({ error: 'Not found' }, 404);
-  // Each request must recheck publication. Browser/CDN caches cannot bypass it.
+  // Each request rechecks publication, so a draft cannot leak through a shared
+  // cache. A short browser-only cache (no shared CDN store) keeps repeat page
+  // views from re-downloading every photo while limiting any unpublished photo
+  // to at most 3 more minutes on devices that had already viewed it.
   const headers = objectHeaders(row.type, object.httpEtag, false);
-  // Allowed-site admins can pull an existing photo by URL to attach it to a new
-  // listing (the client downloads then re-uploads through a staff session).
   const allowedOrigin = matchAllowedOrigin(c.req.header('Origin') ?? null, c.env.ALLOWED_ORIGIN);
   if (allowedOrigin) headers.set('Access-Control-Allow-Origin', allowedOrigin);
-  headers.set('Cache-Control', 'no-store');
+  headers.set('Cache-Control', 'private, max-age=180');
   return new Response(object.body, { status: 200, headers });
 });
 
