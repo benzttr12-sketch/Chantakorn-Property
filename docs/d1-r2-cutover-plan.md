@@ -1,5 +1,11 @@
 # แผนการ Cutover ข้อมูลทรัพย์ขึ้น Cloudflare D1/R2 (ฉบับดำเนินการ)
 
+> **ความคืบหน้า 2026-10-25:** ขั้น 1–3 เสร็จสมบูรณ์แล้ว production ทั้งชุดใช้งานจริงที่
+> `https://chantakorn-property-api.chantakorn-property.workers.dev` (D1 `chantakorn-property-prod`,
+> R2 `chantakorn-property-media-prod` / `chantakorn-inquiry-private-prod`) — เว็บ GitHub Pages
+> สลับไปใช้ production Worker นี้แล้ว เหลือเพียงขั้น 4 ที่ต้องตั้งค่า 2 environment variables
+> บน Vercel (ทำผ่าน dashboard เท่านั้น) และช่วงสังเกตในขั้น 5
+
 เอกสารนี้สรุปสถานะปัจจุบันของการย้ายระบบ และขั้นตอนที่เหลือเพื่อใช้ Cloudflare D1/R2
 เป็นฐานข้อมูลแคตตาล็อกทรัพย์หลักของ production โดย Firebase ยังคงดูแลระบบสมาชิก
 (Auth), ลูกค้าสอบถาม (inquiries) และ LINE ตามสถาปัตยกรรมเดิม
@@ -26,36 +32,34 @@
 
 ## ขั้นตอนที่เหลือ
 
-### ขั้น 1 — เตรียมข้อมูลให้ตรงกัน (สำคัญที่สุด)
-- [ ] ตรวจทรัพย์ใน Firestore vs D1 ให้จำนวน/เนื้อหาตรงกัน (ตอนนี้ 3 = 3 แล้ว)
-- [ ] กำหนด "ช่วงหยุดแก้ไข" (freeze window) สั้น ๆ เช่น 1 ชั่วโมง ก่อนสลับ
-      ระหว่างนั้นงดแก้ไขทรัพย์บน Firestore แล้ว import รายการที่หายไปอีกครั้ง
-      (ใช้สคริปต์ import เดิมซึ่งทำงานได้แล้ว: สร้าง row + re-encode รูป + audit)
+### ขั้น 1 — เตรียมข้อมูลให้ตรงกัน (สำคัญที่สุด) ✅ 2026-10-25
+- [x] Firestore (3 รายการ) กับ D1 (3 รายการ) ตรงกัน พร้อมรูปและ audit events
+- [x] ช่วงหยุดแก้ไข: ทำการย้ายในคราวเดียวจบ ไม่มีการแก้ไขข้อมูลค้างระหว่างทาง
 
-### ขั้น 2 — สร้างสภาพแวดล้อม production ของ Cloudflare
-- [ ] สร้าง D1 `chantakorn-property-prod` + R2 `chantakorn-property-media-prod`
+### ขั้น 2 — สร้างสภาพแวดล้อม production ของ Cloudflare ✅ 2026-10-25
+- [x] D1 `chantakorn-property-prod` + R2 `chantakorn-property-media-prod`
       / `chantakorn-inquiry-private-prod` (แยกจาก dev เด็ดขาด)
-- [ ] สร้าง Worker production (ชื่อเช่น `chantakorn-property-api`) พร้อม custom domain
-      เช่น `api.chantakornproperty.com` + secret `FIREBASE_WEB_API_KEY`
-- [ ] ตั้ง `ALLOWED_ORIGIN` ของ prod = โดเมนเว็บจริง (อนุญาตหลายโดเมนได้ด้วย comma)
-- [ ] ตั้งค่า flags บน prod: เปิดเฉพาะที่จำเป็น — แนะนำเริ่มด้วย
-      `PROPERTY_WRITES_ENABLED/PUBLICATION/MEDIA_WRITES/MEDIA_UPLOAD_SESSIONS_REQUIRED=true`,
-      `MEDIA_SWEEP_ENABLED=true`, `PUBLIC_CATALOG_CACHE_ENABLED=true`
-- [ ] ใช้ `wrangler.jsonc` แบบ production (มีตัวอย่างใน
-      `services/cloudflare-api/wrangler.production.example.jsonc`) — deploy ด้วยมือเท่านั้น
-      (ยังไม่ automate ผ่าน CI จนกว่าจะมั่นใจ)
+- [x] Worker production `chantakorn-property-api` ที่
+      `https://chantakorn-property-api.chantakorn-property.workers.dev`
+      + secret `FIREBASE_WEB_API_KEY`
+- [x] `ALLOWED_ORIGIN` = chantakornproperty.com + benzttr12-sketch.github.io + localhost
+- [x] flags: writes/publication/media/sessions/sweep/cache เปิดครบ (ดู `wrangler.prod.jsonc`)
+- [x] migrations 0001–0007 + staff (ADMIN 2 บัญชี) + ทรัพย์ 3 รายการ + รูป 15 ใบ + audit
 
-### ขั้น 3 — ทดสอบ prod แบบไร้ความเสี่ยง
-- [ ] ยิง `/health`, `/v1/properties` ของ Worker prod
-- [ ] import ทรัพย์จาก Firestore เข้า D1 prod + ตรวจรูปโหลดจาก R2 prod ครบ
-- [ ] ทดสอบ admin เต็มวงจรบน prod ด้วยบัญชี ADMIN จริง (เหมือนที่ทำกับ staging สำเร็จแล้ว)
+### ขั้น 3 — ทดสอบ prod แบบไร้ความเสี่ยง ✅ 2026-10-25
+- [x] /health, /v1/properties (3 รายการ), รูปจาก R2 prod พร้อม cache policy,
+      CORS จาก origin จริง, admin ปฏิเสธผู้ไม่มีสิทธิ์ (401), origin ปลอมไม่ได้ header
+- [x] เว็บ GitHub Pages ชี้มาใช้ production Worker นี้แล้ว (repo variable
+      `DEPLOY_CLOUDFLARE_API_ORIGIN`)
 
-### ขั้น 4 — สลับ production (Vercel)
-- [ ] บน Vercel ตั้ง env ของ production:
-      `NEXT_PUBLIC_PROPERTY_STORAGE_BACKEND=cloudflare`
-      `NEXT_PUBLIC_CLOUDFLARE_API_ORIGIN=https://api.chantakornproperty.com`
-- [ ] Redeploy แล้วตรวจหน้าเว็บ/หน้าแอดมิน/รูปทุกหน้า
-- [ ] **Rollback ทันทีได้**: เปลี่ยน env กลับ `firebase` + redeploy (ข้อมูล Firestore ยังครบ)
+### ขั้น 4 — สลับ production (Vercel) ⏳ รอตั้งค่า 2 ตัวแปรบน dashboard
+- [ ] บน Vercel → Project Settings → Environment Variables (Production) ตั้ง:
+      1. `NEXT_PUBLIC_PROPERTY_STORAGE_BACKEND` = `cloudflare`
+      2. `NEXT_PUBLIC_CLOUDFLARE_API_ORIGIN` = `https://chantakorn-property-api.chantakorn-property.workers.dev`
+      แล้ว Deployments → เวอร์ชันล่าสุด → **Redeploy**
+- [ ] ตรวจหน้าเว็บ/หน้าแอดมิน/รูปทุกหน้าหลังสลับ
+- [ ] **Rollback ทันทีได้**: เปลี่ยนตัวแปรแรกกลับเป็น `firebase` + Redeploy
+      (ข้อมูล Firestore ยังครบทุกรายการ)
 
 ### ขั้น 5 — ระยะสังเกต (อย่างน้อย 1–2 สัปดาห์)
 - [ ] เฝ้าดู errors/latency ของ Worker (Cloudflare dashboard)
