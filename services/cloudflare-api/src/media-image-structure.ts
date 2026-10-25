@@ -193,8 +193,19 @@ function validateJpeg(bytes: Uint8Array): ImageStructureResult {
     const segmentLength = u16be(bytes, i);
     if (segmentLength < 2 || i + segmentLength > length) return fail(415, 'Invalid JPEG segment length');
     const segmentEnd = i + segmentLength;
-    if (marker >= 0xe1 && marker <= 0xef)
+    if (marker >= 0xe1 && marker <= 0xef) {
+      // Chrome/Safari/Firefox canvas JPEG encoders embed a small sRGB ICC
+      // profile in APP2 ("ICC_PROFILE\0" + chunk counters + profile bytes).
+      // The web client always re-encodes through a canvas, so every normal
+      // browser upload carries this segment. Accept only that bounded form;
+      // EXIF/XMP/IPTC and oversized or foreign APP2 payloads stay rejected.
+      if (marker === 0xe2 && segmentLength >= 18 && segmentLength <= 1032 &&
+          ascii(bytes, i + 2, 12) === 'ICC_PROFILE\0') {
+        i = segmentEnd;
+        continue;
+      }
       return fail(415, 'JPEG metadata (EXIF/XMP/IPTC/ICC) is not accepted');
+    }
     if (marker === 0xfe) return fail(415, 'JPEG comments are not accepted');
     if (marker === 0xe0) {
       if (segmentLength < 8 || ascii(bytes, i + 2, 5) !== 'JFIF\0')
