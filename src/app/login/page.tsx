@@ -19,6 +19,22 @@ import {
 import { dataBackend } from '@/lib/backend';
 import { signInWithGoogle, loginWithEmail, getCurrentUserProfile } from '@/lib/auth-helpers';
 
+/** Map raw Firebase error codes to Thai messages staff can act on. */
+function friendlyAuthError(err: any): string {
+  const code = err?.code || '';
+  const map: Record<string, string> = {
+    'auth/invalid-credential': 'อีเมลหรือรหัสผ่านไม่ถูกต้อง กรุณาลองอีกครั้ง',
+    'auth/wrong-password': 'รหัสผ่านไม่ถูกต้อง กรุณาลองอีกครั้ง',
+    'auth/user-not-found': 'ไม่พบบัญชีผู้ใช้งานนี้ในระบบ',
+    'auth/too-many-requests': 'พยายามหลายครั้งเกินไป กรุณารอสักครู่แล้วลองใหม่',
+    'auth/network-request-failed': 'เครือข่ายขัดข้อง กรุณาตรวจอินเทอร์เน็ตแล้วลองใหม่',
+    'auth/invalid-email': 'รูปแบบอีเมลไม่ถูกต้อง',
+  };
+  if (map[code]) return map[code];
+  if (err?.message?.includes('invalid-credential') || err?.message?.includes('wrong-password')) return map['auth/invalid-credential'];
+  return err?.message || 'ไม่สามารถเข้าสู่ระบบได้ กรุณาลองใหม่อีกครั้ง';
+}
+
 function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -60,7 +76,7 @@ function LoginForm() {
       .catch(err => {
         if (!active) return;
         setCheckingSession(false);
-        setError('การกลับมาจากหน้าล็อกอิน Google ไม่สำเร็จ: ' + (err?.code ? err.code + ' — ' : '') + (err?.message || 'กรุณาลองใหม่อีกครั้ง'));
+        setError('การกลับมาจากหน้าล็อกอิน Google ไม่สำเร็จ: ' + friendlyAuthError(err));
       });
     return () => { active = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -104,7 +120,7 @@ function LoginForm() {
         handleSuccessfulAuth(profile.role);
         return;
       } catch (err: any) {
-        setError(err.message || 'อีเมลหรือรหัสผ่านไม่ถูกต้อง');
+        setError(friendlyAuthError(err));
         setLoading(false);
         return;
       }
