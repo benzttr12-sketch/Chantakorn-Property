@@ -34,7 +34,6 @@ import {
   Flame,
   Globe2,
   Video,
-  RefreshCw,
   Search,
   CheckCheck,
   Clock,
@@ -63,9 +62,7 @@ import {
   getQuickClosingScripts,
   QuickClosingScript
 } from '@/lib/automation-engine';
-import SocialBestTimeD3Chart from '@/components/admin/SocialBestTimeD3Chart';
-import { fetchStaffApi } from '@/lib/staff-api';
-import PropertyMediaStudio from '@/components/admin/PropertyMediaStudio';
+import SocialBestTimeD3Chart from '@/components/admin/SocialBestTimeD3Chart';
 import InvestmentZoneDistributionMap from '@/components/admin/InvestmentZoneDistributionMap';
 import {
   calculateBestTimeSlot,
@@ -80,7 +77,7 @@ function AutomationContent() {
   const initialPropId = searchParams?.get('propertyId') || '';
   const initialInquiryId = searchParams?.get('inquiryId') || '';
 
-  const [activeTab, setActiveTab] = useState<'marketing' | 'best_time' | 'leads' | 'valuation' | 'contracts' | 'scripts' | 'media_studio'>(
+  const [activeTab, setActiveTab] = useState<'marketing' | 'best_time' | 'leads' | 'valuation' | 'contracts' | 'scripts' >(
     (initialTab as any) || 'marketing'
   );
 
@@ -108,7 +105,6 @@ function AutomationContent() {
   const [selectedChannel, setSelectedChannel] = useState<MarketingChannel>('facebook');
   const [selectedTone, setSelectedTone] = useState<MarketingTone>('hot_deal');
   const [generatedPost, setGeneratedPost] = useState<SocialMediaPostResult | null>(null);
-  const [isAiGenerating, setIsAiGenerating] = useState(false);
 
   // Best Time State
   const [selectedScheduleSlot, setSelectedScheduleSlot] = useState<{
@@ -193,40 +189,6 @@ function AutomationContent() {
       setCopiedKey(key);
       setTimeout(() => setCopiedKey(null), 2500);
     } catch { setError('คัดลอกไม่สำเร็จ กรุณาลองอีกครั้ง'); }
-  };
-
-  const handleAiDeepEnhance = async () => {
-    if (!selectedProperty) return;
-    setIsAiGenerating(true);
-    try {
-      const res = await fetchStaffApi('/api/ai/automate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: 'generate-social-post',
-          payload: {
-            property: selectedProperty,
-            channel: selectedChannel,
-            tone: selectedTone,
-          },
-        }),
-      });
-      const data = await res.json();
-      if (res.ok && data.success && data.text) {
-        setGeneratedPost(prev => ({
-          headline: prev?.headline || 'AI Generated Post',
-          body: data.text,
-          hashtags: prev?.hashtags || [],
-          callToAction: prev?.callToAction || '',
-          fullPost: data.text,
-        }));
-      }
-      else { setError(data.error || 'สร้างข้อความด้วย AI ไม่สำเร็จ สามารถใช้ข้อความที่เตรียมไว้ได้'); }
-    } catch {
-      setError('เชื่อมต่อ AI ไม่สำเร็จ กรุณาลองใหม่');
-    } finally {
-      setIsAiGenerating(false);
-    }
   };
 
   // Matched leads calculation
@@ -407,19 +369,6 @@ function AutomationContent() {
           <MessageCircle className="w-4 h-4 text-rose-500" />
           <span>ข้อความตอบลูกค้า</span>
         </button>
-
-        <button
-          onClick={() => setActiveTab('media_studio')}
-          aria-pressed={activeTab === 'media_studio'}
-          className={`flex items-center space-x-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap ${
-            activeTab === 'media_studio'
-              ? 'bg-navy-950 text-gold-400 shadow-md scale-102'
-              : 'text-gray-600 hover:bg-gray-100 hover:text-navy-950'
-          }`}
-        >
-          <Video className="w-4 h-4 text-purple-500" />
-          <span>เตรียมสื่อ</span>
-        </button>
       </div>
 
       {/* ========================================================================= */}
@@ -518,25 +467,6 @@ function AutomationContent() {
                   </div>
                 </div>
               )}
-
-              {/* AI Deep Generate Button */}
-              <button
-                onClick={handleAiDeepEnhance}
-                disabled={isAiGenerating}
-                className="w-full py-3 px-4 rounded-xl bg-linear-to-r/srgb from-navy-950 to-blue-900 hover:from-navy-900 hover:to-blue-800 text-gold-400 font-extrabold text-xs shadow-md transition-all flex items-center justify-center space-x-2 disabled:opacity-60"
-              >
-                {isAiGenerating ? (
-                  <>
-                    <RefreshCw className="w-4 h-4 animate-spin text-gold-400" />
-                    <span>AI กำลังประพันธ์เนื้อหาการตลาดชั้นยอด...</span>
-                  </>
-                ) : (
-                  <>
-                    <Sparkles className="w-4 h-4 text-gold-400" />
-                    <span>✨ ยกระดับคำโฆษณาด้วย Gemini 3.8 AI</span>
-                  </>
-                )}
-              </button>
             </div>
 
             {/* Result Output Panel */}
@@ -1379,8 +1309,7 @@ function AutomationContent() {
 
       {/* ========================================================================= */}
       {/* TAB 7: PROPERTY MEDIA BRIEFS */}
-      {/* ========================================================================= */}
-      {activeTab === 'media_studio' && <PropertyMediaStudio key={selectedProperty?.id || 'empty'} property={selectedProperty} />}
+      {/* ========================================================================= */}
     </div>
   );
 }

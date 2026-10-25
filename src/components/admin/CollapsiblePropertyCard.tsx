@@ -20,6 +20,7 @@ import {
   Star,
   MapPin,
   MessageCircle,
+  Facebook,
   ClipboardCopy,
   CalendarDays,
   UserRound,
@@ -61,6 +62,7 @@ interface CollapsiblePropertyCardProps {
   onOpenLandsMaps: (property: Property) => void;
   onOpenHistoryModal: (property: Property) => void;
   onOpenLineModal?: (property: Property) => void;
+  onOpenFacebookModal?: (property: Property) => void;
   onDuplicate: (property: Property) => void;
   onDeleteConfirm: (id: string) => void;
   onUpdateNotes?: (id: string, notes: string, expectedUpdatedAt?: string) => Promise<void>;
@@ -97,6 +99,7 @@ export default function CollapsiblePropertyCard({
   onOpenLandsMaps,
   onOpenHistoryModal,
   onOpenLineModal,
+  onOpenFacebookModal,
   onDuplicate,
   onDeleteConfirm,
   onUpdateNotes,
@@ -320,7 +323,7 @@ export default function CollapsiblePropertyCard({
             </button>
           </div>
         )}
-        <div className="grid grid-cols-2 gap-2">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
           <Link
             href={`/admin/properties/new?id=${encodeURIComponent(property.id)}`}
             className="flex min-h-11 items-center justify-center gap-2 rounded-xl bg-navy-950 px-2 text-sm font-semibold text-white hover:bg-navy-900"
@@ -341,6 +344,16 @@ export default function CollapsiblePropertyCard({
           >
             <MessageCircle className="h-4 w-4 shrink-0" />
             ส่ง LINE
+          </button>
+          <button
+            type="button"
+            disabled={!onOpenFacebookModal}
+            onClick={() => onOpenFacebookModal?.(property)}
+            title="สร้างข้อความโพสต์พร้อมวางบน Facebook เพจ"
+            className="flex min-h-11 items-center justify-center gap-2 rounded-xl border border-blue-200 bg-blue-50 px-2 text-sm font-semibold text-blue-800 hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            <Facebook className="h-4 w-4 shrink-0" />
+            โพสต์ Facebook
           </button>
         </div>
         <button

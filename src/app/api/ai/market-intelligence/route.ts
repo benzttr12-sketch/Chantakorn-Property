@@ -1,7 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getGeminiClient } from '@/lib/gemini';
 import { readJsonBody } from '@/lib/server-request';
-import { enforceRequestBudget } from '@/lib/server-budget';
 
 export interface GroundingSource {
   title: string;
@@ -15,7 +13,7 @@ export interface MarketIntelligenceResponse {
   timestamp: string;
 }
 
-// In-memory cache for market intelligence to protect against Gemini API rate limits & 429 quota errors
+// In-memory cache keeps repeat insights cheap (bounded entries and bytes)
 interface CachedInsight {
   data: {
     answer: string;
@@ -86,103 +84,17 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    let ai = getGeminiClient();
-    if (ai) {
-      const limited = await enforceRequestBudget(req, 'market-intelligence', { perMinute: 5, perDay: 100 });
-      if (limited) {
-        if (process.env.NEXT_PUBLIC_DATA_BACKEND === 'local' && limited.status === 503) ai = null;
-        else return limited;
-      }
-    }
-
-    if (!ai) {
-      const fallbackResult = {
-        answer: getFallbackMarketInsight(query || category),
-        sources: getFallbackSources(query || category),
-        searchQueries: ['ราคาประเมินที่ดิน หาดใหญ่ ล่าสุด', 'โครงการมอเตอร์เวย์ หาดใหญ่ สะเดา', 'แนวโน้มอสังหา สงขลา'],
-        timestamp: new Date().toISOString(),
-      };
-      cacheInsight(cacheKey, fallbackResult);
-
-      return NextResponse.json({
-        success: true,
-        ...fallbackResult,
-      });
-    }
-
-    const prompt = `คุณคือผู้เชี่ยวชาญด้านเศรษฐกิจและการลงทุนอสังหาริมทรัพย์ชั้นนำประจำจังหวัดสงขลาและอำเภอหาดใหญ่แห่ง "ฉันทากร พร็อพเพอร์ตี้ (Chantakorn Property)"
-จงค้นหาข้อมูลอัปเดตล่าสุดจาก Google Search และให้บทวิเคราะห์ที่แม่นยำ ทันสมัย อ้างอิงข้อมูลจริงเชิงตัวเลข
-
-คำถาม/หัวข้อที่ต้องการวิเคราะห์:
-"${query}"
-
-คำแนะนำการตอบ:
-1. สรุปสถานการณ์และแนวโน้มล่าสุดอย่างกระชับ เจาะลึก มีความเป็นมืออาชีพสูง
-2. ระบุตัวเลข สถิติ หรือข้อเท็จจริงสำคัญ (เช่น ราคาประเมิน, ดอกเบี้ย, อัตราผลตอบแทน Yield, กำหนดการโครงการ)
-3. ให้คำแนะนำเชิงกลยุทธ์สำหรับผู้ซื้อเพื่ออยู่อาศัย และนักลงทุนอสังหาฯ ในหาดใหญ่-สงขลา
-4. ใช้ภาษาไทยที่สุภาพ น่าเชื่อถือ ชัดเจน`;
-
-    let responseText = '';
-    let uniqueSources: GroundingSource[] = [];
-    let searchQueries: string[] = [];
-
-    try {
-      const response = await ai.models.generateContent({
-        model: 'gemini-3.8-flash',
-        contents: prompt,
-        config: {
-          maxOutputTokens: 4096,
-          tools: [{ googleSearch: {} }],
-        },
-      });
-
-      responseText = response.text || '';
-      const groundingMetadata = response.candidates?.[0]?.groundingMetadata;
-      const webChunks = (groundingMetadata?.groundingChunks || [])
-        .map((chunk: any) => ({
-          title: chunk.web?.title || 'แหล่งข้อมูลอ้างอิง',
-          uri: chunk.web?.uri || '',
-        }))
-        .filter((c: any) => c.uri);
-
-      const seenUris = new Set<string>();
-      for (const source of webChunks) {
-        if (!seenUris.has(source.uri)) {
-          seenUris.add(source.uri);
-          uniqueSources.push(source);
-        }
-      }
-
-      searchQueries = groundingMetadata?.webSearchQueries || [];
-    } catch (genError: any) {
-      // Graceful fallback when rate limited (429 RESOURCE_EXHAUSTED) or quota exceeded
-      const isQuotaError = genError?.status === 429 || 
-                           genError?.message?.includes('429') || 
-                           genError?.message?.includes('RESOURCE_EXHAUSTED') ||
-                           genError?.message?.includes('quota');
-
-      if (!isQuotaError) {
-        console.info('Market intelligence search note, using curated dataset');
-      }
-
-      responseText = getFallbackMarketInsight(query || category);
-      uniqueSources = getFallbackSources(query || category);
-      searchQueries = ['ราคาประเมินที่ดิน หาดใหญ่ ล่าสุด', 'โครงการมอเตอร์เวย์ หาดใหญ่ สะเดา', 'แนวโน้มอสังหา สงขลา'];
-    }
-
-    const finalResult = {
-      answer: responseText || getFallbackMarketInsight(query || category),
-      sources: uniqueSources.length > 0 ? uniqueSources : getFallbackSources(query || category),
-      searchQueries: searchQueries.length > 0 ? searchQueries : ['ราคาประเมินที่ดิน หาดใหญ่ ล่าสุด', 'โครงการมอเตอร์เวย์ หาดใหญ่ สะเดา', 'แนวโน้มอสังหา สงขลา'],
+    const fallbackResult = {
+      answer: getFallbackMarketInsight(query || category),
+      sources: getFallbackSources(query || category),
+      searchQueries: ['ราคาประเมินที่ดิน หาดใหญ่ ล่าสุด', 'โครงการมอเตอร์เวย์ หาดใหญ่ สะเดา', 'แนวโน้มอสังหา สงขลา'],
       timestamp: new Date().toISOString(),
     };
-
-    // Store in cache to minimize future API calls
-    cacheInsight(cacheKey, finalResult);
+    cacheInsight(cacheKey, fallbackResult);
 
     return NextResponse.json({
       success: true,
-      ...finalResult,
+      ...fallbackResult,
     });
   } catch (error: any) {
     // Ultimate graceful catch-all

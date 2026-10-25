@@ -200,10 +200,10 @@ export default function SmartDescriptionGeneratorModal({
             <div>
               <div className="flex items-center space-x-2">
                 <h3 className="text-base sm:text-lg font-black text-white">
-                  AI Smart Description Generator
+                  Smart Description Generator
                 </h3>
                 <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-gold-400 text-navy-950">
-                  Gemini 3.8 Flash
+                  Smart Template Engine
                 </span>
               </div>
               <p className="text-xs text-slate-300 mt-0.5">

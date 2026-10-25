@@ -33,34 +33,27 @@ export default function RealEstateFAQ() {
   const [faqs, setFaqs] = useState<FAQItem[]>([]);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
-  const [refreshingAi, setRefreshingAi] = useState<boolean>(false);
   const [searchQuery, setSearchQuery] = useState<string>('');
-  const [source, setSource] = useState<string>('curated-expert-database');
 
-  // Custom AI Question State
+  // Custom Question State
   const [customQuestion, setCustomQuestion] = useState<string>('');
   const [askingAi, setAskingAi] = useState<boolean>(false);
   const [customAnswer, setCustomAnswer] = useState<FAQItem | null>(null);
   const [askError, setAskError] = useState<string>('');
 
-  // Fetch FAQs dynamically
-  const fetchFaqs = useCallback(async (cat: string, refreshWithGemini = false) => {
-    if (refreshWithGemini) {
-      setRefreshingAi(true);
-    } else {
-      setLoading(true);
-    }
+  // Fetch FAQs from the curated expert database
+  const fetchFaqs = useCallback(async (cat: string) => {
+    setLoading(true);
 
     try {
       const res = await fetch('/api/ai/faq', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ category: cat, refreshWithGemini }),
+        body: JSON.stringify({ category: cat }),
       });
       const data = await res.json();
       if (data.success && Array.isArray(data.faqs)) {
         setFaqs(data.faqs);
-        setSource(data.source || 'gemini-3.8-flash');
         // Auto-expand first item
         if (data.faqs.length > 0) {
           setExpandedId(prev => prev || data.faqs[0].id);
@@ -70,19 +63,18 @@ export default function RealEstateFAQ() {
       console.warn('Failed to fetch FAQs:', err);
     } finally {
       setLoading(false);
-      setRefreshingAi(false);
     }
   }, []);
 
   useEffect(() => {
-    fetchFaqs(activeCategory, false);
+    fetchFaqs(activeCategory);
   }, [activeCategory, fetchFaqs]);
 
   const toggleAccordion = (id: string) => {
     setExpandedId(prev => (prev === id ? null : id));
   };
 
-  // Handle Asking Custom Real Estate Question to Gemini
+  // Handle Asking Custom Real Estate Question (answers route to staff contact)
   const handleAskCustomQuestion = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!customQuestion.trim() || askingAi) return;
@@ -105,7 +97,7 @@ export default function RealEstateFAQ() {
         setAskError(data.error || 'ไม่สามารถรับคำตอบได้ในขณะนี้ กรุณาลองใหม่อีกครั้ง');
       }
     } catch (err) {
-      setAskError('เกิดข้อผิดพลาดในการเชื่อมต่อกับระบบ AI');
+      setAskError('เกิดข้อผิดพลาดในการเชื่อมต่อ กรุณาลองใหม่อีกครั้ง');
     } finally {
       setAskingAi(false);
     }
@@ -133,8 +125,8 @@ export default function RealEstateFAQ() {
         {/* Section Header */}
         <div className="text-center max-w-3xl mx-auto mb-12">
           <div className="inline-flex items-center space-x-2 px-3.5 py-1.5 rounded-full bg-gold-100/80 border border-gold-300 text-navy-950 text-xs font-bold uppercase tracking-wider mb-3">
-            <Sparkles className="w-3.5 h-3.5 text-gold-600 animate-pulse" />
-            <span>AI-POWERED REAL ESTATE KNOWLEDGE</span>
+            <Sparkles className="w-3.5 h-3.5 text-gold-600" />
+            <span>REAL ESTATE KNOWLEDGE</span>
           </div>
 
           <h2 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold text-navy-950 tracking-tight leading-tight">
@@ -143,23 +135,23 @@ export default function RealEstateFAQ() {
           </h2>
 
           <p className="text-slate-600 text-sm sm:text-base mt-3 leading-relaxed">
-            ไขข้อข้องใจเรื่องการซื้อ ขาย เช่า กู้สินเชื่อบ้าน และการขายฝากถูกต้องตามกฎหมาย 
-            ประมวลผลและตอบคำถามเชิงลึกด้วย <strong className="text-navy-950 font-bold">Gemini AI</strong> ร่วมกับข้อมูลมาตรฐานวิชาชีพของ Chantakorn Property
+            ไขข้อข้องใจเรื่องการซื้อ ขาย เช่า กู้สินเชื่อบ้าน และการขายฝากถูกต้องตามกฎหมาย
+            คำตอบจาก<strong className="text-navy-950 font-bold">ฐานข้อมูลมาตรฐานวิชาชีพ</strong>ของ Chantakorn Property
           </p>
 
-          {/* AI Status Badge */}
+          {/* Knowledge Base Status Badge */}
           <div className="mt-4 flex items-center justify-center space-x-2 text-xs text-slate-500">
             <span className="flex h-2 w-2 relative">
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
               <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
             </span>
             <span className="font-medium">
-              ขับเคลื่อนด้วย {source === 'gemini-3.8-flash' ? 'Google Gemini 3.8 Flash (Live Dynamic)' : 'ฐานข้อมูลผู้เชี่ยวชาญ & Gemini AI'}
+              ขับเคลื่อนด้วยฐานข้อมูลผู้เชี่ยวชาญด้านอสังหาริมทรัพย์หาดใหญ่–สงขลา
             </span>
           </div>
         </div>
 
-        {/* Controls Bar: Category Tabs & Gemini Refresh */}
+        {/* Controls Bar: Category Tabs */}
         <div className="space-y-4 mb-8">
           {/* Category Pills */}
           <div className="flex items-center justify-start sm:justify-center gap-2 overflow-x-auto pb-2 scrollbar-none">
@@ -186,7 +178,7 @@ export default function RealEstateFAQ() {
             })}
           </div>
 
-          {/* Search Input & Dynamic Gemini AI Refresh Button */}
+          {/* Search Input */}
           <div className="flex flex-col sm:flex-row items-center gap-3 max-w-2xl mx-auto">
             <div className="relative w-full">
               <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
@@ -206,22 +198,12 @@ export default function RealEstateFAQ() {
                 </button>
               )}
             </div>
-
-            <button
-              onClick={() => fetchFaqs(activeCategory, true)}
-              disabled={refreshingAi || loading}
-              className="w-full sm:w-auto px-4 py-2.5 bg-linear-to-r/srgb from-amber-500 to-gold-500 hover:from-amber-600 hover:to-gold-600 disabled:opacity-70 text-navy-950 text-xs font-bold rounded-xl shadow-xs hover:shadow-md flex items-center justify-center space-x-2 shrink-0 transition-all cursor-pointer"
-              title="สืบค้นและสร้างคำถามใหม่แบบสดๆ ด้วย Gemini API"
-            >
-              <RefreshCw className={`w-3.5 h-3.5 ${refreshingAi ? 'animate-spin' : ''}`} />
-              <span>{refreshingAi ? 'กำลังวิเคราะห์ด้วย Gemini...' : 'ดึงคำถามใหม่ด้วย Gemini'}</span>
-            </button>
           </div>
         </div>
 
         {/* FAQ Accordion List */}
         <div className="max-w-3xl mx-auto space-y-3.5">
-          {loading && !refreshingAi ? (
+          {loading ? (
             <div className="space-y-3 py-6">
               {[1, 2, 3, 4].map(idx => (
                 <div key={idx} className="bg-white rounded-2xl p-5 border border-slate-200 animate-pulse space-y-2">
@@ -235,7 +217,7 @@ export default function RealEstateFAQ() {
               <HelpCircle className="w-10 h-10 text-slate-300 mx-auto" />
               <p className="text-sm font-bold text-navy-950">ไม่พบคำถามที่ตรงกับคำค้นหา &ldquo;{searchQuery}&rdquo;</p>
               <p className="text-xs text-slate-500">
-                คุณสามารถพิมพ์คำถามนี้ในกล่องด้านล่าง เพื่อให้ Gemini AI ตอบให้คุณได้ทันทีครับ
+                คุณสามารถพิมพ์คำถามนี้ในกล่องด้านล่าง เพื่อรับคำแนะนำและช่องทางติดต่อทีมงานได้ทันทีครับ
               </p>
             </div>
           ) : (
@@ -294,14 +276,14 @@ export default function RealEstateFAQ() {
           )}
         </div>
 
-        {/* Interactive Custom Question Box: Ask Gemini AI */}
+        {/* Interactive Custom Question Box */}
         <div className="max-w-3xl mx-auto mt-12 bg-linear-to-br/srgb from-navy-950 via-navy-900 to-navy-950 rounded-3xl p-6 sm:p-8 text-white border border-gold-500/20 shadow-xl relative overflow-hidden">
           <div className="absolute top-0 right-0 w-64 h-64 bg-gold-400/10 rounded-full blur-3xl pointer-events-none" />
 
           <div className="relative z-10 space-y-4">
             <div className="flex items-center space-x-2 text-xs font-bold text-gold-400 uppercase tracking-widest">
               <Sparkles className="w-4 h-4 text-gold-400" />
-              <span>ถามคำถามอสังหาฯ เฉพาะตัวกับ GEMINI AI</span>
+              <span>ถามคำถามอสังหาฯ เฉพาะตัวกับทีมงาน</span>
             </div>
 
             <div>
@@ -309,7 +291,7 @@ export default function RealEstateFAQ() {
                 ยังมีข้อสงสัยเรื่องอื่นเกี่ยวกับอสังหาฯ หาดใหญ่–สงขลา?
               </h3>
               <p className="text-xs sm:text-sm text-slate-300 mt-1">
-                พิมพ์คำถามของคุณได้เลย ระบบ Gemini AI พร้อมตอบคำถามเรื่องข้อกฎหมาย ดอกเบี้ย และทำเลให้อย่างละเอียดทันที
+                พิมพ์คำถามของคุณได้เลย ทีมงานพร้อมให้คำแนะนำเรื่องข้อกฎหมาย ดอกเบี้ย และทำเลอย่างละเอียด
               </p>
             </div>
 
@@ -352,7 +334,7 @@ export default function RealEstateFAQ() {
                 <div className="flex items-center justify-between text-xs">
                   <span className="font-bold text-gold-400 flex items-center gap-1.5">
                     <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-                    คำตอบจาก Gemini AI (Chantakorn Expert Consultant)
+                    คำแนะนำจากทีมงาน Chantakorn Property
                   </span>
                   <span className="text-[10px] text-slate-400 bg-navy-900 px-2 py-0.5 rounded-full border border-slate-700">
                     {customAnswer.tag}

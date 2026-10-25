@@ -11,5 +11,5 @@ export interface FAQCategoryData {
   category: string;
   categoryTitle: string;
   faqs: FAQItem[];
-  source: 'gemini-3.8-flash' | 'curated-expert-database';
+  source: 'curated-expert-database';
 }

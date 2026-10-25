@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { GoogleGenAI, Type } from '@google/genai';
 
-import type { FAQItem, FAQCategoryData } from '@/lib/faq-types';
+import type { FAQItem } from '@/lib/faq-types';
 
 // Curated Fallback Database for Hat Yai - Songkhla Real Estate
 const CURATED_FAQS: Record<string, FAQItem[]> = {
@@ -36,7 +35,7 @@ const CURATED_FAQS: Record<string, FAQItem[]> = {
       answer: 'โดยทั่วไปประกอบด้วย: 1. ค่าธรรมเนียมการโอน 2% (มักแบ่งชำระคนละครึ่งฝ่ายละ 1% หรือตามตกลง) 2. ค่าภาษีเงินได้บุคคลธรรมดาหัก ณ ที่จ่าย (ผู้ขายรับผิดชอบ) 3. ค่าภาษีธุรกิจเฉพาะ 3.3% หรือค่าอากรแสตมป์ 0.5% (ผู้ขายรับผิดชอบ) และ 4. ค่าจดจำนอง 1% (กรณีผู้ซื้อกู้เงินธนาคาร ผู้ซื้อรับผิดชอบ) ทั้งนี้ควรระบุข้อตกลงการแบ่งจ่ายให้ชัดเจนในสัญญาจะซื้อจะขาย ซึ่งทีมงานเราช่วยคำนวณยอดสุทธิล่วงหน้าให้แม่นยำทุกรายการ',
       category: 'selling',
       tag: 'ค่าโอน & ภาษี',
-      tip: 'ครอบครองเกิน 5 ปี หรือมีชื่อในทะเบียนบ้านเกิน 1 ปี จะเสียอากรแสตมป์แทนภาษีธุรกิจเฉพาะ ประหยัดได้มาก',
+      tip: 'ครอบครองเกิน 5 ปี หรือมีชื่อในทะเบียนบ้านเกิน 1 ปี จะเสียอากรแสตมป์แทนภาษีธุรกิจเฉพาะ ประหัดได้มาก',
     },
     {
       id: 'faq-buy-01',
@@ -162,76 +161,7 @@ export async function POST(req: NextRequest) {
     const category = typeof body.category === 'string' && body.category in CURATED_FAQS ? body.category : 'all';
     const customQuestion = typeof body.customQuestion === 'string' ? body.customQuestion.trim() : '';
 
-    const apiKey = process.env.GEMINI_API_KEY;
-
-    // Mode 1: Answer Custom User Question via Gemini API
     if (customQuestion) {
-      if (apiKey) {
-        try {
-          const ai = new GoogleGenAI({
-            apiKey,
-            httpOptions: {
-              headers: {
-                'User-Agent': 'aistudio-build',
-              },
-            },
-          });
-
-          const prompt = `คุณคือผู้เชี่ยวชาญด้านอสังหาริมทรัพย์ระดับอาวุโส (Senior Real Estate Consultant & Legal Advisor) ประจำบริษัท Chantakorn Property ในอำเภอหาดใหญ่และจังหวัดสงขลา
-ตอบคำถามของลูกค้าต่อไปนี้ด้วยภาษาไทยที่สุภาพ เป็นมืออาชีพ ชัดเจน ถูกต้องตามกฎหมายอสังหาริมทรัพย์ไทย และอ้างอิงบริบทของพื้นที่หาดใหญ่–สงขลา:
-
-คำถามของลูกค้า: "${customQuestion}"
-
-กรุณาตอบเป็น JSON ตามโครงสร้างนี้:
-{
-  "question": "${customQuestion}",
-  "answer": "คำตอบที่ละเอียด เข้าใจง่าย ชัดเจน 3-5 บรรทัด",
-  "category": "หมวดหมู่ภาษาอังกฤษ (buying / selling / loans / consignment / legal)",
-  "tag": "แท็กภาษาไทยสั้นๆ 1-2 คำ",
-  "tip": "คำแนะนำพิเศษที่เป็นประโยชน์ 1 ประโยค"
-}`;
-
-          const response = await ai.models.generateContent({
-            model: 'gemini-3.8-flash',
-            contents: prompt,
-            config: {
-              systemInstruction: 'คุณคือที่ปรึกษาอสังหาริมทรัพย์ผู้เชี่ยวชาญในหาดใหญ่และสงขลา ตอบเป็น JSON เท่านั้น',
-              responseMimeType: 'application/json',
-              responseSchema: {
-                type: Type.OBJECT,
-                properties: {
-                  question: { type: Type.STRING },
-                  answer: { type: Type.STRING },
-                  category: { type: Type.STRING },
-                  tag: { type: Type.STRING },
-                  tip: { type: Type.STRING },
-                },
-                required: ['question', 'answer', 'category', 'tag'],
-              },
-            },
-          });
-
-          const text = response.text?.trim();
-          if (text) {
-            const parsed = JSON.parse(text);
-            return NextResponse.json({
-              success: true,
-              source: 'gemini-3.8-flash',
-              faq: {
-                id: `faq-custom-${Date.now()}`,
-                ...parsed,
-              },
-            });
-          }
-        } catch (geminiError: any) {
-          const isQuota = geminiError?.status === 429 || geminiError?.message?.includes('429') || geminiError?.message?.includes('quota');
-          if (!isQuota) {
-            console.info('Custom Q&A using curated fallback response');
-          }
-        }
-      }
-
-      // Fallback for custom question if Gemini is unavailable
       return NextResponse.json({
         success: true,
         source: 'curated-expert-database',
@@ -246,78 +176,6 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // Mode 2: Fetch Category FAQ List (Dynamically generated with Gemini or refreshed)
-    if (apiKey && body.refreshWithGemini === true) {
-      try {
-        const ai = new GoogleGenAI({
-          apiKey,
-          httpOptions: {
-            headers: {
-              'User-Agent': 'aistudio-build',
-            },
-          },
-        });
-
-        const prompt = `คุณคือผู้เชี่ยวชาญด้านอสังหาริมทรัพย์และนิติกรรมสัญญา ประจำ "Chantakorn Property" ในอำเภอหาดใหญ่และจังหวัดสงขลา
-กรุณาสร้างชุดคำถาม-คำตอบ (FAQ) อสังหาริมทรัพย์ยอดนิยมจำนวน 5-6 ข้อ สำหรับหมวดหมู่: "${CATEGORY_NAMES[category] || category}"
-โดยครอบคลุมปัญหาที่คนซื้อ คนขาย คนกู้บ้าน และคนขายฝากในหาดใหญ่–สงขลามักสงสัยบ่อยที่สุด เช่น ราคาประเมิน, การกู้ธนาคาร, โฉนดที่ดิน, สิทธิคุ้มครองขายฝาก, ทำเลทองใกล้มหาวิทยาลัยสงขลานครินทร์ (ม.อ.), เซ็นทรัลหาดใหญ่ ฯลฯ
-
-เงื่อนไข:
-1. ภาษาไทยไพเราะ สุภาพ เป็นมืออาชีพ ถูกต้องตามกฎหมายที่ดินและสินเชื่อไทย
-2. คำตอบกระชับ ตรงประเด็น ชัดเจน
-3. มีคำแนะนำพิเศษ (tip) 1 ประโยคในแต่ละข้อ`;
-
-        const response = await ai.models.generateContent({
-          model: 'gemini-3.8-flash',
-          contents: prompt,
-          config: {
-            systemInstruction: 'คุณคือที่ปรึกษาอสังหาริมทรัพย์ผู้เชี่ยวชาญ ตอบกลับด้วยโครงสร้าง JSON เท่านั้น',
-            responseMimeType: 'application/json',
-            responseSchema: {
-              type: Type.OBJECT,
-              properties: {
-                categoryTitle: { type: Type.STRING },
-                faqs: {
-                  type: Type.ARRAY,
-                  items: {
-                    type: Type.OBJECT,
-                    properties: {
-                      id: { type: Type.STRING },
-                      question: { type: Type.STRING },
-                      answer: { type: Type.STRING },
-                      category: { type: Type.STRING },
-                      tag: { type: Type.STRING },
-                      tip: { type: Type.STRING },
-                    },
-                    required: ['id', 'question', 'answer', 'category', 'tag'],
-                  },
-                },
-              },
-              required: ['categoryTitle', 'faqs'],
-            },
-          },
-        });
-
-        const text = response.text?.trim();
-        if (text) {
-          const parsed = JSON.parse(text);
-          return NextResponse.json({
-            success: true,
-            source: 'gemini-3.8-flash',
-            category,
-            categoryTitle: parsed.categoryTitle || CATEGORY_NAMES[category] || 'คำถามที่พบบ่อย',
-            faqs: parsed.faqs || [],
-          });
-        }
-      } catch (geminiError: any) {
-        const isQuota = geminiError?.status === 429 || geminiError?.message?.includes('429') || geminiError?.message?.includes('quota');
-        if (!isQuota) {
-          console.info('Using curated real estate FAQ database');
-        }
-      }
-    }
-
-    // Default: Fast, ultra-reliable Curated Database
     const items = CURATED_FAQS[category] || CURATED_FAQS.all;
 
     return NextResponse.json({

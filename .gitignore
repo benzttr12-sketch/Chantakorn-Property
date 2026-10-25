@@ -40,3 +40,4 @@ next-env.d.ts
 *.firestore.enc
 *.firestore.enc.manifest.json
 /private-backups/
+wrangler.prod.jsonc
