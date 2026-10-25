@@ -48,7 +48,8 @@ function LoginForm() {
   // The Google redirect flow lands back on this page after sign-in. Consume
   // the pending redirect result / existing session on mount and continue to
   // the right destination; without this the page would sit on the form even
-  // though sign-in already succeeded.
+  // though sign-in already succeeded. A failed redirect (blocked provider,
+  // domain mismatch, storage) is surfaced instead of swallowed.
   React.useEffect(() => {
     let active = true;
     getCurrentUserProfile()
@@ -56,7 +57,11 @@ function LoginForm() {
         if (active && profile) handleSuccessfulAuth(profile.role);
         else if (active) setCheckingSession(false);
       })
-      .catch(() => { if (active) setCheckingSession(false); });
+      .catch(err => {
+        if (!active) return;
+        setCheckingSession(false);
+        setError('การกลับมาจากหน้าล็อกอิน Google ไม่สำเร็จ: ' + (err?.code ? err.code + ' — ' : '') + (err?.message || 'กรุณาลองใหม่อีกครั้ง'));
+      });
     return () => { active = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
