@@ -219,9 +219,9 @@ export default function GooglePropertyMap({
   }, [targetCenter, activePopupProperty, initialCenter, zoom, mapType]);
 
   return (
-    <div 
+    <div
       className={`relative w-full rounded-2xl overflow-hidden border border-surface-border shadow-md bg-navy-950 flex flex-col transition-all duration-300 ${
-        isFullScreen ? 'h-[calc(100vh-140px)]' : 'h-full min-h-[480px]'
+        isFullScreen ? 'h-[calc(100vh-140px)]' : 'h-full'
       } ${className}`}
       style={{ height: isFullScreen ? 'calc(100vh - 140px)' : height }}
     >
