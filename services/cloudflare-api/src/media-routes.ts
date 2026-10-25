@@ -80,6 +80,10 @@ media.get('/v1/media/properties/:mediaId', async c => {
   if (!object || !('body' in object)) return c.json({ error: 'Not found' }, 404);
   // Each request must recheck publication. Browser/CDN caches cannot bypass it.
   const headers = objectHeaders(row.type, object.httpEtag, false);
+  // Allowed-site admins can pull an existing photo by URL to attach it to a new
+  // listing (the client downloads then re-uploads through a staff session).
+  const allowedOrigin = matchAllowedOrigin(c.req.header('Origin') ?? null, c.env.ALLOWED_ORIGIN);
+  if (allowedOrigin) headers.set('Access-Control-Allow-Origin', allowedOrigin);
   headers.set('Cache-Control', 'no-store');
   return new Response(object.body, { status: 200, headers });
 });

@@ -179,6 +179,24 @@ test('accepts the metadata-free JPEG/PNG/WebP streams produced by the canvas com
   assert.deepEqual(await validateImageStructure(jfif, 'image/jpeg'), { ok: true, width: 2, height: 2 });
 });
 
+test('accepts only the bounded sRGB ICC APP2 segment a browser canvas emits', async () => {
+  // Real canvas output shape: JFIF APP0 + APP2 "ICC_PROFILE\0" + chunk counters + small profile.
+  const iccPayload = Buffer.concat([
+    Buffer.from('ICC_PROFILE\0', 'latin1'),
+    Buffer.from([1, 1]), // chunk sequence / total
+    Buffer.alloc(457, 0x21), // sRGB-class profile body (no EXIF/XMP/IPTC fields)
+  ]);
+  const canvasJpeg = insertJpegSegment(insertJpegSegment(jpeg, 0xe0, jfifApp0()), 0xe2, iccPayload);
+  assert.deepEqual(await validateImageStructure(canvasJpeg, 'image/jpeg'), { ok: true, width: 2, height: 2 });
+  // Oversized ICC profiles (camera imports, not canvas output) stay rejected.
+  const oversized = insertJpegSegment(jpeg, 0xe2,
+    Buffer.concat([Buffer.from('ICC_PROFILE\0', 'latin1'), Buffer.from([1, 1]), Buffer.alloc(1200, 0x21)]));
+  assert.equal((await validateImageStructure(oversized, 'image/jpeg')).ok, false);
+  // APP2 payloads that are not ICC profiles stay rejected.
+  const foreignApp2 = insertJpegSegment(jpeg, 0xe2, Buffer.from('not-a-profile', 'latin1'));
+  assert.equal((await validateImageStructure(foreignApp2, 'image/jpeg')).ok, false);
+});
+
 test('rejects JPEG EXIF/XMP/comments, trailing bytes, truncation and oversized frames', async () => {
   const exif = insertJpegSegment(jpeg, 0xe1, Buffer.from('Exif\0\0MM\0*', 'latin1'));
   assert.deepEqual(await validateImageStructure(exif, 'image/jpeg'),
