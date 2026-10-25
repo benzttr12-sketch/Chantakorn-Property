@@ -17,7 +17,7 @@ import {
   Info
 } from 'lucide-react';
 import { dataBackend } from '@/lib/backend';
-import { signInWithGoogle, loginWithEmail } from '@/lib/auth-helpers';
+import { signInWithGoogle, loginWithEmail, getCurrentUserProfile } from '@/lib/auth-helpers';
 
 function LoginForm() {
   const router = useRouter();
@@ -31,6 +31,7 @@ function LoginForm() {
   const [isUnauthorizedDomain, setIsUnauthorizedDomain] = useState(false);
   const [copiedDomain, setCopiedDomain] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [checkingSession, setCheckingSession] = useState(true);
 
   const handleSuccessfulAuth = (role: string) => {
     if (redirectTarget) {
@@ -43,6 +44,22 @@ function LoginForm() {
       router.push('/profile');
     }
   };
+
+  // The Google redirect flow lands back on this page after sign-in. Consume
+  // the pending redirect result / existing session on mount and continue to
+  // the right destination; without this the page would sit on the form even
+  // though sign-in already succeeded.
+  React.useEffect(() => {
+    let active = true;
+    getCurrentUserProfile()
+      .then(profile => {
+        if (active && profile) handleSuccessfulAuth(profile.role);
+        else if (active) setCheckingSession(false);
+      })
+      .catch(() => { if (active) setCheckingSession(false); });
+    return () => { active = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleGoogleLogin = async () => {
     setError('');
@@ -251,10 +268,10 @@ function LoginForm() {
         <button
           id="login-submit-btn"
           type="submit"
-          disabled={loading}
+          disabled={loading || checkingSession}
           className="w-full py-3 px-4 bg-navy-950 hover:bg-navy-900 text-gold-400 font-bold text-xs sm:text-sm rounded-xl shadow-md transition-all flex items-center justify-center space-x-2 disabled:opacity-50 mt-2 cursor-pointer"
         >
-          <span>{loading ? 'กำลังเข้าสู่ระบบ...' : 'เข้าสู่ระบบ'}</span>
+          <span>{checkingSession ? 'กำลังตรวจสอบสถานะเข้าสู่ระบบ...' : loading ? 'กำลังเข้าสู่ระบบ...' : 'เข้าสู่ระบบ'}</span>
           <ArrowRight className="w-4 h-4" />
         </button>
       </form>
