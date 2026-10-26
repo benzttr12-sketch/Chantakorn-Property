@@ -27,11 +27,11 @@ const csp = [
   "default-src 'self'",
   // Next.js hydration + the Google Maps loader require inline script; Maps needs eval.
   // accounts.google.com serves the Google Identity Services button script.
-  "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://maps.googleapis.com https://*.firebaseio.com https://accounts.google.com",
-  "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+  "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://maps.googleapis.com https://*.firebaseio.com https://accounts.google.com https://apis.google.com",
+  "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://accounts.google.com/gsi/style",
   "font-src 'self' data: https://fonts.gstatic.com",
   `img-src 'self' data: blob: https://maps.gstatic.com https://*.googleapis.com https://lh3.googleusercontent.com ${remotePatterns.map((p) => `https://${p.hostname}`).join(' ')}`,
-  "connect-src 'self' https://*.googleapis.com https://*.firebaseio.com wss://*.firebaseio.com https://*.firebasestorage.app https://*.firebaseapp.com https://*.workers.dev https://api.line.me",
+  "connect-src 'self' https://*.googleapis.com https://*.firebaseio.com wss://*.firebaseio.com https://*.firebasestorage.app https://*.firebaseapp.com https://*.workers.dev https://api.line.me https://accounts.google.com/gsi/",
   // Video tours embed YouTube (privacy-enhanced domain); the map embeds Google Maps;
   // Firebase Auth completes the Google popup through a *.firebaseapp.com iframe;
   // Google Identity Services renders accounts.google.com frames.
