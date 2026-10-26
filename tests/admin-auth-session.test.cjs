@@ -5,12 +5,13 @@ const path = require('node:path');
 const vm = require('node:vm');
 const ts = require('typescript');
 
-function load({ role = 'ADMIN', verified = true, readError = false, current = true, backend = 'firebase', redirect = false, redirectError, credentialError } = {}) {
+function load({ role = 'ADMIN', verified = true, readError = false, current = true, backend = 'firebase', redirect = false, redirectError, popupError, popupWait, startRedirectError } = {}) {
   const user = { uid: 'staff-id', email: 'staff@example.com', emailVerified: verified, displayName: 'Team member' };
   let fields = { id: user.uid, full_name: 'Team member', role, avatar_url: '' };
   const state = { reads: 0, failReads: readError, writes: [], events: [], storage: new Map([['chantakorn_auth_user', JSON.stringify({ id: 'forged', full_name: 'Forged', role: 'ADMIN' })]]) };
   state.redirectCalls = 0;
-  state.credentials = [];
+  state.popupCalls = 0;
+  state.startRedirectCalls = 0;
   const auth = { currentUser: current ? user : null, authStateReady: async () => undefined };
   const moduleUnderTest = { exports: {} };
   const source = ts.transpileModule(fs.readFileSync(path.join(__dirname, '../src/lib/auth-helpers.ts'), 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
@@ -26,13 +27,20 @@ function load({ role = 'ADMIN', verified = true, readError = false, current = tr
         getRedirectResult: async () => {
           state.redirectCalls++;
           if (redirectError) throw redirectError;
+          if (redirect) auth.currentUser = user;
           return redirect ? { user } : null;
         },
-        GoogleAuthProvider: { credential: token => ({ idToken: token }) },
-        signInWithCredential: async (_auth, credential) => {
-          state.credentials.push(credential);
-          if (credentialError) throw credentialError;
+        signInWithPopup: async () => {
+          state.popupCalls++;
+          await popupWait?.();
+          if (popupError) throw popupError;
+          auth.currentUser = user;
           return { user };
+        },
+        signInWithRedirect: async () => {
+          state.startRedirectCalls++;
+          if (startRedirectError) throw startRedirectError;
+          return new Promise(() => {});
         },
       };
       if (name === 'firebase/firestore') return {
@@ -139,15 +147,68 @@ test('ordinary session readers can recover a valid signed-in session after an un
   assert.equal(state.reads, 1);
 });
 
-test('GIS exchanges credentials through Firebase and still derives staff permission from the server', async () => {
+test('Google popup completes through Firebase and still derives staff permission from the server', async () => {
   const { api, state } = load({ role: 'USER' });
-  const profile = await api.signInWithGoogleIdToken('synthetic-google-token');
+  const profile = await api.signInWithGoogle();
   assert.equal(profile.role, 'USER');
-  assert.equal(state.credentials.length, 1);
-  assert.equal(state.credentials[0].idToken, 'synthetic-google-token');
+  assert.equal(state.popupCalls, 1);
+  assert.equal(state.startRedirectCalls, 0);
   assert.equal(state.reads, 1);
-  const rejected = load({ credentialError: new Error('Invalid credential') });
-  await assert.rejects(rejected.api.signInWithGoogleIdToken('rejected-token'), /Invalid credential/);
-  assert.equal(rejected.state.reads, 0);
-  assert.equal(rejected.state.writes.length, 0);
+});
+
+test('Google opens only one popup for concurrent clicks and permits another attempt after completion', async () => {
+  let release;
+  const wait = new Promise(resolve => { release = resolve; });
+  const { api, state } = load({ popupWait: () => wait });
+  const first = api.signInWithGoogle(), second = api.signInWithGoogle();
+  assert.equal(first, second);
+  assert.equal(state.popupCalls, 1);
+  release();
+  assert.equal((await first).role, 'ADMIN');
+  await api.signInWithGoogle();
+  assert.equal(state.popupCalls, 2);
+});
+
+test('only blocked or unsupported popups fall back to redirect, preserving redirect failures', async () => {
+  for (const code of ['auth/popup-blocked', 'auth/operation-not-supported-in-this-environment']) {
+    const redirectFailure = new Error('Redirect could not start');
+    const { api, state } = load({ popupError: Object.assign(new Error(code), { code }), startRedirectError: redirectFailure });
+    await assert.rejects(api.signInWithGoogle(), error => error === redirectFailure);
+    assert.equal(state.popupCalls, 1);
+    assert.equal(state.startRedirectCalls, 1);
+    assert.equal(state.reads, 0);
+  }
+});
+
+test('popup cancellation, network and configuration errors never trigger redirect loops', async () => {
+  for (const code of ['auth/popup-closed-by-user', 'auth/cancelled-popup-request', 'auth/network-request-failed', 'auth/internal-error', 'auth/unauthorized-domain', 'auth/operation-not-allowed']) {
+    const failure = Object.assign(new Error(code), { code });
+    const { api, state } = load({ popupError: failure });
+    await assert.rejects(api.signInWithGoogle(), error => error === failure);
+    assert.equal(state.startRedirectCalls, 0);
+    assert.equal(state.reads, 0);
+  }
+  const profileFailure = load({ readError: true });
+  await assert.rejects(profileFailure.api.signInWithGoogle(), /Server unavailable/);
+  assert.equal(profileFailure.state.startRedirectCalls, 0);
+});
+
+test('concurrent session readers consume redirect once and cannot reuse its user after sign-out', async () => {
+  const { api, state, auth } = load({ current: false, redirect: true });
+  const profiles = await Promise.all([api.getCurrentUserProfile(), api.getCurrentUserProfile()]);
+  assert.deepEqual(profiles.map(profile => profile.role), ['ADMIN', 'ADMIN']);
+  assert.equal(state.redirectCalls, 1);
+  auth.currentUser = null;
+  assert.equal(await api.getCurrentUserProfile(), null);
+  assert.equal(api.getStoredUser(), null);
+  assert.equal(state.redirectCalls, 1);
+});
+
+test('successful popup clears a stale redirect failure for future session reads', async () => {
+  const failure = Object.assign(new Error('Old redirect failed'), { code: 'auth/internal-error' });
+  const { api, auth } = load({ current: false, redirectError: failure });
+  await assert.rejects(api.getCurrentUserProfile({ surfaceRedirectError: true }), error => error === failure);
+  await api.signInWithGoogle();
+  auth.currentUser = null;
+  assert.equal(await api.getCurrentUserProfile({ surfaceRedirectError: true }), null);
 });

@@ -1,9 +1,8 @@
 import { auth, db, googleProvider } from '@/lib/firebase/client';
 import {
   signInWithRedirect,
+  signInWithPopup,
   getRedirectResult,
-  signInWithCredential,
-  GoogleAuthProvider,
   signOut as firebaseSignOut,
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
@@ -20,6 +19,15 @@ const VALID_ROLES: UserProfile['role'][] = ['ADMIN', 'AGENT', 'USER'];
 const PROFILE_FIELDS = ['full_name', 'phone', 'avatar_url', 'line_id', 'facebook', 'bio'] as const;
 type ProfileUpdates = Partial<Pick<UserProfile, (typeof PROFILE_FIELDS)[number]>>;
 let verifiedProfile: UserProfile | null = null;
+let redirectCompletion: Promise<void> | undefined;
+let pendingGoogleSignIn: Promise<UserProfile> | undefined;
+
+/** Read the redirect result once per page load. Firebase restores currentUser;
+ * never retain a returned User that could resurrect a session after sign-out. */
+function completeGoogleRedirect(): Promise<void> {
+  if (!auth) return Promise.resolve();
+  return redirectCompletion ||= getRedirectResult(auth).then(() => undefined);
+}
 
 function validRole(value: unknown): value is UserProfile['role'] {
   return typeof value === 'string' && VALID_ROLES.includes(value as UserProfile['role']);
@@ -78,18 +86,16 @@ export async function syncFirebaseUserProfile(user: User, customFullName?: strin
 
 export async function getCurrentUserProfile(options: { surfaceRedirectError?: boolean } = {}): Promise<UserProfile | null> {
   if (dataBackend === 'firebase' && auth) {
-    // Complete a pending signInWithRedirect (mobile/LINE browsers block popups)
-    // before reporting state. Resolves locally with null when no redirect happened.
+    let redirectFailure: unknown;
     try {
-      const redirectResult = await getRedirectResult(auth);
-      if (redirectResult?.user) return syncFirebaseUserProfile(redirectResult.user);
+      await completeGoogleRedirect();
     } catch (error) {
-      // The login screen needs the actual redirect failure. Other session readers
-      // may still recover an already signed-in user without replaying that error.
-      if (options.surfaceRedirectError) throw error;
+      redirectFailure = error;
     }
     await auth.authStateReady();
     if (auth.currentUser) return syncFirebaseUserProfile(auth.currentUser);
+    cacheProfile(null);
+    if (redirectFailure && options.surfaceRedirectError) throw redirectFailure;
   }
   cacheProfile(null);
   return null;
@@ -120,27 +126,28 @@ export async function updateCurrentUserProfile(updates: ProfileUpdates): Promise
   return updatedProfile;
 }
 
-// Google sign-in uses the full-page redirect flow exclusively. The popup
-// variant is unreliable across the environments this site runs in: in-app
-// browsers (LINE etc.) and popup-blocking mobile browsers either throw
-// internal-error or leave the popup promise hanging silently forever. The
-// redirect flow works everywhere and the login page consumes the returning
-// result on mount (getCurrentUserProfile) to forward the user onward.
-export async function signInWithGoogle(): Promise<UserProfile> {
-  if (dataBackend !== 'firebase' || !auth) throw new Error('ระบบ Google Sign-In ยังไม่ได้ตั้งค่า');
-  await signInWithRedirect(auth, googleProvider);
-  // The browser is navigating to Google; if it somehow did not, tell the user.
-  throw new Error('กำลังพาไปหน้าล็อกอิน Google ถ้าหน้าไม่เปลี่ยน กรุณากดปุ่มเข้าสู่ระบบอีกครั้ง');
-}
-
-/** Complete a Google Identity Services sign-in: verify the ID token client-side
- * and sign in to Firebase with it. Works in storage-partitioned browsers
- * because GIS does not depend on the authDomain handler handshake. */
-export async function signInWithGoogleIdToken(idToken: string): Promise<UserProfile> {
-  if (dataBackend !== 'firebase' || !auth) throw new Error('ระบบ Google Sign-In ยังไม่ได้ตั้งค่า');
-  const credential = GoogleAuthProvider.credential(idToken);
-  const result = await signInWithCredential(auth, credential);
-  return syncFirebaseUserProfile(result.user);
+/** One Firebase flow: popup when available, redirect only when it is blocked.
+ * Cancellation, configuration errors and profile failures must never redirect. */
+export function signInWithGoogle(): Promise<UserProfile> {
+  if (dataBackend !== 'firebase' || !auth)
+    return Promise.reject(new Error('ระบบ Google Sign-In ยังไม่ได้ตั้งค่า'));
+  if (pendingGoogleSignIn) return pendingGoogleSignIn;
+  const currentAuth = auth;
+  const signIn = async (): Promise<UserProfile> => {
+    let result;
+    try {
+      result = await signInWithPopup(currentAuth, googleProvider);
+    } catch (error) {
+      const code = (error as { code?: string })?.code;
+      if (code === 'auth/popup-blocked' || code === 'auth/operation-not-supported-in-this-environment')
+        return await signInWithRedirect(currentAuth, googleProvider);
+      throw error;
+    }
+    redirectCompletion = Promise.resolve();
+    return syncFirebaseUserProfile(result.user);
+  };
+  pendingGoogleSignIn = signIn().finally(() => { pendingGoogleSignIn = undefined; });
+  return pendingGoogleSignIn;
 }
 
 export async function loginWithEmail(email: string, password: string): Promise<UserProfile> {
