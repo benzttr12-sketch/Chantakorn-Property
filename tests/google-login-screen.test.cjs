@@ -95,5 +95,16 @@ test('login honors local return paths and refuses external or script destination
     const page = screen({ redirect }); page.render(); await page.flush();
     await googleButton(page.render()).props.onClick();
     assert.deepEqual(page.destinations, [target]);
+    assert.equal(new URL(page.destinations[0], 'https://chantakornproperty.com').origin, 'https://chantakornproperty.com');
+  }
+});
+
+test('login rejects control characters that URL parsing can turn into an external destination', async () => {
+  for (const control of ['\t', '\n', '\r', '\0', '\u001f', '\u007f']) {
+    const page = screen({ redirect: `/${control}/untrusted.invalid` });
+    page.render(); await page.flush();
+    await googleButton(page.render()).props.onClick();
+    assert.deepEqual(page.destinations, ['/admin']);
+    assert.equal(new URL(page.destinations[0], 'https://chantakornproperty.com').origin, 'https://chantakornproperty.com');
   }
 });

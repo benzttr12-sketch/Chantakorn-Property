@@ -55,7 +55,9 @@ function LoginForm() {
   const activeRef = React.useRef(true);
 
   const handleSuccessfulAuth = (role: string) => {
-    if (redirectTarget?.startsWith('/') && !redirectTarget.startsWith('//') && !redirectTarget.includes('\\')) {
+    // URL parsing strips tabs/newlines before resolving a destination, so a
+    // value such as /<newline>/host must not become an external redirect.
+    if (redirectTarget?.startsWith('/') && !redirectTarget.startsWith('//') && !/[\\\u0000-\u001f\u007f]/.test(redirectTarget)) {
       router.replace(redirectTarget);
       return;
     }
