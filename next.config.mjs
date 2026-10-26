@@ -26,16 +26,15 @@ const remotePatterns = [
 const csp = [
   "default-src 'self'",
   // Next.js hydration + the Google Maps loader require inline script; Maps needs eval.
-  // accounts.google.com serves the Google Identity Services button script.
-  "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://maps.googleapis.com https://*.firebaseio.com https://accounts.google.com https://apis.google.com",
-  "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://accounts.google.com/gsi/style",
+  // Firebase Google Sign-In loads its iframe resolver through apis.google.com.
+  "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://maps.googleapis.com https://*.firebaseio.com https://apis.google.com",
+  "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
   "font-src 'self' data: https://fonts.gstatic.com",
   `img-src 'self' data: blob: https://maps.gstatic.com https://*.googleapis.com https://lh3.googleusercontent.com ${remotePatterns.map((p) => `https://${p.hostname}`).join(' ')}`,
-  "connect-src 'self' https://*.googleapis.com https://*.firebaseio.com wss://*.firebaseio.com https://*.firebasestorage.app https://*.firebaseapp.com https://*.workers.dev https://api.line.me https://accounts.google.com/gsi/",
+  "connect-src 'self' https://*.googleapis.com https://*.firebaseio.com wss://*.firebaseio.com https://*.firebasestorage.app https://*.firebaseapp.com https://*.workers.dev https://api.line.me",
   // Video tours embed YouTube (privacy-enhanced domain); the map embeds Google Maps;
-  // Firebase Auth completes the Google popup through a *.firebaseapp.com iframe;
-  // Google Identity Services renders accounts.google.com frames.
-  "frame-src 'self' https://www.youtube-nocookie.com https://www.youtube.com https://maps.google.com https://*.firebaseapp.com https://accounts.google.com",
+  // Firebase Auth completes the Google popup through a same-origin or Firebase iframe.
+  "frame-src 'self' https://www.youtube-nocookie.com https://www.youtube.com https://maps.google.com https://*.firebaseapp.com",
   "media-src 'self' data: blob: https:",
   "worker-src 'self' blob:",
   "object-src 'none'",

@@ -17,23 +17,7 @@ import {
   Info
 } from 'lucide-react';
 import { dataBackend } from '@/lib/backend';
-import { signInWithGoogle, loginWithEmail, getCurrentUserProfile, signInWithGoogleIdToken } from '@/lib/auth-helpers';
-
-/** Firebase Auth's auto-created web OAuth client for this project. */
-const GOOGLE_OAUTH_CLIENT_ID = '256306327731-da3sna4afb9a3kc0a4dmqjc997crrpqg.apps.googleusercontent.com';
-
-declare global {
-  interface Window {
-    google?: {
-      accounts: {
-        id: {
-          initialize: (config: Record<string, unknown>) => void;
-          renderButton: (parent: HTMLElement, options: Record<string, unknown>) => void;
-        };
-      };
-    };
-  }
-}
+import { signInWithGoogle, loginWithEmail, getCurrentUserProfile } from '@/lib/auth-helpers';
 
 /** Map raw Firebase error codes to Thai messages staff can act on. */
 function friendlyAuthError(err: any): string {
@@ -45,6 +29,10 @@ function friendlyAuthError(err: any): string {
     'auth/too-many-requests': 'พยายามหลายครั้งเกินไป กรุณารอสักครู่แล้วลองใหม่',
     'auth/network-request-failed': 'เครือข่ายขัดข้อง กรุณาตรวจอินเทอร์เน็ตแล้วลองใหม่',
     'auth/invalid-email': 'รูปแบบอีเมลไม่ถูกต้อง',
+    'auth/popup-closed-by-user': 'คุณปิดหน้าต่าง Google ก่อนเข้าสู่ระบบสำเร็จ กรุณาลองอีกครั้ง',
+    'auth/cancelled-popup-request': 'มีหน้าต่างเข้าสู่ระบบเปิดอยู่แล้ว กรุณาดำเนินการในหน้าต่างนั้น',
+    'auth/web-storage-unsupported': 'เบราว์เซอร์นี้ไม่รองรับการเก็บสถานะเข้าสู่ระบบ กรุณาเปิดเว็บใน Chrome, Edge หรือ Safari โดยตรง',
+    'auth/internal-error': 'รับผลเข้าสู่ระบบจาก Google ไม่สำเร็จ กรุณาโหลดหน้าใหม่แล้วลองอีกครั้ง',
   };
   if (map[code]) return map[code];
   if (err?.message?.includes('invalid-credential') || err?.message?.includes('wrong-password')) return map['auth/invalid-credential'];
@@ -64,18 +52,19 @@ function LoginForm() {
   const [copiedDomain, setCopiedDomain] = useState(false);
   const [loading, setLoading] = useState(false);
   const [checkingSession, setCheckingSession] = useState(true);
-  const gsiContainerRef = React.useRef<HTMLDivElement | null>(null);
   const activeRef = React.useRef(true);
 
   const handleSuccessfulAuth = (role: string) => {
-    if (redirectTarget) {
-      router.push(redirectTarget);
+    // URL parsing strips tabs/newlines before resolving a destination, so a
+    // value such as /<newline>/host must not become an external redirect.
+    if (redirectTarget?.startsWith('/') && !redirectTarget.startsWith('//') && !/[\\\u0000-\u001f\u007f]/.test(redirectTarget)) {
+      router.replace(redirectTarget);
       return;
     }
     if (role === 'ADMIN' || role === 'AGENT') {
-      router.push('/admin');
+      router.replace('/admin');
     } else {
-      router.push('/profile');
+      router.replace('/profile');
     }
   };
 
@@ -107,55 +96,17 @@ function LoginForm() {
     setLoading(true);
     try {
       const profile = await signInWithGoogle();
-      handleSuccessfulAuth(profile.role);
+      if (activeRef.current) handleSuccessfulAuth(profile.role);
     } catch (err: any) {
+      if (!activeRef.current) return;
       console.error('Google sign-in error:', err);
       if (err?.code === 'auth/unauthorized-domain' || err?.message?.includes('unauthorized-domain')) {
         setIsUnauthorizedDomain(true);
       }
-      setError(err.message || 'ไม่สามารถเข้าสู่ระบบด้วย Google ได้ กรุณาลองใหม่อีกครั้ง');
+      setError(friendlyAuthError(err));
       setLoading(false);
     }
   };
-
-  // Google Identity Services button: completes sign-in with an ID token via
-  // signInWithCredential — no authDomain handler handshake, so it works in
-  // storage-partitioned browsers where the redirect flow cannot.
-  React.useEffect(() => {
-    if (dataBackend !== 'firebase') return;
-    let cancelled = false;
-    const render = () => {
-      if (cancelled || !gsiContainerRef.current || !window.google) return;
-      try {
-        window.google.accounts.id.initialize({
-          client_id: GOOGLE_OAUTH_CLIENT_ID,
-          callback: (response: { credential?: string }) => {
-            if (!response.credential || !activeRef.current) return;
-            setLoading(true);
-            signInWithGoogleIdToken(response.credential)
-              .then(profile => { if (activeRef.current) handleSuccessfulAuth(profile.role); })
-              .catch(err => { if (activeRef.current) setError(friendlyAuthError(err)); })
-              .finally(() => { if (activeRef.current) setLoading(false); });
-          },
-        });
-        window.google.accounts.id.renderButton(gsiContainerRef.current, {
-          type: 'standard', theme: 'outline', size: 'large', text: 'signin_with', width: 320,
-        });
-      } catch { /* GSI render failure leaves the redirect button as the path */ }
-    };
-    if (window.google?.accounts?.id) {
-      render();
-    } else {
-      const script = document.createElement('script');
-      script.src = 'https://accounts.google.com/gsi/client';
-      script.async = true;
-      script.onload = render;
-      script.onerror = () => { /* keep the redirect button as the only path */ };
-      document.head.appendChild(script);
-    }
-    return () => { cancelled = true; };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
   const handleCopyCurrentDomain = () => {
     if (typeof window !== 'undefined' && navigator.clipboard) {
@@ -225,7 +176,7 @@ function LoginForm() {
                 โดเมนนี้ยังไม่ได้รับอนุญาตสำหรับ Google Sign-In ใน Firebase Console
               </h4>
               <p className="text-[11px] text-amber-800 leading-relaxed">
-                เนื่องจาก URL พรีวิวของ Google Cloud Run เปลี่ยนตามเวอร์ชัน กรุณาเพิ่มโดเมนนี้ใน <strong>Firebase Console &gt; Authentication &gt; Settings &gt; Authorized domains</strong>
+                กรุณาให้ผู้ดูแลเพิ่มโดเมนที่แสดงด้านล่างใน <strong>Firebase Console &gt; Authentication &gt; Settings &gt; Authorized domains</strong>
               </p>
             </div>
           </div>
@@ -267,7 +218,7 @@ function LoginForm() {
           id="google-signin-btn"
           type="button"
           onClick={handleGoogleLogin}
-          disabled={loading}
+          disabled={loading || checkingSession}
           className="w-full flex items-center justify-center space-x-3 py-3 px-4 border border-gray-300 rounded-xl shadow-xs bg-white hover:bg-gray-50 text-xs sm:text-sm font-bold text-gray-700 transition-all cursor-pointer disabled:opacity-50"
         >
           <svg className="w-5 h-5" viewBox="0 0 24 24">
@@ -288,13 +239,8 @@ function LoginForm() {
               d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
             />
           </svg>
-          <span>เข้าสู่ระบบด้วย Google</span>
+          <span>{loading ? 'กำลังเข้าสู่ระบบ…' : 'เข้าสู่ระบบด้วย Google'}</span>
         </button>
-        {/* Google Identity Services: works in storage-partitioned browsers
-            where the authDomain handler handshake fails. Loaded lazily; the
-            GSI button requires the site origin in the OAuth client's
-            Authorized JavaScript origins. */}
-        <div className="flex justify-center min-h-[44px]" ref={gsiContainerRef} />
       </>}
 
       <div className="relative my-6">
