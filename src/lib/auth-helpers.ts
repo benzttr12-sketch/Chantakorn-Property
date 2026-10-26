@@ -76,14 +76,18 @@ export async function syncFirebaseUserProfile(user: User, customFullName?: strin
   return profile;
 }
 
-export async function getCurrentUserProfile(): Promise<UserProfile | null> {
+export async function getCurrentUserProfile(options: { surfaceRedirectError?: boolean } = {}): Promise<UserProfile | null> {
   if (dataBackend === 'firebase' && auth) {
     // Complete a pending signInWithRedirect (mobile/LINE browsers block popups)
     // before reporting state. Resolves locally with null when no redirect happened.
     try {
       const redirectResult = await getRedirectResult(auth);
       if (redirectResult?.user) return syncFirebaseUserProfile(redirectResult.user);
-    } catch {}
+    } catch (error) {
+      // The login screen needs the actual redirect failure. Other session readers
+      // may still recover an already signed-in user without replaying that error.
+      if (options.surfaceRedirectError) throw error;
+    }
     await auth.authStateReady();
     if (auth.currentUser) return syncFirebaseUserProfile(auth.currentUser);
   }

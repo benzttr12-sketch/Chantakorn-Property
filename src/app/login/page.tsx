@@ -87,7 +87,7 @@ function LoginForm() {
   React.useEffect(() => {
     let active = true;
     activeRef.current = true;
-    getCurrentUserProfile()
+    getCurrentUserProfile({ surfaceRedirectError: true })
       .then(profile => {
         if (active && profile) handleSuccessfulAuth(profile.role);
         else if (active) setCheckingSession(false);
