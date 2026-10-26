@@ -23,18 +23,29 @@ const remotePatterns = [
   { protocol: 'https', hostname: '*.workers.dev' },
 ];
 
+// Satellite and Street View hosts from developers.google.com/maps/domains.
+// Keep these separate from executable sources and the image optimizer.
+const googleMapsTileSources = [
+  'khmdb0.google.com', 'khmdb1.google.com',
+  'khm.google.com', 'khm0.google.com', 'khm1.google.com',
+  'khms0.google.com', 'khms1.google.com', 'khms2.google.com', 'khms3.google.com',
+  'cbks0.google.com', 'cbks1.google.com', 'cbks2.google.com', 'cbks3.google.com',
+].map(host => `https://${host}`).join(' ');
+
 const csp = [
   "default-src 'self'",
   // Next.js hydration + the Google Maps loader require inline script; Maps needs eval.
   // Firebase Google Sign-In loads its iframe resolver through apis.google.com.
-  "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://maps.googleapis.com https://*.firebaseio.com https://apis.google.com",
+  "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://maps.googleapis.com https://maps.gstatic.com https://*.firebaseio.com https://apis.google.com",
   "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
   "font-src 'self' data: https://fonts.gstatic.com",
-  `img-src 'self' data: blob: https://maps.gstatic.com https://*.googleapis.com https://lh3.googleusercontent.com ${remotePatterns.map((p) => `https://${p.hostname}`).join(' ')}`,
-  "connect-src 'self' https://*.googleapis.com https://*.firebaseio.com wss://*.firebaseio.com https://*.firebasestorage.app https://*.firebaseapp.com https://*.workers.dev https://api.line.me",
+  // Leaflet uses direct image tiles for the admin/parcel maps.
+  `img-src 'self' data: blob: https://maps.gstatic.com https://*.googleapis.com https://*.ggpht.com ${googleMapsTileSources} https://*.tile.openstreetmap.org https://server.arcgisonline.com https://lh3.googleusercontent.com ${remotePatterns.map((p) => `https://${p.hostname}`).join(' ')}`,
+  `connect-src 'self' https://*.googleapis.com https://maps.gstatic.com https://csi.gstatic.com ${googleMapsTileSources} https://*.firebaseio.com wss://*.firebaseio.com https://*.firebasestorage.app https://*.firebaseapp.com https://*.workers.dev https://api.line.me`,
   // Video tours embed YouTube (privacy-enhanced domain); the map embeds Google Maps;
   // Firebase Auth completes the Google popup through a same-origin or Firebase iframe.
-  "frame-src 'self' https://www.youtube-nocookie.com https://www.youtube.com https://maps.google.com https://*.firebaseapp.com",
+  // maps.google.com embeds redirect to www.google.com/maps/embed.
+  "frame-src 'self' https://www.youtube-nocookie.com https://www.youtube.com https://maps.google.com https://www.google.com https://www.openstreetmap.org https://*.firebaseapp.com",
   "media-src 'self' data: blob: https:",
   "worker-src 'self' blob:",
   "object-src 'none'",
