@@ -1,7 +1,8 @@
 import { jsonResponse } from '@/lib/api-response';
 import { Property } from '@/lib/types';
 import { requireStaff } from '@/lib/server-auth';
-import { createFirestoreDocument, listFirestoreDocuments, patchFirestoreDocument } from '@/lib/firestore-rest';
+import { createFirestoreDocument, patchFirestoreDocument } from '@/lib/firestore-rest';
+import { listPublishedProperties } from '@/lib/server-property-catalog';
 import { getLinePropertyImageUrl } from '@/lib/line-property-image';
 import { formatPropertyCode } from '@/lib/format-code';
 
@@ -220,8 +221,7 @@ function isConsignmentRequest(text: string): boolean {
 // Search only published production listings; failed storage is different from zero matches.
 async function searchProperties(keyword: string): Promise<PropertySearchResult> {
   try {
-    const list = ((await listFirestoreDocuments('properties', 200, { publishedOnly: true })) as Property[])
-      .filter((property) => property.published === true);
+    const list = await listPublishedProperties(200);
     const knownLocations = [...new Set(list.flatMap(property => [property.district, property.subdistrict, property.province])
       .filter((location): location is string => typeof location === 'string' && location.trim().length > 0)
       .map(location => location.toLowerCase().trim()))].sort((a, b) => b.length - a.length);

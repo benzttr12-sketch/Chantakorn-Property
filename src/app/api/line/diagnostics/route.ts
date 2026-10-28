@@ -1,5 +1,5 @@
 import { jsonResponse } from '@/lib/api-response';
-import { listFirestoreDocuments } from '@/lib/firestore-rest';
+import { listPublishedProperties } from '@/lib/server-property-catalog';
 import { OFFICIAL_LINE_BASIC_ID } from '@/lib/line-auth';
 import { requireStaff } from '@/lib/server-auth';
 
@@ -47,7 +47,7 @@ async function readLine(path: string, token: string): Promise<LineResult> {
 async function checkProperties(): Promise<Check> {
   try {
     // Match the query used for customer replies; the helper has a 10-second timeout.
-    const properties = await listFirestoreDocuments('properties', 20, { publishedOnly: true });
+    const properties = await listPublishedProperties(20);
     const count = properties.filter((property) => 'published' in property && property.published === true).length;
     return count > 0
       ? { name: 'รายการทรัพย์ที่เผยแพร่', ok: true, code: 'PROPERTIES_AVAILABLE', message: `อ่านรายการทรัพย์ที่เผยแพร่ได้ ${count} รายการ (สูงสุด 20 รายการ)` }

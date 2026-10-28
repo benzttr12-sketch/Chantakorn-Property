@@ -384,7 +384,7 @@ test('public photo delivery requires published parent, attached membership and m
       images: { arrayValue: { values: [] } },
     } });
     return Response.json({ fields: { property_id: { stringValue: parent }, data_url: { stringValue: dataUrl } } });
-  } } })('app/api/properties/[id]/image/route.ts');
+  } } }, { process: { env: { NEXT_PUBLIC_PROPERTY_STORAGE_BACKEND: 'firebase' } } })('app/api/properties/[id]/image/route.ts');
   const get = () => api.GET(new Request(`${mediaUrl}&id=forged`), { params: Promise.resolve({ id: 'published' }) });
   published = false;
   assert.equal((await get()).status, 404);

@@ -1,5 +1,6 @@
 import sharp from 'sharp';
 import { getFirestoreDocument } from '@/lib/firestore-rest';
+import { getPublishedPropertyDocument } from '@/lib/server-property-catalog';
 import { selectPropertyImage } from '@/lib/line-property-image';
 
 export const runtime = 'nodejs';
@@ -21,7 +22,7 @@ export async function GET(request: Request): Promise<Response> {
   }
 
   try {
-    const response = await getFirestoreDocument('properties', id);
+    const response = await getPublishedPropertyDocument(id);
     if (response.status === 403 || response.status === 404) return notFound();
     if (!response.ok) return new Response('Property photo temporarily unavailable', { status: 503, headers });
     const { fields } = await response.json();

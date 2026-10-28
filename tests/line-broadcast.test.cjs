@@ -31,11 +31,14 @@ function load({ staff = true, configuredEnv = env, getDocument = async () => doc
       compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
     }).outputText;
     vm.runInNewContext(source, {
-      module, exports: module.exports, Request, Response, URL, Headers, AbortSignal, fetch, process: { env: configuredEnv },
+      module, exports: module.exports, Request, Response, URL, URLSearchParams, Headers, AbortSignal, TextDecoder, fetch,
+      process: { env: { NEXT_PUBLIC_PROPERTY_STORAGE_BACKEND: 'firebase', ...configuredEnv } },
       require(name) {
         if (name === '@/lib/api-response') return { jsonResponse: (body, init) => Response.json(body, init) };
         if (name === '@/lib/server-auth') return { requireStaff: async () => staff ? null : Response.json({ error: 'Unauthorized' }, { status: 401 }) };
         if (name === '@/lib/firestore-rest') return { getFirestoreDocument: getDocument };
+        if (name === '@/lib/server-property-catalog') return loadModule('lib/server-property-catalog.ts');
+        if (name === '@/lib/public-property') return loadModule('lib/public-property.ts');
         if (name === '@/lib/line-auth') return { OFFICIAL_LINE_BASIC_ID: '@930xzcyi' };
         if (name === '@/lib/line-property-broadcast') return loadModule('lib/line-property-broadcast.ts');
         if (name === '@/lib/line-property-image') return loadModule('lib/line-property-image.ts');
@@ -109,6 +112,33 @@ test('preview reads the selected authoritative published document and reveals on
   for (const privateValue of ['private-line-token', 'private-line-secret', 'private-owner-note', 'private-owner-email', 'private-bot-user-id', 'incorrect-stored-id']) {
     assert.equal(JSON.stringify(result).includes(privateValue), false);
   }
+});
+
+test('Cloudflare broadcast preview reads the public selected catalog without forwarding staff credentials', async () => {
+  const apiOrigin = 'https://catalog.example';
+  const mediaId = '8adca02a-3479-47aa-a101-037434ff4bcb';
+  const requests = [];
+  const api = load({
+    configuredEnv: { ...env, NEXT_PUBLIC_PROPERTY_STORAGE_BACKEND: 'cloudflare', NEXT_PUBLIC_CLOUDFLARE_API_ORIGIN: apiOrigin },
+    getDocument: async () => { throw Error('Must not read legacy Firestore listings'); },
+    fetch: async (url, init) => {
+      requests.push(url);
+      if (url === 'https://api.line.me/v2/bot/info') return botInfo(url, init);
+      assert.equal(url, `${apiOrigin}/v1/properties/${propertyId}`);
+      assert.equal(init.headers, undefined);
+      assert.equal(init.credentials, 'omit');
+      assert.equal(init.redirect, 'error');
+      return Response.json({ data: { ...property, id: propertyId, cover_image: `/v1/media/properties/${mediaId}` } });
+    },
+  });
+  const response = await api.GET(previewRequest());
+  const result = await response.json();
+  assert.equal(response.status, 200);
+  assert.equal(result.property.title, property.title);
+  assert.equal(result.property.imageUrl, `${apiOrigin}/v1/media/properties/${mediaId}`);
+  assert.equal(result.property.detailUrl, 'https://site.example/properties/CK-813F2B');
+  assert.equal(requests.length, 2);
+  assert.equal(JSON.stringify(result).includes('private'), false);
 });
 
 test('drafts, missing documents and storage failures cannot be previewed or sent', async () => {
