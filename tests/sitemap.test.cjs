@@ -54,6 +54,61 @@ test('catalog errors retain static pages and log only a diagnostic code', async 
   assert.deepEqual(warnings, ['SITEMAP_CATALOG_UNAVAILABLE']);
 });
 
+test('sitemap defaults to the active D1 catalog and normalizes explicit Cloudflare mode', async () => {
+  for (const configured of [undefined, '', 'cloudflare', ' CloudFlare ']) {
+    let requests = 0;
+    const env = { NEXT_PUBLIC_CLOUDFLARE_API_ORIGIN: 'https://api.example.test' };
+    if (configured !== undefined) env.NEXT_PUBLIC_PROPERTY_STORAGE_BACKEND = configured;
+    const { module } = load('lib/sitemap-catalog', {
+      env,
+      server: () => { throw new Error('Must not read the legacy Firestore catalog'); },
+      fetch: async url => {
+        requests++;
+        assert.equal(url.origin, 'https://api.example.test');
+        assert.equal(url.pathname, '/v1/properties');
+        return Response.json({ data: [{ id: 'current-d1-listing' }], next_cursor: null });
+      },
+    });
+    const rows = await module.sitemapCatalog();
+    assert.equal(rows[0].id, 'current-d1-listing');
+    assert.equal(requests, 1);
+  }
+});
+
+test('sitemap rejects invalid explicit backends before reading either catalog', async () => {
+  for (const backend of ['postgres', '   ']) {
+    let reads = 0;
+    const { module } = load('lib/sitemap-catalog', {
+      env: { NEXT_PUBLIC_PROPERTY_STORAGE_BACKEND: backend, NEXT_PUBLIC_CLOUDFLARE_API_ORIGIN: 'https://api.example.test' },
+      server: () => { reads++; throw new Error('Unexpected Firestore read'); },
+      fetch: async () => { reads++; throw new Error('Unexpected Cloudflare read'); },
+    });
+    await assert.rejects(module.sitemapCatalog(), /NEXT_PUBLIC_PROPERTY_STORAGE_BACKEND must be firebase or cloudflare/);
+    assert.equal(reads, 0);
+  }
+});
+
+test('explicit Firebase sitemap mode retains the bounded published Firestore query', async () => {
+  const calls = [];
+  const query = {
+    collection(name) { calls.push(['collection', name]); return this; },
+    where(...args) { calls.push(['where', ...args]); return this; },
+    select(...fields) { calls.push(['select', ...fields]); return this; },
+    limit(count) { calls.push(['limit', count]); return this; },
+    async get() { return { size: 1, docs: [{ id: 'legacy-listing', data: () => ({ published: true }) }] }; },
+  };
+  const { module } = load('lib/sitemap-catalog', {
+    env: { NEXT_PUBLIC_PROPERTY_STORAGE_BACKEND: ' Firebase ' },
+    server: () => query,
+    fetch: async () => { throw new Error('Must not fetch the D1 catalog'); },
+  });
+  const rows = await module.sitemapCatalog();
+  assert.equal(rows[0].id, 'legacy-listing');
+  assert.deepEqual(calls[0], ['collection', 'properties']);
+  assert.deepEqual(calls[1], ['where', 'published', '==', true]);
+  assert.deepEqual(calls.at(-1), ['limit', 1000]);
+});
+
 test('Cloudflare sitemap follows bounded public pages without authentication or redirects', async () => {
   const calls = [];
   const { module } = load('lib/sitemap-catalog', { env: { NEXT_PUBLIC_PROPERTY_STORAGE_BACKEND: 'cloudflare', NEXT_PUBLIC_CLOUDFLARE_API_ORIGIN: 'https://api.example.test' },
@@ -77,7 +132,7 @@ test('Cloudflare sitemap rejects repeated cursor instead of returning a partial 
 });
 
 test('local preview avoids cloud reads and robots points to the canonical sitemap', async () => {
-  const { module } = load('lib/sitemap-catalog', { env: { NEXT_PUBLIC_DATA_BACKEND: 'local' } });
+  const { module } = load('lib/sitemap-catalog', { env: { NEXT_PUBLIC_DATA_BACKEND: 'local', NEXT_PUBLIC_PROPERTY_STORAGE_BACKEND: 'firebase' } });
   assert.equal((await module.sitemapCatalog()).length, 0);
   const robots = load('app/robots', { env: { NEXT_PUBLIC_BASE_PATH: '/site' } }).module.default();
   assert.equal(robots.sitemap, 'https://chantakornproperty.com/site/sitemap.xml');

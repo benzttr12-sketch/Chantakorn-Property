@@ -2,7 +2,10 @@ type CatalogRow = Record<string, unknown>;
 
 /** Read-only, bounded catalog inventory. Never import demo data or grant roles. */
 export async function sitemapCatalog(): Promise<CatalogRow[]> {
-  if (process.env.NEXT_PUBLIC_PROPERTY_STORAGE_BACKEND === 'cloudflare') {
+  const backend = (process.env.NEXT_PUBLIC_PROPERTY_STORAGE_BACKEND || 'cloudflare').trim().toLowerCase();
+  if (backend !== 'firebase' && backend !== 'cloudflare')
+    throw new Error('NEXT_PUBLIC_PROPERTY_STORAGE_BACKEND must be firebase or cloudflare');
+  if (backend === 'cloudflare') {
     const origin = new URL(process.env.NEXT_PUBLIC_CLOUDFLARE_API_ORIGIN || '');
     if (origin.protocol !== 'https:' || origin.username || origin.password || origin.pathname !== '/' || origin.search || origin.hash)
       throw new Error('Invalid sitemap API origin');
