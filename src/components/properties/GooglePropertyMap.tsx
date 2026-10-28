@@ -11,7 +11,8 @@ import {
   useMap 
 } from '@vis.gl/react-google-maps';
 import { Property } from '@/lib/types';
-import { formatPrice, isValidLatLng } from '@/lib/utils';
+import { formatPrice } from '@/lib/utils';
+import { getPropertyCoordinates } from '@/lib/property-coordinates';
 import { propertyHref } from '@/components/properties/property-link';
 import { 
   GOOGLE_MAPS_API_KEY, 
@@ -64,11 +65,9 @@ function MapCameraController({
 
   useEffect(() => {
     if (!map) return;
-    if (selectedProperty && isValidLatLng(Number(selectedProperty.latitude), Number(selectedProperty.longitude))) {
-      map.panTo({
-        lat: Number(selectedProperty.latitude),
-        lng: Number(selectedProperty.longitude),
-      });
+    const coordinates = getPropertyCoordinates(selectedProperty);
+    if (coordinates) {
+      map.panTo(coordinates);
       const currentZoom = map.getZoom() || 12;
       if (currentZoom < 14) {
         map.setZoom(15);
@@ -120,34 +119,12 @@ export default function GooglePropertyMap({
 
   // Sync active popup with selectedProperty from parent
   useEffect(() => {
-    if (selectedProperty) {
-      setActivePopupProperty(selectedProperty);
-    }
+    setActivePopupProperty(getPropertyCoordinates(selectedProperty) ? selectedProperty ?? null : null);
   }, [selectedProperty]);
 
-  // Valid coordinate properties with safe fallback coordinates in Songkhla / Hat Yai
-  const validProperties = useMemo(() => {
-    return properties.map((p, idx) => {
-      let lat = Number(p.latitude);
-      let lng = Number(p.longitude);
-
-      if (!isValidLatLng(lat, lng)) {
-        const districtKey = p.district || 'หาดใหญ่';
-        const fallback = SONGKHLA_DISTRICT_COORDS[districtKey] || DEFAULT_MAP_CENTER;
-        // Jitter slightly so overlapping pins spread out naturally
-        const offsetLat = ((idx % 5) - 2) * 0.004;
-        const offsetLng = (((idx * 3) % 5) - 2) * 0.004;
-        lat = fallback.lat + offsetLat;
-        lng = fallback.lng + offsetLng;
-      }
-
-      return {
-        ...p,
-        latitude: lat,
-        longitude: lng,
-      };
-    });
-  }, [properties]);
+  const validProperties = useMemo(() => properties.filter(p => getPropertyCoordinates(p) !== null), [properties]);
+  const unavailableCount = properties.length - validProperties.length;
+  const activePopupCoordinates = getPropertyCoordinates(activePopupProperty);
 
   // Compute initial map center
   const initialCenter = useMemo(() => {
@@ -159,9 +136,8 @@ export default function GooglePropertyMap({
         return { lat: center.lat, lng: center.lng };
       }
     }
-    if (selectedProperty && isValidLatLng(Number(selectedProperty.latitude), Number(selectedProperty.longitude))) {
-      return { lat: Number(selectedProperty.latitude), lng: Number(selectedProperty.longitude) };
-    }
+    const selectedCoordinates = getPropertyCoordinates(selectedProperty);
+    if (selectedCoordinates) return selectedCoordinates;
     if (validProperties.length > 0) {
       return { lat: Number(validProperties[0].latitude), lng: Number(validProperties[0].longitude) };
     }
@@ -212,11 +188,14 @@ export default function GooglePropertyMap({
 
   // Fallback URL for embedded view if needed
   const embedMapUrl = useMemo(() => {
-    const lat = targetCenter?.lat || (activePopupProperty ? Number(activePopupProperty.latitude) : initialCenter.lat);
-    const lng = targetCenter?.lng || (activePopupProperty ? Number(activePopupProperty.longitude) : initialCenter.lng);
+    const popupCoordinates = getPropertyCoordinates(activePopupProperty);
+    const propertyCoordinates = popupCoordinates ?? getPropertyCoordinates(validProperties[0]);
+    const focus = targetCenter ?? popupCoordinates ?? initialCenter;
+    // Viewport/district centers use ll, which does not create a property pin.
+    const locationQuery = propertyCoordinates && focus.lat === propertyCoordinates.lat && focus.lng === propertyCoordinates.lng ? 'q' : 'll';
     const zoomLvl = targetCenter?.zoom || zoom || 13;
-    return `https://maps.google.com/maps?q=${lat},${lng}&hl=th&z=${zoomLvl}&t=${mapType === 'satellite' || mapType === 'hybrid' ? 'k' : 'm'}&output=embed`;
-  }, [targetCenter, activePopupProperty, initialCenter, zoom, mapType]);
+    return `https://maps.google.com/maps?${locationQuery}=${focus.lat},${focus.lng}&hl=th&z=${zoomLvl}&t=${mapType === 'satellite' || mapType === 'hybrid' ? 'k' : 'm'}&output=embed`;
+  }, [targetCenter, activePopupProperty, initialCenter, validProperties, zoom, mapType]);
 
   return (
     <div
@@ -273,7 +252,7 @@ export default function GooglePropertyMap({
 
             {/* Google Maps External Open */}
             <a
-              href={`https://www.google.com/maps/search/?api=1&query=${initialCenter.lat},${initialCenter.lng}`}
+              href={embedMapUrl.replace('&output=embed', '')}
               target="_blank"
               rel="noreferrer"
               title="เปิดดูใน Google Maps App"
@@ -367,12 +346,9 @@ export default function GooglePropertyMap({
             })}
 
             {/* Luxury Property InfoWindow Popup */}
-            {activePopupProperty && isValidLatLng(Number(activePopupProperty.latitude), Number(activePopupProperty.longitude)) && (
+            {activePopupProperty && activePopupCoordinates && (
               <InfoWindow
-                position={{
-                  lat: Number(activePopupProperty.latitude),
-                  lng: Number(activePopupProperty.longitude),
-                }}
+                position={activePopupCoordinates}
                 onCloseClick={() => setActivePopupProperty(null)}
                 pixelOffset={[0, -32]}
               >
@@ -460,18 +436,27 @@ export default function GooglePropertyMap({
         </div>
       )}
 
+      {unavailableCount > 0 && (
+        <p role="status" className={`absolute left-3 right-3 z-10 rounded-xl border border-white/15 bg-navy-950/95 px-3 py-2 text-xs text-white shadow-lg ${isFullScreen && properties.length > 0 ? 'bottom-32' : 'bottom-3'}`}>
+          {validProperties.length > 0
+            ? `แสดงตำแหน่งทรัพย์ ${validProperties.length} จาก ${properties.length} รายการ · อีก ${unavailableCount} รายการยังไม่มีพิกัดที่ใช้งานได้`
+            : 'ยังไม่มีพิกัดทรัพย์ที่ใช้งานได้ แผนที่แสดงภาพรวมพื้นที่'}
+        </p>
+      )}
+
       {/* Fullscreen Floating Cards Carousel at Bottom */}
-      {isFullScreen && validProperties.length > 0 && (
+      {isFullScreen && properties.length > 0 && (
         <div className="absolute bottom-4 left-4 right-4 z-10 pointer-events-auto">
           <div className="flex items-center space-x-3 overflow-x-auto pb-2 no-scrollbar">
-            {validProperties.map((p) => {
+            {properties.map((p) => {
               const isSelected = activePopupProperty?.id === p.id;
+              const coordinates = getPropertyCoordinates(p);
               return (
                 <div
                   key={p.id}
                   onClick={() => {
-                    setActivePopupProperty(p);
-                    setTargetCenter({ lat: Number(p.latitude), lng: Number(p.longitude), zoom: 15 });
+                    setActivePopupProperty(coordinates ? p : null);
+                    if (coordinates) setTargetCenter({ ...coordinates, zoom: 15 });
                     if (onSelectProperty) onSelectProperty(p);
                   }}
                   className={`shrink-0 w-72 bg-white rounded-2xl p-2.5 shadow-2xl border transition-all cursor-pointer flex items-center space-x-3 ${
@@ -501,7 +486,7 @@ export default function GooglePropertyMap({
                       📍 {p.district}, {p.province}
                     </p>
                     <div className="text-[10px] font-bold text-navy-900 mt-1 flex items-center text-gold-600 hover:underline">
-                      <span>เลื่อนดูตำแหน่ง</span>
+                      {coordinates ? <span>เลื่อนดูตำแหน่ง</span> : <Link href={propertyHref(p)}>ยังไม่มีพิกัด · ดูรายละเอียดทรัพย์</Link>}
                       <ArrowRight className="w-2.5 h-2.5 ml-1" />
                     </div>
                   </div>
