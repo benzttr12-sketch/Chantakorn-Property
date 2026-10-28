@@ -32,6 +32,7 @@ import { formatPrice, getPropertyStatusBadge, formatThaiNumber, formatPropertyCo
 
 import { Property } from '@/lib/types';
 import { calculateNearbyLandmarks } from '@/lib/nearby-landmarks';
+import { getPropertyCoordinates } from '@/lib/property-coordinates';
 import { getStoredUser } from '@/lib/auth-helpers';
 
 export default function PropertyDetail({ slug, initialProperty = null }: { slug: string; initialProperty?: Property | null }) {
@@ -85,6 +86,7 @@ export default function PropertyDetail({ slug, initialProperty = null }: { slug:
   if (!property) return <div className="p-16 text-center space-y-4"><h1 className="text-xl font-bold">{error || 'ไม่พบอสังหาริมทรัพย์นี้'}</h1><Link className="text-gold-700 underline" href="/properties">กลับไปค้นหาอสังหาริมทรัพย์</Link></div>;
 
   const statusBadge = getPropertyStatusBadge(property.status);
+  const coordinates = getPropertyCoordinates(property);
 
   // JSON-LD Structured Data for RealEstateListing
   const jsonLd = {
@@ -105,28 +107,21 @@ export default function PropertyDetail({ slug, initialProperty = null }: { slug:
       addressRegion: property.province,
       addressCountry: 'TH',
     },
-    geo: {
-      '@type': 'GeoCoordinates',
-      latitude: property.latitude,
-      longitude: property.longitude,
-    },
+    ...(coordinates ? {
+      geo: {
+        '@type': 'GeoCoordinates',
+        latitude: coordinates.lat,
+        longitude: coordinates.lng,
+      },
+    } : {}),
   };
 
-  const dynamicLandmarks = calculateNearbyLandmarks(property.latitude, property.longitude, { limit: 8 });
-  const nearbyAmenities = dynamicLandmarks.length > 0
-    ? dynamicLandmarks.map(item => ({
-        title: item.title,
-        distance: item.combinedText,
-        categoryLabel: item.categoryLabel,
-      }))
-    : [
-        { title: 'มหาวิทยาลัยสงขลานครินทร์ (ม.อ.) & รพ.ม.อ.', distance: '10-15 นาที', categoryLabel: 'การศึกษา/การแพทย์' },
-        { title: 'เซ็นทรัลหาดใหญ่ (Central Hatyai)', distance: '7 นาที', categoryLabel: 'ห้างสรรพสินค้า' },
-        { title: 'สนามบินนานาชาติหาดใหญ่ (HDY Airport)', distance: '15 นาที', categoryLabel: 'การเดินทาง' },
-        { title: 'ตลาดกิมหยง & ย่านการค้าหาดใหญ่', distance: '12 นาที', categoryLabel: 'ตลาด & ช้อปปิ้ง' },
-        { title: 'โรงพยาบาลกรุงเทพหาดใหญ่', distance: '12 นาที', categoryLabel: 'การแพทย์' },
-        { title: 'แหลมสมิหลา & หาดชลาทัศน์ เมืองสงขลา', distance: '30 นาที', categoryLabel: 'ท่องเที่ยว' },
-      ];
+  const dynamicLandmarks = coordinates ? calculateNearbyLandmarks(coordinates.lat, coordinates.lng, { limit: 8 }) : [];
+  const nearbyAmenities = dynamicLandmarks.map(item => ({
+    title: item.title,
+    distance: item.combinedText,
+    categoryLabel: item.categoryLabel,
+  }));
 
   return (
     <div className="bg-surface-bg min-h-screen pb-24 md:pb-16">
@@ -363,45 +358,54 @@ export default function PropertyDetail({ slug, initialProperty = null }: { slug:
               </div>
 
               {/* Map View */}
-              <div className="h-80 sm:h-96 w-full rounded-2xl overflow-hidden mb-6 border border-gray-200 shadow-xs relative">
-                <GooglePropertyMap
-                  properties={[property]}
-                  selectedProperty={property}
-                  zoom={15}
-                  height="100%"
-                  showDistrictPills={false}
-                />
-              </div>
+              {coordinates ? (
+                <div className="h-80 sm:h-96 w-full rounded-2xl overflow-hidden mb-6 border border-gray-200 shadow-xs relative">
+                  <GooglePropertyMap
+                    properties={[property]}
+                    selectedProperty={property}
+                    zoom={15}
+                    height="100%"
+                    showDistrictPills={false}
+                  />
+                </div>
+              ) : (
+                <p role="status" className="mb-6 rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">ทรัพย์นี้ยังไม่มีพิกัดที่ใช้งานได้ กรุณาสอบถามตำแหน่งกับทีมงาน</p>
+              )}
 
               {/* Nearby Landmarks Grid */}
               <div>
                 <div className="flex items-center justify-between mb-3">
                   <h4 className="text-xs font-bold text-navy-900 uppercase tracking-wider">
-                    สถานที่สำคัญใกล้เคียง (คำนวณจากพิกัดจริง)
+                    สถานที่สำคัญใกล้เคียง
                   </h4>
-                  <span className="text-[11px] text-emerald-700 font-semibold bg-emerald-50 border border-emerald-200 px-2.5 py-0.5 rounded-full">
-                    คำนวณอัตโนมัติ
-                  </span>
+                  {nearbyAmenities.length > 0 && <span className="text-[11px] text-emerald-700 font-semibold bg-emerald-50 border border-emerald-200 px-2.5 py-0.5 rounded-full">ระยะทางและเวลาโดยประมาณ</span>}
                 </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                  {nearbyAmenities.map((item, i) => (
-                    <div key={i} className="flex items-center justify-between p-2.5 bg-slate-50 border border-slate-200/80 rounded-xl text-xs hover:border-gold-300 transition-colors">
-                      <div className="min-w-0 pr-2">
-                        <div className="flex items-center space-x-1.5">
-                          {item.categoryLabel && (
-                            <span className="text-[10px] font-bold px-1.5 py-0.2 rounded-sm bg-navy-100 text-navy-800 shrink-0">
-                              {item.categoryLabel}
-                            </span>
-                          )}
-                          <span className="text-navy-950 font-medium truncate">{item.title}</span>
+                {nearbyAmenities.length > 0 ? (
+                  <>
+                    <p className="mb-3 text-[11px] leading-relaxed text-slate-500">ระยะทางตรงจากพิกัดทรัพย์ เวลาเดินทางเป็นการประมาณ อาจแตกต่างจากเส้นทางและสภาพจราจรจริง</p>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                      {nearbyAmenities.map((item, i) => (
+                        <div key={i} className="flex items-center justify-between p-2.5 bg-slate-50 border border-slate-200/80 rounded-xl text-xs hover:border-gold-300 transition-colors">
+                          <div className="min-w-0 pr-2">
+                            <div className="flex items-center space-x-1.5">
+                              {item.categoryLabel && (
+                                <span className="text-[10px] font-bold px-1.5 py-0.2 rounded-sm bg-navy-100 text-navy-800 shrink-0">
+                                  {item.categoryLabel}
+                                </span>
+                              )}
+                              <span className="text-navy-950 font-medium truncate">{item.title}</span>
+                            </div>
+                          </div>
+                          <span className="text-gold-700 font-extrabold shrink-0 text-[11px] bg-gold-50 px-2 py-0.5 rounded-md border border-gold-200">
+                            {item.distance}
+                          </span>
                         </div>
-                      </div>
-                      <span className="text-gold-700 font-extrabold shrink-0 text-[11px] bg-gold-50 px-2 py-0.5 rounded-md border border-gold-200">
-                        {item.distance}
-                      </span>
+                      ))}
                     </div>
-                  ))}
-                </div>
+                  </>
+                ) : (
+                  <p className="text-xs text-slate-500">{coordinates ? 'ยังไม่มีข้อมูลสถานที่ใกล้เคียงในระยะที่แสดง' : 'ยังคำนวณสถานที่ใกล้เคียงไม่ได้ เนื่องจากไม่มีพิกัดทรัพย์'}</p>
+                )}
               </div>
             </div>
           </div>
