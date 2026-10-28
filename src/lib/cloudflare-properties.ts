@@ -325,6 +325,10 @@ export async function cloudflareUpdateProperty(id: string, updates: Partial<Prop
   // Validate the whole batch and cover before the first upload can persist a file.
   const preparedPhotos = preparePhotos(newImages);
   const outgoing = cleanOutgoing(updates as Record<string, unknown>);
+  // Removing media is draft-only. Publish only after every requested removal
+  // succeeds, so a failed delete cannot leave an accidentally public listing.
+  const publishAfterRemoval = removedIds.length > 0 && outgoing.published === true;
+  if (publishAfterRemoval) delete outgoing.published;
   const uploaded = await uploadPhotos(id, preparedPhotos);
   if (uploadedCoverIndex >= 0) coverId = uploaded[uploadedCoverIndex].id;
   const needsPatch = Object.keys(outgoing).length > 0 || updates.cover_image !== undefined;
@@ -336,6 +340,12 @@ export async function cloudflareUpdateProperty(id: string, updates: Partial<Prop
       } catch (error) {
         throw new Error(`บันทึกข้อมูลแล้ว แต่ลบรูปภาพไม่สำเร็จ กรุณาโหลดใหม่และลบรูปที่เหลือ: ${error instanceof Error ? error.message : 'โปรดลองอีกครั้ง'}`);
       }
+    }
+    if (publishAfterRemoval) {
+      // Use only our own accepted revision, never a fresh read that could
+      // silently accept a concurrent staff member's intervening edit.
+      const revision = saved ? requireObservedRevision(saved.updated_at) : expected;
+      return await patch(id, revision, { published: true });
     }
     return await cloudflareAdminDetail(id);
   }

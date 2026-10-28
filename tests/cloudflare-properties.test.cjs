@@ -374,15 +374,20 @@ test('a rejected or malformed upload session stops the batch before any upload',
   }
 });
 
-test('removing photos from a published listing fails before uploading replacements', async () => {
+test('published listings must be separately unpublished before any photo removal', async () => {
   const path = '/v1/media/properties/' + imageId;
-  const { adapter, calls } = load(() => json({ data: {
-    ...sample, images: [path], cover_image: path, published: true,
-  } }));
-  await assert.rejects(adapter.cloudflareUpdateProperty(sample.id, {
-    images: ['data:image/jpeg;base64,/9j/'],
-  }, observed), /ยกเลิกการเผยแพร่ประกาศและโหลดใหม่ก่อนเพิ่มหรือลบรูปภาพ/);
-  assert.equal(calls.length, 1);
+  for (const updates of [
+    { images: [] }, { images: [], published: false },
+    { images: ['data:image/jpeg;base64,/9j/'] },
+    { images: ['data:image/jpeg;base64,/9j/'], published: false },
+  ]) {
+    const { adapter, calls } = load(() => json({ data: {
+      ...sample, images: [path], cover_image: path, published: true,
+    } }));
+    await assert.rejects(adapter.cloudflareUpdateProperty(sample.id, updates, observed),
+      /ยกเลิกการเผยแพร่ประกาศและโหลดใหม่ก่อนเพิ่มหรือลบรูปภาพ/);
+    assert.equal(calls.length, 1);
+  }
 });
 
 test('removing the photo that stays selected as cover is rejected before any write', async () => {
@@ -393,6 +398,140 @@ test('removing the photo that stays selected as cover is rejected before any wri
     images: [], cover_image: origin + path,
   }, observed), /รูปปกต้องไม่ใช่รูปที่จะลบ/);
   assert.equal(calls.length, 1);
+});
+
+test('draft photo removals and cover changes complete before requested publication', async () => {
+  const origin = 'https://staging-api.example.invalid';
+  const keptId = imageId, removedId = '7537cedc-3fbf-4df9-9741-82757f583629';
+  const kept = '/v1/media/properties/' + keptId, removed = '/v1/media/properties/' + removedId;
+  const publishedRevision = '2026-10-20T00:02:00.000Z';
+  let row = { ...sample, published: false, images: [removed, kept], cover_image: removed };
+  const { adapter, calls } = load(call => {
+    if (!call.method) return json({ data: row });
+    if (call.method === 'PATCH') {
+      const payload = JSON.parse(call.body);
+      assert.equal(payload.expected_updated_at, row.updated_at);
+      row = { ...row, ...payload.updates,
+        ...(payload.cover_media_id ? { cover_image: '/v1/media/properties/' + payload.cover_media_id } : {}),
+        updated_at: row.updated_at === observed ? newer : publishedRevision };
+      return json({ data: row });
+    }
+    assert.equal(call.method, 'DELETE');
+    if (row.published) return json({ error: 'Unpublish the property before removing images' }, 409);
+    assert.equal(row.cover_image, kept);
+    row = { ...row, images: [kept] };
+    return json({ ok: true });
+  });
+  const saved = await adapter.cloudflareUpdateProperty(sample.id, {
+    price: 800000, published: true, images: [origin + kept], cover_image: origin + kept,
+  }, observed);
+  assert.equal(saved.published, true);
+  assert.equal(saved.price, 800000);
+  assert.equal(saved.images.length, 1);
+  assert.equal(saved.cover_image, origin + kept);
+  assert.equal(saved.updated_at, publishedRevision);
+  assert.deepEqual(calls.map(call => call.method || 'GET'), ['GET', 'PATCH', 'DELETE', 'PATCH']);
+  const patches = calls.filter(call => call.method === 'PATCH').map(call => JSON.parse(call.body));
+  assert.deepEqual(patches, [
+    { updates: { price: 800000 }, expected_updated_at: observed, cover_media_id: keptId },
+    { updates: { published: true }, expected_updated_at: newer },
+  ]);
+});
+
+test('a partial photo removal failure never publishes the draft', async () => {
+  const origin = 'https://staging-api.example.invalid';
+  const kept = '/v1/media/properties/' + imageId;
+  const removed = ['7537cedc-3fbf-4df9-9741-82757f583629', '7537cedc-3fbf-4df9-9741-82757f583630'];
+  let row = { ...sample, published: false, images: [kept, ...removed.map(id => '/v1/media/properties/' + id)], cover_image: kept };
+  let deleted = 0;
+  const { adapter, calls } = load(call => {
+    if (!call.method) return json({ data: row });
+    if (call.method === 'PATCH') {
+      row = { ...row, ...JSON.parse(call.body).updates, updated_at: newer };
+      return json({ data: row });
+    }
+    assert.equal(call.method, 'DELETE');
+    if (row.published) return json({ error: 'Unpublish the property before removing images' }, 409);
+    if (deleted) return json({ error: 'Image delete unavailable' }, 503);
+    deleted++;
+    row = { ...row, images: row.images.filter(photo => !photo.endsWith(removed[0])) };
+    return json({ ok: true });
+  });
+  await assert.rejects(adapter.cloudflareUpdateProperty(sample.id, {
+    title: 'Edited draft', published: true, images: [origin + kept],
+  }, observed), /บันทึกข้อมูลแล้ว แต่ลบรูปภาพไม่สำเร็จ/);
+  assert.equal(row.published, false);
+  assert.equal(row.title, 'Edited draft');
+  assert.equal(deleted, 1);
+  assert.equal(calls.filter(call => call.method === 'PATCH' && JSON.parse(call.body).updates.published === true).length, 0);
+  assert.deepEqual(calls.map(call => call.method || 'GET'), ['GET', 'PATCH', 'DELETE', 'DELETE']);
+});
+
+test('a removal with publication but no metadata edit deletes first and publishes with the observed revision', async () => {
+  const origin = 'https://staging-api.example.invalid';
+  const kept = '/v1/media/properties/' + imageId;
+  const removed = '/v1/media/properties/7537cedc-3fbf-4df9-9741-82757f583629';
+  let row = { ...sample, published: false, images: [kept, removed], cover_image: kept };
+  const { adapter, calls } = load(call => {
+    if (!call.method) return json({ data: row });
+    if (call.method === 'DELETE') {
+      if (row.published) return json({ error: 'Unpublish before removing images' }, 409);
+      row = { ...row, images: [kept] };
+      return json({ ok: true });
+    }
+    assert.equal(call.method, 'PATCH');
+    assert.deepEqual(JSON.parse(call.body), { updates: { published: true }, expected_updated_at: observed });
+    row = { ...row, published: true, updated_at: newer };
+    return json({ data: row });
+  });
+  const saved = await adapter.cloudflareUpdateProperty(sample.id, { images: [origin + kept], published: true }, observed);
+  assert.equal(saved.published, true);
+  assert.equal(saved.images.length, 1);
+  assert.deepEqual(calls.map(call => call.method || 'GET'), ['GET', 'DELETE', 'PATCH']);
+});
+
+test('publication after removals cannot refresh away a concurrent edit revision', async () => {
+  const origin = 'https://staging-api.example.invalid';
+  const kept = '/v1/media/properties/' + imageId;
+  const removed = '/v1/media/properties/7537cedc-3fbf-4df9-9741-82757f583629';
+  const concurrentRevision = '2026-10-20T00:02:00.000Z';
+  let row = { ...sample, published: false, images: [kept, removed], cover_image: removed };
+  const { adapter, calls } = load(call => {
+    if (!call.method) return json({ data: row });
+    if (call.method === 'DELETE') {
+      if (row.published) return json({ error: 'Unpublish before removing images' }, 409);
+      row = { ...row, images: [kept], title: 'Another staff edit', updated_at: concurrentRevision };
+      return json({ ok: true });
+    }
+    assert.equal(call.method, 'PATCH');
+    const payload = JSON.parse(call.body);
+    if (payload.updates.published === true) {
+      assert.equal(payload.expected_updated_at, newer);
+      return json({ error: 'Concurrent edit after removal; reload before publishing' }, 409);
+    }
+    assert.equal(payload.expected_updated_at, observed);
+    row = { ...row, cover_image: kept, updated_at: newer };
+    return json({ data: row });
+  });
+  await assert.rejects(adapter.cloudflareUpdateProperty(sample.id, {
+    images: [origin + kept], cover_image: origin + kept, published: true,
+  }, observed), /Concurrent edit after removal/);
+  assert.equal(row.published, false);
+  assert.equal(row.title, 'Another staff edit');
+  assert.deepEqual(calls.map(call => call.method || 'GET'), ['GET', 'PATCH', 'DELETE', 'PATCH']);
+});
+
+test('unpublishing an existing listing remains a single revision-checked metadata patch', async () => {
+  const photo = '/v1/media/properties/' + imageId;
+  const { adapter, calls } = load(call => {
+    if (!call.method) return json({ data: { ...sample, images: [photo], cover_image: photo, published: true } });
+    assert.equal(call.method, 'PATCH');
+    assert.deepEqual(JSON.parse(call.body), { updates: { published: false }, expected_updated_at: observed });
+    return json({ data: { ...sample, images: [photo], cover_image: photo, published: false, updated_at: newer } });
+  });
+  const saved = await adapter.cloudflareUpdateProperty(sample.id, { published: false }, observed);
+  assert.equal(saved.published, false);
+  assert.deepEqual(calls.map(call => call.method || 'GET'), ['GET', 'PATCH']);
 });
 
 test('a failed media delete reports that the listing itself was already saved', async () => {
