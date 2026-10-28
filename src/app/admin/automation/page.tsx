@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useMemo, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import Image from 'next/image';
+import StaffPropertyImage from '@/components/admin/StaffPropertyImage';
 import {
   Sparkles,
   Share2,
@@ -447,13 +447,11 @@ function AutomationContent() {
                   <div className="flex items-center space-x-3">
                     <div className="relative w-12 h-12 rounded-lg overflow-hidden bg-gray-200 shrink-0">
                       {selectedProperty.cover_image ? (
-                        <Image
+                        <StaffPropertyImage
                           src={selectedProperty.cover_image}
+                          propertyId={selectedProperty.id}
                           alt={selectedProperty.title}
-                          fill
                           className="object-cover"
-                          unoptimized
-                          referrerPolicy="no-referrer"
                         />
                       ) : (
                         <Building2 className="w-6 h-6 m-auto text-gray-400" />
@@ -848,13 +846,11 @@ function AutomationContent() {
                       {/* Image + Match Badge */}
                       <div className="relative h-40 w-full bg-gray-200">
                         {prop.cover_image ? (
-                          <Image
+                          <StaffPropertyImage
                             src={prop.cover_image}
+                            propertyId={prop.id}
                             alt={prop.title}
-                            fill
                             className="object-cover"
-                            unoptimized
-                            referrerPolicy="no-referrer"
                           />
                         ) : (
                           <Building2 className="w-10 h-10 m-auto text-gray-400" />

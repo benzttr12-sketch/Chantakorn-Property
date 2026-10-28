@@ -1,7 +1,6 @@
 import { spawnSync } from 'node:child_process';
-import { existsSync, readFileSync, renameSync, unlinkSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { join, resolve } from 'node:path';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, renameSync, rmdirSync, unlinkSync, writeFileSync } from 'node:fs';
+import { isAbsolute, join, relative, resolve, sep } from 'node:path';
 
 // The explicit backend keeps a local .env.local out of the public demo build.
 const env = {
@@ -56,19 +55,32 @@ async function cloudflareStaticSlugs() {
   throw new Error('Catalog exceeds static export budget');
 }
 
-const apiRoutes = resolve('src/app/api');
-const apiBackup = join(tmpdir(), `chantakorn-pages-api-${process.pid}`);
-const propertyPage = resolve('src/app/properties/[slug]/page.tsx');
-const propertyClient = resolve('src/app/properties/[slug]/pages-build-client.tsx');
-const routesModule = resolve('src/lib/generated-static-routes.ts');
-const routesBackup = join(tmpdir(), `chantakorn-pages-routes-${process.pid}.ts`);
+const workspaceRoot = realpathSync(process.cwd());
+function workspacePath(path) {
+  const target = resolve(workspaceRoot, path);
+  const part = relative(workspaceRoot, target);
+  if (!part || part === '..' || part.startsWith(`..${sep}`) || isAbsolute(part))
+    throw new Error('Pages build staging must stay inside the workspace');
+  return target;
+}
+// /tmp may be a different filesystem on CI. Keep rename backups outside app/
+// but on the checkout filesystem; .tools/ is ignored and Next never cleans it.
+const stagingParent = workspacePath('.tools');
+mkdirSync(stagingParent, { recursive: true });
+const staging = workspacePath(mkdtempSync(join(workspacePath(realpathSync(stagingParent)), 'pages-build-')));
+const apiRoutes = workspacePath('src/app/api');
+const apiBackup = workspacePath(join(staging, 'api'));
+const propertyPage = workspacePath('src/app/properties/[slug]/page.tsx');
+const propertyClient = workspacePath('src/app/properties/[slug]/pages-build-client.tsx');
+const routesModule = workspacePath('src/lib/generated-static-routes.ts');
+const routesBackup = workspacePath(join(staging, 'generated-static-routes.ts'));
 let apiMoved = false;
 let pageMoved = false;
 let routesMoved = false;
 
 /** Sample listing link keys (slug/id) read from the demo data source. */
 function samplePropertyKeys() {
-  const source = readFileSync(resolve('src/data/sample-properties.ts'), 'utf8');
+  const source = readFileSync(workspacePath('src/data/sample-properties.ts'), 'utf8');
   const keys = new Set();
   for (const match of source.matchAll(/^\s*(?:slug|id)\s*:\s*'([^']{1,120})'/gm)) keys.add(match[1]);
   return [...keys];
@@ -117,19 +129,27 @@ export function generateStaticParams() {
 export default function PropertyDetailPage() { return <PropertyPage />; }
 `);
   const result = spawnSync(process.execPath, ['node_modules/next/dist/bin/next', 'build'], {
-    env, stdio: 'inherit',
+    cwd: workspaceRoot, env, stdio: 'inherit',
   });
   if (result.error) throw result.error;
   if (result.status !== 0) throw new Error(`Static export failed with exit code ${result.status || 1}`);
-  writeFileSync('.next-pages/.nojekyll', '');
+  writeFileSync(workspacePath('.next-pages/.nojekyll'), '');
 } finally {
-  if (routesMoved) {
-    unlinkSync(routesModule);
-    renameSync(routesBackup, routesModule);
+  const failures = [];
+  for (const [moved, backup, original, generated] of [
+    [routesMoved, routesBackup, routesModule, true],
+    [pageMoved, propertyClient, propertyPage, true],
+    [apiMoved, apiBackup, apiRoutes, false],
+  ]) {
+    if (!moved) continue;
+    try {
+      if (generated && existsSync(original)) unlinkSync(original);
+      renameSync(backup, original);
+    } catch (error) { failures.push(error); }
   }
-  if (pageMoved) {
-    unlinkSync(propertyPage);
-    renameSync(propertyClient, propertyPage);
+  // Never recursively remove a staging directory: failed backups must survive.
+  if (!failures.length) {
+    try { rmdirSync(staging); } catch (error) { failures.push(error); }
   }
-  if (apiMoved) renameSync(apiBackup, apiRoutes);
+  if (failures.length) throw new AggregateError(failures, 'Pages build source restoration failed; backups retained in ' + staging);
 }

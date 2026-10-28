@@ -202,9 +202,11 @@ test('local Worker HTTP / D1 / R2 / Firebase authorization contract', async t =>
     assert.equal(hit.headers.get('X-Catalog-Cache'), 'HIT');
     assert.equal(hit.headers.get('Cache-Control'), 'no-store');
     assert.equal(hit.headers.get('Access-Control-Allow-Origin'), origin);
+    assert.match(hit.headers.get('Vary') || '', /\bOrigin\b/i);
     const otherOrigin = await fetchApi(path, { headers: { Origin: 'https://other.example.test' } });
     assert.equal(otherOrigin.headers.get('X-Catalog-Cache'), 'HIT');
     assert.equal(otherOrigin.headers.get('Access-Control-Allow-Origin'), null);
+    assert.match(otherOrigin.headers.get('Vary') || '', /\bOrigin\b/i);
     assert.equal((await fetchApi(path, { headers })).headers.get('X-Catalog-Cache'), 'BYPASS');
     assert.equal((await fetchApi(path, { headers: { Cookie: 'session=synthetic' } })).headers.get('X-Catalog-Cache'), 'BYPASS');
     assert.equal((await fetchApi(path + '&limit=30')).status, 400);
@@ -237,7 +239,19 @@ test('local Worker HTTP / D1 / R2 / Firebase authorization contract', async t =>
     assert.deepEqual(await staff.json(), { uid, full_name: 'Synthetic staff', role: 'ADMIN' });
     const good = await fetchApi('/v1/media/inquiries/' + privateId, { headers });
     assert.equal(good.status, 200); assert.equal(good.headers.get('Cache-Control'), 'private, no-store');
+    assert.equal(good.headers.get('Access-Control-Allow-Origin'), origin);
+    assert.match(good.headers.get('Vary') || '', /\bOrigin\b/i);
     assert.deepEqual(Buffer.from(await good.arrayBuffer()), png);
+    for (const requestOrigin of [undefined, 'https://untrusted.invalid']) {
+      const image = await fetchApi('/v1/media/inquiries/' + privateId, {
+        headers: { Authorization: headers.Authorization, ...(requestOrigin ? { Origin: requestOrigin } : {}) },
+      });
+      assert.equal(image.status, 200);
+      assert.equal(image.headers.get('Access-Control-Allow-Origin'), null);
+      assert.match(image.headers.get('Vary') || '', /\bOrigin\b/i);
+      assert.equal(image.headers.get('Cache-Control'), 'private, no-store');
+      assert.deepEqual(Buffer.from(await image.arrayBuffer()), png);
+    }
     account.disabled = true;
     const disabled = await fetchApi('/v1/media/inquiries/' + privateId, { headers });
     assert.equal(disabled.status, 403); assert.equal(disabled.headers.get('Cache-Control'), 'private, no-store');
@@ -271,7 +285,21 @@ test('local Worker HTTP / D1 / R2 / Firebase authorization contract', async t =>
       assert.equal(response.headers.get('Cache-Control'), 'private, no-store');
       assert.equal(response.headers.get('Content-Type'), 'image/png');
       assert.equal(response.headers.get('Cross-Origin-Resource-Policy'), 'same-site');
+      // Unlike c.json catalog responses, these successful image routes return
+      // raw Responses. Browser fetch still needs CORS on the actual GET body.
+      assert.equal(response.headers.get('Access-Control-Allow-Origin'), origin);
+      assert.match(response.headers.get('Vary') || '', /\bOrigin\b/i);
       assert.deepEqual(Buffer.from(await response.arrayBuffer()), png);
+      for (const requestOrigin of [undefined, 'https://untrusted.invalid']) {
+        const image = await fetchApi(path, {
+          headers: { Authorization: headers.Authorization, ...(requestOrigin ? { Origin: requestOrigin } : {}) },
+        });
+        assert.equal(image.status, 200);
+        assert.equal(image.headers.get('Access-Control-Allow-Origin'), null);
+        assert.match(image.headers.get('Vary') || '', /\bOrigin\b/i);
+        assert.equal(image.headers.get('Cache-Control'), 'private, no-store');
+        assert.deepEqual(Buffer.from(await image.arrayBuffer()), png);
+      }
       assert.equal((await fetchApi(`/v1/admin/properties/${publicId}/media/${previewMedia}`, { headers })).status, 404);
       await db.prepare('UPDATE profiles SET role=? WHERE uid=?').bind('AGENT', uid).run();
       assert.equal((await preview()).status, 200);

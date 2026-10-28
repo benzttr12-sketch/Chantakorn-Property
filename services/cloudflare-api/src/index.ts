@@ -33,12 +33,14 @@ const app = new Hono<{ Bindings: Bindings }>();
 app.use('*', async (c, next) => {
   const origin = c.req.header('Origin');
   const allowed = matchAllowedOrigin(origin, c.env?.ALLOWED_ORIGIN);
+  c.header('Cache-Control', 'no-store');
+  await next();
+  // Raw R2 Responses do not inherit Hono's prepared headers. Apply CORS to
+  // the final response so authorized browser image reads work as JSON reads do.
   if (allowed) {
     c.header('Access-Control-Allow-Origin', allowed);
   }
   c.header('Vary', 'Origin');
-  c.header('Cache-Control', 'no-store');
-  await next();
   c.header('X-Content-Type-Options', 'nosniff');
   c.header('Referrer-Policy', 'strict-origin-when-cross-origin');
 });
