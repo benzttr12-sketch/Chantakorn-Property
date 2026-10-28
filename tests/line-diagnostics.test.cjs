@@ -4,6 +4,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
 const ts = require('typescript');
+const loadTs = require('./load-ts.cjs');
 
 const expectedEndpoint = 'https://site.example/api/line/webhook';
 const configuredEnv = { LINE_CHANNEL_ACCESS_TOKEN: 'private-token', LINE_CHANNEL_SECRET: 'private-secret', NEXT_PUBLIC_SITE_URL: 'https://site.example/some-path/' };
@@ -19,7 +20,7 @@ function load({ staff = true, env = configuredEnv, fetch = async () => { throw E
       if (name === '@/lib/api-response') return { jsonResponse: (body, init) => Response.json(body, init) };
       if (name === '@/lib/server-auth') return { requireStaff: async () => staff ? null : Response.json({ error: 'Unauthorized' }, { status: 401 }) };
       if (name === '@/lib/line-auth') return { OFFICIAL_LINE_BASIC_ID: '@930xzcyi' };
-      if (name === '@/lib/firestore-rest') return { listFirestoreDocuments: listProperties };
+      if (name === '@/lib/server-property-catalog') return { listPublishedProperties: listProperties };
       throw Error(name);
     },
   });
@@ -123,13 +124,34 @@ test('valid account, canonical webhook origin and published properties return re
   assert.equal(result.ready, true);
   assert.equal(result.expectedWebhookEndpoint, expectedEndpoint);
   assert.equal(result.checks.every(item => item.ok && item.code && item.message && item.name), true);
-  assert.deepEqual(query.slice(0, 2), ['properties', 20]);
-  assert.equal(query[2].publishedOnly, true);
+  assert.deepEqual(query, [20]);
   assert.match(check(result, 'รายการทรัพย์ที่เผยแพร่').message, /1 รายการ/);
   assert.equal(requests.length, 2);
   for (const value of ['private-token', 'private-secret', 'private-bot-id', 'Private display name', 'private-to-diagnostics-title']) {
     assert.equal(JSON.stringify(result).includes(value), false);
   }
+});
+
+test('diagnostics read Cloudflare catalog readiness without reading legacy Firestore listings', async () => {
+  const apiOrigin = 'https://catalog.example';
+  let catalogRequests = 0;
+  const fetch = async (url, init) => {
+    if (url.startsWith('https://api.line.me/')) return validLine(url, init);
+    catalogRequests += 1;
+    assert.equal(url, `${apiOrigin}/v1/properties?limit=20`);
+    assert.equal(init.headers, undefined);
+    assert.equal(init.credentials, 'omit');
+    return Response.json({ data: [{ id: 'cloudflare-home', title: 'Current catalog', published: true }], next_cursor: null });
+  };
+  const catalog = loadTs({ '@/lib/firestore-rest': {
+    listFirestoreDocuments: async () => { throw Error('Must not read legacy Firestore listings'); },
+  } }, { fetch, process: { env: { NEXT_PUBLIC_CLOUDFLARE_API_ORIGIN: apiOrigin } } })('lib/server-property-catalog.ts');
+  const api = load({ fetch, listProperties: catalog.listPublishedProperties });
+  const result = await (await api.GET(request())).json();
+  assert.equal(result.ready, true);
+  assert.equal(catalogRequests, 1);
+  assert.ok(hasCode(result, 'PROPERTIES_AVAILABLE'));
+  assert.equal(JSON.stringify(result).includes('Current catalog'), false);
 });
 
 test('request origin supplies canonical webhook when no site URL is configured', async () => {

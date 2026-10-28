@@ -14,13 +14,15 @@ function load(file, { env = {}, fetch = async () => { throw Error('Unexpected re
   }).outputText;
   const context = vm.createContext({
     module, exports: module.exports, Request, Response, URL, URLSearchParams, Headers, AbortSignal, Buffer,
-    TextEncoder, crypto: webcrypto, btoa: text => Buffer.from(text, 'binary').toString('base64'),
-    fetch, process: { env }, console: Object.fromEntries(['log', 'info', 'warn', 'error'].map(level => [level, (...args) => log(level, ...args)])),
+    TextEncoder, TextDecoder, crypto: webcrypto, btoa: text => Buffer.from(text, 'binary').toString('base64'),
+    fetch, process: { env: { NEXT_PUBLIC_PROPERTY_STORAGE_BACKEND: 'firebase', ...env } }, console: Object.fromEntries(['log', 'info', 'warn', 'error'].map(level => [level, (...args) => log(level, ...args)])),
     require(name) {
       if (name === '@/lib/api-response') return { jsonResponse: (body, init) => Response.json(body, init) };
       if (name === '@/lib/server-auth') return { requireStaff };
       if (name === '@/lib/line-property-image') return load('lib/line-property-image.ts');
       if (name === '@/lib/format-code') return load('lib/format-code.ts');
+      if (name === '@/lib/server-property-catalog') return load('lib/server-property-catalog.ts', { env, fetch, firestore, requireStaff, log });
+      if (name === '@/lib/public-property') return load('lib/public-property.ts');
       if (name === '@/app/api/line/property-image/route') return load('app/api/line/property-image/route.ts', { env, fetch, firestore, requireStaff });
       if (name === 'sharp') return { default: sharp };
       if (name === 'node:buffer') return require(name);
@@ -198,6 +200,46 @@ test('LINE property carousel contains only published homes with static-site link
   assert.equal(bubbles.length, 1);
   assert.equal(bubbles[0].body.contents[1].text, 'Public home');
   assert.equal(bubbles[0].footer.contents[0].action.uri, 'https://example.com/site/properties/CK-HOME%20ONE');
+});
+
+test('Cloudflare customer search uses current public listings while retaining Firebase inbox writes', async () => {
+  const apiOrigin = 'https://catalog.example';
+  const mediaId = '8adca02a-3479-47aa-a101-037434ff4bcb';
+  let sent;
+  let inboxWrites = 0;
+  const api = load('app/api/line/webhook/route.ts', {
+    env: { NEXT_PUBLIC_PROPERTY_STORAGE_BACKEND: 'cloudflare', NEXT_PUBLIC_CLOUDFLARE_API_ORIGIN: apiOrigin,
+      LINE_CHANNEL_SECRET: 'test-secret', LINE_CHANNEL_ACCESS_TOKEN: 'test-token', NEXT_PUBLIC_SITE_URL: 'https://site.example.com' },
+    firestore: {
+      listFirestoreDocuments: async () => { throw Error('Must not read legacy Firestore listings'); },
+      createFirestoreDocument: async (collection) => { assert.equal(collection, 'inquiries'); inboxWrites += 1; return { ok: true }; },
+    },
+    fetch: async (url, init) => {
+      if (url === `${apiOrigin}/v1/properties?limit=30`) {
+        assert.equal(init.headers, undefined);
+        assert.equal(init.credentials, 'omit');
+        assert.equal(init.redirect, 'error');
+        return Response.json({ data: [
+          { id: 'cf-home', title: 'Current D1 home', published: true, cover_image: `/v1/media/properties/${mediaId}`, images: [] },
+          { id: 'draft', title: 'Private D1 draft', published: false },
+        ], next_cursor: null });
+      }
+      assert.equal(url, 'https://api.line.me/v2/bot/message/reply');
+      assert.equal(init.headers.Authorization, 'Bearer test-token');
+      sent = JSON.parse(init.body);
+      return Response.json({});
+    },
+  });
+  const response = await api.POST(signedRequest('ดูทรัพย์'));
+  const result = await response.json();
+  assert.equal(result.successfulReplies, 1);
+  assert.equal(result.failedReplies, 0);
+  const bubbles = sent.messages[0].contents.contents;
+  assert.equal(bubbles.length, 1);
+  assert.equal(bubbles[0].hero.url, `${apiOrigin}/v1/media/properties/${mediaId}`);
+  assert.equal(JSON.stringify(sent).includes('Current D1 home'), true);
+  assert.equal(JSON.stringify(sent).includes('Private D1 draft'), false);
+  assert.equal(inboxWrites, 1);
 });
 
 async function customerReply(text, properties, options = {}) {
@@ -539,6 +581,26 @@ test('public image endpoint does not expose drafts or missing property documents
     assert.equal(response.status, 404);
     assert.equal(response.headers.get('location'), null);
   }
+});
+
+test('Cloudflare LINE image endpoint redirects only to the image on the selected published catalog record', async () => {
+  const apiOrigin = 'https://catalog.example';
+  const mediaId = '8adca02a-3479-47aa-a101-037434ff4bcb';
+  const api = load('app/api/line/property-image/route.ts', {
+    env: { NEXT_PUBLIC_PROPERTY_STORAGE_BACKEND: 'cloudflare', NEXT_PUBLIC_CLOUDFLARE_API_ORIGIN: apiOrigin },
+    firestore: { getFirestoreDocument: async () => { throw Error('Must not read legacy Firestore listings'); } },
+    fetch: async (url, init) => {
+      assert.equal(url, `${apiOrigin}/v1/properties/cf-home`);
+      assert.equal(init.headers, undefined);
+      assert.equal(init.credentials, 'omit');
+      assert.equal(init.redirect, 'error');
+      return Response.json({ data: { id: 'cf-home', published: true, cover_image: `/v1/media/properties/${mediaId}`, images: [] } });
+    },
+  });
+  const response = await api.GET(new Request('https://api.example.com/api/line/property-image?id=cf-home&url=https://attacker.example/image'));
+  assert.equal(response.status, 307);
+  assert.equal(response.headers.get('location'), `${apiOrigin}/v1/media/properties/${mediaId}`);
+  assert.equal(response.headers.get('cache-control'), 'no-store');
 });
 
 test('public image endpoint rejects unsupported and malformed embedded photos', async () => {

@@ -1,5 +1,5 @@
 import { jsonResponse } from '@/lib/api-response';
-import { getFirestoreDocument } from '@/lib/firestore-rest';
+import { getPublishedPropertyDocument } from '@/lib/server-property-catalog';
 import { OFFICIAL_LINE_BASIC_ID } from '@/lib/line-auth';
 import { buildPropertyBroadcast } from '@/lib/line-property-broadcast';
 import { requireStaff } from '@/lib/server-auth';
@@ -38,7 +38,7 @@ async function prepare(req: Request, id: string) {
     const siteBase = `${site.origin}${site.pathname.replace(/\/+$/, '')}`;
     const staffToken = req.headers.get('authorization')?.match(/^Bearer\s+(.+)$/i)?.[1];
     // Staff may read drafts, but a draft can never be previewed or broadcast.
-    const response = await getFirestoreDocument('properties', id, staffToken);
+    const response = await getPublishedPropertyDocument(id, staffToken);
     if (response.status === 404) return { error: failure('PROPERTY_NOT_FOUND', 'ไม่พบทรัพย์ที่เลือก กรุณาเลือกทรัพย์ใหม่', 404) };
     if (!response.ok) return { error: failure('PROPERTY_UNAVAILABLE', 'อ่านข้อมูลทรัพย์ไม่ได้ กรุณาลองอีกครั้ง', 503) };
     const document = await response.json();
