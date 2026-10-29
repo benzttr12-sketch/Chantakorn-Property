@@ -5,7 +5,7 @@ const path = require('node:path');
 const vm = require('node:vm');
 const ts = require('typescript');
 
-function screen({ role = 'ADMIN', failure, existing, redirect } = {}) {
+function screen({ role = 'ADMIN', failure, existing, redirect, reason } = {}) {
   const hooks = [], effects = [], destinations = [];
   let cursor = 0, popupCalls = 0;
   const react = {
@@ -27,7 +27,7 @@ function screen({ role = 'ADMIN', failure, existing, redirect } = {}) {
     'next/link': 'Link',
     'next/navigation': {
       useRouter: () => ({ replace: value => destinations.push(value) }),
-      useSearchParams: () => new URLSearchParams(redirect ? { redirect } : {}),
+      useSearchParams: () => new URLSearchParams({ ...(redirect ? { redirect } : {}), ...(reason ? { reason } : {}) }),
     },
     'lucide-react': new Proxy({}, { get: (_object, name) => String(name) }),
     '@/lib/backend': { dataBackend: 'firebase' },
@@ -88,6 +88,28 @@ test('popup cancellation shows actionable text and leaves the form available wit
   assert.ok(text(result).includes('คุณปิดหน้าต่าง Google'));
   assert.ok(!text(result).includes('Firebase raw message'));
   assert.equal(googleButton(result).props.disabled, false);
+});
+
+test('a restored member session stays on staff login so a different Google account can be chosen', async () => {
+  for (const options of [{ reason: 'admin_required' }, { redirect: '/admin/properties' }]) {
+    const page = screen({ ...options, existing: { role: 'USER' } });
+    page.render(); await page.flush();
+    assert.deepEqual(page.destinations, []);
+    assert.equal(googleButton(page.render()).props.disabled, false);
+    assert.match(text(page.render()), /เลือกบัญชีเจ้าหน้าที่/);
+    await googleButton(page.render()).props.onClick();
+    assert.deepEqual(page.destinations, [options.redirect || '/admin']);
+  }
+});
+
+test('choosing a nonstaff Google account for an admin destination leaves account switching available', async () => {
+  const page = screen({ role: 'USER', reason: 'auth_required', redirect: '/admin/properties' });
+  page.render(); await page.flush();
+  await googleButton(page.render()).props.onClick();
+  assert.deepEqual(page.destinations, []);
+  const tree = page.render();
+  assert.equal(googleButton(tree).props.disabled, false);
+  assert.ok(nodes(tree).some(node => node.props.role === 'alert' && /ยังไม่มีสิทธิ์/.test(text(node))));
 });
 
 test('login honors local return paths and refuses external or script destinations', async () => {

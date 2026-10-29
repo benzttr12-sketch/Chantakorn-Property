@@ -14,7 +14,7 @@ import {
   AlertCircle 
 } from 'lucide-react';
 import { dataBackend } from '@/lib/backend';
-import { signInWithGoogle, registerWithEmail } from '@/lib/auth-helpers';
+import { signInWithGoogle, registerWithEmail, getCurrentUserProfile } from '@/lib/auth-helpers';
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -25,18 +25,42 @@ export default function RegisterPage() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [registered, setRegistered] = useState(false);
+  const [checkingSession, setCheckingSession] = useState(true);
+  const activeRef = React.useRef(true);
+  const registrationTimer = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Redirect fallback returns to this page too. Complete it before accepting
+  // another sign-in so a successful Google account cannot remain on signup.
+  React.useEffect(() => {
+    let active = true;
+    activeRef.current = true;
+    getCurrentUserProfile({ surfaceRedirectError: true })
+      .then(profile => {
+        if (!active) return;
+        if (profile) router.replace(profile.role === 'ADMIN' || profile.role === 'AGENT' ? '/admin' : '/favorites');
+        else setCheckingSession(false);
+      })
+      .catch(err => {
+        if (!active) return;
+        setCheckingSession(false);
+        setError(err.message || 'รับผลเข้าสู่ระบบจาก Google ไม่สำเร็จ กรุณาลองอีกครั้ง');
+      });
+    return () => {
+      active = false;
+      activeRef.current = false;
+      if (registrationTimer.current !== null) clearTimeout(registrationTimer.current);
+    };
+  }, [router]);
 
   const handleGoogleSignUp = async () => {
     setError('');
     setLoading(true);
     try {
       const profile = await signInWithGoogle();
-      if (profile.role === 'ADMIN' || profile.role === 'AGENT') {
-        router.push('/admin');
-      } else {
-        router.push('/favorites');
-      }
+      if (!activeRef.current) return;
+      router.replace(profile.role === 'ADMIN' || profile.role === 'AGENT' ? '/admin' : '/favorites');
     } catch (err: any) {
+      if (!activeRef.current) return;
       setError(err.message || 'ไม่สามารถสมัครสมาชิกด้วย Google ได้ กรุณาลองใหม่อีกครั้ง');
       setLoading(false);
     }
@@ -52,9 +76,11 @@ export default function RegisterPage() {
     if (dataBackend === 'firebase') {
       try {
         const profile = await registerWithEmail(email, password, fullName, phone);
+        if (!activeRef.current) return;
         setRegistered(true);
         setLoading(false);
-        setTimeout(() => {
+        registrationTimer.current = setTimeout(() => {
+          if (!activeRef.current) return;
           if (profile.role === 'ADMIN' || profile.role === 'AGENT') {
             router.push('/admin');
           } else {
@@ -63,6 +89,7 @@ export default function RegisterPage() {
         }, 1500);
         return;
       } catch (err: any) {
+        if (!activeRef.current) return;
         setError(err.message || 'เกิดข้อผิดพลาดในการลงทะเบียน');
         setLoading(false);
         return;
@@ -115,7 +142,7 @@ export default function RegisterPage() {
           {dataBackend === 'firebase' && <button
             type="button"
             onClick={handleGoogleSignUp}
-            disabled={loading}
+            disabled={loading || checkingSession}
             className="w-full py-3 px-4 mb-5 bg-white hover:bg-gray-50 border border-gray-300 text-gray-700 font-bold text-xs sm:text-sm rounded-xl shadow-xs transition-all flex items-center justify-center space-x-3"
           >
             <svg className="w-4 h-4" viewBox="0 0 24 24">
@@ -219,10 +246,10 @@ export default function RegisterPage() {
 
             <button
               type="submit"
-              disabled={loading || registered}
+              disabled={loading || registered || checkingSession}
               className="w-full py-3 bg-navy-950 hover:bg-navy-900 text-gold-400 font-bold text-xs sm:text-sm rounded-xl shadow-md transition-all flex items-center justify-center space-x-2"
             >
-              <span>{loading ? 'กำลังลงทะเบียน...' : 'สมัครสมาชิก'}</span>
+              <span>{checkingSession ? 'กำลังตรวจสอบสถานะเข้าสู่ระบบ...' : loading ? 'กำลังลงทะเบียน...' : 'สมัครสมาชิก'}</span>
               <ArrowRight className="w-4 h-4" />
             </button>
           </form>

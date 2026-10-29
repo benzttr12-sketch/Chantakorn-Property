@@ -44,6 +44,8 @@ let app: FirebaseApp | null = null;
 let db: Firestore | null = null;
 let auth: Auth | null = null;
 const googleProvider = new GoogleAuthProvider();
+// A different Google account may be needed to access the staff workspace.
+googleProvider.setCustomParameters({ prompt: 'select_account' });
 
 if (isFirebaseConfigured) {
   try {

@@ -33,6 +33,7 @@ function friendlyAuthError(err: any): string {
     'auth/cancelled-popup-request': 'มีหน้าต่างเข้าสู่ระบบเปิดอยู่แล้ว กรุณาดำเนินการในหน้าต่างนั้น',
     'auth/web-storage-unsupported': 'เบราว์เซอร์นี้ไม่รองรับการเก็บสถานะเข้าสู่ระบบ กรุณาเปิดเว็บใน Chrome, Edge หรือ Safari โดยตรง',
     'auth/internal-error': 'รับผลเข้าสู่ระบบจาก Google ไม่สำเร็จ กรุณาโหลดหน้าใหม่แล้วลองอีกครั้ง',
+    'auth/session-changed': 'บัญชีเข้าสู่ระบบเปลี่ยนไป กรุณาเลือกบัญชีแล้วลองอีกครั้ง',
   };
   if (map[code]) return map[code];
   if (err?.message?.includes('invalid-credential') || err?.message?.includes('wrong-password')) return map['auth/invalid-credential'];
@@ -55,13 +56,21 @@ function LoginForm() {
   const activeRef = React.useRef(true);
 
   const handleSuccessfulAuth = (role: string) => {
+    const isStaff = role === 'ADMIN' || role === 'AGENT';
+    const needsStaff = reason === 'admin_required' || /^\/admin(?:\/|[?#]|$)/.test(redirectTarget || '');
+    if (needsStaff && !isStaff) {
+      setCheckingSession(false);
+      setLoading(false);
+      setError('บัญชีนี้ยังไม่มีสิทธิ์เข้าหลังบ้าน กรุณากดเข้าสู่ระบบด้วย Google แล้วเลือกบัญชีเจ้าหน้าที่ หรือติดต่อผู้ดูแลระบบ');
+      return;
+    }
     // URL parsing strips tabs/newlines before resolving a destination, so a
     // value such as /<newline>/host must not become an external redirect.
     if (redirectTarget?.startsWith('/') && !redirectTarget.startsWith('//') && !/[\\\u0000-\u001f\u007f]/.test(redirectTarget)) {
       router.replace(redirectTarget);
       return;
     }
-    if (role === 'ADMIN' || role === 'AGENT') {
+    if (isStaff) {
       router.replace('/admin');
     } else {
       router.replace('/profile');
@@ -84,7 +93,7 @@ function LoginForm() {
       .catch(err => {
         if (!active) return;
         setCheckingSession(false);
-        setError('การกลับมาจากหน้าล็อกอิน Google ไม่สำเร็จ: ' + friendlyAuthError(err));
+        setError('ตรวจสอบสถานะเข้าสู่ระบบไม่สำเร็จ: ' + friendlyAuthError(err));
       });
     return () => { active = false; activeRef.current = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -126,9 +135,11 @@ function LoginForm() {
     if (dataBackend === 'firebase') {
       try {
         const profile = await loginWithEmail(email, password);
+        if (!activeRef.current) return;
         handleSuccessfulAuth(profile.role);
         return;
       } catch (err: any) {
+        if (!activeRef.current) return;
         setError(friendlyAuthError(err));
         setLoading(false);
         return;
@@ -161,7 +172,7 @@ function LoginForm() {
       )}
 
       {error && !isUnauthorizedDomain && (
-        <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-xl text-xs text-red-600 flex items-center space-x-2">
+        <div role="alert" className="mb-4 p-3 bg-red-50 border border-red-200 rounded-xl text-xs text-red-600 flex items-center space-x-2">
           <AlertCircle className="w-4 h-4 shrink-0" />
           <span>{error}</span>
         </div>

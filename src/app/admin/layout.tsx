@@ -28,6 +28,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const menuButtonRef = useRef<HTMLButtonElement>(null);
   const drawerRef = useRef<HTMLDivElement>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
+  const signingOutRef = useRef(false);
   const isStaff = currentUser?.role === 'ADMIN' || currentUser?.role === 'AGENT';
   const restrictedPage = pathname.startsWith('/admin/users') && currentUser?.role !== 'ADMIN';
 
@@ -47,7 +48,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         setCurrentUser(profile);
         if (!profile) {
           setSessionState('redirecting');
-          router.replace('/login?reason=admin_required');
+          if (!signingOutRef.current) router.replace(`/login?reason=auth_required&redirect=${encodeURIComponent(window.location.pathname + window.location.search)}`);
         } else {
           setSessionState(profile.role === 'ADMIN' || profile.role === 'AGENT' ? 'ready' : 'denied');
         }
@@ -81,7 +82,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           revision += 1;
           setCurrentUser(null);
           setSessionState('redirecting');
-          router.replace('/login?reason=admin_required');
+          if (!signingOutRef.current) router.replace(`/login?reason=auth_required&redirect=${encodeURIComponent(window.location.pathname + window.location.search)}`);
         }
       });
     } else {
@@ -154,12 +155,15 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   const handleLogout = async () => {
     if (loggingOut) return;
+    signingOutRef.current = true;
     setLoggingOut(true);
     setLogoutError('');
     try {
       await logoutUser();
       router.replace('/');
     } catch {
+      signingOutRef.current = false;
+      setSessionState('error');
       setLogoutError('ออกจากระบบไม่สำเร็จ กรุณาลองอีกครั้ง');
       setLoggingOut(false);
     }
@@ -179,7 +183,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             {denied ? 'ระบบนี้สำหรับผู้ดูแลระบบและนายหน้า กรุณาใช้บัญชีเจ้าหน้าที่หรือติดต่อผู้ดูแลระบบ' : failed ? 'กรุณาตรวจการเชื่อมต่ออินเทอร์เน็ต แล้วลองใหม่อีกครั้ง' : 'กรุณารอสักครู่ ระบบกำลังตรวจสอบสิทธิ์ของคุณ'}
           </p>
           {failed && <button onClick={() => setSessionAttempt((value) => value + 1)} className="mt-5 inline-flex min-h-11 items-center gap-2 rounded-xl bg-navy-950 px-5 text-sm font-bold text-white"><RefreshCw className="h-4 w-4" />ลองใหม่</button>}
-          {denied && <div className="mt-6 flex flex-col gap-3"><button disabled={loggingOut} onClick={handleLogout} className="min-h-11 rounded-xl bg-navy-950 px-4 text-sm font-bold text-white">เข้าสู่ระบบด้วยบัญชีเจ้าหน้าที่</button><Link href="/" className="py-2 text-sm text-slate-600">กลับหน้าเว็บไซต์</Link></div>}
+          {denied && <div className="mt-6 flex flex-col gap-3"><Link href={`/login?reason=admin_required&redirect=${encodeURIComponent(pathname)}`} className="flex min-h-11 items-center justify-center rounded-xl bg-navy-950 px-4 text-sm font-bold text-white">เลือกบัญชีเจ้าหน้าที่</Link><Link href="/" className="py-2 text-sm text-slate-600">กลับหน้าเว็บไซต์</Link></div>}
           {logoutError && <p role="alert" className="mt-3 text-sm text-red-700">{logoutError}</p>}
         </div>
       </main>
