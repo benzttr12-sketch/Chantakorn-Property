@@ -59,29 +59,38 @@ export default function Header() {
 
   // Listen to user auth state
   useEffect(() => {
+    let active = true;
+    let revision = 0;
     setCurrentUser(getStoredUser());
 
-    const handleAuthCustom = (e: any) => {
-      setCurrentUser(e.detail || null);
+    const handleAuthCustom = () => {
+      revision += 1;
+      if (active) setCurrentUser(getStoredUser());
     };
     window.addEventListener('chantakorn_auth_change', handleAuthCustom);
 
     let unsubscribe = () => {};
     if (dataBackend === 'firebase' && auth) {
       unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+        if (!active) return;
+        const requestRevision = ++revision;
+        setCurrentUser(null);
         if (!firebaseUser) {
-          setCurrentUser(null);
+          return;
         } else {
           try {
-            setCurrentUser(await syncFirebaseUserProfile(firebaseUser));
+            const profile = await syncFirebaseUserProfile(firebaseUser);
+            if (active && requestRevision === revision) setCurrentUser(profile);
           } catch {
-            setCurrentUser(null);
+            if (active && requestRevision === revision) setCurrentUser(null);
           }
         }
       });
     }
 
     return () => {
+      active = false;
+      revision += 1;
       window.removeEventListener('chantakorn_auth_change', handleAuthCustom);
       unsubscribe();
     };

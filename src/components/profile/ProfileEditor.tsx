@@ -50,6 +50,8 @@ export default function ProfileEditor({ isAdminView = false }: ProfileEditorProp
   const [avatarUrl, setAvatarUrl] = useState('');
 
   useEffect(() => {
+    let active = true;
+    let revision = 0;
     // Show only a profile already verified from Firebase in this session.
     const stored = getStoredUser();
     if (stored) {
@@ -65,9 +67,15 @@ export default function ProfileEditor({ isAdminView = false }: ProfileEditorProp
     let unsubscribe: (() => void) | undefined;
     if (dataBackend === 'firebase' && auth) {
       unsubscribe = onAuthStateChanged(auth, async (user) => {
+        if (!active) return;
+        const requestRevision = ++revision;
+        setUserProfile(null);
+        setErrorMessage('');
         if (user) {
+          setLoading(true);
           try {
             const profile = await syncFirebaseUserProfile(user);
+            if (!active || requestRevision !== revision) return;
             setUserProfile(profile);
             setFullName(profile.full_name);
             setPhone(profile.phone || '');
@@ -75,12 +83,13 @@ export default function ProfileEditor({ isAdminView = false }: ProfileEditorProp
             setBio(profile.bio || '');
             setAvatarUrl(profile.avatar_url || '');
           } catch {
-            setUserProfile(null);
-            setErrorMessage('โหลดข้อมูลสมาชิกจากระบบไม่ได้ กรุณาเข้าสู่ระบบอีกครั้ง');
+            if (active && requestRevision === revision) {
+              setUserProfile(null);
+              setErrorMessage('โหลดข้อมูลสมาชิกจากระบบไม่ได้ กรุณาเข้าสู่ระบบอีกครั้ง');
+            }
           }
-          setLoading(false);
+          if (active && requestRevision === revision) setLoading(false);
         } else {
-          setUserProfile(null);
           setLoading(false);
         }
       });
@@ -89,6 +98,8 @@ export default function ProfileEditor({ isAdminView = false }: ProfileEditorProp
     }
 
     return () => {
+      active = false;
+      revision += 1;
       if (unsubscribe) unsubscribe();
     };
   }, []);
