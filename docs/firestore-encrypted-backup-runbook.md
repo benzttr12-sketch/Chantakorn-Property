@@ -1,6 +1,6 @@
 # Encrypted Firestore backup runbook — before D1 cutover
 
-**Status: TOOLING ONLY. No backup of production data has been run.** This is not permission to delete Firestore. Operate with a trusted human and a **read-only** Google identity. Do not upload the archive, encryption password, Auth user list or LINE follower IDs to GitHub, PRs, AI chats or CI.
+This document describes the Firestore-only format. The owner-authorized Windows administrator workflow is documented in [admin-backup-operations.md](admin-backup-operations.md), including separate Auth/R2 tooling and DPAPI custody. A successful local backup does not establish cutover readiness or authorize deleting Firestore. Operate on a trusted administrator's machine with a **read-only** Google identity. Do not upload the archive, encryption password, Auth user list or LINE follower IDs to GitHub, PRs, AI chats or CI.
 
 ## What it covers
 
@@ -19,7 +19,7 @@ The separate plaintext manifest contains only database identifiers, timestamp, d
 3. Use Google Application Default Credentials with least-privileged, time-bounded Firestore read access; do not copy service-account private keys to repo or Cloudflare. A Vercel OIDC token is not automatically a local ADC credential.
 4. Set a distinct backup passphrase of at least 24 characters in an isolated local shell and save it **separately** in a password manager. Do not put it into `.env`, shell-history command lines, CI or PRs.
 5. Consider Firebase read quotas and egress. Metadata discovery plus a separate typed read of every existing document costs more than the previous existing-document-only scan. Each discovered location also needs a subcollection-list request, even if it has no children. This can consume free quota or incur billable usage. **Never enable billing automatically.** Select conservative scan limits before starting; caps are fail-closed limits, not a free-tier guarantee. Provider accounting and SDK read retries can add usage.
-6. Do not run these commands in CI or from an AI tool with production credentials. Run after authorized local environment and backup ownership are confirmed.
+6. Do not run these commands in CI or expose production credentials in tool output. Run only after the owner has authorized local read-only export, backup ownership and protected archive/key custody. The administrator wrapper keeps the key in local DPAPI custody and unwraps it only in a transient child environment.
 7. Pause application/admin writes for a complete cutover snapshot and include LINE webhook/customer submissions in that operational plan. This client scan is **not a transactionally consistent point-in-time export**. It fails if an enumerated existing document disappears before its typed read, but cannot detect every concurrent insert/update. If writes cannot be paused, retain Firestore, reconcile changes, and take a final reviewed delta backup before cutover.
 
 The confirmed target edition is Enterprise Native mode; these backup calls use the read-only metadata/document API to preserve source types and missing ancestors. They do not modify application query semantics, indexes, Firebase Auth or database settings.
