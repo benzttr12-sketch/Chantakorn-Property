@@ -72,7 +72,17 @@ const nextConfig = {
   ...(normalizedBasePath ? { basePath: normalizedBasePath } : {}),
   async headers() {
     // headers() is ignored by `output: export`; these apply to server deployments only.
-    return [{ source: '/:path*', headers: securityHeaders }];
+    return [
+      { source: '/:path*', headers: securityHeaders },
+      // Firebase's proxied OAuth helper navigates to Google and back. Giving
+      // that helper the app's COOP can sever its opener before it can finish
+      // the popup handshake. Match Firebase Hosting's default on this path;
+      // keep every other header and the app's popup-compatible COOP intact.
+      ...['/__/auth', '/__/auth/:path*'].map(source => ({
+        source,
+        headers: [{ key: 'Cross-Origin-Opener-Policy', value: 'unsafe-none' }],
+      })),
+    ];
   },
   devIndicators: false,
   experimental: {
