@@ -10,7 +10,7 @@ const promptFont = Prompt({
   variable: '--font-prompt',
 });
 
-const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
+const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://chantakornproperty.com';
 const rawIconBasePath = (process.env.NEXT_PUBLIC_BASE_PATH || '').trim();
 const iconBasePath = !rawIconBasePath || rawIconBasePath === '51895189zaza' || rawIconBasePath.includes('YOUR_') || rawIconBasePath.includes('your-')
   ? ''

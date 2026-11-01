@@ -5,7 +5,8 @@ import {
   numberToThaiBahtWords, 
   getPropertyTypeName, 
   formatLineUrl,
-  DEFAULT_OFFICIAL_FACEBOOK
+  DEFAULT_OFFICIAL_FACEBOOK,
+  DEFAULT_OFFICIAL_PHONE
 } from '@/lib/utils';
 
 export type MarketingChannel = 'facebook' | 'tiktok' | 'line' | 'instagram' | 'english' | 'chinese';
@@ -35,7 +36,7 @@ export function generateLocalSocialPost(
   const priceUnit = property.status === 'rent' ? '/เดือน' : ' บาท';
   const sizeText = property.land_size ? `${property.land_size} ตร.ว.` : property.usable_area ? `${property.usable_area} ตร.ม.` : '';
   const agentName = property.agent?.name || 'ทีมงาน ฉันทากร พร็อพเพอร์ตี้';
-  const agentPhone = property.agent?.phone || '082-436-4499';
+  const agentPhone = property.agent?.phone || DEFAULT_OFFICIAL_PHONE;
   const lineLink = formatLineUrl(property.agent?.line_id || '@930xzcyi');
 
   const origin = typeof window !== 'undefined' ? window.location.origin : 'https://chantakornproperty.com';
@@ -217,45 +218,61 @@ Explore full gallery: ${url}`;
     };
   }
 
-  // Default: Facebook Feed / Marketplace
-  const fullPost = `🔥 [${tone === 'hot_deal' ? 'ด่วน! ทรัพย์เด่นทำเลทอง' : tone === 'luxury' ? 'คัดพิเศษระดับพรีเมียม' : 'แนะนำบ้านสวยพร้อมอยู่'}] ${property.title}
-📍 โซน: ${location}
-💰 ราคาเพียง: ${priceFormatted}${priceUnit}
-
-✨ รายละเอียดและฟังก์ชันที่น่าอยู่:
-🏡 ประเภท: ${typeName}
-📐 ขนาด: ${sizeText || 'พื้นที่ใช้สอยโอ่โถง'}
-🛏️ ${property.bedrooms} ห้องนอน | 🚿 ${property.bathrooms} ห้องน้ำ | 🚗 ที่จอดรถ ${property.parking} คัน
-${property.facing_direction ? `🧭 ทิศหน้าบ้าน: ${property.facing_direction} (รับทรัพย์ รับลม)` : ''}
-🛋️ การตกแต่ง: ${property.furniture || 'พร้อมเข้าอยู่อาศัย'}
-
-💎 จุดเด่นที่ต้องจอง:
-${property.features && property.features.length > 0 ? property.features.map(f => `✔️ ${f}`).join('\n') : '✔️ ทำเลศักยภาพสูง ใกล้แหล่งอำนวยความสะดวก\n✔️ โครงสร้างแข็งแรง วัสดุมาตรฐานพรีเมียม\n✔️ ปลอดภัย เงียบสงบ น่าอยู่อาศัย'}
-
-🎁 สิทธิพิเศษเฉพาะลูกค้า ฉันทากร พร็อพเพอร์ตี้:
-✅ บริการเช็กวงเงินกู้ฟรี รู้ผลไวใน 1 วัน
-✅ ดูแลเรื่องสินเชื่อ ยื่นกู้ธนาคารให้จนผ่าน
-✅ ดูแลเอกสารนิติกรรมวันโอนกรรมสิทธิ์ครบวงจร
-
-📸 ชมรูปถ่าย 360° และพิกัดแผนที่:
-👉 ${url}
-
-━━━━━━━━━━━━━━━━━━━━
-สนใจสอบถามข้อมูลเพิ่มเติม / นัดเข้าชมบ้านจริง:
-📞 โทร: ${agentPhone} (${agentName})
-💬 ทักไลน์: ${lineLink} หรือค้นหาไอดี "${property.agent?.line_id || '@930xzcyi'}"
-🌐 Facebook: ${DEFAULT_OFFICIAL_FACEBOOK}
-━━━━━━━━━━━━━━━━━━━━
-
-#บ้านหาดใหญ่ #บ้านสงขลา #ซื้อขายบ้านหาดใหญ่ #คอนโดหาดใหญ่ #ที่ดินหาดใหญ่ #ฉันทากรพร็อพเพอร์ตี้ #บ้านมือสองหาดใหญ่ #บ้านเดี่ยวสงขลา`;
-
-  return {
-    headline: `🔥 ${property.title} - ${priceFormatted}${priceUnit}`,
-    body: fullPost,
-    hashtags: ['#บ้านหาดใหญ่', '#บ้านสงขลา', '#ซื้อขายบ้านหาดใหญ่', '#คอนโดหาดใหญ่', '#ที่ดินหาดใหญ่'],
-    callToAction: `โทรด่วน ${agentPhone}`,
-    fullPost
+  // Facebook copy must describe the saved record. A tone changes presentation,
+  // never property condition, amenities, financing eligibility or location.
+  const hasPositiveNumber = (value: unknown): value is number => typeof value === 'number' && Number.isFinite(value) && value > 0;
+  const savedText = (value: unknown): string => typeof value === 'string' ? value.trim() : '';
+  const statusLabel = property.status === 'rent' ? 'ให้เช่า' : 'ขาย';
+  const facebookPrice = hasPositiveNumber(property.price) ? formatPrice(property.price, property.status) : 'ติดต่อสอบถามราคา';
+  const facebookLocation = [property.subdistrict, property.district, property.province].map(savedText).filter(Boolean).join(', ');
+  const facebookAgent = savedText(property.agent?.name) || 'ทีมงาน ฉันทากร พร็อพเพอร์ตี้';
+  const facebookPhone = savedText(property.agent?.phone) || DEFAULT_OFFICIAL_PHONE;
+  const facebookLineId = savedText(property.agent?.line_id) || '@930xzcyi';
+  const intro: Record<MarketingTone, string> = {
+    hot_deal: 'ข้อมูลราคาและรายละเอียดทรัพย์',
+    luxury: 'แนะนำทรัพย์',
+    friendly: 'ชวนชมรายละเอียดทรัพย์',
+    investor: 'ข้อมูลประกอบการพิจารณาทรัพย์',
   };
+  const facts = [`🏡 ประเภท: ${typeName}`];
+  if (hasPositiveNumber(property.land_size)) facts.push(`📐 เนื้อที่: ${property.land_size} ตร.ว.`);
+  if (hasPositiveNumber(property.usable_area)) facts.push(`📐 พื้นที่ใช้สอย: ${property.usable_area} ตร.ม.`);
+  if (['house', 'condo', 'commercial', 'investment'].includes(property.property_type)) {
+    if (hasPositiveNumber(property.bedrooms)) facts.push(`🛏️ ห้องนอน: ${property.bedrooms} ห้อง`);
+    if (hasPositiveNumber(property.bathrooms)) facts.push(`🚿 ห้องน้ำ: ${property.bathrooms} ห้อง`);
+    if (hasPositiveNumber(property.parking)) facts.push(`🚗 ที่จอดรถ: ${property.parking} คัน`);
+    if (savedText(property.furniture)) facts.push(`🛋️ การตกแต่ง: ${savedText(property.furniture)}`);
+  }
+  if (savedText(property.facing_direction)) facts.push(`🧭 ทิศหน้าทรัพย์: ${savedText(property.facing_direction)}`);
+  const features = Array.isArray(property.features) ? property.features.map(savedText).filter(Boolean) : [];
+  const description = savedText(property.description);
+  const typeHashtag = {
+    house: '#บ้าน', land: '#ที่ดิน', condo: '#คอนโด', commercial: '#อาคารพาณิชย์',
+    investment: '#อสังหาเพื่อการลงทุน', consignment: '#ขายฝากจำนอง',
+  }[property.property_type];
+  const hashtags = ['#ChantakornProperty', property.status === 'rent' ? '#ให้เช่า' : '#ขายอสังหาริมทรัพย์', ...(typeHashtag ? [typeHashtag] : [])];
+  const headline = `${statusLabel}${typeName}${savedText(property.title) ? `: ${savedText(property.title)}` : ''} — ${facebookPrice}`;
+  const fullPost = [
+    `🏡 ${intro[tone]}`,
+    headline,
+    facebookLocation ? `📍 ทำเล: ${facebookLocation}` : '',
+    '',
+    ...facts,
+    ...(description ? ['', 'รายละเอียดจากประกาศ:', description] : []),
+    ...(features.length ? ['', 'จุดเด่นที่ระบุไว้:', ...features.map(feature => `✔️ ${feature}`)] : []),
+    '',
+    '🔗 ดูประกาศและรายละเอียดทรัพย์:',
+    url,
+    '',
+    'สนใจสอบถามข้อมูลเพิ่มเติม / นัดชมทรัพย์:',
+    `📞 โทร: ${facebookPhone} (${facebookAgent})`,
+    `💬 LINE: ${formatLineUrl(facebookLineId)}`,
+    `🌐 Facebook: ${DEFAULT_OFFICIAL_FACEBOOK}`,
+    '',
+    hashtags.join(' '),
+  ].join('\n');
+
+  return { headline, body: fullPost, hashtags, callToAction: `สอบถาม / นัดชมทรัพย์ โทร ${facebookPhone}`, fullPost };
 }
 
 // ==========================================
