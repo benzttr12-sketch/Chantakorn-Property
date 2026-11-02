@@ -351,8 +351,23 @@
   opacity: 0.88;
 }
 
+.home-mesh-drift {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.home-mesh-drift[data-rendered='true'] { opacity: 1; }
+
 .home-hero-shade {
   background: linear-gradient(180deg, rgba(2, 8, 18, 0.7) 0%, rgba(2, 8, 18, 0.76) 36%, rgba(2, 8, 18, 0.93) 78%, #020812 100%);
+}
+
+.home-mesh-drift[data-rendered='true'] + .home-hero-shade {
+  background: linear-gradient(180deg, rgba(2, 8, 18, 0.77) 0%, rgba(2, 8, 18, 0.80) 55%, #020812 100%);
 }
 
 @media (min-width: 1024px) {
@@ -360,6 +375,9 @@
   .home-hero-backdrop { object-position: center; }
   .home-hero-shade {
     background: linear-gradient(90deg, rgba(2, 8, 18, 0.94) 0%, rgba(2, 8, 18, 0.84) 44%, rgba(2, 8, 18, 0.6) 100%), linear-gradient(0deg, #020812 0%, transparent 55%);
+  }
+  .home-mesh-drift[data-rendered='true'] + .home-hero-shade {
+    background: linear-gradient(90deg, rgba(2, 8, 18, 0.80) 0%, rgba(2, 8, 18, 0.75) 58%, rgba(2, 8, 18, 0.62) 100%), linear-gradient(0deg, #020812 0%, transparent 55%);
   }
 }
 

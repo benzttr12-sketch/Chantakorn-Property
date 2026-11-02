@@ -3,6 +3,7 @@ import Image from 'next/image';
 import { Search, PlusCircle, ChevronRight, MapPin, ShieldCheck, HeartHandshake, ArrowDown } from 'lucide-react';
 import FloatingSearchBox from './FloatingSearchBox';
 import HomeMoodSelector from './HomeMoodSelector';
+import MeshDriftBackground from './MeshDriftBackground';
 import { hatyaiModernHouseHero } from '@/assets/images';
 
 export default function HeroSection() {
@@ -10,6 +11,7 @@ export default function HeroSection() {
     <section className="home-hero relative overflow-hidden bg-navy-950 pb-10 pt-12 sm:pb-14 sm:pt-16 lg:pt-20">
       <div className="home-hero-background pointer-events-none absolute inset-x-0 top-0" aria-hidden="true">
         <Image src={hatyaiModernHouseHero} alt="" fill priority placeholder="blur" sizes="100vw" className="home-hero-backdrop object-cover" />
+        <MeshDriftBackground />
         <div className="home-hero-shade absolute inset-0" />
       </div>
       <div className="relative mx-auto grid w-full max-w-7xl items-center gap-10 px-4 sm:px-6 lg:grid-cols-[1.1fr_0.9fr] lg:gap-14 lg:px-8">
