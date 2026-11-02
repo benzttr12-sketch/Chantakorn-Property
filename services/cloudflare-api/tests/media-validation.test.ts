@@ -57,6 +57,14 @@ test('ALLOWED_ORIGIN accepts a comma-separated list and echoes only the exact ma
   assert.equal(validBrowserOrigin('https://site.test', 'https://site.test, not-a-url ,http://ok.test'), true);
 });
 
+test('both production website origins are distinct and must match exactly', () => {
+  const origins = 'https://chantakornproperty.com,https://www.chantakornproperty.com';
+  for (const origin of origins.split(',')) assert.equal(matchAllowedOrigin(origin, origins), origin);
+  for (const origin of ['https://www.chantakornproperty.com.evil.test', 'http://www.chantakornproperty.com', 'https://evil.test']) {
+    assert.equal(matchAllowedOrigin(origin, origins), null);
+  }
+});
+
 test('bounds image streams and rejects type forgery', async () => {
   const good = await readBoundedImage(request(jpeg));
   assert.equal(good.ok, true);
