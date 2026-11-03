@@ -28,7 +28,7 @@
 | มือถือ | เจ้าของเว็บยืนยันว่าเปิดได้และรูปทรัพย์โหลดครบหลังแก้ DNS | ไม่ใช่การวัดความเร็วหรือทดสอบทุกรุ่น |
 | Google Login | มี first-party handler ทั้งสอง host และชุดทดสอบ session/account switching/สิทธิ์ | การเลือกบัญชีจริงและ logout เป็น release gate แยกจาก HTTP 200 |
 | Sitemap/robots | เส้นทางตอบ 200 และชุดทดสอบ sitemap/ลิงก์เดิมผ่าน | ไม่ได้ยืนยันว่า search engine index หรือ Facebook ดึงข้อมูลใหม่แล้ว |
-| ไฟล์สำรองเดิม | ตรวจความสมบูรณ์ Firestore/Auth metadata/R2 ที่เข้ารหัสได้ | ไม่ครอบคลุม D1 ไม่ใช่หลักฐานกู้จริงหรือสำเนานอกเครื่อง |
+| สำรอง 3 พ.ย. | สร้างและตรวจ Firestore/Auth metadata/R2 ที่เข้ารหัส พร้อมกู้ข้อมูลจริง Firestore ตัวอย่าง 1 รายการใน emulator ส่วนตัวได้ | ไม่ครอบคลุม D1 ไม่ใช่การกู้ทั้งหมดหรือสำเนานอกเครื่อง และไม่กู้รหัสผ่าน Auth |
 
 แคตตาล็อกทรัพย์ใช้ D1/R2 ส่วน Firebase Auth, โปรไฟล์, ลูกค้าสอบถามและ LINE
 ยังใช้ Firebase ตามเส้นทางที่เกี่ยวข้อง ดู [คู่มือสำรองสำหรับแอดมิน](admin-backup-operations.md)
@@ -44,12 +44,13 @@ Production Worker: `https://chantakorn-property-api.chantakorn-property.workers.
 - [ ] ตรวจ effective backend/environment/binding ของ deployment ที่จะปล่อย โดยไม่พิมพ์ secrets
 - [ ] ตรวจที่มาของประกาศเดิม 3 รายการกับข้อมูล D1 แบบอ่านอย่างเดียว ไม่ import ซ้ำหรือลบ
       และไม่สมมติว่าข้อมูลตรงกันเพราะจำนวนเท่ากัน
-- [ ] สำรอง Firestore/Auth/R2 ล่าสุด ตรวจ checksum/authentication ทุกชุด บันทึกผู้ดูแลและเวลาไว้นอก repo
+- [x] สำรอง Firestore/Auth/R2 วันที่ 3 พ.ย. ตรวจ checksum/authentication ทุกชุด
+      พร้อมบันทึกผลไว้นอก repo ทั้งนี้ต้องทำ final delta ใหม่ก่อนเปลี่ยนเส้นทางข้อมูล
 - [ ] เทียบ UID/role/สถานะบัญชี ลูกค้าค้างติดต่อ และ LINE follower/opt-out จาก inventory ที่ครบ
       แยก completed scan ออกจาก clean inventory และทบทวนข้อค้นพบกับข้อมูลปัจจุบัน
 - [ ] มีหลักฐานสำรอง D1 ที่ตรวจและทดลองกู้ได้ แยกจาก vault ที่ครอบคลุมเฉพาะ Firestore/Auth/R2
-- [ ] ทดลองกู้ restricted sample ของข้อมูลจริงในสภาพแวดล้อมส่วนตัวที่แยกจาก production
-      การทดสอบ emulator ด้วยข้อมูลจำลองใช้แทนหลักฐานนี้ไม่ได้
+- [x] ทดลองกู้ restricted sample ข้อมูลจริง Firestore 1 รายการใน emulator ส่วนตัวที่แยกจาก production
+      และตรวจค่าที่อ่านกลับตรงกัน ไม่ใช่การกู้ทั้งหมด ไม่ครอบคลุม D1/R2 หรือรหัสผ่าน Auth
 - [ ] กำหนด retention, สำเนาเข้ารหัสนอกเครื่อง และกุญแจกู้คืนแบบพกพาที่แอดมินดูแลแยกจาก archive
       ปัจจุบันยังไม่มีที่เก็บนอกเครื่องที่กำหนด
 - [ ] ทดสอบ API/Admin/รูป R2/Firebase Auth ทั้งสอง host และ LINE reply จริง
