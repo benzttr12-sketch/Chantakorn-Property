@@ -11,7 +11,8 @@ popup security headers, the same-origin Firebase helper, public catalog CORS,
 one published cover image, and rejection of anonymous/forged staff credentials.
 Domain registration warns at 30 days. Empty catalogs are allowed. It never
 signs in, reads customer/private media, changes accounts or writes production.
-Responses and image requests are bounded; output contains fixed check IDs and
+JSON/HTML responses are bounded; image bodies are sampled to 1 KiB and cancelled
+even if the server ignores the Range header. Output contains fixed check IDs and
 failure codes only. No raw provider errors or listing bodies enter artifacts.
 
 ## GitHub Actions and notifications

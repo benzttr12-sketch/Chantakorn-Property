@@ -15,19 +15,26 @@ function requireHealth(value, code) { if (!value) throw new HealthError(code); }
 
 // No cookies, credentials, POSTs or redirects. Never log response bodies, URLs
 // derived from customer records, raw provider errors or certificate subjects.
-export async function boundedRequest(url, { fetchImpl = fetch, headers = {}, maxBytes = MAX_BODY } = {}) {
+export async function boundedRequest(url, { fetchImpl = fetch, headers = {}, maxBytes = MAX_BODY, prefixOnly = false } = {}) {
   const response = await fetchImpl(url, {
     method: 'GET', redirect: 'error', credentials: 'omit',
     headers: { 'User-Agent': 'Chantakorn-ReadOnly-Health/1.0', ...headers },
     signal: AbortSignal.timeout(10_000),
   });
-  if (Number(response.headers.get('content-length')) > maxBytes) {
+  if (!prefixOnly && Number(response.headers.get('content-length')) > maxBytes) {
     await response.body?.cancel();
     throw new HealthError('response-too-large');
   }
   const chunks = [];
   let bytes = 0;
   for await (const chunk of response.body || []) {
+    if (prefixOnly) {
+      const prefix = Buffer.from(chunk).subarray(0, maxBytes - bytes);
+      bytes += prefix.byteLength;
+      chunks.push(prefix);
+      if (bytes >= maxBytes) break; // Async iterator closes/cancels the rest.
+      continue;
+    }
     bytes += chunk.byteLength;
     if (bytes > maxBytes) throw new HealthError('response-too-large');
     chunks.push(Buffer.from(chunk));
@@ -124,7 +131,9 @@ export async function runProductionChecks({ fetchImpl = fetch, readCertificate =
       requireHealth(imageUrl.origin === API_ORIGIN && imageUrl.pathname.startsWith('/v1/media/properties/') &&
         !imageUrl.username && !imageUrl.password && !imageUrl.search, 'catalog-cover-origin-invalid');
       // A range request bounds bandwidth; no private media or customer URLs.
-      const image = await request(imageUrl.href, { headers: { Origin: origin, Range: 'bytes=0-1023' }, maxBytes: 2_097_152 });
+      const image = await request(imageUrl.href, {
+        headers: { Origin: origin, Range: 'bytes=0-1023' }, maxBytes: 1024, prefixOnly: true,
+      });
       requireHealth([200, 206].includes(image.status) && /^image\//.test(image.headers.get('content-type') || '') &&
         image.text.length > 0, 'catalog-image-unavailable');
       requireHealth(image.headers.get('access-control-allow-origin') === origin, 'catalog-image-origin-denied');

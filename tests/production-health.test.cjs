@@ -134,3 +134,17 @@ test('bounded response reader rejects misleading length headers and oversized st
     fetchImpl: async () => new Response('more than eight bytes'),
   }), /response-too-large/);
 });
+
+test('image sampling cancels a range-ignoring response instead of downloading or rejecting a valid large cover', async () => {
+  const { boundedRequest } = await monitor;
+  let cancelled = false, chunks = 0;
+  const result = await boundedRequest('https://example.invalid/image', { maxBytes: 1024, prefixOnly: true,
+    fetchImpl: async () => new Response(new ReadableStream({
+      pull(controller) { chunks++; controller.enqueue(new Uint8Array(4096).fill(65)); },
+      cancel() { cancelled = true; },
+    }), { headers: { 'content-length': '5000000', 'content-type': 'image/jpeg' } }),
+  });
+  assert.equal(result.text.length, 1024);
+  assert.equal(cancelled, true);
+  assert.ok(chunks <= 2);
+});
