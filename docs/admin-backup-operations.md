@@ -39,8 +39,9 @@ Offline reconciliation authenticates and checks every Firestore/Auth record befo
 The reconciliation CLI exits **0** only for a complete inventory with no
 findings, **2** for a complete inventory requiring identity/LINE review, and
 **1** when the inventory cannot be fully authenticated or inspected. Exit 2
-retains the aggregate report on stdout. The vault wrapper treats any nonzero
-exit as a failed gate and does not emit its final success result. An unmatched
+retains the aggregate report on stdout. The vault wrapper preserves exit 2
+and emits an explicit `reviewRequired:true`, `ok:false` result instead of its
+final success result. Other nonzero exits fail the gate. An unmatched
 account may be intentional; an administrator must review the current source
 before deciding. Never auto-create profiles, grant roles, mark email verified
 or delete accounts merely to make the report pass.
