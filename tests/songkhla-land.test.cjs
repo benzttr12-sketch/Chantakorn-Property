@@ -46,13 +46,13 @@ test('mismatched snapshots, truncated rows and malicious or malformed records ar
   }
 });
 
-test('loading is a credential-free, abortable request for one sheet and refuses failed or malformed responses', async () => {
+test('loading retains same-origin Preview sessions, is abortable and refuses failed or malformed responses', async () => {
   const { loadLandSheet } = library();
   const signal = new AbortController().signal;
   let calls = 0;
   const records = await loadLandSheet(index, '5022-1-0000', signal, async (url, options) => {
     calls++; assert.equal(url, `/data/songkhla-land/${version}/5022-1-0000.json`);
-    assert.equal(options.signal, signal); assert.equal(options.credentials, 'omit'); assert.equal(options.redirect, 'error');
+    assert.equal(options.signal, signal); assert.equal(options.credentials, 'same-origin'); assert.equal(options.redirect, 'error');
     return Response.json(sheet());
   });
   assert.equal(calls, 1); assert.equal(records.length, 3);

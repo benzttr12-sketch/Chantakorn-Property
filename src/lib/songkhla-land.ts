@@ -56,7 +56,9 @@ export function decodeLandSheet(value: unknown, key: string, index: LandIndex): 
 export async function loadLandSheet(index: LandIndex, key: string, signal: AbortSignal, fetchImpl: typeof fetch = fetch): Promise<LandRecord[]> {
   const url = landAssetPath(index, key);
   let response: Response;
-  try { response = await fetchImpl(url, { signal, credentials: 'omit', redirect: 'error', cache: 'force-cache' }); }
+  // Same-origin cookies let protected Preview assets use the existing Vercel
+  // session. The validated relative path cannot send cookies to another host.
+  try { response = await fetchImpl(url, { signal, credentials: 'same-origin', redirect: 'error', cache: 'force-cache' }); }
   catch (failure) {
     if (signal.aborted) throw failure;
     throw new Error('เชื่อมต่อข้อมูลไม่สำเร็จ กรุณาตรวจอินเทอร์เน็ตแล้วลองใหม่');

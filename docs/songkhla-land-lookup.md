@@ -51,7 +51,10 @@ prices, buildings, taxes or transaction fees. The result points users to
   and cancels/ignores obsolete searches and clears selected rates on edits.
 - Content-addressed asset paths have immutable browser caching on Next/Vercel.
   Static hosts apply their own cache policy; the versioned path and
-  credential-free `force-cache` fetch work without a runtime API or database.
+  `force-cache` fetch work without a runtime API or database. Reads use
+  `credentials: same-origin` so an existing Vercel Protection session also
+  covers Preview assets. Validated relative paths cannot transmit cookies to
+  other hosts; no Firebase bearer token is requested or attached.
   Page/index data does not receive the immutable asset policy.
 
 ## Reproduce and refresh
