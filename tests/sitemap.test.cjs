@@ -32,7 +32,8 @@ function load(file, { env = {}, catalog, fetch, server } = {}) {
 test('fresh catalog produces only real public landing pages, never demo or user pages', async () => {
   const { module } = load('app/sitemap', { catalog: async () => [] });
   const rows = await module.default();
-  assert.equal(rows.length, 8);
+  assert.equal(rows.length, 9);
+  assert.ok(rows.some(row => row.url === 'https://chantakornproperty.com/land-valuation'));
   assert.ok(rows.every(row => !row.url.includes('/properties/') && !row.url.includes('favorites') && !row.lastModified));
   assert.equal(rows[0].url, 'https://chantakornproperty.com');
 });
@@ -43,14 +44,14 @@ test('sitemap projects published undeleted records, preserves D1 codes and avoid
     catalog: async () => [row, row, { ...row, published: false }, { ...row, deleted_at: '2026-10-20' }, { ...row, id: '../admin' }],
   });
   const rows = await module.default();
-  assert.equal(rows.length, 9);
+  assert.equal(rows.length, 10);
   assert.equal(rows.at(-1).url, 'https://chantakornproperty.com/site/properties/CK-1234567890AB');
   assert.equal(rows.at(-1).lastModified, row.updated_at);
 });
 
 test('catalog errors retain static pages and log only a diagnostic code', async () => {
   const { module, warnings } = load('app/sitemap', { catalog: async () => { throw new Error('sensitive details'); } });
-  assert.equal((await module.default()).length, 8);
+  assert.equal((await module.default()).length, 9);
   assert.deepEqual(warnings, ['SITEMAP_CATALOG_UNAVAILABLE']);
 });
 

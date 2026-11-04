@@ -15,6 +15,7 @@ import SellPropertyCTA from '@/components/home/SellPropertyCTA';
 import ContactCTA from '@/components/home/ContactCTA';
 import HomeExperience from '@/components/home/HomeExperience';
 import HomeExploreNav from '@/components/home/HomeExploreNav';
+import LandValuationCTA from '@/components/home/LandValuationCTA';
 
 export default function HomePage() {
   return (
@@ -28,6 +29,7 @@ export default function HomePage() {
 
       {/* 3: PROPERTY CATEGORIES (หมวดหมู่อสังหาริมทรัพย์) */}
       <div data-home-reveal><PropertyCategories /></div>
+      <div data-home-reveal><LandValuationCTA /></div>
 
       {/* 4: WHY CHOOSE US (มาตรฐานการบริการระดับมืออาชีพ 4 ประการ) */}
       <div data-home-reveal><WhyChooseUs /></div>

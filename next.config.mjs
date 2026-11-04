@@ -74,6 +74,11 @@ const nextConfig = {
     // headers() is ignored by `output: export`; these apply to server deployments only.
     return [
       { source: '/:path*', headers: securityHeaders },
+      // Content-addressed public appraisal sheets change URL on every refresh.
+      // Keep the index/page fresh while caching immutable sheet bytes for reuse.
+      { source: '/data/songkhla-land/:version([a-f0-9]{16})/:file', headers: [
+        { key: 'Cache-Control', value: 'public, max-age=31536000, immutable' },
+      ] },
       // Firebase's proxied OAuth helper navigates to Google and back. Giving
       // that helper the app's COOP can sever its opener before it can finish
       // the popup handshake. Match Firebase Hosting's default on this path;

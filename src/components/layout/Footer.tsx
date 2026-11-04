@@ -140,6 +140,7 @@ export default function Footer() {
                   ปรึกษาประเมินราคา & สินเชื่อ
                 </Link>
               </li>
+              <li><Link href="/land-valuation" className="hover:text-gold-400 transition-colors">ค้นหาราคาประเมินที่ดินสงขลา</Link></li>
               <li>
                 <Link href="/sell" className="text-gold-400 font-medium hover:underline flex items-center">
                   ฝากขายทรัพย์กับเรา

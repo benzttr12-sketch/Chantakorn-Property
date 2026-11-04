@@ -1,16 +1,17 @@
-import { ArrowDownRight, Compass, Sparkles, Shapes, WandSparkles } from 'lucide-react';
+import { ArrowDownRight, Compass, FileSearch, Sparkles, Shapes, WandSparkles } from 'lucide-react';
 
 const SHORTCUTS = [
   { href: '#home-properties', label: 'ทรัพย์แนะนำ', detail: 'ดูรายการล่าสุด', icon: Sparkles },
   { href: '#home-categories', label: 'เลือกประเภท', detail: 'ค้นหาสิ่งที่ใช่', icon: Shapes },
   { href: '#home-locations', label: 'สำรวจทำเล', detail: 'รู้จักย่านที่ชอบ', icon: Compass },
   { href: '#home-matchmaker', label: 'ช่วยค้นหาทรัพย์', detail: 'ตอบคำถามสั้น ๆ', icon: WandSparkles },
+  { href: '#home-land-valuation', label: 'ราคาประเมิน', detail: 'ค้นหาที่ดินสงขลา', icon: FileSearch },
 ];
 
 export default function HomeExploreNav() {
   return (
     <nav aria-label="สำรวจส่วนต่าง ๆ ของหน้าแรก" className="border-b border-slate-200 bg-white">
-      <div className="mx-auto grid max-w-7xl grid-cols-2 px-4 py-4 sm:px-6 md:grid-cols-4 lg:px-8">
+      <div className="mx-auto grid max-w-7xl grid-cols-2 px-4 py-4 sm:px-6 md:grid-cols-5 lg:px-8">
         {SHORTCUTS.map((item, index) => {
           const Icon = item.icon;
           return <a key={item.href} href={item.href} className="home-explore-link group flex min-w-0 items-center gap-3 rounded-xl p-3 sm:p-4 focus-visible:outline focus-visible:outline-2 focus-visible:outline-gold-600">
