@@ -3,6 +3,7 @@ import HeroSection from '@/components/home/HeroSection';
 import FeaturedProperties from '@/components/home/FeaturedProperties';
 import LandValuationCTA from '@/components/home/LandValuationCTA';
 import SmartPropertyMatchmaker from '@/components/home/SmartPropertyMatchmaker';
+import FeaturedAgents from '@/components/home/FeaturedAgents';
 import ContactCTA from '@/components/home/ContactCTA';
 import HomeExperience from '@/components/home/HomeExperience';
 import MortgageCalculator from '@/components/tools/MortgageCalculator';
@@ -54,6 +55,7 @@ export default function HomePage() {
         </details>
       </div>
 
+      <FeaturedAgents />
       <ContactCTA />
     </HomeExperience>
   );
