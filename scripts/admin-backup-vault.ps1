@@ -179,6 +179,11 @@ try {
         if ($Action -eq 'Reconcile') {
             $vaultPhase = 'offline-reconciliation'
             & node (Join-Path $PSScriptRoot 'backup-reconciliation.mjs') $snapshotDirectory
+            if ($LASTEXITCODE -eq 2) {
+                @{ ok = $false; action = $Action; snapshotId = $SnapshotId; complete = $true;
+                    reviewRequired = $true; inventoriesMatch = $false; cutoverReady = $false } | ConvertTo-Json -Compress
+                exit 2
+            }
             if ($LASTEXITCODE -ne 0) { throw 'Offline reconciliation failed.' }
         }
         @{ ok = $true; action = $Action; snapshotId = $SnapshotId; sources = $Sources;

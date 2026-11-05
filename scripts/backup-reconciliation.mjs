@@ -169,6 +169,10 @@ async function main() {
       expectedProject: firebase.projectId, expectedDatabase: database, limits: reconciliationLimits() });
     // Fixed keys and aggregate numbers only; no decoded records, provider IDs or private paths.
     console.log(JSON.stringify({ ...result, inventoriesMatch: result.findings === 0 }));
+    // A completed scan is not a clean reconciliation. Keep its redacted report,
+    // but stop callers (including the admin vault) from treating findings as a
+    // successful readiness gate. Exit 1 remains an incomplete/invalid scan.
+    if (!result.inventoriesMatch) process.exitCode = 2;
   } catch {
     console.error(JSON.stringify({ ok: false, complete: false, code: 'BACKUP_RECONCILIATION_FAILED' }));
     process.exitCode = 1;
