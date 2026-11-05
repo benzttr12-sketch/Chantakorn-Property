@@ -1,0 +1,16 @@
+{
+  "province": "สงขลา",
+  "provinceCode": "90",
+  "publisher": "กรมธนารักษ์ — กองมาตรฐานการประเมินราคาทรัพย์สิน",
+  "datasetUrl": "https://catalog.treasury.go.th/dataset/land-valuation",
+  "resourceId": "5e45fa23-62f1-44d9-9a15-af2ec2d99469",
+  "downloadUrl": "https://catalog.treasury.go.th/dataset/f5072145-2f1a-4500-bf60-d122b866ac2f/resource/5e45fa23-62f1-44d9-9a15-af2ec2d99469/download/land_90_songkhla.csv",
+  "sourceUpdatedAt": "2026-06-10",
+  "fileModifiedAt": "2026-01-20",
+  "verifiedAt": "2026-11-04",
+  "appraisalPeriod": null,
+  "license": "Open Data Common (ตามแค็ตตาล็อกต้นทาง)",
+  "bytes": 42785363,
+  "md5": "32ecc5296ab5fcfde2bbc63e72db9304",
+  "sha256": "b5ab6a05d099fd8d561badf7071f19b4f9ed4088e898c0c6a91652496808fcdc"
+}

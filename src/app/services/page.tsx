@@ -80,6 +80,14 @@ export default function ServicesPage() {
       ctaText: 'นัดหมายเข้าชม',
       ctaLink: '/properties',
     },
+    {
+      id: 'land-valuation',
+      icon: FileText,
+      title: '9. ค้นหาราคาประเมินที่ดินสงขลา',
+      description: 'ค้นหาจากเลขระวางและเลขที่ดินในชุดข้อมูลเปิดกรมธนารักษ์ พร้อมวันที่อ้างอิงต้นทาง และคำนวณมูลค่าตามพื้นที่ในเอกสาร ใช้ได้ฟรีโดยไม่ต้องเข้าสู่ระบบ',
+      ctaText: 'ค้นหาราคาประเมิน',
+      ctaLink: '/land-valuation',
+    },
   ];
 
   return (
