@@ -88,10 +88,10 @@ export default function FeaturedProperties() {
   const activeLabel = FILTER_TABS.find(tab => tab.id === activeCategory)?.label || 'ทั้งหมด';
 
   return (
-    <section id="home-properties" aria-labelledby="home-properties-title" className="relative scroll-mt-24 border-y border-slate-200/80 bg-[#FAFAFA] py-10 md:py-14">
+    <section id="home-properties" aria-labelledby="home-properties-title" className="relative scroll-mt-24 py-10 md:py-14">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-          <h2 id="home-properties-title" className="text-2xl font-black tracking-tight text-navy-950 sm:text-3xl">
+        <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
+          <h2 id="home-properties-title" className="border-l-[3px] border-[#b99b62] pl-4 text-2xl font-semibold tracking-tight text-navy-950 sm:text-3xl">
             ทรัพย์แนะนำ
           </h2>
           <Link href="/properties" className="inline-flex shrink-0 items-center gap-2 self-start rounded-xl border border-slate-200 bg-white px-5 py-3 text-sm font-bold text-navy-950 transition-colors hover:border-gold-300 hover:text-gold-700 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-gold-500 focus-visible:ring-offset-4 md:self-auto">
@@ -110,7 +110,7 @@ export default function FeaturedProperties() {
                 aria-pressed={isActive}
                 aria-controls="home-property-results"
                 onClick={() => setActiveCategory(tab.id)}
-                className={`inline-flex min-h-11 shrink-0 items-center gap-2 whitespace-nowrap rounded-full border px-4 py-2.5 text-xs font-semibold transition-colors focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-gold-500 focus-visible:ring-offset-2 sm:text-sm ${isActive ? 'border-navy-950 bg-navy-950 text-gold-300 shadow-xs' : 'border-slate-200 bg-white text-slate-600 hover:border-gold-300 hover:text-navy-950'}`}
+                className={`inline-flex min-h-11 shrink-0 items-center gap-2 whitespace-nowrap rounded-full border px-4 py-2.5 text-xs font-semibold transition-colors focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-gold-500 focus-visible:ring-offset-2 sm:text-sm ${isActive ? 'border-navy-950 bg-navy-950 text-[#efe3cb] shadow-sm' : 'border-[#e4ded1] bg-white/75 text-slate-600 hover:border-gold-300 hover:text-navy-950'}`}
               >
                 {Icon && <Icon aria-hidden="true" className="h-4 w-4 shrink-0" />}
                 <span>{tab.label}</span>

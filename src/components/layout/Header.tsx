@@ -8,7 +8,6 @@ import {
   X, 
   Phone, 
   PlusCircle, 
-  User, 
   Heart, 
   Building2, 
   ShieldCheck,
@@ -120,64 +119,59 @@ export default function Header() {
   return (
     <>
       {/* Top Notification / Trust Bar */}
-      <div className="bg-navy-950 text-white text-xs py-2 px-4 hidden md:block border-b border-navy-800 inset-shadow-sm">
-        <div className="max-w-7xl mx-auto flex justify-between items-center">
-          <div className="flex items-center space-x-3 min-w-0">
-            <span className="inline-flex items-center text-gold-300 font-bold tracking-wide whitespace-nowrap">
-              <ShieldCheck className="w-4 h-4 mr-1.5 text-gold-400 shrink-0" />
+      <div className="hidden border-b border-[#d6b77b]/20 bg-navy-950 text-xs text-[#efe3cb] md:block">
+        <div className="mx-auto flex min-h-11 max-w-7xl items-center justify-between gap-5 px-6 lg:min-h-9 lg:px-8">
+          <div className="flex min-w-0 items-center gap-4">
+            <span className="inline-flex items-center gap-1.5 whitespace-nowrap font-medium">
+              <ShieldCheck className="size-4 shrink-0 text-[#d6b77b]" aria-hidden="true" />
               นายหน้าอสังหาริมทรัพย์มืออาชีพ หาดใหญ่ – สงขลา
             </span>
-            <span className="text-navy-600">|</span>
-            <span className="text-gray-200 font-normal whitespace-nowrap hidden xl:inline">บริการซื้อ ขาย เช่า ฝากขาย ให้คำปรึกษาฟรี</span>
+            <span className="hidden whitespace-nowrap border-l border-white/15 pl-4 text-slate-300 xl:inline">บริการซื้อ ขาย เช่า ฝากขาย ให้คำปรึกษาฟรี</span>
           </div>
 
-          <div className="flex items-center space-x-4 text-xs">
+          <div className="flex shrink-0 items-center gap-2 lg:gap-3">
             <a 
               href="tel:0816040097" 
-              className="hover:text-gold-300 text-white transition-colors flex items-center group font-medium whitespace-nowrap"
+              className="inline-flex min-h-11 items-center gap-1.5 whitespace-nowrap px-1 font-medium text-slate-100 transition-colors hover:text-[#d6b77b] lg:min-h-9"
             >
-              <Phone className="w-3.5 h-3.5 mr-1.5 text-gold-400 group-hover:scale-110 transition-transform" />
-              <span className="font-semibold">081-604-0097</span>
+              <Phone className="size-3.5 text-[#d6b77b]" aria-hidden="true" />
+              <span>081-604-0097</span>
             </a>
-
-            <span className="text-navy-600">•</span>
 
             <a
               href="https://www.facebook.com/people/Chantakorn-Property-%E0%B8%99%E0%B8%B2%E0%B8%A2%E0%B8%AB%E0%B8%99%E0%B9%89%E0%B8%B2-%E0%B8%9A%E0%B9%89%E0%B8%B2%E0%B8%99-%E0%B8%97%E0%B8%B5%E0%B9%88%E0%B8%94%E0%B8%B4%E0%B8%99-%E0%B8%84%E0%B8%AD%E0%B8%99%E0%B9%82%E0%B8%94-%E0%B8%AB%E0%B8%B2%E0%B8%94%E0%B9%83%E0%B8%AB%E0%B8%8D%E0%B9%88-%E0%B8%AA%E0%B8%87%E0%B8%82%E0%B8%A5%E0%B8%B2/61593092347613/"
               target="_blank"
               rel="noreferrer"
-              className="hover:text-gold-300 text-white transition-colors flex items-center font-medium whitespace-nowrap"
+              className="inline-flex min-h-11 min-w-11 items-center justify-center gap-1.5 whitespace-nowrap text-slate-100 transition-colors hover:text-[#d6b77b] lg:min-h-9 lg:min-w-0 lg:px-1"
+              aria-label="Facebook ของ Chantakorn Property"
               title="Facebook Page: Chantakorn Property"
             >
-              <Facebook className="w-3.5 h-3.5 mr-1.5 text-[#3b82f6]" />
+              <Facebook className="size-3.5 text-[#d6b77b]" aria-hidden="true" />
               <span className="hidden lg:inline">Facebook</span>
             </a>
-
-            <span className="text-navy-600">•</span>
 
             <a
               href="https://lin.ee/NMSe28T3"
               target="_blank"
               rel="noreferrer"
-              className="hover:text-gold-300 text-white transition-colors flex items-center group font-medium whitespace-nowrap"
+              className="inline-flex min-h-11 min-w-11 items-center justify-center gap-1.5 whitespace-nowrap text-slate-100 transition-colors hover:text-[#d6b77b] lg:min-h-9 lg:min-w-0 lg:px-1"
+              aria-label="LINE Official Account ของ Chantakorn Property"
               title="LINE Official Account: Chantakorn Property (คลิกเพื่อแอดไลน์)"
             >
-              <MessageCircle className="w-3.5 h-3.5 mr-1.5 text-[#06C755] fill-current group-hover:scale-110 transition-transform" />
-              <span className="hidden lg:inline">LINE: <span className="text-gold-300 font-bold">Official Account</span></span>
+              <MessageCircle className="size-3.5 text-[#d6b77b]" aria-hidden="true" />
+              <span className="hidden lg:inline">LINE Official</span>
             </a>
-
-            <span className="text-navy-600">•</span>
 
             {/* User Access: เข้าสู่ระบบ or Logged-in profile */}
             {currentUser ? (
               <Link
                 id="topbar-profile-link"
                 href={currentUser.role === 'ADMIN' || currentUser.role === 'AGENT' ? '/admin' : '/profile'}
-                className="inline-flex items-center space-x-1.5 px-3 py-1 rounded-full bg-navy-900 border border-gold-400/50 text-gold-300 hover:text-white hover:border-gold-300 transition-all text-[11px]"
+                className="inline-flex min-h-11 items-center gap-1.5 border-l border-white/15 px-3 text-[11px] text-[#efe3cb] transition-colors hover:text-white lg:min-h-9"
               >
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                <span className="size-1.5 rounded-full bg-emerald-400" aria-hidden="true" />
                 <span className="font-bold max-w-[120px] truncate text-white">{currentUser.full_name || 'บัญชีของฉัน'}</span>
-                <span className="text-[10px] px-1.5 py-0.5 bg-gold-400 text-navy-950 rounded-sm font-black">
+                <span className="rounded bg-[#efe3cb] px-1.5 py-0.5 text-[10px] font-semibold text-navy-950">
                   {currentUser.role}
                 </span>
               </Link>
@@ -185,9 +179,9 @@ export default function Header() {
               <Link 
                 id="topbar-login-link"
                 href="/login" 
-                className="inline-flex items-center space-x-1 px-3 py-1 rounded-full bg-gold-400 text-navy-950 hover:bg-gold-300 hover:text-navy-900 font-bold text-xs shadow-xs transition-all"
+                className="inline-flex min-h-11 items-center gap-1.5 whitespace-nowrap border-l border-white/15 px-3 font-medium text-[#efe3cb] transition-colors hover:text-white lg:min-h-9"
               >
-                <LogIn className="w-3.5 h-3.5 text-navy-950 stroke-[2.5]" />
+                <LogIn className="size-3.5 text-[#d6b77b]" aria-hidden="true" />
                 <span>เข้าสู่ระบบ</span>
               </Link>
             )}
@@ -197,31 +191,28 @@ export default function Header() {
 
       {/* Main Sticky Header */}
       <header
-        className={`sticky top-0 z-[60] w-full transition-all duration-300 ${
-          isScrolled
-            ? 'bg-navy-950 shadow-xl border-b border-gold-500/20 py-2.5'
-            : 'bg-navy-950 border-b border-navy-800/90 py-3.5'
+        className={`sticky top-0 z-[60] w-full border-b border-[#d6b77b]/45 bg-[#fcfaf6] transition-shadow ${
+          isScrolled ? 'shadow-[0_5px_18px_rgba(2,8,18,0.07)]' : ''
         }`}
-        style={{ backgroundColor: '#020812' }}
       >
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between">
+        <div className="mx-auto flex min-h-16 max-w-7xl items-center justify-between gap-x-3 px-4 sm:px-6 lg:grid lg:grid-cols-[minmax(0,1fr)_auto] lg:px-8 xl:grid-cols-[auto_minmax(0,1fr)_auto] xl:gap-x-4">
           {/* Brand Logo */}
-          <Link href="/" className="flex items-center space-x-3 group">
-            <div className="w-10 h-10 rounded-xl bg-linear-to-br/srgb from-gold-400 via-gold-500 to-amber-600 flex items-center justify-center text-navy-950 font-bold shadow-md shadow-gold-500/20 group-hover:scale-105 group-hover:shadow-gold-500/30 transition-all">
-              <Building2 className="w-6 h-6 text-navy-950" />
+          <Link href="/" className="inline-flex min-h-16 min-w-0 items-center gap-2.5 justify-self-start">
+            <div className="grid size-10 shrink-0 place-items-center rounded-xl border border-[#d6b77b] bg-[#efe3cb] text-navy-950">
+              <Building2 className="size-5" aria-hidden="true" />
             </div>
             <div className="flex flex-col">
-              <span className="text-white font-black text-lg tracking-wider leading-none group-hover:text-gold-200 transition-colors">
+              <span className="text-sm font-extrabold leading-none tracking-wider text-navy-950 sm:text-base">
                 CHANTAKORN
               </span>
-              <span className="text-gold-400 text-xs font-bold tracking-widest leading-tight">
+              <span className="mt-1 text-[10px] font-semibold leading-none tracking-[0.22em] text-[#77591d]">
                 PROPERTY
               </span>
             </div>
           </Link>
 
           {/* Center Navigation Links (Desktop) */}
-          <nav className="hidden lg:flex items-center space-x-1 xl:space-x-1.5">
+          <nav aria-label="เมนูหลัก" className="hidden items-center justify-center gap-1 lg:col-span-2 lg:row-start-2 lg:flex lg:border-t lg:border-[#d6b77b]/30 lg:py-1 xl:col-span-1 xl:col-start-2 xl:row-start-1 xl:border-0 xl:py-0">
             {navLinks.map((link) => {
               const isActive = pathname === link.href;
               return (
@@ -229,10 +220,11 @@ export default function Header() {
                   key={link.name}
                   href={link.href}
                   onClick={() => setMobileMenuOpen(false)}
-                  className={`px-3 py-1.5 rounded-xl text-sm transition-all ${
+                  aria-current={isActive ? 'page' : undefined}
+                  className={`inline-flex min-h-11 items-center whitespace-nowrap rounded-lg px-2.5 text-sm font-medium transition-colors ${
                     isActive
-                      ? 'text-gold-300 bg-navy-900 border border-gold-400/50 font-bold shadow-xs'
-                      : 'text-white hover:text-gold-300 hover:bg-navy-900/80 font-medium'
+                      ? 'bg-[#efe3cb] text-navy-950'
+                      : 'text-slate-700 hover:bg-[#f4ede0] hover:text-navy-950'
                   }`}
                 >
                   {link.name}
@@ -242,10 +234,11 @@ export default function Header() {
           </nav>
 
           {/* Right Actions (Desktop) */}
-          <div className="hidden lg:flex items-center space-x-2 xl:space-x-3">
+          <div className="hidden items-center gap-2 lg:col-start-2 lg:row-start-1 lg:flex xl:col-start-3">
             <Link
               href="/favorites"
-              className="relative p-2 text-white hover:text-gold-300 hover:bg-navy-900 rounded-xl border border-transparent hover:border-navy-700 transition-all"
+              aria-label="ทรัพย์ที่บันทึกไว้"
+              className="relative grid size-11 shrink-0 place-items-center rounded-xl text-navy-950 transition-colors hover:bg-[#efe3cb]"
               title="ทรัพย์ที่บันทึกไว้"
             >
               <Heart className="w-5 h-5" />
@@ -261,24 +254,24 @@ export default function Header() {
               <Link
                 id="main-user-profile-btn"
                 href={currentUser.role === 'ADMIN' || currentUser.role === 'AGENT' ? '/admin' : '/profile'}
-                className="flex items-center space-x-2 pl-2 pr-3 py-1.5 bg-navy-900 hover:bg-navy-850 rounded-full border border-gold-400/50 hover:border-gold-300 shadow-xs transition-all group"
+                className="flex min-h-11 items-center gap-2 rounded-xl border border-[#d6b77b]/65 bg-white py-1 pl-1.5 pr-2.5 transition-colors hover:bg-[#efe3cb]"
                 title="คลิกเพื่อจัดการโปรไฟล์"
               >
-                <div className="w-7 h-7 rounded-full overflow-hidden ring-2 ring-gold-400 bg-navy-950 flex items-center justify-center shrink-0">
+                <div className="flex size-7 shrink-0 items-center justify-center overflow-hidden rounded-full bg-navy-950 ring-1 ring-[#d6b77b]">
                   {currentUser.avatar_url ? (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img src={currentUser.avatar_url} alt={currentUser.full_name} className="w-full h-full object-cover" />
                   ) : (
-                    <span className="text-xs font-bold text-gold-400">
+                    <span className="text-xs font-semibold text-[#efe3cb]">
                       {(currentUser.full_name || 'U').charAt(0).toUpperCase()}
                     </span>
                   )}
                 </div>
                 <div className="flex flex-col text-left">
-                  <span className="text-xs font-bold text-white group-hover:text-gold-200 transition-colors max-w-[100px] truncate leading-tight">
+                  <span className="max-w-24 truncate text-xs font-semibold leading-tight text-navy-950">
                     {currentUser.full_name || 'ผู้ใช้งาน'}
                   </span>
-                  <span className="text-[10px] text-gold-300 font-bold leading-none">
+                  <span className="mt-0.5 text-[10px] font-medium leading-none text-[#77591d]">
                     {currentUser.role === 'ADMIN' ? 'ผู้ดูแลระบบ' : currentUser.role === 'AGENT' ? 'เจ้าหน้าที่' : 'สมาชิก'}
                   </span>
                 </div>
@@ -287,35 +280,35 @@ export default function Header() {
               <Link
                 id="main-login-btn"
                 href="/login"
-                className="flex items-center space-x-2 bg-navy-900 hover:bg-navy-850 text-white hover:text-gold-300 px-3.5 py-1.5 text-sm font-bold rounded-xl border border-gold-400/40 hover:border-gold-300 transition-all shadow-xs group"
+                className="inline-flex min-h-11 items-center gap-1.5 whitespace-nowrap rounded-xl border border-[#d6b77b]/65 bg-white px-2.5 text-sm font-medium text-navy-950 transition-colors hover:bg-[#efe3cb]"
               >
-                <LogIn className="w-4 h-4 text-gold-400 group-hover:translate-x-0.5 transition-transform" />
-                <span className="text-white group-hover:text-gold-300">เข้าสู่ระบบ</span>
+                <LogIn className="size-4 text-[#77591d]" aria-hidden="true" />
+                <span>เข้าสู่ระบบ</span>
               </Link>
             )}
 
             <Link
               href="/sell"
-              className="flex items-center space-x-1.5 px-3.5 py-1.5 text-xs font-bold text-gold-300 border border-gold-400/50 hover:border-gold-300 hover:bg-gold-500/15 rounded-xl transition-all shadow-xs"
+              className="inline-flex min-h-11 items-center gap-1.5 whitespace-nowrap rounded-xl border border-[#d6b77b]/75 px-2.5 text-sm font-semibold text-navy-950 transition-colors hover:bg-[#efe3cb]"
             >
-              <PlusCircle className="w-3.5 h-3.5 text-gold-400" />
+              <PlusCircle className="size-4 text-[#77591d]" aria-hidden="true" />
               <span>ลงประกาศ</span>
             </Link>
 
             <Link
               href="/contact"
-              className="px-4 py-2 text-xs font-bold text-navy-950 bg-linear-to-r/srgb from-gold-400 via-gold-500 to-amber-500 hover:from-gold-300 hover:to-gold-400 rounded-xl shadow-md hover:shadow-gold-500/25 transition-all transform hover:-translate-y-0.5"
+              className="inline-flex min-h-11 items-center whitespace-nowrap rounded-xl bg-navy-950 px-3 text-sm font-semibold text-[#efe3cb] transition-colors hover:bg-navy-800"
             >
               ติดต่อเรา
             </Link>
           </div>
 
           {/* Mobile Right Icons & Hamburger */}
-          <div className="flex items-center space-x-2 lg:hidden">
+          <div className="flex shrink-0 items-center gap-1 lg:hidden">
             <Link
               href="/favorites"
               aria-label="ทรัพย์ที่บันทึกไว้"
-              className="relative p-2 text-gray-300 hover:text-gold-400 rounded-lg"
+              className="relative grid size-11 place-items-center rounded-xl text-navy-950 transition-colors hover:bg-[#efe3cb]"
             >
               <Heart className="w-5 h-5" />
               {favCount > 0 && (
@@ -328,7 +321,7 @@ export default function Header() {
             <button
               type="button"
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="p-2 text-gray-200 hover:text-gold-400 hover:bg-navy-900 rounded-lg focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-gold-400 focus-visible:ring-offset-2 focus-visible:ring-offset-navy-950"
+              className="grid size-11 place-items-center rounded-xl border border-[#d6b77b]/60 text-navy-950 transition-colors hover:bg-[#efe3cb] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#77591d]"
               aria-label={mobileMenuOpen ? 'ปิดเมนูหลัก' : 'เปิดเมนูหลัก'}
               aria-expanded={mobileMenuOpen}
               aria-controls="mobile-navigation-menu"
@@ -337,34 +330,32 @@ export default function Header() {
             </button>
           </div>
         </div>
-      </header>
 
       {/* Mobile Slide-down Navigation Menu */}
       {mobileMenuOpen && (
         <div 
           id="mobile-navigation-menu"
-          className="lg:hidden fixed inset-0 top-[60px] z-[60] bg-[#020812] border-t border-navy-800 flex flex-col p-5 overflow-y-auto animate-fadeIn shadow-2xl"
-          style={{ backgroundColor: '#020812' }}
+          className="absolute inset-x-0 top-full flex h-[calc(100dvh-4rem)] flex-col overflow-y-auto overscroll-contain border-t border-[#d6b77b]/45 bg-[#fcfaf6] p-4 shadow-xl md:h-[calc(100dvh-6.75rem)] lg:hidden"
         >
           {/* User Account Card in Mobile Menu if logged in */}
           {currentUser && (
-            <div className="mb-5 p-4 rounded-2xl bg-navy-900 border border-gold-500/40 flex items-center justify-between shadow-md">
-              <div className="flex items-center space-x-3">
-                <div className="w-10 h-10 rounded-full overflow-hidden ring-2 ring-gold-400 bg-navy-950 flex items-center justify-center shrink-0">
+            <div className="mb-5 flex items-center justify-between gap-3 rounded-2xl border border-[#d6b77b]/45 bg-white p-4">
+              <div className="flex min-w-0 items-center gap-3">
+                <div className="flex size-10 shrink-0 items-center justify-center overflow-hidden rounded-full bg-navy-950 ring-1 ring-[#d6b77b]">
                   {currentUser.avatar_url ? (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img src={currentUser.avatar_url} alt={currentUser.full_name} className="w-full h-full object-cover" />
                   ) : (
-                    <span className="text-sm font-bold text-gold-400">
+                    <span className="text-sm font-semibold text-[#efe3cb]">
                       {(currentUser.full_name || 'U').charAt(0).toUpperCase()}
                     </span>
                   )}
                 </div>
-                <div>
-                  <div className="font-bold text-white text-sm">
+                <div className="min-w-0">
+                  <div className="break-words text-sm font-semibold text-navy-950">
                     {currentUser.full_name || 'ผู้ใช้งาน'}
                   </div>
-                  <div className="text-xs text-gold-400 font-semibold">
+                  <div className="mt-0.5 text-xs font-medium text-[#77591d]">
                     {currentUser.role === 'ADMIN' ? 'ผู้ดูแลระบบ (Admin)' : currentUser.role === 'AGENT' ? 'เจ้าหน้าที่ (Agent)' : 'สมาชิก'}
                   </div>
                 </div>
@@ -372,17 +363,17 @@ export default function Header() {
               <Link
                 href="/profile"
                 onClick={() => setMobileMenuOpen(false)}
-                className="px-3 py-1.5 bg-navy-800 text-gold-300 text-xs font-bold rounded-xl border border-gold-400/40 hover:bg-navy-750 transition-all"
+                className="inline-flex min-h-11 shrink-0 items-center rounded-xl border border-[#d6b77b]/65 px-3 text-xs font-semibold text-navy-950 transition-colors hover:bg-[#efe3cb]"
               >
                 โปรไฟล์
               </Link>
             </div>
           )}
 
-          <div className="flex flex-col space-y-2 mb-6">
-            <div className="text-xs font-bold text-gold-400 uppercase tracking-wider mb-2 px-2 flex items-center justify-between">
+          <nav aria-label="เมนูหลัก" className="mb-5 grid gap-2">
+            <div className="mb-1 flex items-center justify-between gap-2 px-1 text-xs font-semibold text-[#77591d]">
               <span>เมนูหลัก</span>
-              <span className="text-[11px] text-gray-400 font-normal">Chantakorn Property</span>
+              <span className="text-[11px] font-medium text-slate-600">Chantakorn Property</span>
             </div>
             {navLinks.map((link) => {
               const isActive = pathname === link.href;
@@ -391,26 +382,27 @@ export default function Header() {
                   key={link.name}
                   href={link.href}
                   onClick={() => setMobileMenuOpen(false)}
-                  className={`flex items-center justify-between px-4 py-3 rounded-xl text-base transition-all ${
+                  aria-current={isActive ? 'page' : undefined}
+                  className={`flex min-h-11 items-center justify-between gap-3 rounded-xl border px-3 py-2 text-sm font-medium text-navy-950 transition-colors ${
                     isActive
-                      ? 'bg-navy-900 text-gold-300 font-bold border border-gold-400/60 shadow-md ring-1 ring-gold-400/30'
-                      : 'text-white hover:text-gold-300 font-semibold bg-navy-900/70 hover:bg-navy-850 border border-navy-800'
+                      ? 'border-[#d6b77b]/70 bg-[#efe3cb]'
+                      : 'border-[#d6b77b]/35 bg-white hover:bg-[#f4ede0]'
                   }`}
                 >
-                  <span className="tracking-wide">{link.name}</span>
-                  <ChevronRight className={`w-4 h-4 shrink-0 ${isActive ? 'text-gold-400' : 'text-gray-400'}`} />
+                  <span>{link.name}</span>
+                  <ChevronRight className="size-4 shrink-0 text-[#77591d]" aria-hidden="true" />
                 </Link>
               );
             })}
-          </div>
+          </nav>
 
-          <div className="border-t border-navy-800 pt-5 flex flex-col space-y-3 pb-24">
+          <div className="grid gap-2.5 border-t border-[#d6b77b]/40 pt-4 pb-24 md:pb-8">
             <Link
               href="/sell"
               onClick={() => setMobileMenuOpen(false)}
-              className="w-full flex items-center justify-center space-x-2 py-3 px-4 rounded-xl border border-gold-400/50 bg-navy-900 text-gold-300 font-bold hover:bg-navy-850 transition-all shadow-xs"
+              className="flex min-h-11 items-center justify-center gap-2 rounded-xl border border-[#d6b77b]/65 bg-white px-4 py-2 text-sm font-semibold text-navy-950 transition-colors hover:bg-[#efe3cb]"
             >
-              <PlusCircle className="w-4 h-4 text-gold-400" />
+              <PlusCircle className="size-4 text-[#77591d]" aria-hidden="true" />
               <span>ลงประกาศ / ฝากขายทรัพย์</span>
             </Link>
 
@@ -420,18 +412,18 @@ export default function Header() {
                   <Link
                     href="/admin"
                     onClick={() => setMobileMenuOpen(false)}
-                    className="w-full flex items-center justify-center space-x-2 py-3 px-4 rounded-xl bg-navy-900 border border-gold-500/40 text-gold-300 font-bold hover:bg-navy-850 transition-all"
+                    className="flex min-h-11 items-center justify-center gap-2 rounded-xl border border-[#d6b77b]/65 bg-white px-4 py-2 text-sm font-semibold text-navy-950 transition-colors hover:bg-[#efe3cb]"
                   >
-                    <LayoutDashboard className="w-4 h-4" />
+                    <LayoutDashboard className="size-4 text-[#77591d]" aria-hidden="true" />
                     <span>แผงควบคุมระบบ (Admin Panel)</span>
                   </Link>
                 )}
                 <Link
                   href="/profile"
                   onClick={() => setMobileMenuOpen(false)}
-                  className="w-full flex items-center justify-center space-x-2 py-3 px-4 rounded-xl bg-navy-850 text-white font-medium hover:bg-navy-800 transition-all border border-navy-800"
+                  className="flex min-h-11 items-center justify-center gap-2 rounded-xl border border-[#d6b77b]/65 bg-white px-4 py-2 text-sm font-medium text-navy-950 transition-colors hover:bg-[#efe3cb]"
                 >
-                  <UserCircle className="w-4 h-4" />
+                  <UserCircle className="size-4 text-[#77591d]" aria-hidden="true" />
                   <span>จัดการโปรไฟล์ส่วนตัว</span>
                 </Link>
                 <button
@@ -440,9 +432,9 @@ export default function Header() {
                     handleLogout();
                     setMobileMenuOpen(false);
                   }}
-                  className="w-full flex items-center justify-center space-x-2 py-2.5 px-4 rounded-xl bg-red-950/50 border border-red-800/60 text-red-300 text-xs font-semibold hover:bg-red-900/40 transition-all"
+                  className="flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-2 text-sm font-medium text-red-800 transition-colors hover:bg-red-100"
                 >
-                  <LogOut className="w-4 h-4" />
+                  <LogOut className="size-4" aria-hidden="true" />
                   <span>ออกจากระบบ</span>
                 </button>
               </div>
@@ -450,9 +442,9 @@ export default function Header() {
               <Link
                 href="/login"
                 onClick={() => setMobileMenuOpen(false)}
-                className="w-full flex items-center justify-center space-x-2 py-3 px-4 rounded-xl bg-gold-400 text-navy-950 font-bold hover:bg-gold-300 transition-all shadow-md"
+                className="flex min-h-11 items-center justify-center gap-2 rounded-xl bg-[#efe3cb] px-4 py-2 text-sm font-semibold text-navy-950 transition-colors hover:bg-[#e6d2a8]"
               >
-                <LogIn className="w-4 h-4 text-navy-950 stroke-[2.5]" />
+                <LogIn className="size-4" aria-hidden="true" />
                 <span>เข้าสู่ระบบ / สมัครสมาชิก</span>
               </Link>
             )}
@@ -460,22 +452,27 @@ export default function Header() {
             <Link
               href="/contact"
               onClick={() => setMobileMenuOpen(false)}
-              className="w-full flex items-center justify-center py-3.5 px-4 rounded-xl bg-linear-to-r/srgb from-gold-400 via-gold-500 to-amber-500 text-navy-950 font-black shadow-md hover:shadow-gold-500/25 transition-all"
+              className="flex min-h-11 items-center justify-center rounded-xl bg-navy-950 px-4 py-2 text-sm font-semibold text-[#efe3cb] transition-colors hover:bg-navy-800"
             >
               ติดต่อ Chantakorn Property
             </Link>
 
-            <div className="mt-4 pt-4 border-t border-navy-800 text-center text-xs text-gray-200 space-y-2">
-              <div>โทร: <a href="tel:0816040097" className="text-gold-300 font-bold hover:underline">081-604-0097</a></div>
+            <div className="mt-1 border-t border-[#d6b77b]/40 pt-2 text-center text-sm text-slate-700">
+              <div>
+                <a href="tel:0816040097" className="inline-flex min-h-11 items-center gap-2 px-2 font-medium text-navy-950 hover:underline">
+                  <Phone className="size-4 text-[#77591d]" aria-hidden="true" />
+                  081-604-0097
+                </a>
+              </div>
               <div>
                 <a
                   href="https://lin.ee/NMSe28T3"
                   target="_blank"
                   rel="noreferrer"
-                  className="text-[#06C755] hover:underline font-bold inline-flex items-center space-x-1"
+                  className="inline-flex min-h-11 items-center gap-2 px-2 font-medium text-emerald-800 hover:underline"
                 >
-                  <MessageCircle className="w-3.5 h-3.5 fill-current inline mr-1" />
-                  <span>LINE Official: @930xzcyi (คลิกเพื่อแอดไลน์)</span>
+                  <MessageCircle className="size-4" aria-hidden="true" />
+                  <span>LINE Official @930xzcyi</span>
                 </a>
               </div>
               <div>
@@ -483,15 +480,17 @@ export default function Header() {
                   href="https://www.facebook.com/people/Chantakorn-Property-%E0%B8%99%E0%B8%B2%E0%B8%A2%E0%B8%AB%E0%B8%99%E0%B9%89%E0%B8%B2-%E0%B8%9A%E0%B9%89%E0%B8%B2%E0%B8%99-%E0%B8%97%E0%B8%B5%E0%B9%88%E0%B8%94%E0%B8%B4%E0%B8%99-%E0%B8%84%E0%B8%AD%E0%B8%99%E0%B9%82%E0%B8%94-%E0%B8%AB%E0%B8%B2%E0%B8%94%E0%B9%83%E0%B8%AB%E0%B8%8D%E0%B9%88-%E0%B8%AA%E0%B8%87%E0%B8%82%E0%B8%A5%E0%B8%B2/61593092347613/"
                   target="_blank"
                   rel="noreferrer"
-                  className="text-blue-400 hover:underline font-medium"
+                  className="inline-flex min-h-11 items-center gap-2 px-2 font-medium text-navy-950 hover:underline"
                 >
-                  Facebook: Chantakorn Property
+                  <Facebook className="size-4 text-[#77591d]" aria-hidden="true" />
+                  Facebook Chantakorn Property
                 </a>
               </div>
             </div>
           </div>
         </div>
       )}
+      </header>
     </>
   );
 }
