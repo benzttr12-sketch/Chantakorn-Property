@@ -2,11 +2,15 @@
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Check, Copy, ExternalLink, Facebook, X } from 'lucide-react';
+import { Check, Copy, Download, ExternalLink, Facebook, Loader2, X } from 'lucide-react';
 import { Property } from '@/lib/types';
 import { generateLocalSocialPost, MarketingTone } from '@/lib/automation-engine';
 import { DEFAULT_OFFICIAL_FACEBOOK, formatPrice, formatPropertyCode, getPropertyTypeName } from '@/lib/utils';
 import StaffPropertyImage from '@/components/admin/StaffPropertyImage';
+import { fetchPropertyPhoto, propertyPhotoFilename, savePhotoDownload } from '@/lib/property-photo-download';
+
+type PhotoDownload = { status: 'loading'; completed: number; total: number }
+  | { status: 'success' | 'error'; message: string };
 
 const TONES: { value: MarketingTone; label: string }[] = [
   { value: 'hot_deal', label: '📋 เน้นข้อมูล' },
@@ -30,9 +34,18 @@ export default function FacebookPostModal({ isOpen, property, onClose }: {
   const [tone, setTone] = useState<MarketingTone>('hot_deal');
   const [edited, setEdited] = useState<{ source: string; text: string } | null>(null);
   const [copyResult, setCopyResult] = useState<{ key: string; ok: boolean } | null>(null);
+  const [photoDownload, setPhotoDownload] = useState<PhotoDownload | null>(null);
   const activeRef = useRef(false);
   const copyAttempt = useRef(0);
+  const downloadRequest = useRef<AbortController | null>(null);
   const textRef = useRef<HTMLTextAreaElement>(null);
+  const photos = useMemo(
+    () => [...new Set([property?.cover_image, ...(property?.images || [])]
+      .filter((photo): photo is string => typeof photo === 'string' && photo.trim().length > 0))],
+    [property?.cover_image, property?.images],
+  );
+  const photoKey = useMemo(() => JSON.stringify([property?.id, photos]), [property?.id, photos]);
+  const downloading = photoDownload?.status === 'loading';
 
   useEffect(() => { setMounted(true); }, []);
 
@@ -41,6 +54,14 @@ export default function FacebookPostModal({ isOpen, property, onClose }: {
     copyAttempt.current += 1;
     return () => { activeRef.current = false; copyAttempt.current += 1; };
   }, [isOpen, property?.id]);
+
+  useEffect(() => {
+    setPhotoDownload(null);
+    return () => {
+      downloadRequest.current?.abort();
+      downloadRequest.current = null;
+    };
+  }, [isOpen, photoKey]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -65,8 +86,6 @@ export default function FacebookPostModal({ isOpen, property, onClose }: {
   const copyKey = `${source}\u0000${content}`;
   const copied = copyResult?.key === copyKey && copyResult.ok;
   const copyFailed = copyResult?.key === copyKey && !copyResult.ok;
-  const photos = property ? [...new Set([property.cover_image, ...(property.images || [])]
-    .filter((photo): photo is string => typeof photo === 'string' && photo.trim().length > 0))] : [];
 
   if (!isOpen || !mounted || !property) return null;
 
@@ -80,6 +99,42 @@ export default function FacebookPostModal({ isOpen, property, onClose }: {
       setCopyResult({ key: copyKey, ok: false });
       textRef.current?.focus();
       textRef.current?.select();
+    }
+  };
+
+  const handleDownload = async (indices: number[], archive = false) => {
+    if (downloadRequest.current || indices.length === 0) return;
+    const controller = new AbortController();
+    downloadRequest.current = controller;
+    setPhotoDownload({ status: 'loading', completed: 0, total: indices.length });
+    let currentIndex = indices[0];
+    try {
+      const files: Record<string, Uint8Array> = {};
+      for (const [completed, index] of indices.entries()) {
+        currentIndex = index;
+        const blob = await fetchPropertyPhoto(photos[index], property.id, controller.signal);
+        controller.signal.throwIfAborted();
+        const filename = propertyPhotoFilename(property.id, index, blob.type);
+        if (archive) files[filename] = new Uint8Array(await blob.arrayBuffer());
+        else savePhotoDownload(blob, filename);
+        controller.signal.throwIfAborted();
+        setPhotoDownload({ status: 'loading', completed: completed + 1, total: indices.length });
+      }
+      if (archive) {
+        const { zipSync } = await import('fflate');
+        controller.signal.throwIfAborted();
+        // Photos are already compressed; store them without recompressing their bytes.
+        const zip = new Uint8Array(zipSync(files, { level: 0 }));
+        savePhotoDownload(new Blob([zip], { type: 'application/zip' }), `${formatPropertyCode(property.id)}-facebook-photos.zip`);
+      }
+      setPhotoDownload({ status: 'success', message: archive
+        ? `เตรียมไฟล์ ZIP ครบ ${indices.length} รูปแล้ว กรุณาแตกไฟล์ก่อนแนบใน Facebook`
+        : `เริ่มดาวน์โหลดรูปที่ ${indices[0] + 1} แล้ว` });
+    } catch {
+      if (controller.signal.aborted) return;
+      setPhotoDownload({ status: 'error', message: `ดาวน์โหลดรูปที่ ${currentIndex + 1} ไม่สำเร็จ กรุณาลองอีกครั้ง หากเป็นรูปจากเว็บไซต์ภายนอก เว็บไซต์นั้นอาจไม่อนุญาตให้ดาวน์โหลด` });
+    } finally {
+      if (downloadRequest.current === controller) downloadRequest.current = null;
     }
   };
 
@@ -114,16 +169,39 @@ export default function FacebookPostModal({ isOpen, property, onClose }: {
           </div>
 
           {photos.length > 0 ? <div className="space-y-2">
-            <p className="text-xs font-bold text-navy-950">รูปทรัพย์ที่เลือก · {photos.length} รูป</p>
-            <ul aria-label="รูปทรัพย์สำหรับโพสต์" className="grid grid-cols-3 gap-2">
-              {photos.slice(0, 6).map((photo, index) => <li key={photo}>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <p className="text-xs font-bold text-navy-950">รูปทรัพย์สำหรับโพสต์ · {photos.length} รูป</p>
+              <button
+                type="button"
+                disabled={downloading}
+                onClick={() => handleDownload(photos.map((_, index) => index), true)}
+                className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-navy-950 px-3 py-2 text-xs font-bold text-white hover:bg-navy-800 disabled:cursor-wait disabled:opacity-60"
+              >
+                {downloading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />}
+                ดาวน์โหลดรูปทั้งหมด (ZIP)
+              </button>
+            </div>
+            <ul aria-label="รูปทรัพย์สำหรับโพสต์" className="grid max-h-80 grid-cols-2 gap-2 overflow-y-auto sm:grid-cols-3">
+              {photos.map((photo, index) => <li key={photo}>
                 <div className="relative aspect-[4/3] overflow-hidden rounded-xl border border-slate-200 bg-slate-50">
                   <StaffPropertyImage src={photo} propertyId={property.id} alt={`${property.title} — ${index === 0 ? 'รูปปก' : `รูปที่ ${index + 1}`}`} className="object-contain" />
                 </div>
                 <p className="mt-1 text-center text-[11px] text-slate-500">{index === 0 ? 'รูปปกสำหรับลิงก์' : `รูปที่ ${index + 1}`}</p>
+                <button
+                  type="button"
+                  aria-label={`ดาวน์โหลดรูปที่ ${index + 1}`}
+                  disabled={downloading}
+                  onClick={() => handleDownload([index])}
+                  className="mt-1 flex w-full items-center justify-center gap-1 rounded-lg border border-slate-200 px-2 py-2 text-xs font-bold text-navy-950 hover:bg-slate-50 disabled:cursor-wait disabled:opacity-60"
+                >
+                  <Download className="h-3.5 w-3.5" /> ดาวน์โหลดรูป
+                </button>
               </li>)}
             </ul>
-            <p className="text-[11px] text-slate-500">การคัดลอกข้อความไม่แนบไฟล์รูป หากโพสต์รูปให้แนบรูปของทรัพย์นี้ใน Facebook ด้วย</p>
+            {photoDownload?.status === 'loading' && <p role="status" className="text-xs text-slate-600">กำลังเตรียมรูป {photoDownload.completed}/{photoDownload.total}…</p>}
+            {photoDownload?.status === 'success' && <p role="status" className="text-xs text-emerald-700">{photoDownload.message}</p>}
+            {photoDownload?.status === 'error' && <p role="alert" className="text-xs text-red-700">{photoDownload.message}</p>}
+            <p className="text-[11px] text-slate-500">ดาวน์โหลดรูปลงเครื่อง แล้วแนบรูปใน Facebook พร้อมข้อความโพสต์ หากดาวน์โหลดทั้งหมด ให้แตกไฟล์ ZIP ก่อนเลือกรูป</p>
           </div> : <p role="status" className="rounded-xl bg-amber-50 p-3 text-xs text-amber-900">ทรัพย์นี้ยังไม่มีรูป กรุณาเพิ่มรูปในหน้าจัดการทรัพย์ก่อนโพสต์</p>}
 
           <div className="space-y-2">
@@ -181,7 +259,7 @@ export default function FacebookPostModal({ isOpen, property, onClose }: {
             </a>
           </div>
           {copyFailed && <p role="alert" className="text-xs text-red-700">คัดลอกอัตโนมัติไม่ได้ เลือกข้อความไว้ให้แล้ว กรุณากด Ctrl+C หรือคัดลอกจากเมนูของอุปกรณ์</p>}
-          <p className="text-[11px] text-gray-500">เปิด Facebook วางข้อความ ตรวจรูปและรายละเอียด แล้วกดเผยแพร่บนเพจ</p>
+          <p className="text-[11px] text-gray-500">ดาวน์โหลดรูป เปิด Facebook วางข้อความ แนบรูปที่บันทึกไว้ ตรวจรายละเอียด แล้วกดเผยแพร่บนเพจ</p>
         </div>
       </section>
     </div>,
