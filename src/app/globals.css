@@ -347,8 +347,8 @@
 }
 
 .home-hero-backdrop {
-  object-position: 64% center;
-  opacity: 0.88;
+  object-position: 62% center;
+  opacity: 0.94;
 }
 
 .home-mesh-drift {
@@ -360,25 +360,23 @@
   pointer-events: none;
 }
 
-.home-mesh-drift[data-rendered='true'] { opacity: 1; }
+.home-mesh-drift[data-rendered='true'] { opacity: 0.24; }
 
 .home-hero-shade {
-  background: linear-gradient(180deg, rgba(2, 8, 18, 0.7) 0%, rgba(2, 8, 18, 0.76) 36%, rgba(2, 8, 18, 0.93) 78%, #020812 100%);
-}
-
-.home-mesh-drift[data-rendered='true'] + .home-hero-shade {
-  background: linear-gradient(180deg, rgba(2, 8, 18, 0.77) 0%, rgba(2, 8, 18, 0.80) 55%, #020812 100%);
+  background: linear-gradient(180deg, rgba(5, 17, 34, 0.82), rgba(5, 17, 34, 0.72) 45%, rgba(5, 17, 34, 0.96));
 }
 
 @media (min-width: 1024px) {
   .home-hero-background { height: 100%; }
   .home-hero-backdrop { object-position: center; }
   .home-hero-shade {
-    background: linear-gradient(90deg, rgba(2, 8, 18, 0.94) 0%, rgba(2, 8, 18, 0.84) 44%, rgba(2, 8, 18, 0.6) 100%), linear-gradient(0deg, #020812 0%, transparent 55%);
+    background: linear-gradient(90deg, rgba(5, 17, 34, 0.92), rgba(5, 17, 34, 0.76) 42%, rgba(5, 17, 34, 0.2)), linear-gradient(0deg, rgba(5, 17, 34, 0.55), transparent 60%);
   }
-  .home-mesh-drift[data-rendered='true'] + .home-hero-shade {
-    background: linear-gradient(90deg, rgba(2, 8, 18, 0.80) 0%, rgba(2, 8, 18, 0.75) 58%, rgba(2, 8, 18, 0.62) 100%), linear-gradient(0deg, #020812 0%, transparent 55%);
-  }
+}
+
+.home-experience :is(a, button, input, select, summary):focus-visible {
+  outline: 2px solid #a17b3a;
+  outline-offset: 3px;
 }
 
 .home-mood-option, .home-explore-link { transition: background-color 180ms ease, color 180ms ease, border-color 180ms ease; }

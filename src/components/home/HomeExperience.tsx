@@ -18,5 +18,5 @@ export default function HomeExperience({ children }: { children: ReactNode }) {
     return () => observer.disconnect();
   }, []);
 
-  return <div ref={root} className="flex min-h-screen flex-col bg-white">{children}</div>;
+  return <div ref={root} className="home-experience flex min-h-screen flex-col bg-[#f7f5f0]">{children}</div>;
 }
