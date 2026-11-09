@@ -246,3 +246,22 @@ test('CLI prints only aggregate counts for a matching configured project and emi
   assert.deepEqual(JSON.parse(bad.stderr), { ok: false, complete: false, code: 'BACKUP_RECONCILIATION_FAILED' });
   for (const value of [...privateValues, password, f.directory]) assert.ok(!bad.stderr.includes(value));
 });
+
+test('CLI returns exit 2 for a complete inventory with unresolved findings and preserves its aggregate report', async t => {
+  const project = JSON.parse(fs.readFileSync(path.join(repository, 'firebase-applet-config.json'), 'utf8')).projectId;
+  const database = JSON.parse(fs.readFileSync(path.join(repository, 'firebase.json'), 'utf8')).firestore.database;
+  const users = fixtureUsers();
+  users[0].emailVerified = false;
+  const f = await fixture(t, { project, database, users });
+  const result = spawnSync(process.execPath, [script, f.directory], { encoding: 'utf8',
+    env: { ...process.env, CHANTAKORN_BACKUP_PASSPHRASE: password } });
+  assert.equal(result.status, 2);
+  assert.equal(result.stderr, '');
+  const report = JSON.parse(result.stdout);
+  assert.equal(report.complete, true);
+  assert.equal(report.inventoriesMatch, false);
+  assert.equal(report.profiles.unverifiedStaffAuth, 1);
+  assert.equal(report.findings, 1);
+  assertCountsOnly(report);
+  for (const value of [...privateValues, password, f.directory, project, database]) assert.ok(!result.stdout.includes(value));
+});
