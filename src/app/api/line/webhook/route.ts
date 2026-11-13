@@ -781,8 +781,17 @@ export async function POST(req: Request) {
           inquiry_type: 'inquiry',
         });
 
-        const welcomeFlex = buildWelcomeFlex(hostOrigin);
-        await reply(replyToken, [welcomeFlex]);
+        await reply(replyToken, [{
+          type: 'text',
+          text: `สวัสดี 🏡 ยินดีต้อนรับสู่ Chantakorn Property
+ขอบคุณที่เพิ่มเพื่อนกับเรา 💛
+
+สนใจซื้อ–ขาย–เช่า หรือฝากขาย–ฝากเช่าทรัพย์ในหาดใหญ่–สงขลา แจ้งบริการที่สนใจ ทำเล ประเภททรัพย์ และงบประมาณหรือราคาที่ต้องการได้เลย
+
+กด “ค้นหาทรัพย์” ในริชเมนูเพื่อดูรูป ราคา และรายละเอียดเบื้องต้น แล้วเลือกเปิดข้อมูลเพิ่มเติมบนเว็บไซต์
+
+เว็บไซต์: https://chantakornproperty.com`,
+        }]);
       }
 
       // Event B: User sends a text message
