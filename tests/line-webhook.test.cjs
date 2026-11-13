@@ -150,6 +150,39 @@ test('staff simulation neither writes customer records nor sends real replies', 
   assert.equal(sends, 0);
 });
 
+test('new followers receive the prepared Thai text greeting with the current website', async () => {
+  const sent = [];
+  const api = load('app/api/line/webhook/route.ts', {
+    env: { LINE_CHANNEL_SECRET: 'test-secret', LINE_CHANNEL_ACCESS_TOKEN: 'test-token', NEXT_PUBLIC_SITE_URL: 'https://old-preview.example' },
+    fetch: async (url, init) => {
+      assert.equal(url, 'https://api.line.me/v2/bot/message/reply');
+      sent.push(JSON.parse(init.body));
+      return Response.json({});
+    },
+  });
+  const body = JSON.stringify({ events: [{ type: 'follow', replyToken: 'follow-reply', source: { userId: `U${'a'.repeat(32)}` } }] });
+  const signature = createHmac('sha256', 'test-secret').update(body).digest('base64');
+  const response = await api.POST(new Request('https://api.example.com/api/line/webhook', {
+    method: 'POST', headers: { 'x-line-signature': signature }, body,
+  }));
+  const result = await response.json();
+  assert.equal(result.successfulReplies, 1);
+  assert.equal(result.failedReplies, 0);
+  assert.equal(sent.length, 1);
+  assert.equal(sent[0].replyToken, 'follow-reply');
+  assert.equal(sent[0].messages.length, 1);
+  assert.equal(sent[0].messages[0].type, 'text');
+  assert.equal(sent[0].messages[0].text, `สวัสดี 🏡 ยินดีต้อนรับสู่ Chantakorn Property
+ขอบคุณที่เพิ่มเพื่อนกับเรา 💛
+
+สนใจซื้อ–ขาย–เช่า หรือฝากขาย–ฝากเช่าทรัพย์ในหาดใหญ่–สงขลา แจ้งบริการที่สนใจ ทำเล ประเภททรัพย์ และงบประมาณหรือราคาที่ต้องการได้เลย
+
+กด “ค้นหาทรัพย์” ในริชเมนูเพื่อดูรูป ราคา และรายละเอียดเบื้องต้น แล้วเลือกเปิดข้อมูลเพิ่มเติมบนเว็บไซต์
+
+เว็บไซต์: https://chantakornproperty.com`);
+  assert.equal(sent[0].messages[0].text.includes('https://old-preview.example'), false);
+});
+
 test('anonymous callers cannot bypass signatures with the simulation header', async () => {
   const api = load('app/api/line/webhook/route.ts', {
     requireStaff: async () => Response.json({ error: 'Unauthorized' }, { status: 401 }),
