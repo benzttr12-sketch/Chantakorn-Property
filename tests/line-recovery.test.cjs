@@ -110,7 +110,7 @@ test('failed final verification reports uncertain rather than success and never 
 
 function routeHarness({ admin = true, env = {}, code = 'RESTORED' } = {}) {
   let calls = 0;
-  const globals = { process: { env: { VERCEL_ENV: 'production', LINE_CHANNEL_ACCESS_TOKEN: token, ...env }, cwd: () => '/workspace/line-menu-recovery-prep' }, fetch: async () => { throw Error('unexpected network'); } };
+  const globals = { process: { env: { VERCEL_ENV: 'production', LINE_CHANNEL_ACCESS_TOKEN: token, ...env }, cwd: () => process.cwd() }, fetch: async () => { throw Error('unexpected network'); } };
   const route = loadTs({
     '@/lib/server-auth': { requireAdmin: async () => admin ? null : Response.json({error:'forbidden'}, {status:403}) },
     '@/lib/server-firestore': { serverFirestore: () => { throw Error('unexpected database'); } },
