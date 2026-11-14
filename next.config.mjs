@@ -67,6 +67,7 @@ const securityHeaders = [
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  outputFileTracingIncludes: { '/api/line/restore-rich-menu': ['./src/lib/line-recovery/original-rich-menu.jpg'] },
   distDir: staticExport ? '.next-pages' : '.next',
   ...(staticExport ? { output: 'export', trailingSlash: true } : {}),
   ...(normalizedBasePath ? { basePath: normalizedBasePath } : {}),

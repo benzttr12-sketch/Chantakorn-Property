@@ -1,9 +1,10 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { ArrowUpRight, Check, ChevronDown, Copy, Database, Loader2, MessageCircle, RefreshCw, Send, ShieldCheck } from 'lucide-react';
 import { fetchStaffApi } from '@/lib/staff-api';
+import LineRichMenuRestore from '@/components/admin/LineRichMenuRestore';
 import { apiUrl } from '@/lib/api-url';
 import { dataBackend } from '@/lib/backend';
 import { LinePreferences, saveLinePreferences } from '@/lib/line-admin-settings';
@@ -48,6 +49,7 @@ export default function AdminSettingsPage() {
   const [copied, setCopied] = useState(false);
   const [copyError, setCopyError] = useState('');
   const [checking, setChecking] = useState(false);
+  const checkRevision = useRef(0);
   const [connection, setConnection] = useState<ConnectionResult | null>(null);
   const [keyword, setKeyword] = useState('ดูทรัพย์');
   const [simulating, setSimulating] = useState(false);
@@ -112,17 +114,24 @@ export default function AdminSettingsPage() {
     } catch { setCopyError('คัดลอกไม่สำเร็จ กรุณาเลือกข้อความในช่อง URL แล้วคัดลอก'); }
   }
 
+  function invalidateConnection() {
+    checkRevision.current += 1;
+    setConnection(null);
+    setChecking(false);
+  }
+
   async function checkConnection() {
+    const revision = ++checkRevision.current;
     setChecking(true);
     setConnection(null);
     try {
       const response = await fetchStaffApi('/api/line/diagnostics', { cache: 'no-store' });
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || 'ตรวจการเชื่อมต่อไม่สำเร็จ');
-      setConnection({ ready: result.ready === true, message: result.message, checks: result.checks || [], richMenu: result.richMenu });
+      if (revision === checkRevision.current) setConnection({ ready: result.ready === true, message: result.message, checks: result.checks || [], richMenu: result.richMenu });
     } catch (error) {
-      setConnection({ ready: false, message: error instanceof Error ? error.message : 'ตรวจการเชื่อมต่อไม่สำเร็จ', checks: [] });
-    } finally { setChecking(false); }
+      if (revision === checkRevision.current) setConnection({ ready: false, message: error instanceof Error ? error.message : 'ตรวจการเชื่อมต่อไม่สำเร็จ', checks: [] });
+    } finally { if (revision === checkRevision.current) setChecking(false); }
   }
 
   async function simulate() {
@@ -190,6 +199,8 @@ export default function AdminSettingsPage() {
         </li>)}</ul>}
         <p className="text-xs leading-relaxed text-slate-500">ผลนี้ไม่รวมเมนูที่สร้างผ่าน LINE OA Manager และไม่ตรวจการผูกเมนูเฉพาะผู้ใช้ เป็นการอ่านสถานะเท่านั้น</p>
       </section>}
+
+      <LineRichMenuRestore checkedEmpty={connection?.richMenu?.status === 'checked' && connection.richMenu.defaultStatus === 'none' && connection.richMenu.totalMenus === 0} onAttemptStarted={invalidateConnection} onAttemptFinished={invalidateConnection} />
 
       <div className="grid items-start gap-6 lg:grid-cols-[1.2fr_1fr]">
         <section className="admin-panel">
