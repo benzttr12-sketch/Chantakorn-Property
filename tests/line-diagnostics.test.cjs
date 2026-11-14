@@ -37,6 +37,8 @@ function validLine(url, init) {
   assert.ok(init.signal instanceof AbortSignal);
   assert.equal(init.headers.Authorization, 'Bearer private-token');
   if (url === 'https://api.line.me/v2/bot/info') return Response.json({ basicId: '@930xzcyi', userId: 'private-bot-id', displayName: 'Private display name' });
+  if (url === 'https://api.line.me/v2/bot/user/all/richmenu') return Response.json({}, { status: 404 });
+  if (url === 'https://api.line.me/v2/bot/richmenu/list') return Response.json({ richmenus: [] });
   assert.equal(url, 'https://api.line.me/v2/bot/channel/webhook/endpoint');
   return Response.json({ active: true, endpoint: expectedEndpoint });
 }
@@ -86,6 +88,7 @@ test('valid token for a different OA reports mismatch and skips its webhook sett
   assert.equal(lineRequests, 1);
   assert.equal(JSON.stringify(result).includes('@other-account'), false);
   assert.equal(JSON.stringify(result).includes('private-other-id'), false);
+  assert.equal(result.richMenu.status, 'not_checked');
 });
 
 test('disabled and wrong webhook configurations are separately identified', async () => {
@@ -126,7 +129,12 @@ test('valid account, canonical webhook origin and published properties return re
   assert.equal(result.checks.every(item => item.ok && item.code && item.message && item.name), true);
   assert.deepEqual(query, [20]);
   assert.match(check(result, 'รายการทรัพย์ที่เผยแพร่').message, /1 รายการ/);
-  assert.equal(requests.length, 2);
+  assert.equal(requests.length, 4);
+  assert.equal(result.richMenu.status, 'checked');
+  assert.equal(result.richMenu.defaultStatus, 'none');
+  assert.equal(result.richMenu.defaultId, null);
+  assert.equal(result.richMenu.totalMenus, 0);
+  assert.match(result.richMenu.message, /ไม่รวมเมนูที่สร้างใน LINE OA Manager/);
   for (const value of ['private-token', 'private-secret', 'private-bot-id', 'Private display name', 'private-to-diagnostics-title']) {
     assert.equal(JSON.stringify(result).includes(value), false);
   }
@@ -198,4 +206,94 @@ test('invalid canonical site URL is not echoed and prevents webhook readiness', 
   assert.equal(result.expectedWebhookEndpoint, undefined);
   assert.equal(JSON.stringify(result).includes('private-token'), false);
   assert.equal(JSON.stringify(result).includes('private-secret'), false);
+});
+
+const menuId = suffix => `richmenu-${suffix.repeat(32)}`;
+const storedMenu = (id, name = 'Main menu') => ({
+  richMenuId: id, name, selected: true, size: { width: 2500, height: 1686 },
+  areas: Array.from({ length: 6 }, () => ({ action: { type: 'message', text: 'private-customer-message' } })),
+  privateField: 'private-user-data',
+});
+
+test('rich-menu inspection reads only fixed endpoints and returns bounded safe metadata', async () => {
+  const requests = [];
+  const api = load({ fetch: async (url, init) => {
+    requests.push({ url, method: init.method });
+    if (url.endsWith('/user/all/richmenu')) {
+      assert.equal(init.headers.Authorization, 'Bearer private-token');
+      assert.equal(init.redirect, 'error');
+      return Response.json({ richMenuId: menuId('a'), privateField: 'private-user-data' });
+    }
+    if (url.endsWith('/richmenu/list')) return Response.json({ richmenus: [storedMenu(menuId('a'), 'Main private-token private-secret')] });
+    return validLine(url, init);
+  } });
+  const result = await (await api.GET(request())).json();
+  assert.equal(result.ready, true);
+  assert.equal(result.richMenu.status, 'checked');
+  assert.equal(result.richMenu.defaultStatus, 'set');
+  assert.equal(result.richMenu.defaultId, menuId('a'));
+  assert.equal(result.richMenu.totalMenus, 1);
+  assert.deepEqual(result.richMenu.menus, [{ id: menuId('a'), name: 'Main [REDACTED] [REDACTED]', selected: true, width: 2500, height: 1686, areaCount: 6 }]);
+  assert.deepEqual(requests.map(item => item.method), ['GET', 'GET', 'GET', 'GET']);
+  assert.deepEqual(new Set(requests.map(item => item.url)), new Set([
+    'https://api.line.me/v2/bot/info', 'https://api.line.me/v2/bot/channel/webhook/endpoint',
+    'https://api.line.me/v2/bot/user/all/richmenu', 'https://api.line.me/v2/bot/richmenu/list',
+  ]));
+  for (const value of ['private-token', 'private-secret', 'private-user-data', 'private-customer-message']) assert.equal(JSON.stringify(result).includes(value), false);
+});
+
+test('rich-menu 404 means no API default and does not imply Manager menu absence', async () => {
+  const api = load({ fetch: async (url, init) => url.endsWith('/richmenu/list')
+    ? Response.json({ richmenus: [storedMenu(menuId('b'))] }) : validLine(url, init) });
+  const result = await (await api.GET(request())).json();
+  assert.equal(result.richMenu.status, 'checked');
+  assert.equal(result.richMenu.defaultStatus, 'none');
+  assert.equal(result.richMenu.totalMenus, 1);
+  assert.match(result.richMenu.message, /ไม่รวมเมนูที่สร้างใน LINE OA Manager/);
+});
+
+test('menu failures and malformed menu data do not expose provider bodies or alter other readiness', async () => {
+  for (const menuResponse of [
+    () => ({ ok: false, status: 403, json: async () => { throw Error('Must not read private-token provider body'); } }),
+    () => Response.json({ richmenus: [storedMenu('private-token')] }),
+    () => Response.json({ richmenus: [{ ...storedMenu(menuId('a')), size: { width: 'private-token', height: 1686 } }] }),
+  ]) {
+    const api = load({ fetch: async (url, init) => url.endsWith('/richmenu/list') ? menuResponse() : validLine(url, init) });
+    const result = await (await api.GET(request())).json();
+    assert.equal(result.ready, true);
+    assert.equal(result.richMenu.status, 'unavailable');
+    assert.equal(result.richMenu.listStatus, 'unavailable');
+    assert.equal(result.richMenu.totalMenus, null);
+    assert.deepEqual(result.richMenu.menus, []);
+    assert.equal(JSON.stringify(result).includes('private-token'), false);
+  }
+});
+
+test('invalid or unavailable default ID is distinguished from an absent API default', async () => {
+  for (const defaultResponse of [
+    () => Response.json({ richMenuId: 'private-token' }),
+    () => Response.json({}, { status: 503 }),
+    () => { throw Object.assign(Error('private-token'), { name: 'TimeoutError' }); },
+  ]) {
+    const api = load({ fetch: async (url, init) => url.endsWith('/user/all/richmenu') ? defaultResponse() : validLine(url, init) });
+    const result = await (await api.GET(request())).json();
+    assert.equal(result.richMenu.defaultStatus, 'unavailable');
+    assert.equal(result.richMenu.defaultId, null);
+    assert.equal(result.richMenu.status, 'unavailable');
+    assert.equal(JSON.stringify(result).includes('private-token'), false);
+  }
+});
+
+test('many stored menus keep the API default visible without returning every menu', async () => {
+  const menus = Array.from({ length: 25 }, (_, index) => storedMenu(`richmenu-${index.toString(16).padStart(32, '0')}`, `Menu ${index}`));
+  const defaultId = menus[24].richMenuId;
+  const api = load({ fetch: async (url, init) => {
+    if (url.endsWith('/user/all/richmenu')) return Response.json({ richMenuId: defaultId });
+    if (url.endsWith('/richmenu/list')) return Response.json({ richmenus: menus });
+    return validLine(url, init);
+  } });
+  const result = await (await api.GET(request())).json();
+  assert.equal(result.richMenu.totalMenus, 25);
+  assert.equal(result.richMenu.menus.length, 20);
+  assert.equal(result.richMenu.menus[0].id, defaultId);
 });

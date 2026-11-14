@@ -16,6 +16,14 @@ interface ConnectionResult {
   ready: boolean;
   message: string;
   checks: Array<{ name: string; ok: boolean; message: string }>;
+  richMenu?: {
+    status: 'checked' | 'unavailable' | 'not_checked';
+    defaultStatus: 'set' | 'none' | 'unavailable' | 'not_checked';
+    defaultId: string | null;
+    totalMenus: number | null;
+    menus: Array<{ id: string; name: string; selected: boolean; width: number; height: number; areaCount: number }>;
+    message: string;
+  };
 }
 interface SimulationResult {
   success: boolean;
@@ -111,7 +119,7 @@ export default function AdminSettingsPage() {
       const response = await fetchStaffApi('/api/line/diagnostics', { cache: 'no-store' });
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || 'ตรวจการเชื่อมต่อไม่สำเร็จ');
-      setConnection({ ready: result.ready === true, message: result.message, checks: result.checks || [] });
+      setConnection({ ready: result.ready === true, message: result.message, checks: result.checks || [], richMenu: result.richMenu });
     } catch (error) {
       setConnection({ ready: false, message: error instanceof Error ? error.message : 'ตรวจการเชื่อมต่อไม่สำเร็จ', checks: [] });
     } finally { setChecking(false); }
@@ -169,6 +177,19 @@ export default function AdminSettingsPage() {
       </section>
       {configError && <div role="alert" className="flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-red-50 p-4 text-sm text-red-700"><span>{configError}</span><button type="button" onClick={loadConfig} disabled={loading} className="inline-flex items-center gap-2 font-semibold"><RefreshCw className="h-4 w-4" />ลองใหม่</button></div>}
       {connection && <div role="status" className={`rounded-2xl border p-5 text-sm ${connection.ready ? 'border-emerald-200 bg-emerald-50 text-emerald-900' : 'border-amber-200 bg-amber-50 text-amber-900'}`}><p className="font-semibold">{connection.message}</p><ul className="mt-3 space-y-2">{connection.checks.map(item => <li key={item.name}>{item.ok ? '✓' : '•'} {item.message}</li>)}</ul><p className="mt-4 text-xs">ยืนยันการตอบกลับจริงโดยส่ง “ดูทรัพย์” จาก LINE ของลูกค้า แล้วตรวจว่าได้รับการ์ดทรัพย์</p></div>}
+      {connection?.richMenu && <section aria-label="ผลตรวจริชเมนูจาก API" className="admin-panel space-y-3 text-sm">
+        <h2 className="font-semibold text-navy-950">ริชเมนูจาก API</h2>
+        <p className={connection.richMenu.status === 'unavailable' ? 'text-amber-700' : 'text-slate-600'}>{connection.richMenu.message}</p>
+        <dl className="grid gap-3 sm:grid-cols-2">
+          <div><dt className="text-xs text-slate-500">เมนูหลักจาก API</dt><dd className="mt-1 break-all font-mono text-xs">{connection.richMenu.defaultStatus === 'set' ? connection.richMenu.defaultId : connection.richMenu.defaultStatus === 'none' ? 'ไม่มีค่าเริ่มต้นจาก API' : connection.richMenu.defaultStatus === 'not_checked' ? 'ยังไม่ได้ตรวจ' : 'อ่านไม่ได้'}</dd></div>
+          <div><dt className="text-xs text-slate-500">จำนวนเมนูที่สร้างผ่าน API</dt><dd className="mt-1">{connection.richMenu.totalMenus === null ? 'ยังอ่านไม่ได้' : `${connection.richMenu.totalMenus} เมนู`}</dd></div>
+        </dl>
+        {connection.richMenu.menus.length > 0 && <ul className="space-y-2">{connection.richMenu.menus.map(menu => <li key={menu.id} className="rounded-xl border border-slate-200 p-3">
+          <p className="font-medium text-navy-950">{menu.name || 'เมนูไม่มีชื่อ'}</p><p className="mt-1 break-all font-mono text-xs text-slate-500">{menu.id}</p>
+          <p className="mt-1 text-xs text-slate-600">{menu.width} × {menu.height} · {menu.areaCount} พื้นที่ · เริ่มต้น{menu.selected ? 'แสดง' : 'ซ่อน'}</p>
+        </li>)}</ul>}
+        <p className="text-xs leading-relaxed text-slate-500">ผลนี้ไม่รวมเมนูที่สร้างผ่าน LINE OA Manager และไม่ตรวจการผูกเมนูเฉพาะผู้ใช้ เป็นการอ่านสถานะเท่านั้น</p>
+      </section>}
 
       <div className="grid items-start gap-6 lg:grid-cols-[1.2fr_1fr]">
         <section className="admin-panel">
