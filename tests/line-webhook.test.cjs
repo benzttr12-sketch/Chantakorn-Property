@@ -730,3 +730,123 @@ test('Firestore property search constrains results to published documents', asyn
   assert.deepEqual(filter, ['published', '==', true]);
   assert.equal(results[0].published, true);
 });
+
+test('brokerage and sale-with-redemption requests get separate illustrated cards and destinations', async () => {
+  for (const [phrase, image, destination, title] of [
+    ['ฝากขายบ้าน', 'sell-service.png', '/sell', 'ฝากขายทรัพย์กับเรา'],
+    ['ขายฝาก', 'sale-with-redemption.png', '/contact', 'ปรึกษาขายฝาก / จำนอง'],
+    ['ปรึกษาจำนอง', 'sale-with-redemption.png', '/contact', 'ปรึกษาขายฝาก / จำนอง'],
+    ['ขายฝาก/จำนอง', 'sale-with-redemption.png', '/contact', 'ปรึกษาขายฝาก / จำนอง'],
+  ]) {
+    let reads = 0;
+    const { sent } = await customerReply(phrase, searchableProperties, { firestore: {
+      listFirestoreDocuments: async () => { reads++; return searchableProperties; },
+      createFirestoreDocument: async () => ({ ok: true }),
+    } });
+    const card = sent[0].messages[0];
+    assert.equal(card.type, 'flex', phrase);
+    assert.equal(card.contents.hero.url, `https://site.example.com/images/line/${image}`, phrase);
+    assert.equal(card.contents.body.contents[0].text, title, phrase);
+    assert.equal(card.contents.body.contents.at(-1).action.uri, `https://site.example.com${destination}`, phrase);
+    assert.equal(reads, 0, phrase);
+    assert.equal(fs.existsSync(path.join(__dirname, '../public/images/line', image)), true);
+  }
+});
+
+test('explicit searches for consignment listings and all listings remain catalog searches', async () => {
+  const properties = [...searchableProperties,
+    { id: 'redemption', title: 'ทรัพย์ขายฝาก', published: true, property_type: 'consignment', status: 'sale' }];
+  const specific = await customerReply('ดูทรัพย์ขายฝาก', properties);
+  assert.equal(specific.sent[0].messages[0].contents.contents.length, 1);
+  assert.equal(specific.sent[0].messages[0].contents.contents[0].body.contents[1].text, 'ทรัพย์ขายฝาก');
+  const all = await customerReply('all', properties);
+  assert.equal(all.sent[0].messages[0].contents.contents.length, properties.length);
+});
+
+test('property cards show only recorded locations and facts with their actual units', async () => {
+  const { sent } = await customerReply('all', [
+    { id: 'land', title: 'ที่ดิน', published: true, property_type: 'land', status: 'sale', price: 2000000,
+      subdistrict: 'บ้านพรุ', district: 'หาดใหญ่', province: 'สงขลา', land_size: 125, cover_image: 'https://images.example.com/land.jpg' },
+    { id: 'condo', title: 'คอนโด', published: true, property_type: 'condo', status: 'rent', price: 9000,
+      district: 'เมือง', province: 'ภูเก็ต', bedrooms: 1, bathrooms: 1, usable_area: 35 },
+    { id: 'commercial', title: 'อาคาร', published: true, property_type: 'commercial', status: 'sale' },
+  ]);
+  const cards = sent[0].messages[0].contents.contents;
+  const land = JSON.stringify(cards[0]);
+  assert.match(land, /ต\.บ้านพรุ อ\.หาดใหญ่ จ\.สงขลา/);
+  assert.match(land, /เนื้อที่ 125 ตร\.ว\./);
+  assert.equal(cards[0].hero.url, 'https://images.example.com/land.jpg');
+  assert.equal(cards[0].footer.contents[0].action.uri, 'https://site.example.com/properties/CK-LAND');
+  const condo = JSON.stringify(cards[1]);
+  assert.match(condo, /อ\.เมือง จ\.ภูเก็ต/);
+  assert.match(condo, /พื้นที่ใช้สอย 35 ตร\.ม\./);
+  assert.match(condo, /1 ห้องนอน/);
+  const commercial = JSON.stringify(cards[2]);
+  assert.match(commercial, /อาคารพาณิชย์/);
+  assert.match(commercial, /สอบถามราคา/);
+  assert.doesNotMatch(commercial, /ควนลัง|หาดใหญ่|สงขลา|ตร\.ม\.|ตร\.ว\.|0 ห้อง/);
+});
+
+test('service menu keyword presents both illustrated choices before the website', async () => {
+  let reads = 0;
+  const { sent } = await customerReply('บริการฝากขาย', searchableProperties, { firestore: {
+    listFirestoreDocuments: async () => { reads++; return searchableProperties; },
+    createFirestoreDocument: async () => ({ ok: true }),
+  } });
+  const message = sent[0].messages[0];
+  assert.equal(message.type, 'flex');
+  assert.equal(message.contents.type, 'carousel');
+  assert.equal(message.contents.contents.length, 2);
+  const [selling, redemption] = message.contents.contents;
+  assert.equal(selling.hero.url, 'https://site.example.com/images/line/sell-service.png');
+  assert.equal(selling.body.contents[0].text, 'ฝากขายทรัพย์กับเรา');
+  assert.equal(selling.body.contents.at(-1).action.uri, 'https://site.example.com/sell');
+  assert.equal(redemption.hero.url, 'https://site.example.com/images/line/sale-with-redemption.png');
+  assert.equal(redemption.body.contents[0].text, 'ปรึกษาขายฝาก / จำนอง');
+  assert.equal(redemption.body.contents.at(-1).action.uri, 'https://site.example.com/contact');
+  assert.equal(reads, 0);
+});
+
+test('explicit property searches take precedence over both service intents', async () => {
+  const properties = [
+    { id: 'consignment', title: 'บ้านที่ดินคอนโดขายฝาก', published: true, property_type: 'consignment', status: 'sale' },
+    { id: 'sale-house', title: 'บ้านขาย', published: true, property_type: 'house', status: 'sale' },
+  ];
+  for (const phrase of ['ดูบ้านขายฝาก', 'หาที่ดินขายฝาก', 'ค้นหาคอนโดขายฝาก', 'ดูทรัพย์ฝากขาย', 'find consignment', 'show consignment']) {
+    let reads = 0;
+    const { sent } = await customerReply(phrase, properties, { firestore: {
+      listFirestoreDocuments: async () => { reads++; return properties; },
+      createFirestoreDocument: async () => ({ ok: true }),
+    } });
+    assert.equal(reads, 1, phrase);
+    const message = sent[0].messages[0];
+    assert.ok(message.type === 'text' || message.contents.type === 'carousel', phrase);
+    assert.ok(!JSON.stringify(message).includes('/images/line/'), phrase);
+  }
+  for (const [phrase, suffix] of [['ต้องการฝากขายบ้าน', '/sell'], ['ปรึกษาขายฝาก', '/contact']]) {
+    let reads = 0;
+    const { sent } = await customerReply(phrase, properties, { firestore: {
+      listFirestoreDocuments: async () => { reads++; return properties; },
+      createFirestoreDocument: async () => ({ ok: true }),
+    } });
+    assert.equal(reads, 0, phrase);
+    assert.equal(sent[0].messages[0].contents.body.contents.at(-1).action.uri, `https://site.example.com${suffix}`, phrase);
+  }
+});
+
+test('a consignment search with a property type requires both category and textual evidence', async () => {
+  const properties = [
+    { id: 'ordinary-house', title: 'บ้านทั่วไป', published: true, property_type: 'house', status: 'sale' },
+    { id: 'consignment-house', title: 'บ้านสำหรับขายฝาก', published: true, property_type: 'consignment', status: 'sale' },
+    { id: 'consignment-land', title: 'ที่ดินสำหรับขายฝาก', published: true, property_type: 'consignment', status: 'sale' },
+    { id: 'unclear', title: 'ทรัพย์ขายฝาก', published: true, property_type: 'consignment', status: 'sale' },
+    { id: 'place-name', title: 'ที่ดินบ้านพรุ', subdistrict: 'บ้านพรุ', published: true, property_type: 'consignment', status: 'sale' },
+  ];
+  const { sent } = await customerReply('ดูบ้านขายฝาก', properties);
+  const cards = sent[0].messages[0].contents.contents;
+  assert.equal(cards.length, 1);
+  assert.equal(cards[0].body.contents[1].text, 'บ้านสำหรับขายฝาก');
+  const search = await customerReply('ดูที่ดินขายฝาก', properties);
+  const landTitles = search.sent[0].messages[0].contents.contents.map(card => card.body.contents[1].text);
+  assert.deepEqual(landTitles, ['ที่ดินสำหรับขายฝาก', 'ที่ดินบ้านพรุ']);
+});
