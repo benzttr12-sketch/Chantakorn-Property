@@ -199,7 +199,17 @@ function matchesPropertySearch(property: Property, keyword: string, knownLocatio
   const wantsRent = /เช่า|\brent\b/.test(query);
   const wantsSale = /ขาย|ซื้อ|\bsale\b|\bbuy\b/.test(query);
   query = query.replace(/เช่า|ขาย|ซื้อ|\brent\b|\bsale\b|\bbuy\b/g, ' ');
-  if (requestedTypes.length && !requestedTypes.includes(property.property_type)) return false;
+  if (requestedTypes.includes('consignment') && requestedTypes.some(type => type !== 'consignment')) {
+    // The category is exclusive in the catalog. A second type must be supported by
+    // the listing text; do not return an ordinary house merely because it is a house.
+    if (property.property_type !== 'consignment') return false;
+    let typeEvidence = [property.title, property.description].filter(value => typeof value === 'string').join(' ').toLowerCase();
+    // Place names such as บ้านพรุ are not evidence that a property is a house.
+    for (const location of knownLocations) typeEvidence = typeEvidence.split(location).join(' ');
+    const hasTypeEvidence = PROPERTY_TYPES.some(({ type, pattern }) => type !== 'consignment' && requestedTypes.includes(type)
+      && new RegExp(pattern.source, pattern.flags.replace('g', '')).test(typeEvidence));
+    if (!hasTypeEvidence) return false;
+  } else if (requestedTypes.length && !requestedTypes.includes(property.property_type)) return false;
   if (wantsRent && !wantsSale && property.status !== 'rent') return false;
   if (wantsSale && !wantsRent && property.status !== 'sale') return false;
 
@@ -215,7 +225,17 @@ function matchesPropertySearch(property: Property, keyword: string, knownLocatio
 }
 
 function isConsignmentRequest(text: string): boolean {
-  return /ฝากขาย|ฝากเช่า|ประเมิน|จำนอง|(?:ต้องการ|อยาก|จะ|ช่วย|รับ)\s*ขาย|(?:ผม|ฉัน|ดิฉัน|เรา)\s*(?:มี.*)?(?:ขายบ้าน|ขายที่ดิน)|ปล่อยเช่า|\bconsignment\b/.test(text);
+  return /ฝากขาย|ฝากเช่า|ประเมิน|(?:ต้องการ|อยาก|จะ|ช่วย|รับ)\s*ขาย|(?:ผม|ฉัน|ดิฉัน|เรา)\s*(?:มี.*)?(?:ขายบ้าน|ขายที่ดิน)|ปล่อยเช่า/.test(text);
+}
+
+// Explicit requests to find listings take precedence over the service keywords.
+function isExplicitPropertySearch(text: string): boolean {
+  return /(?:ขอดู|ช่วยหา|ค้นหา|ดู|หา)\s*(?:รายการ)?(?:ทรัพย์|อสังหา|บ้าน|ที่ดิน|คอนโด|อาคารพาณิชย์|ตึกแถว|ทาวน์โฮม|ทาวน์เฮ้าส์|ขายฝาก)/.test(text)
+    || /\b(?:find|show|search)\s+(?:(?:me|for)\s+)?(?:properties|property|houses?|land|condos?|consignment)\b/.test(text);
+}
+
+function isRedemptionConsultation(text: string): boolean {
+  return /ขายฝาก|จำนอง|\bconsignment\b/.test(text);
 }
 
 // Search only published production listings; failed storage is different from zero matches.
@@ -246,8 +266,18 @@ function buildPropertyCarouselFlex(properties: Property[], hostOrigin: string, q
   const bubbles = properties.slice(0, 10).map((p) => {
     const priceFormatted = p.price
       ? new Intl.NumberFormat('th-TH', { style: 'currency', currency: 'THB', maximumFractionDigits: 0 }).format(p.price)
-      : 'ราคาพิเศษ';
-    const actionText = p.status === 'rent' ? 'ปล่อยเช่า' : 'เสนอขาย';
+      : 'สอบถามราคา';
+    const actionText = p.status === 'rent' ? 'ปล่อยเช่า' : p.status === 'sale' ? 'เสนอขาย' : 'อสังหาริมทรัพย์';
+    const typeNames: Record<string, string> = { house: 'บ้าน', land: 'ที่ดิน', condo: 'คอนโด', commercial: 'อาคารพาณิชย์', investment: 'ทรัพย์ลงทุน', consignment: 'ทรัพย์ขายฝาก' };
+    const location = ([ [p.subdistrict, 'ต.'], [p.district, 'อ.'], [p.province, 'จ.'] ] as Array<[string | undefined, string]>)
+      .flatMap(([value, prefix]) => typeof value === 'string' && value.trim() ? [`${prefix}${value.trim()}`] : []).join(' ');
+    const positive = (value: number) => typeof value === 'number' && Number.isFinite(value) && value > 0;
+    const facts = [
+      ...(positive(p.bedrooms) ? [`🛏️ ${p.bedrooms} ห้องนอน`] : []),
+      ...(positive(p.bathrooms) ? [`🚿 ${p.bathrooms} ห้องน้ำ`] : []),
+      ...(positive(p.usable_area) ? [`📐 พื้นที่ใช้สอย ${p.usable_area} ตร.ม.`]
+        : positive(p.land_size) ? [`📐 เนื้อที่ ${p.land_size} ตร.ว.`] : []),
+    ];
     const propertyKey = (p.id ? formatPropertyCode(p.id) : '') || p.slug;
     const detailUrl = propertyKey ? `${hostOrigin}/properties/${encodeURIComponent(propertyKey)}` : `${hostOrigin}/properties/`;
     const coverImg = getLinePropertyImageUrl(p, imageOrigin);
@@ -278,7 +308,7 @@ function buildPropertyCarouselFlex(properties: Property[], hostOrigin: string, q
             contents: [
               {
                 type: 'text',
-                text: `${actionText}อสังหาฯ`,
+                text: actionText,
                 weight: 'bold',
                 color: '#B45309',
                 size: 'xxs',
@@ -286,7 +316,7 @@ function buildPropertyCarouselFlex(properties: Property[], hostOrigin: string, q
               },
               {
                 type: 'text',
-                text: p.property_type === 'land' ? 'ที่ดิน' : p.property_type === 'condo' ? 'คอนโด' : 'บ้านเดี่ยว/ทาวน์เฮ้าส์',
+                text: typeNames[p.property_type] || 'อสังหาริมทรัพย์',
                 color: '#6B7280',
                 size: 'xxs',
                 align: 'end',
@@ -296,20 +326,16 @@ function buildPropertyCarouselFlex(properties: Property[], hostOrigin: string, q
           },
           {
             type: 'text',
-            text: p.title || 'อสังหาริมทรัพย์หาดใหญ่-สงขลา',
+            text: p.title || 'อสังหาริมทรัพย์',
             weight: 'bold',
             size: 'sm',
             wrap: true,
             maxLines: 2,
             color: '#0F172A',
           },
-          {
-            type: 'text',
-            text: `📍 ต.${p.subdistrict || 'ควนลัง'} อ.${p.district || 'หาดใหญ่'} จ.สงขลา`,
-            size: 'xxs',
-            color: '#64748B',
-            wrap: true,
-          },
+          ...(location ? [{
+            type: 'text', text: `📍 ${location}`, size: 'xxs', color: '#64748B', wrap: true,
+          }] : []),
           {
             type: 'box',
             layout: 'baseline',
@@ -317,39 +343,17 @@ function buildPropertyCarouselFlex(properties: Property[], hostOrigin: string, q
             contents: [
               {
                 type: 'text',
-                text: `${priceFormatted}${p.status === 'rent' ? '/เดือน' : ''}`,
+                text: `${priceFormatted}${p.status === 'rent' && p.price ? '/เดือน' : ''}`,
                 weight: 'bold',
                 size: 'md',
                 color: '#059669',
               },
             ],
           },
-          {
-            type: 'box',
-            layout: 'horizontal',
-            spacing: 'sm',
-            contents: [
-              {
-                type: 'text',
-                text: `🛏️ ${p.bedrooms || 0} นอน`,
-                size: 'xxs',
-                color: '#475569',
-              },
-              {
-                type: 'text',
-                text: `🚿 ${p.bathrooms || 0} น้ำ`,
-                size: 'xxs',
-                color: '#475569',
-              },
-              {
-                type: 'text',
-                text: `📐 ${p.usable_area || p.land_size || '-'} ตร.ม.`,
-                size: 'xxs',
-                color: '#475569',
-                align: 'end',
-              },
-            ],
-          },
+          ...(facts.length ? [{
+            type: 'box', layout: 'vertical', spacing: 'xs',
+            contents: facts.map(text => ({ type: 'text', text, size: 'xxs', color: '#475569', wrap: true })),
+          }] : []),
         ],
       },
       footer: {
@@ -504,77 +508,52 @@ function buildWelcomeFlex(hostOrigin: string): any {
   };
 }
 
-// Build Consignment Service Flex Message
+// Listing brokerage and sale with redemption are different services.
 function buildConsignmentFlex(hostOrigin: string): any {
   return {
     type: 'flex',
-    altText: 'บริการรับฝากขายอสังหาริมทรัพย์ หาดใหญ่-สงขลา - Chantakorn Property',
+    altText: 'ฝากขายอสังหาริมทรัพย์กับ Chantakorn Property',
     contents: {
       type: 'bubble',
+      hero: { type: 'image', url: `${hostOrigin}/images/line/sell-service.png`, size: 'full', aspectRatio: '1:1', aspectMode: 'fit' },
       body: {
-        type: 'box',
-        layout: 'vertical',
-        spacing: 'md',
+        type: 'box', layout: 'vertical', spacing: 'md',
         contents: [
-          {
-            type: 'text',
-            text: '🏡 บริการรับฝากขาย - ปล่อยเช่า ฟรีค่าการตลาด!',
-            weight: 'bold',
-            size: 'md',
-            color: '#0F172A',
-            wrap: true,
-          },
-          {
-            type: 'text',
-            text: 'ต้องการฝากขายบ้าน ที่ดิน คอนโด ในโซนหาดใหญ่ สงขลา หรือภาคใต้? ทีมงาน Chantakorn พร้อมดูแลทำการตลาดออนไลน์ วิเคราะห์ราคาตลาด และพาชมทรัพย์จนกว่าจะปิดการขาย',
-            size: 'xs',
-            color: '#475569',
-            wrap: true,
-          },
-          {
-            type: 'box',
-            layout: 'vertical',
-            spacing: 'xs',
-            backgroundColor: '#F8FAFC',
-            paddingAll: '10px',
-            cornerRadius: '8px',
-            contents: [
-              {
-                type: 'text',
-                text: '✓ ถ่ายภาพ/วิดีโอทรัพย์มุมมองสวยงามฟรี',
-                size: 'xxs',
-                color: '#059669',
-                weight: 'bold',
-              },
-              {
-                type: 'text',
-                text: '✓ วิเคราะห์ราคาประเมินและทิศทางฮวงจุ้ย',
-                size: 'xxs',
-                color: '#059669',
-                weight: 'bold',
-              },
-              {
-                type: 'text',
-                text: '✓ ยิงโฆษณาโซเชียลมีเดียและโปรโมทบนเว็บไซต์ชั้นนำ',
-                size: 'xxs',
-                color: '#059669',
-                weight: 'bold',
-              },
-            ],
-          },
-          {
-            type: 'button',
-            style: 'primary',
-            color: '#06C755',
-            action: {
-              type: 'uri',
-              label: 'กรอกแบบฟอร์มฝากขายทันที ➔',
-              uri: `${hostOrigin}/sell`,
-            },
-          },
+          { type: 'text', text: 'ฝากขายทรัพย์กับเรา', weight: 'bold', size: 'lg', color: '#0F172A', wrap: true },
+          { type: 'text', text: 'ส่งข้อมูลบ้าน ที่ดิน หรือคอนโดให้ทีมงานพิจารณา เพื่อช่วยวางแผนราคา จัดทำประกาศ และประสานงานกับผู้สนใจ', size: 'sm', color: '#475569', wrap: true },
+          { type: 'text', text: 'เตรียมรายละเอียดทรัพย์ ทำเล และราคาที่ต้องการ แล้วเริ่มกรอกข้อมูลบนเว็บไซต์', size: 'xs', color: '#64748B', wrap: true },
+          { type: 'button', style: 'primary', color: '#0F172A', action: { type: 'uri', label: 'กรอกข้อมูลฝากขาย', uri: `${hostOrigin}/sell` } },
         ],
       },
     },
+  };
+}
+
+function buildRedemptionFlex(hostOrigin: string): any {
+  return {
+    type: 'flex',
+    altText: 'ปรึกษาขายฝากและจำนองอสังหาริมทรัพย์',
+    contents: {
+      type: 'bubble',
+      hero: { type: 'image', url: `${hostOrigin}/images/line/sale-with-redemption.png`, size: 'full', aspectRatio: '4:5', aspectMode: 'fit' },
+      body: {
+        type: 'box', layout: 'vertical', spacing: 'md',
+        contents: [
+          { type: 'text', text: 'ปรึกษาขายฝาก / จำนอง', weight: 'bold', size: 'lg', color: '#0F172A', wrap: true },
+          { type: 'text', text: 'ขายฝากเป็นการขายโดยมีสิทธิไถ่คืนตามข้อตกลง ส่วนจำนองเป็นการนำทรัพย์มาเป็นหลักประกันโดยกรรมสิทธิ์ยังเป็นของเจ้าของ', size: 'sm', color: '#475569', wrap: true },
+          { type: 'text', text: 'สอบถามรายละเอียด เงื่อนไข ระยะเวลา และค่าใช้จ่ายกับทีมงานก่อนตัดสินใจ', size: 'xs', color: '#64748B', wrap: true },
+          { type: 'button', style: 'primary', color: '#0F172A', action: { type: 'uri', label: 'ปรึกษาทีมงาน', uri: `${hostOrigin}/contact` } },
+        ],
+      },
+    },
+  };
+}
+
+function buildServiceChoicesFlex(hostOrigin: string): any {
+  return {
+    type: 'flex',
+    altText: 'เลือกบริการฝากขาย หรือปรึกษาขายฝากและจำนอง',
+    contents: { type: 'carousel', contents: [buildConsignmentFlex(hostOrigin).contents, buildRedemptionFlex(hostOrigin).contents] },
   };
 }
 
@@ -827,7 +806,24 @@ export async function POST(req: Request) {
           await reply(replyToken, [welcomeMsg]);
         }
 
-        // Intent 2: Consignment / Selling / Valuation
+        // The service menu presents both choices before a customer opens either website.
+        else if (lowerText === 'บริการฝากขาย') {
+          await reply(replyToken, [buildServiceChoicesFlex(hostOrigin)]);
+        }
+
+        // Search wording such as ดูบ้านขายฝาก is a catalog request, not a service request.
+        else if (!isWebsiteFormSubmission && (isExplicitPropertySearch(lowerText) ||
+          (/\bckp?-[a-z0-9]+\b/i.test(lowerText) && !isConsignmentRequest(lowerText)))) {
+          // In a listing search, ฝากขาย is sale wording rather than a brokerage request.
+          await replyWithProperties(replyToken, userText.replace(/ฝากขาย/g, 'ขาย'));
+        }
+
+        // Redemption and mortgages are distinct from brokerage for a sale.
+        else if (!isWebsiteFormSubmission && isRedemptionConsultation(lowerText)) {
+          await reply(replyToken, [buildRedemptionFlex(hostOrigin)]);
+        }
+
+        // Intent 2: Listing / Selling / Valuation
         else if (isWebsiteFormSubmission || isConsignmentRequest(lowerText)) {
           const consignmentMsg = buildConsignmentFlex(hostOrigin);
           await reply(replyToken, [consignmentMsg]);
