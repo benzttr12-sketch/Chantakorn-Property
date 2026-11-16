@@ -1,6 +1,6 @@
-# Prepared menu transition — disabled
+# Guarded menu transition
 
-This is local preparation only. `TRANSITION_ENABLED` is deliberately false for both the route and the administrator control. Do not enable it until the actual production webhook has been deployed and verified to answer the fixed message `บริการฝากขาย` with the intended two service information cards and working website links. Enabling requires a separate reviewed code change; deployment of this preparation alone cannot enable the operation.
+The production webhook has been deployed; both images and website destinations returned HTTP 200, and the account owner confirmed that sending `บริการฝากขาย` in LINE displays both cards with their website buttons. `TRANSITION_ENABLED` enables the fixed, administrator-controlled operation below. After it runs, verify the changed rich-menu action on a real mobile client.
 
 The operation applies only to OA `@930xzcyi`, only when the API menu list contains exactly one menu, the current API default, whose complete stored specification and downloaded image match the bundled original recovery menu. It creates a second menu with the same JPEG and the same five other actions; B changes from the fixed `/sell` URI to the fixed message `บริการฝากขาย`. It verifies the new complete specification and image, rechecks the list and original menu, and reads the original default immediately before setting the new default. It verifies the resulting default, image, and specification. It does not delete either menu or unlink any user. Individual user menus remain higher priority than the global default. API verification does not prove that a phone displays the menu or receives the webhook response.
 
