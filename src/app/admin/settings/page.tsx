@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { ArrowUpRight, Check, ChevronDown, Copy, Database, Loader2, MessageCircle, RefreshCw, Send, ShieldCheck } from 'lucide-react';
 import { fetchStaffApi } from '@/lib/staff-api';
 import LineRichMenuRestore from '@/components/admin/LineRichMenuRestore';
+import LineRichMenuTransition from '@/components/admin/LineRichMenuTransition';
 import { apiUrl } from '@/lib/api-url';
 import { dataBackend } from '@/lib/backend';
 import { LinePreferences, saveLinePreferences } from '@/lib/line-admin-settings';
@@ -201,6 +202,7 @@ export default function AdminSettingsPage() {
       </section>}
 
       <LineRichMenuRestore checkedEmpty={connection?.richMenu?.status === 'checked' && connection.richMenu.defaultStatus === 'none' && connection.richMenu.totalMenus === 0} onAttemptStarted={invalidateConnection} onAttemptFinished={invalidateConnection} />
+      <LineRichMenuTransition checkedDefault={connection?.richMenu?.status === 'checked' && connection.richMenu.defaultStatus === 'set' && !!connection.richMenu.defaultId} onAttemptStarted={invalidateConnection} onAttemptFinished={invalidateConnection} />
 
       <div className="grid items-start gap-6 lg:grid-cols-[1.2fr_1fr]">
         <section className="admin-panel">
