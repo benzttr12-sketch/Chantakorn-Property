@@ -521,6 +521,8 @@ function buildConsignmentFlex(hostOrigin: string): any {
         contents: [
           { type: 'text', text: 'ฝากขายทรัพย์กับเรา', weight: 'bold', size: 'lg', color: '#0F172A', wrap: true },
           { type: 'text', text: 'ส่งข้อมูลบ้าน ที่ดิน หรือคอนโดให้ทีมงานพิจารณา เพื่อช่วยวางแผนราคา จัดทำประกาศ และประสานงานกับผู้สนใจ', size: 'sm', color: '#475569', wrap: true },
+          { type: 'text', text: 'ข้อดีของการฝากขายกับเรา', weight: 'bold', size: 'sm', color: '#0F172A', wrap: true },
+          { type: 'text', text: '• ช่วยวางแผนราคาจากข้อมูลทรัพย์และทำเล\n• จัดทำภาพและรายละเอียดสำหรับประกาศ\n• ประสานผู้สนใจและช่วยนัดชมทรัพย์\n• ช่วยประสานการเตรียมเอกสารที่เกี่ยวข้อง', size: 'xs', color: '#475569', wrap: true },
           { type: 'text', text: 'เตรียมรายละเอียดทรัพย์ ทำเล และราคาที่ต้องการ แล้วเริ่มกรอกข้อมูลบนเว็บไซต์', size: 'xs', color: '#64748B', wrap: true },
           { type: 'button', style: 'primary', color: '#0F172A', action: { type: 'uri', label: 'กรอกข้อมูลฝากขาย', uri: `${hostOrigin}/sell` } },
         ],

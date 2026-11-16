@@ -800,6 +800,8 @@ test('service menu keyword presents both illustrated choices before the website'
   const [selling, redemption] = message.contents.contents;
   assert.equal(selling.hero.url, 'https://site.example.com/images/line/sell-service.png');
   assert.equal(selling.body.contents[0].text, 'ฝากขายทรัพย์กับเรา');
+  assert.match(selling.body.contents.map(item => item.text || '').join(' '), /ข้อดีของการฝากขายกับเรา/);
+  assert.match(selling.body.contents.map(item => item.text || '').join(' '), /วางแผนราคา[\s\S]*ประกาศ[\s\S]*ผู้สนใจ[\s\S]*เอกสาร/);
   assert.equal(selling.body.contents.at(-1).action.uri, 'https://site.example.com/sell');
   assert.equal(redemption.hero.url, 'https://site.example.com/images/line/sale-with-redemption.png');
   assert.equal(redemption.body.contents[0].text, 'ปรึกษาขายฝาก / จำนอง');
