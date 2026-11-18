@@ -1,73 +1,48 @@
-# แผนการ Cutover ข้อมูลทรัพย์ขึ้น Cloudflare D1/R2 (ฉบับดำเนินการ)
+# สถานะและขั้นตอนตรวจการย้ายแคตตาล็อกไป Cloudflare D1/R2
 
-> **ความคืบหน้า 2026-10-25:** ขั้น 1–3 เสร็จสมบูรณ์แล้ว production ทั้งชุดใช้งานจริงที่
-> `https://chantakorn-property-api.chantakorn-property.workers.dev` (D1 `chantakorn-property-prod`,
-> R2 `chantakorn-property-media-prod` / `chantakorn-inquiry-private-prod`) — เว็บ GitHub Pages
-> สลับไปใช้ production Worker นี้แล้ว เหลือเพียงขั้น 4 ที่ต้องตั้งค่า 2 environment variables
-> บน Vercel (ทำผ่าน dashboard เท่านั้น) และช่วงสังเกตในขั้น 5
+## ขอบเขตที่โค้ดรองรับ
 
-เอกสารนี้สรุปสถานะปัจจุบันของการย้ายระบบ และขั้นตอนที่เหลือเพื่อใช้ Cloudflare D1/R2
-เป็นฐานข้อมูลแคตตาล็อกทรัพย์หลักของ production โดย Firebase ยังคงดูแลระบบสมาชิก
-(Auth), ลูกค้าสอบถาม (inquiries) และ LINE ตามสถาปัตยกรรมเดิม
+`next.config.mjs` และตัวอ่านแคตตาล็อกกำหนดค่าเริ่มต้นเป็น:
 
-## สถานะปัจจุบัน (2026-10-25)
+```text
+NEXT_PUBLIC_PROPERTY_STORAGE_BACKEND=cloudflare
+NEXT_PUBLIC_CLOUDFLARE_API_ORIGIN=https://chantakorn-property-api.chantakorn-property.workers.dev
+```
 
-| ส่วน | สถานะ |
-|---|---|
-| โค้ด Worker D1/R2 (PR #35–#67) | ✅ รวม main ครบ, CI เขียว |
-| Staging Worker + D1 + R2 (dev) | ✅ รันจริง, flags เปิดเขียน/เผยแพร่/อัปโหลด/สวีป |
-| ข้อมูลทรัพย์ 3 รายการ + รูป 15 ใบ | ✅ import เข้า D1/R2 แล้ว (พร้อม audit events) |
-| นายหน้า (agents) ใน D1 | ✅ ลงทะเบียนจาก profiles แล้ว |
-| เว็บ GitHub Pages | ✅ ใช้ D1 catalog + Firebase auth (ผ่านการทดสอบเต็มวงจร) |
-| Vercel production (chantakornproperty.com) | ⏳ ยังอ่านทรัพย์จาก Firestore (โค้ดพร้อมเปลี่ยนด้วย env เดียว) |
-| การทดสอบเต็มวงจรผ่าน UI จริง | ✅ login → สร้าง → อัปโหลดรูป (upload session + R2) → publish → โผล่หน้าเว็บสาธารณะ |
+ค่า environment ของ Vercel สามารถแทนค่าเหล่านี้ได้ ส่วน GitHub Pages ใช้ `DEPLOY_PROPERTY_BACKEND` และ `DEPLOY_CLOUDFLARE_API_ORIGIN` ตอน build ค่าเริ่มต้นใน repository จึงไม่ใช่หลักฐานว่า deployment ปัจจุบันใช้ฐานข้อมูลใด
 
-## หลักการสำคัญ
+| ข้อมูล/เส้นทาง | ระบบที่โค้ดใช้ |
+| --- | --- |
+| แคตตาล็อกทรัพย์, หน้าแอดมินทรัพย์, รูปทรัพย์ | Cloudflare D1/R2 เมื่อเลือก `cloudflare` |
+| sitemap และข้อมูลทรัพย์ใน LINE cards/replies | แคตตาล็อกเดียวกับหน้าเว็บ |
+| บัญชีและการเข้าสู่ระบบ | Firebase Authentication |
+| สมาชิก, นายหน้าแนะนำบนหน้าเว็บ, ลูกค้าสอบถามและรูปส่วนตัว, งานติดตาม, รีวิว, settings และสถานะ LINE | Firestore และ API เดิมบน Vercel |
+| สิทธิ์พนักงานสำหรับ Worker | D1 `profiles` พร้อมตรวจบัญชี Firebase ที่ยังใช้งานได้ |
+| นายหน้าที่เลือกผูกกับทรัพย์และข้อมูลติดต่อในประกาศ | D1 `agents` ผ่าน `/v1/admin/agents` และตัวอ่านทรัพย์; ข้อมูลติดต่อสาธารณะส่งเฉพาะ `is_public=1` แยกจากนายหน้าแนะนำบนหน้าเว็บ |
 
-1. **Firebase Auth / inquiries / LINE ไม่ย้าย** — โครงสร้างนี้ถูกออกแบบให้สมาชิกและข้อมูลลูกค้า
-   อยู่กับ Firebase ต่อไป มีเพียง "แคตตาล็อกทรัพย์" ที่ย้ายไป D1/R2
-2. **ทุกการเปลี่ยน env ย้อนกลับได้ทันที** — การ rollback = ตั้งค่า env กลับเป็น firebase
-   และข้อมูล Firestore ยังอยู่ครบ (ห้ามลบ/ห้ามหยุดเขียน Firestore จนกว่า cutover จะเสถียร)
-3. **เผยแพร่ทีละขั้น** — ทดสอบกับเว็บ static ก่อน (ทำแล้ว) แล้วค่อยสลับ production หลัก
+การมีตารางลูกค้า/LINE/work jobs ใน D1 ยังไม่หมายความว่าเส้นทางใช้งานเหล่านั้นย้ายแล้ว ขอบเขตการย้ายนี้มีเฉพาะแคตตาล็อกทรัพย์ ส่วนข้อมูลธุรกิจอื่นคงใช้ Firebase
 
-## ขั้นตอนที่เหลือ
+## หลักฐานย้อนหลัง
 
-### ขั้น 1 — เตรียมข้อมูลให้ตรงกัน (สำคัญที่สุด) ✅ 2026-10-25
-- [x] Firestore (3 รายการ) กับ D1 (3 รายการ) ตรงกัน พร้อมรูปและ audit events
-- [x] ช่วงหยุดแก้ไข: ทำการย้ายในคราวเดียวจบ ไม่มีการแก้ไขข้อมูลค้างระหว่างทาง
+บันทึกเดิมวันที่ 2026-10-25 ระบุว่าได้สร้าง Worker production, D1 `chantakorn-property-prod`, R2 `chantakorn-property-media-prod` / `chantakorn-inquiry-private-prod` และนำเข้าทรัพย์ 3 รายการพร้อมรูป 15 ใบแล้ว ต่อมา commit `6c4e443` เปลี่ยนค่าเริ่มต้นของเว็บเป็น Cloudflare ส่วนการแก้ CORS ล่าสุดเก็บทั้งโดเมนหลักและ `www` ไว้
 
-### ขั้น 2 — สร้างสภาพแวดล้อม production ของ Cloudflare ✅ 2026-10-25
-- [x] D1 `chantakorn-property-prod` + R2 `chantakorn-property-media-prod`
-      / `chantakorn-inquiry-private-prod` (แยกจาก dev เด็ดขาด)
-- [x] Worker production `chantakorn-property-api` ที่
-      `https://chantakorn-property-api.chantakorn-property.workers.dev`
-      + secret `FIREBASE_WEB_API_KEY`
-- [x] `ALLOWED_ORIGIN` = chantakornproperty.com + benzttr12-sketch.github.io + localhost
-- [x] flags: writes/publication/media/sessions/sweep/cache เปิดครบ (ดู `wrangler.prod.jsonc`)
-- [x] migrations 0001–0007 + staff (ADMIN 2 บัญชี) + ทรัพย์ 3 รายการ + รูป 15 ใบ + audit
+จำนวนรายการ ชื่อ resource, flags, การทดสอบ UI และ backup จากบันทึกเก่าไม่ใช่ผลตรวจปัจจุบัน ห้ามนำรายการทรัพย์เดิมเข้าซ้ำหรือสร้าง resource ทดแทนจากบันทึกนี้โดยไม่ตรวจข้อมูลที่มีอยู่ก่อน [แผน fresh-start](cloudflare-d1-r2-fresh-start.md) เป็นเอกสารย้อนหลังและไม่ใช่คำสั่งล้างฐานข้อมูล
 
-### ขั้น 3 — ทดสอบ prod แบบไร้ความเสี่ยง ✅ 2026-10-25
-- [x] /health, /v1/properties (3 รายการ), รูปจาก R2 prod พร้อม cache policy,
-      CORS จาก origin จริง, admin ปฏิเสธผู้ไม่มีสิทธิ์ (401), origin ปลอมไม่ได้ header
-- [x] เว็บ GitHub Pages ชี้มาใช้ production Worker นี้แล้ว (repo variable
-      `DEPLOY_CLOUDFLARE_API_ORIGIN`)
+## ตรวจระบบก่อนเปลี่ยน deployment
 
-### ขั้น 4 — สลับ production (Vercel) ⏳ รอตั้งค่า 2 ตัวแปรบน dashboard
-- [ ] บน Vercel → Project Settings → Environment Variables (Production) ตั้ง:
-      1. `NEXT_PUBLIC_PROPERTY_STORAGE_BACKEND` = `cloudflare`
-      2. `NEXT_PUBLIC_CLOUDFLARE_API_ORIGIN` = `https://chantakorn-property-api.chantakorn-property.workers.dev`
-      แล้ว Deployments → เวอร์ชันล่าสุด → **Redeploy**
-- [ ] ตรวจหน้าเว็บ/หน้าแอดมิน/รูปทุกหน้าหลังสลับ
-- [ ] **Rollback ทันทีได้**: เปลี่ยนตัวแปรแรกกลับเป็น `firebase` + Redeploy
-      (ข้อมูล Firestore ยังครบทุกรายการ)
+ลำดับเผยแพร่ส่วนที่เพิ่มใหม่คือ **ใช้ D1 migrations จนถึง `0008_catalog_agent_generation.sql` → deploy Worker → deploy frontend → ตรวจ smoke และ flow ที่เกี่ยวข้อง** migration 0008 เพิ่มการล้าง cache เมื่อข้อมูลนายหน้าเปลี่ยน ส่วน Worker เปลี่ยน cache namespace เพื่อไม่ใช้ payload เก่าที่ไม่มีข้อมูลติดต่อ ข้อความนี้เป็นขั้นตอนสำหรับเผยแพร่ ไม่ใช่หลักฐานว่า production ทำแล้ว
 
-### ขั้น 5 — ระยะสังเกต (อย่างน้อย 1–2 สัปดาห์)
-- [ ] เฝ้าดู errors/latency ของ Worker (Cloudflare dashboard)
-- [ ] เก็บ backup D1 สม่ำเสมอ (`wrangler d1 export`)
-- [ ] หลังมั่นใจ: ปิดการเขียนทรัพย์ลง Firestore (แจ้งทีมให้ใช้แอดมินบน D1 เท่านั้น)
-      แล้วจึงจัดเก็บ/ลบข้อมูลทรัพย์เดิมใน Firestore ภายหลังตามนโยบาย backup
+1. ตรวจ production deployment และ environment overrides ของ Vercel/Pages แล้วเทียบ API origin ที่เบราว์เซอร์เรียกจริงกับ Worker ที่ตั้งใจใช้ อย่าเปลี่ยน env เพียงเพราะเอกสารเก่าระบุว่ายังไม่ cutover
+2. รัน `npm run verify:cloudflare -- --require-listings` จาก root เพื่อตรวจ public catalog/CORS และสุ่มตรวจ detail กับรูปจาก R2 หนึ่งรายการแบบอ่านอย่างเดียว `--require-listings` ไม่ยอมให้แคตตาล็อกว่างผ่านโดยข้าม detail/media ไม่ใช่การตรวจครบทุกรายการ `/health` อย่างเดียวไม่ตรวจการเชื่อม D1/R2 ผล public smoke ไม่ยืนยันสิทธิ์พนักงานหรือการเขียนข้อมูล
+3. ตรวจ Worker bindings, migrations 0001–0008, feature flags และ Cron ในบัญชีที่ถูกต้อง เก็บทั้ง `https://chantakornproperty.com` และ `https://www.chantakornproperty.com` ใน `ALLOWED_ORIGIN` พร้อม origin อื่นที่อนุมัติไว้
+   หาก frontend ใช้ `/v1/admin/agents` ต้อง deploy และตรวจ endpoint ของ Worker ก่อน deploy frontend ที่เรียกใช้ การมี endpoint ใน repository ยังไม่ยืนยันว่า production มีแล้ว
+4. ทดสอบ login → สร้าง draft → อัปโหลดรูป → แก้ไข → publish → เปิดหน้าสาธารณะใน staging ที่แยกจาก production ตรวจ disabled/revoked account และ stale revision ด้วย ใช้ข้อมูลทดสอบที่ระบุชัดเจน
+5. ตรวจ staff UID และ role ทั้ง D1/Firestore: `/admin/users` แก้ Firestore เท่านั้น ส่วน `staff:import` เพิ่มเฉพาะ D1 profile ที่ยังไม่มีและไม่แก้ role เดิม การเพิ่ม/ลดสิทธิ์ต้องมีขั้นตอนผู้ดูแลสำหรับทั้งสองระบบ
+6. ยืนยัน backup D1/R2 และ Firestore/Auth ที่เข้ารหัส พร้อมทดสอบ restore และบันทึกเวลา/ขอบเขต/ข้อจำกัด ดู [backup operations](admin-backup-operations.md) และ [Firestore runbook](firestore-encrypted-backup-runbook.md) การมีสคริปต์ backup ไม่ยืนยันว่า backup จริงเสร็จแล้ว
+7. เฝ้าดู errors, latency, query cost และ media sweep alerts บน Worker หลังเปลี่ยน deployment พร้อมบันทึก commit และผลตรวจ โดยไม่แนบ secrets หรือข้อมูลลูกค้า
 
-## สิ่งที่ยังค้าง (ไม่บังคับก่อน cutover)
-- สมาชิก/โปรไฟล์บนเว็บ static กับ Vercel ใช้ Firestore ชุดเดียวกันอยู่แล้ว (ไม่ต้องทำอะไร)
-- ระบบนับผู้ชมสถิติ/ประวัติการลงงานเฟส (work_jobs) ยังอยู่บน Firestore — ไม่เกี่ยวกับ cutover
-- PR เก่า 6 รายการปิดหมดแล้ว
+## ย้อนกลับเมื่อมีข้อมูลใหม่หลัง cutover
+
+การเปลี่ยน `NEXT_PUBLIC_PROPERTY_STORAGE_BACKEND=firebase` แล้ว redeploy เปลี่ยนเพียงปลายทางอ่าน/เขียน และไม่คัดลอกทรัพย์หรือรูปที่เพิ่มใน D1/R2 กลับ Firestore
+
+ก่อนย้อนกลับต้องหยุดการเขียนทรัพย์จากทุก deployment ที่เกี่ยวข้อง เก็บ backup ของทั้งสองฝั่ง ตรวจและกระทบยอดรายการที่สร้าง/แก้/ลบหลัง cutover รวมถึงรูปและลิงก์ แล้วเลือกฐานข้อมูลที่เป็นผู้รับเขียนเพียงแห่งเดียว เมื่อยืนยันข้อมูลครบจึงเปลี่ยน env/redeploy และทดสอบหน้าเว็บกับสิทธิ์พนักงานอีกครั้ง ห้ามเปิดเขียนสองฝั่งระหว่างกระทบยอด ห้ามลบ Firebase Auth หรือ Firestore เพราะข้อมูลธุรกิจอื่นยังใช้งานอยู่

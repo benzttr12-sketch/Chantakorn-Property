@@ -251,8 +251,8 @@ export default function QuickPropertyModal({ isOpen, onClose, onSuccess }: Quick
         }
       };
 
-      await createProperty(newProperty);
-      onSuccess(newProperty);
+      const savedProperty = await createProperty(newProperty);
+      onSuccess(savedProperty);
       onClose();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'เกิดข้อผิดพลาดในการลงประกาศ');

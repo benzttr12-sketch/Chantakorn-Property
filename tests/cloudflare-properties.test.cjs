@@ -47,6 +47,48 @@ const sessionResponse = (ownerId, uploads) => json({
   expires_at: new Date(Date.now() + 10 * 60 * 1000).toISOString(), max_uploads: uploads,
 }, 201);
 
+test('catalog agent picker follows native pages and retains canonical IDs and public contact fields', async () => {
+  const { adapter, calls } = load(call => {
+    assert.equal(call.path, '/v1/admin/agents');
+    assert.equal(call.params.get('limit'), '100');
+    const second = call.params.has('cursor');
+    if (second) assert.equal(call.params.get('cursor'), 'registered-one');
+    return json({ data: [{ id: second ? 'registered-two' : 'registered-one', name: 'Registered agent', title: 'ที่ปรึกษา',
+      phone: '0811111111', email: null, line_id: 'agent-line', photo_url: null, is_public: !second, role: 'ADMIN', uid: 'different-firebase-uid' }],
+      next_cursor: second ? null : 'registered-one' });
+  });
+  const agents = await adapter.cloudflareCatalogAgents();
+  assert.deepEqual(Array.from(agents, agent => agent.id), ['registered-one', 'registered-two']);
+  assert.equal(agents[1].line_id, 'agent-line');
+  assert.equal(agents[1].email, '');
+  assert.equal(agents[0].is_public, true);
+  assert.equal(agents[1].is_public, false);
+  assert.equal(Object.hasOwn(agents[1], 'role'), false);
+  assert.equal(Object.hasOwn(agents[1], 'uid'), false);
+  assert.equal(calls.length, 2);
+});
+
+test('catalog agents reject failed, malformed, duplicate and truncated pages without substituting profiles', async () => {
+  const agent = { id: 'registered-one', name: 'Registered agent', title: 'นายหน้า', is_public: true };
+  for (const body of [ {}, { data: [], next_cursor: '' }, { data: [], next_cursor: 'missing-row' },
+    { data: [agent, agent], next_cursor: null }, { data: [{ ...agent, id: '../profile' }], next_cursor: null },
+    { data: [{ ...agent, name: '' }], next_cursor: null }, { data: [{ ...agent, phone: {} }], next_cursor: null },
+    { data: [{ ...agent, is_public: 'true' }], next_cursor: null },
+    { data: Array(101).fill(agent), next_cursor: null }]) {
+    const { adapter } = load(() => json(body));
+    await assert.rejects(adapter.cloudflareCatalogAgents(), /รายชื่อนายหน้า/);
+  }
+  await assert.rejects(load(() => json({ error: 'Worker not yet deployed' }, 404)).adapter.cloudflareCatalogAgents(), /Worker not yet deployed/);
+  const repeated = load(() => json({ data: [agent], next_cursor: agent.id }));
+  await assert.rejects(repeated.adapter.cloudflareCatalogAgents(), /รายชื่อนายหน้า/);
+  assert.equal(repeated.calls.length, 2);
+  let page = 0;
+  const overflow = load(() => { const id = `registered-${++page}`; return json({ data: [{ ...agent, id }], next_cursor: id }); });
+  await assert.rejects(overflow.adapter.cloudflareCatalogAgents(), /เกินขีดจำกัด/);
+  assert.equal(overflow.calls.length, 10);
+  assert.deepEqual(Array.from(await load(() => json({ data: [], next_cursor: null })).adapter.cloudflareCatalogAgents()), []);
+});
+
 test('compatibility catalog rejects malformed pagination rather than returning incomplete results', async () => {
   for (const admin of [false, true]) {
     for (const body of [

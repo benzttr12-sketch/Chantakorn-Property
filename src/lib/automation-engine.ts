@@ -5,7 +5,6 @@ import {
   numberToThaiBahtWords, 
   getPropertyTypeName, 
   formatLineUrl,
-  DEFAULT_OFFICIAL_FACEBOOK,
   DEFAULT_OFFICIAL_PHONE
 } from '@/lib/utils';
 
@@ -30,14 +29,17 @@ export function generateLocalSocialPost(
   channel: MarketingChannel,
   tone: MarketingTone = 'hot_deal'
 ): SocialMediaPostResult {
+  // Admin catalog responses include hidden contacts for staff use. Generated
+  // public marketing must honor that visibility and use the official team instead.
+  const publicAgent = property.agent?.is_public === false ? undefined : property.agent;
   const typeName = getPropertyTypeName(property.property_type);
   const location = `${property.district ? property.district + ', ' : ''}${property.province}`;
   const priceFormatted = formatPrice(property.price);
   const priceUnit = property.status === 'rent' ? '/เดือน' : ' บาท';
   const sizeText = property.land_size ? `${property.land_size} ตร.ว.` : property.usable_area ? `${property.usable_area} ตร.ม.` : '';
-  const agentName = property.agent?.name || 'ทีมงาน ฉันทากร พร็อพเพอร์ตี้';
-  const agentPhone = property.agent?.phone || DEFAULT_OFFICIAL_PHONE;
-  const lineLink = formatLineUrl(property.agent?.line_id || '@930xzcyi');
+  const agentName = publicAgent?.name || 'ทีมงาน ฉันทากร พร็อพเพอร์ตี้';
+  const agentPhone = publicAgent?.phone || DEFAULT_OFFICIAL_PHONE;
+  const lineLink = formatLineUrl(publicAgent?.line_id || '@930xzcyi');
 
   const origin = typeof window !== 'undefined' ? window.location.origin : 'https://chantakornproperty.com';
   const url = propertyUrl(property, origin);
@@ -69,7 +71,7 @@ export function generateLocalSocialPost(
 [ฉากที่ 4: วินาทีที่ 31-45 (สรุปราคา & ค่างวด & CALL TO ACTION)]
 🎥 ภาพ: นายหน้ายืนยิ้มหน้าบ้าน หรือภาพมุมสูงสวยๆ
 🎙️ เสียงบรรยาย: "ราคาเพียง ${priceFormatted}${priceUnit} เท่านั้น กู้ได้เต็ม มีบริการเช็กวงเงินฟรี ยื่นกู้ให้ทุกธนาคาร รีบคอมเมนต์หรือทักลิงก์ที่หน้าโปรไฟล์ก่อนหลุดนะครับ!"
-💬 ตัวหนังสือบนจอ: "📞 นัดชม: ${agentPhone} | LINE: ${property.agent?.line_id || '@930xzcyi'}"
+💬 ตัวหนังสือบนจอ: "📞 นัดชม: ${agentPhone} | LINE: ${publicAgent?.line_id || '@930xzcyi'}"
 
 #บ้านหาดใหญ่ #บ้านสงขลา #อสังหาหาดใหญ่ #บ้านมือสองหาดใหญ่ #ฉันทากรพร็อพเพอร์ตี้ #บ้านสวยพร้อมอยู่`;
 
@@ -135,7 +137,7 @@ ${property.facing_direction ? `▫️ Direction: ${property.facing_direction}` :
 ความสุขที่เริ่มต้นได้จากบ้านหลังนี้ สัมผัสบรรยากาศจริงได้แล้ววันนี้ นัดหมายเข้าชมแบบ Exclusive ได้เลยค่ะ
 
 📞 Private Viewing: ${agentPhone}
-📲 LINE: ${property.agent?.line_id || '@930xzcyi'}
+📲 LINE: ${publicAgent?.line_id || '@930xzcyi'}
 🌐 Website Link in Bio: ${url}
 
 .
@@ -174,7 +176,7 @@ Free consultation for foreigners, expats, and investors regarding leaseholds, co
 
 📞 For private inspection:
 Phone / WhatsApp: ${agentPhone}
-LINE ID: ${property.agent?.line_id || '@930xzcyi'}
+LINE ID: ${publicAgent?.line_id || '@930xzcyi'}
 Explore full gallery: ${url}`;
 
     return {
@@ -206,7 +208,7 @@ Explore full gallery: ${url}`;
 
 如需预约实地看房或获取中文房产投资资料，欢迎随时与我们联系：
 📞 咨询热线: ${agentPhone}
-📲 微信/LINE: ${property.agent?.line_id || '@930xzcyi'}
+📲 微信/LINE: ${publicAgent?.line_id || '@930xzcyi'}
 🌐 房源详情网址: ${url}`;
 
     return {
@@ -218,61 +220,76 @@ Explore full gallery: ${url}`;
     };
   }
 
-  // Facebook copy must describe the saved record. A tone changes presentation,
-  // never property condition, amenities, financing eligibility or location.
+  // Facebook copy stays short and uses saved facts. Plain-text section labels
+  // remain readable after pasting; Markdown bold is not supported by Page posts.
   const hasPositiveNumber = (value: unknown): value is number => typeof value === 'number' && Number.isFinite(value) && value > 0;
-  const savedText = (value: unknown): string => typeof value === 'string' ? value.trim() : '';
+  const savedText = (value: unknown): string => typeof value === 'string' ? value
+    .replace(/[0-9#*]\uFE0F?\u20E3|\p{Extended_Pictographic}|\p{Regional_Indicator}|\p{Emoji_Modifier}|[\uFE0E\uFE0F\u200D\u20E3\u{E0020}-\u{E007F}]/gu, '')
+    .replace(/\s+/g, ' ').trim() : '';
+  const shortText = (value: unknown, limit: number): string => {
+    const text = savedText(value);
+    if (text.length <= limit) return text;
+    let summary = '';
+    for (const { segment } of new Intl.Segmenter('th', { granularity: 'word' }).segment(text)) {
+      if (summary.length + segment.length > limit) break;
+      summary += segment;
+    }
+    return summary.trim() ? `${summary.trim()}…` : '';
+  };
   const statusLabel = property.status === 'rent' ? 'ให้เช่า' : 'ขาย';
   const facebookPrice = hasPositiveNumber(property.price) ? formatPrice(property.price, property.status) : 'ติดต่อสอบถามราคา';
-  const facebookLocation = [property.subdistrict, property.district, property.province].map(savedText).filter(Boolean).join(', ');
-  const facebookAgent = savedText(property.agent?.name) || 'ทีมงาน ฉันทากร พร็อพเพอร์ตี้';
-  const facebookPhone = savedText(property.agent?.phone) || DEFAULT_OFFICIAL_PHONE;
-  const facebookLineId = savedText(property.agent?.line_id) || '@930xzcyi';
-  const intro: Record<MarketingTone, string> = {
-    hot_deal: 'ข้อมูลราคาและรายละเอียดทรัพย์',
-    luxury: 'แนะนำทรัพย์',
-    friendly: 'ชวนชมรายละเอียดทรัพย์',
-    investor: 'ข้อมูลประกอบการพิจารณาทรัพย์',
+  const facebookLocation = [property.subdistrict, property.district, property.province].map(value => shortText(value, 60)).filter(Boolean).join(', ');
+  const facebookAgent = shortText(publicAgent?.name, 60) || 'ทีมงาน ฉันทากร พร็อพเพอร์ตี้';
+  const facebookPhone = savedText(publicAgent?.phone) || DEFAULT_OFFICIAL_PHONE;
+  const facebookLineId = savedText(publicAgent?.line_id) || '@930xzcyi';
+  const contactLabel: Record<MarketingTone, string> = {
+    hot_deal: 'สอบถาม / นัดชม',
+    luxury: 'นัดชมทรัพย์',
+    friendly: 'สนใจสอบถาม',
+    investor: 'สอบถามข้อมูลทรัพย์',
   };
-  const facts = [`🏡 ประเภท: ${typeName}`];
-  if (hasPositiveNumber(property.land_size)) facts.push(`📐 เนื้อที่: ${property.land_size} ตร.ว.`);
-  if (hasPositiveNumber(property.usable_area)) facts.push(`📐 พื้นที่ใช้สอย: ${property.usable_area} ตร.ม.`);
+  const areas: string[] = [];
+  if (hasPositiveNumber(property.land_size)) areas.push(`เนื้อที่: ${property.land_size} ตร.ว.`);
+  if (hasPositiveNumber(property.usable_area)) areas.push(`พื้นที่ใช้สอย: ${property.usable_area} ตร.ม.`);
+  const rooms: string[] = [];
+  const facts: string[] = [];
   if (['house', 'condo', 'commercial', 'investment'].includes(property.property_type)) {
-    if (hasPositiveNumber(property.bedrooms)) facts.push(`🛏️ ห้องนอน: ${property.bedrooms} ห้อง`);
-    if (hasPositiveNumber(property.bathrooms)) facts.push(`🚿 ห้องน้ำ: ${property.bathrooms} ห้อง`);
-    if (hasPositiveNumber(property.parking)) facts.push(`🚗 ที่จอดรถ: ${property.parking} คัน`);
-    if (savedText(property.furniture)) facts.push(`🛋️ การตกแต่ง: ${savedText(property.furniture)}`);
+    if (hasPositiveNumber(property.bedrooms)) rooms.push(`ห้องนอน: ${property.bedrooms} ห้อง`);
+    if (hasPositiveNumber(property.bathrooms)) rooms.push(`ห้องน้ำ: ${property.bathrooms} ห้อง`);
+    if (hasPositiveNumber(property.parking)) rooms.push(`ที่จอดรถ: ${property.parking} คัน`);
+    if (shortText(property.furniture, 80)) facts.push(`การตกแต่ง: ${shortText(property.furniture, 80)}`);
   }
-  if (savedText(property.facing_direction)) facts.push(`🧭 ทิศหน้าทรัพย์: ${savedText(property.facing_direction)}`);
-  const features = Array.isArray(property.features) ? property.features.map(savedText).filter(Boolean) : [];
-  const description = savedText(property.description);
+  if (shortText(property.facing_direction, 40)) facts.push(`ทิศหน้าทรัพย์: ${shortText(property.facing_direction, 40)}`);
+  const features = Array.isArray(property.features)
+    ? [...new Set(property.features.map(value => shortText(value, 60)).filter(Boolean))].slice(0, 3) : [];
+  const description = shortText(property.description, 120);
   const typeHashtag = {
     house: '#บ้าน', land: '#ที่ดิน', condo: '#คอนโด', commercial: '#อาคารพาณิชย์',
     investment: '#อสังหาเพื่อการลงทุน', consignment: '#ขายฝากจำนอง',
   }[property.property_type];
   const hashtags = ['#ChantakornProperty', property.status === 'rent' ? '#ให้เช่า' : '#ขายอสังหาริมทรัพย์', ...(typeHashtag ? [typeHashtag] : [])];
-  const headline = `${statusLabel}${typeName}${savedText(property.title) ? `: ${savedText(property.title)}` : ''} — ${facebookPrice}`;
+  const title = shortText(property.title, 100);
+  const heading = `${statusLabel}${typeName}`;
+  const headline = title.startsWith(heading) ? title : `${heading}${title ? ` | ${title}` : ''}`;
+  const callToAction = `${contactLabel[tone]} โทร ${facebookPhone}`;
   const fullPost = [
-    `🏡 ${intro[tone]}`,
     headline,
-    facebookLocation ? `📍 ทำเล: ${facebookLocation}` : '',
-    '',
+    `ราคา: ${facebookPrice}`,
+    ...(facebookLocation ? [`ทำเล: ${facebookLocation}`] : []),
+    ...areas,
+    ...(rooms.length ? [rooms.join(' | ')] : []),
     ...facts,
-    ...(description ? ['', 'รายละเอียดจากประกาศ:', description] : []),
-    ...(features.length ? ['', 'จุดเด่นที่ระบุไว้:', ...features.map(feature => `✔️ ${feature}`)] : []),
+    ...(features.length ? [`จุดเด่น: ${features.join(' / ')}`] : []),
+    ...(!features.length && description ? [`รายละเอียด: ${description}`] : []),
     '',
-    '🔗 ดูประกาศและรายละเอียดทรัพย์:',
-    url,
-    '',
-    'สนใจสอบถามข้อมูลเพิ่มเติม / นัดชมทรัพย์:',
-    `📞 โทร: ${facebookPhone} (${facebookAgent})`,
-    `💬 LINE: ${formatLineUrl(facebookLineId)}`,
-    `🌐 Facebook: ${DEFAULT_OFFICIAL_FACEBOOK}`,
+    `${contactLabel[tone]}: ${facebookPhone} (${facebookAgent})`,
+    `LINE: ${formatLineUrl(facebookLineId)}`,
+    `รายละเอียดและรูป: ${url}`,
     '',
     hashtags.join(' '),
   ].join('\n');
 
-  return { headline, body: fullPost, hashtags, callToAction: `สอบถาม / นัดชมทรัพย์ โทร ${facebookPhone}`, fullPost };
+  return { headline, body: fullPost, hashtags, callToAction, fullPost };
 }
 
 // ==========================================

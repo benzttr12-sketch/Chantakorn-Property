@@ -2,6 +2,8 @@ import { Hono } from 'hono';
 import { publicCatalogPayload } from './public-catalog-cache.ts';
 import mediaRoutes from './media-routes.ts';
 import propertyAdmin, { mediaForRows, toEditorProperty } from './property-admin-routes.ts';
+import agentAdmin from './agent-admin-routes.ts';
+import { agentsForRows } from './property-agents.ts';
 import { sweepPropertyMediaOrphans } from './media-orphan-sweep.ts';
 import { drizzle } from 'drizzle-orm/d1';
 import { and, asc, desc, eq, gte, lte, lt, or, isNull, sql } from 'drizzle-orm';
@@ -114,9 +116,9 @@ app.get('/v1/properties', async c => {
     const hasMore = rows.length > f.limit;
     const visible = rows.slice(0, f.limit);
     const last = visible.at(-1);
-    const media = await mediaForRows(db, visible);
+    const [media, assignedAgents] = await Promise.all([mediaForRows(db, visible), agentsForRows(db, visible, true)]);
     return {
-      data: visible.map(row => toEditorProperty(row, media.get(row.id) || [], false)),
+      data: visible.map(row => toEditorProperty(row, media.get(row.id) || [], false, assignedAgents.get(row.agentId || ''))),
       next_cursor: hasMore && last ? catalogCursor(last, f.sortBy) : null,
     };
   });
@@ -138,8 +140,8 @@ app.get('/v1/properties/:identifier', async c => {
       .where(and(eq(properties.published, true), isNull(properties.deletedAt), or(eq(properties.code, identifier), eq(properties.slug, identifier), eq(properties.id, identifier))))
       .limit(1);
     if (!rows.length) return null;
-    const media = await mediaForRows(db, rows);
-    return { data: toEditorProperty(rows[0], media.get(rows[0].id) || [], false) };
+    const [media, assignedAgents] = await Promise.all([mediaForRows(db, rows), agentsForRows(db, rows, true)]);
+    return { data: toEditorProperty(rows[0], media.get(rows[0].id) || [], false, assignedAgents.get(rows[0].agentId || '')) };
   });
   c.header('Cache-Control', 'no-store');
   c.header('X-Catalog-Cache', result.cache);
@@ -149,6 +151,7 @@ app.get('/v1/properties/:identifier', async c => {
 
 app.route('/', mediaRoutes);
 app.route('/', propertyAdmin);
+app.route('/', agentAdmin);
 
 app.notFound(c => c.json({ error: 'Not found' }, 404));
 app.onError((error, c) => {
