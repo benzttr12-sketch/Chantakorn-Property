@@ -30,8 +30,9 @@ function button(tree, label) {
   assert.ok(result, `Expected button: ${label}`);
   return result;
 }
-async function editor(existing, backend = 'firebase') {
+async function editor(existing, backend = 'firebase', catalogAgents = [{ id: staff.id, name: staff.full_name, title: 'นายหน้า', phone: '', line_id: '', email: '', photo_url: '', bio: '', is_public: true }], propertyResponse) {
   const saved = [], hydrated = [], hooks = [], effectQueue = [], elements = new Map();
+  let profileReads = 0;
   let cursor = 0;
   const router = { push() {} };
   const react = {
@@ -55,14 +56,17 @@ async function editor(existing, backend = 'firebase') {
     'next/link': 'Link', 'next/image': 'Image',
     'lucide-react': new Proxy({}, { get: (_target, key) => key }),
     '@/lib/store/properties-store': {
-      fetchUsers: async () => [{ ...staff }], fetchAdminPropertyById: async () => existing ?? null,
+      fetchUsers: async () => { profileReads++; return [{ ...staff }]; }, fetchAdminPropertyById: async () => propertyResponse === undefined ? existing ?? null : propertyResponse,
       createProperty: async property => { saved.push(property); return { ...property, id: 'created' }; },
       updateProperty: async (_id, property) => { saved.push(property); },
     },
     '@/lib/store/agents-store': { getAgents: () => [] },
     '@/lib/staff-api': { fetchStaffApi: async () => Response.json({}) },
     '@/lib/property-media': { loadStaffPropertyPhotos: async property => { hydrated.push(property); return property; } },
-    '@/lib/cloudflare-properties': { useCloudflarePropertyBackend: backend === 'cloudflare' },
+    '@/lib/cloudflare-properties': { useCloudflarePropertyBackend: backend === 'cloudflare', cloudflareCatalogAgents: async () => {
+      if (catalogAgents instanceof Error) throw catalogAgents;
+      return catalogAgents;
+    } },
     '@/components/admin/StaffPropertyImage': 'StaffPropertyImage',
     '@/components/properties/property-link': { propertyHref: () => '/property-fixture' },
     '@/lib/auth-helpers': { getStoredUser: () => staff },
@@ -81,7 +85,7 @@ async function editor(existing, backend = 'firebase') {
     compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, jsx: ts.JsxEmit.React, esModuleInterop: true },
   }).outputText;
   vm.runInNewContext(source, {
-    module, exports: module.exports, console, URLSearchParams, Response, setTimeout() {},
+    module, exports: module.exports, console, URLSearchParams, Response, AbortController, setTimeout() {},
     document: { getElementById: id => elements.get(id) || null },
     require(name) { if (Object.hasOwn(mocks, name)) return mocks[name]; throw new Error(name); },
   });
@@ -96,7 +100,7 @@ async function editor(existing, backend = 'firebase') {
     return render();
   }
   await settle();
-  return { render, settle, saved, hydrated, elements };
+  return { render, settle, saved, hydrated, elements, get profileReads() { return profileReads; } };
 }
 const existingProperty = optional => ({
   id: 'listing-fixture', title: 'บ้านทดสอบข้อมูลจริง', slug: 'real-property', price: 2500000,
@@ -195,4 +199,85 @@ test('D1 editor previews saved media without Firestore hydration and saves origi
   assert.equal(ui.saved[0].cover_image, image);
   const firebase = await editor(property);
   assert.equal(firebase.hydrated.length, 1);
+});
+
+test('D1 editor selects the canonical registered agent ID instead of a matching Firebase profile', async () => {
+  const canonical = { id: 'catalog-agent-two', name: staff.full_name, title: 'ที่ปรึกษา', phone: '0811111111', line_id: 'registered-agent' };
+  const ui = await editor(existingProperty({ agent_id: canonical.id }), 'cloudflare', [
+    { ...canonical, id: 'catalog-agent-one', name: 'Another catalog agent' }, canonical,
+  ]);
+  const picker = field(ui.render(), 'เลือกนายหน้าผู้ดูแลประกาศนี้');
+  assert.equal(picker.props.value, canonical.id);
+  assert.equal(ui.profileReads, 0);
+  const ids = nodes(picker).filter(node => node.type === 'option').map(node => node.props.value);
+  assert.ok(ids.includes(canonical.id));
+  assert.ok(!ids.includes(staff.id));
+  await nodes(ui.render()).find(node => node.type === 'form').props.onSubmit({ preventDefault() {} });
+  assert.equal(ui.saved.length, 1);
+  assert.equal(ui.saved[0].agent_id, canonical.id);
+  assert.equal(ui.saved[0].agent.id, canonical.id);
+  assert.equal(ui.saved[0].agent.title, canonical.title);
+});
+
+test('D1 editor never substitutes a profile or fallback agent when registration is missing or unavailable', async () => {
+  for (const catalogAgents of [[], new Error('Catalog agents unavailable'), [{ id: 'different-agent', name: 'Registered', title: 'นายหน้า' }]]) {
+    const ui = await editor(existingProperty({}), 'cloudflare', catalogAgents);
+    assert.equal(ui.profileReads, 0);
+    await nodes(ui.render()).find(node => node.type === 'form').props.onSubmit({ preventDefault() {} });
+    assert.equal(ui.saved.length, 0);
+    assert.ok(nodes(ui.render()).some(node => text(node).includes(catalogAgents instanceof Error ? 'โหลดรายชื่อนายหน้าไม่สำเร็จ' : 'นายหน้า')));
+  }
+});
+
+test('D1 contacts remain read-only and follow canonical agent data when the list arrives after the listing', async () => {
+  let resolveAgents;
+  const waiting = new Promise(resolve => { resolveAgents = resolve; });
+  const stale = { id: 'canonical-one', name: 'Old embedded agent', phone: '0899999999', line_id: 'old-line', facebook: 'https://facebook.com/old', photo_url: 'https://example.com/old.jpg' };
+  const canonical = { id: stale.id, name: 'Registered agent', title: 'ที่ปรึกษา', phone: '0811111111', line_id: 'current-line', facebook: 'https://facebook.com/current', photo_url: 'https://example.com/current.jpg' };
+  const other = { ...canonical, id: 'canonical-two', phone: '0822222222', line_id: 'second-line', facebook: '' };
+  const ui = await editor(existingProperty({ agent_id: stale.id, agent: stale }), 'cloudflare', waiting);
+  assert.equal(field(ui.render(), 'เบอร์โทรศัพท์ของนายหน้าผู้ดูแลทรัพย์').props.value, '');
+  resolveAgents([canonical, other]);
+  await ui.settle();
+  for (const [label, value] of [
+    ['เบอร์โทรศัพท์ของนายหน้าผู้ดูแลทรัพย์', canonical.phone],
+    ['LINE ID หรือ ลิงก์ LINE', canonical.line_id], ['ลิงก์ Facebook หรือเพจเฟสบุ๊ค', canonical.facebook],
+  ]) {
+    assert.equal(field(ui.render(), label).props.value, value);
+    assert.equal(field(ui.render(), label).props.readOnly, true);
+  }
+  const avatar = nodes(ui.render()).find(node => node.type === 'Image' && node.props.src === canonical.photo_url);
+  assert.ok(avatar);
+  field(ui.render(), 'เลือกนายหน้าผู้ดูแลประกาศนี้').props.onChange({ target: { value: other.id } });
+  assert.equal(field(ui.render(), 'เบอร์โทรศัพท์ของนายหน้าผู้ดูแลทรัพย์').props.value, other.phone);
+  assert.equal(field(ui.render(), 'ลิงก์ Facebook หรือเพจเฟสบุ๊ค').props.value, '');
+  await nodes(ui.render()).find(node => node.type === 'form').props.onSubmit({ preventDefault() {} });
+  assert.equal(ui.saved[0].agent_id, other.id);
+  assert.equal(ui.saved[0].agent.phone, other.phone);
+  assert.equal(ui.saved[0].agent.facebook, '');
+  let resolveProperty;
+  const lateProperty = new Promise(resolve => { resolveProperty = resolve; });
+  const late = await editor(existingProperty({}), 'cloudflare', [canonical], lateProperty);
+  resolveProperty(existingProperty({ agent_id: canonical.id, agent: stale }));
+  await late.settle();
+  assert.equal(field(late.render(), 'เบอร์โทรศัพท์ของนายหน้าผู้ดูแลทรัพย์').props.value, canonical.phone);
+  assert.equal(field(late.render(), 'LINE ID หรือ ลิงก์ LINE').props.value, canonical.line_id);
+  const firebase = await editor(existingProperty({ agent: stale }));
+  assert.equal(field(firebase.render(), 'เบอร์โทรศัพท์ของนายหน้าผู้ดูแลทรัพย์').props.readOnly, false);
+  field(firebase.render(), 'เบอร์โทรศัพท์ของนายหน้าผู้ดูแลทรัพย์').props.onChange({ target: { value: '0833333333' } });
+  await nodes(firebase.render()).find(node => node.type === 'form').props.onSubmit({ preventDefault() {} });
+  assert.equal(firebase.saved[0].agent.phone, '0833333333');
+});
+
+test('D1 editor preserves a hidden registered assignment and explains that its contacts stay private', async () => {
+  const hidden = { id: 'hidden-agent', name: 'Registered hidden agent', title: 'ที่ปรึกษา', phone: '0811111111', is_public: false };
+  const ui = await editor(existingProperty({ agent_id: hidden.id }), 'cloudflare', [hidden]);
+  const picker = field(ui.render(), 'เลือกนายหน้าผู้ดูแลประกาศนี้');
+  assert.equal(picker.props.value, hidden.id);
+  const option = nodes(picker).find(node => node.type === 'option' && node.props.value === hidden.id);
+  assert.match(text(option), /ไม่แสดงข้อมูลติดต่อสาธารณะ/);
+  assert.ok(nodes(ui.render()).some(node => node.props.role === 'status' && /ข้อมูลติดต่อจะไม่แสดงต่อสาธารณะ/.test(text(node))));
+  assert.ok(nodes(ui.render()).some(node => node.props.hidden === true && text(node).includes('ข้อมูลติดต่อที่จะแสดงบนประกาศ')));
+  await nodes(ui.render()).find(node => node.type === 'form').props.onSubmit({ preventDefault() {} });
+  assert.equal(ui.saved[0].agent_id, hidden.id);
 });

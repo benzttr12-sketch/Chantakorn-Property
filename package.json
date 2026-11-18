@@ -12,7 +12,8 @@
     "audit:security": "npm audit --audit-level=low",
     "test:rules": "npx --yes firebase-tools@15.33.0 emulators:exec --project demo-chantakorn-security --config firebase.test.json --only firestore \"node tests/firestore-rules.cjs\"",
     "build:pages": "node scripts/build-pages.mjs",
-    "preview:pages": "node scripts/preview-pages.mjs"
+    "preview:pages": "node scripts/preview-pages.mjs",
+    "verify:cloudflare": "node scripts/verify-cloudflare.mjs"
   },
   "engines": {
     "node": ">=22.19.0"

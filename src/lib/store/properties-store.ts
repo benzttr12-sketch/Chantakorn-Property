@@ -102,7 +102,7 @@ function rowToProperty(property: Property): Property {
   const validLng = property.longitude != null && String(property.longitude).trim() !== '' && Number.isFinite(parsedLng) && Math.abs(parsedLng) <= 180;
 
   let resolvedAgent = property.agent || undefined;
-  if (typeof window !== 'undefined') {
+  if (!useCloudflarePropertyBackend && typeof window !== 'undefined') {
     try {
       const allAgents = getAgents();
       // Match by agent_id, agent.id, or user id
@@ -169,11 +169,11 @@ function filterProperties(properties: Property[], filters?: PropertyFilters): Pr
 }
 
 async function loadProperties(includeUnpublished: boolean): Promise<Property[]> {
-  requireConnection();
   if (useCloudflarePropertyBackend) {
     const { cloudflareListProperties } = await import('@/lib/cloudflare-properties');
     return (await cloudflareListProperties(includeUnpublished)).map(rowToProperty);
   }
+  requireConnection();
   const firestore: Firestore | null = db;
   if (dataBackend === 'firebase') {
     if (firestore) {
@@ -280,12 +280,12 @@ function matchesPropertyKey(property: Property, key: string): boolean {
 }
 
 export async function fetchPropertyBySlug(slug: string): Promise<Property | null> {
-  requireConnection();
   if (useCloudflarePropertyBackend) {
     const { cloudflarePublicDetail } = await import('@/lib/cloudflare-properties');
     const result = await cloudflarePublicDetail(slug);
     return result ? rowToProperty(result) : null;
   }
+  requireConnection();
   return (await loadProperties(false)).find(property => matchesPropertyKey(property, slug)) || null;
 }
 

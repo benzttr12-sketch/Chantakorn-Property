@@ -20,7 +20,9 @@ npm run dev
 
 รูปแบบเว็บใช้ Tailwind CSS 4 รองรับ Safari 16.4+, Chrome 111+ และ Firefox 128+
 
-ค่าเริ่มต้นใช้ Firebase สำหรับข้อมูลและบัญชีจริง หากต้องการดูหน้าเว็บในเครื่องโดยไม่เชื่อมฐานข้อมูล ให้กำหนด `NEXT_PUBLIC_DATA_BACKEND=local` อย่างชัดเจน โหมดนี้ใช้ข้อมูลสำหรับพัฒนา ฟอร์มไม่ส่งข้อมูลถึงทีมงาน และไม่มีระบบบัญชีหรือสิทธิ์พนักงานทดลอง
+ค่าเริ่มต้นของโค้ดใช้ Cloudflare D1/R2 สำหรับแคตตาล็อกทรัพย์และรูปทรัพย์ ส่วนบัญชีและข้อมูลธุรกิจอื่นยังใช้ Firebase ค่า environment ของแต่ละ deployment สามารถแทนค่าเริ่มต้นได้ จึงต้องตรวจเว็บที่เผยแพร่จริงก่อนสรุปว่าย้ายระบบแล้ว ดู [สถานะและขั้นตอนตรวจการย้าย](docs/d1-r2-cutover-plan.md)
+
+หากต้องการดูหน้าเว็บในเครื่องด้วยข้อมูลตัวอย่างโดยไม่อ่านแคตตาล็อก Cloudflare ให้ตั้งทั้ง `NEXT_PUBLIC_DATA_BACKEND=local` และ `NEXT_PUBLIC_PROPERTY_STORAGE_BACKEND=firebase` โหมดนี้ฟอร์มไม่ส่งข้อมูลถึงทีมงาน และไม่มีระบบบัญชีหรือสิทธิ์พนักงานทดลอง การตั้ง `local` เพียงค่าเดียวไม่เปลี่ยน backend ของแคตตาล็อก การทดสอบเขียนทรัพย์จริงควรตั้ง `NEXT_PUBLIC_CLOUDFLARE_API_ORIGIN` เป็น Worker สำหรับ staging ที่แยกจาก production
 
 ## ตรวจสอบและ build
 
@@ -32,6 +34,8 @@ npm test
 npm run build
 npm start
 ```
+
+ตรวจแคตตาล็อก Cloudflare แบบอ่านอย่างเดียวด้วย `npm run verify:cloudflare -- --require-listings` เพื่อตรวจ public list/CORS และสุ่มตรวจรายละเอียดกับรูปหนึ่งรายการ โดยไม่ส่งฟอร์มลูกค้าหรือแก้ข้อมูล `--require-listings` ทำให้ไม่ผ่านเมื่อแคตตาล็อกว่าง ไม่ใช่การตรวจข้อมูลและรูปทุกรายการ ผลตรวจนี้ไม่ยืนยันการสร้างทรัพย์ สิทธิ์พนักงาน หรือความครบถ้วนของ backup
 
 หากต้องการไฟล์เว็บไซต์แบบ static:
 
@@ -76,11 +80,13 @@ npm run preview:pages
 
 บน static hosting ลิงก์ที่สร้างในเว็บใช้ `/properties/detail/?slug=CK-RP6NQM` เพื่อรองรับทรัพย์ที่เพิ่มภายหลังโดยไม่ต้อง build ใหม่ ส่วนทรัพย์ตัวอย่างสร้างหน้าตรงไว้ล่วงหน้าทั้งรหัสสั้น ID และ slug เดิม ข้อมูลจริงโหลดจาก backend ในเบราว์เซอร์
 
-## Firebase สำหรับใช้งานจริง
+## ฐานข้อมูลสำหรับใช้งานจริง
 
-ตั้ง `NEXT_PUBLIC_DATA_BACKEND=firebase` และค่า Firebase ตาม `.env.example` ใช้ Firebase Authentication สำหรับบัญชี และ Firestore สำหรับข้อมูลธุรกิจ รายการทรัพย์สาธารณะอ่านผ่าน `/api/properties` ซึ่งส่งเฉพาะข้อมูลที่เผยแพร่ รูปภาพและข้อมูลลูกค้าถูกควบคุมสิทธิ์บนเซิร์ฟเวอร์ ดู [การตั้งค่าเซิร์ฟเวอร์และระบบรูปภาพ](docs/security-media-operations.md)
+ตั้ง `NEXT_PUBLIC_DATA_BACKEND=firebase` และค่า Firebase ตาม `.env.example` เพื่อใช้ Firebase Authentication และ Firestore สำหรับข้อมูลธุรกิจ `NEXT_PUBLIC_PROPERTY_STORAGE_BACKEND` เลือกฐานข้อมูลทรัพย์แยกต่างหาก โดยค่าเริ่มต้นเป็น `cloudflare` และ `NEXT_PUBLIC_CLOUDFLARE_API_ORIGIN` ชี้ Worker production ที่กำหนดใน `next.config.mjs` หน้าเว็บ รายละเอียด รูปทรัพย์ sitemap และข้อมูลทรัพย์ที่ใช้ใน LINE อ่านจากแคตตาล็อกที่เลือก การรับข้อความลูกค้าและข้อมูล LINE ยังใช้ระบบ Firebase/Vercel เดิม ดู [ขอบเขต D1/R2](docs/d1-r2-cutover-plan.md) และ [ระบบข้อมูลลูกค้าและรูปภาพ](docs/security-media-operations.md)
 
 บัญชี Firebase ใหม่เริ่มด้วย role `USER` เสมอ ไม่มีการยกสิทธิ์จากชื่อโดเมนหรืออีเมลใน browser การตั้ง Admin คนแรกต้องทำจาก Firebase Console หรือ Admin SDK ที่เชื่อถือได้ โดยแก้ `profiles/{uid}.role` เป็น `ADMIN` หลังจากผู้ใช้นั้นสมัครและมี profile แล้ว หลังจากนั้น Admin สามารถเปลี่ยน role ของ profile ที่มีอยู่ผ่านหน้า `/admin/users`
+
+สิทธิ์ทรัพย์บน Worker อ่านจาก D1 `profiles` แยกจาก Firestore การเปลี่ยน role ใน `/admin/users` ยังไม่เปลี่ยน role ใน D1 ต้องตรวจและจัดการทั้งสองฝั่งโดยผู้ดูแลที่เชื่อถือได้ เครื่องมือ `staff:import` ใช้เพิ่ม staff ที่ผ่านการตรวจแล้วเท่านั้นและไม่แก้ role เดิม ดู [ขั้นตอน staff import](services/cloudflare-api/README.md#verified-staff-role-bootstrap-operator-only-offline)
 
 หน้า `/admin/users` ไม่สร้างหรือลบบัญชี Firebase Authentication และไม่เปลี่ยนอีเมลสำหรับเข้าสู่ระบบ เพราะการแก้ profile document อย่างเดียวไม่ใช่การจัดการ Auth account ให้สร้าง ลบ หรือเปลี่ยนอีเมลบัญชีผ่าน Firebase Authentication Console/Admin SDK แล้วใช้หน้านี้จัดการชื่อ เบอร์โทร และ role ของ profile
 
@@ -88,7 +94,7 @@ npm run preview:pages
 
 ## ขอบเขตข้อมูล
 
-- ทรัพย์ นายหน้า รีวิว และลูกค้าบน Firebase ใช้ข้อมูลในระบบจริง การอ่านข้อมูลไม่สร้างข้อมูลตัวอย่างลงฐานข้อมูล
+- ทรัพย์ รูปทรัพย์ และนายหน้าที่ผูกกับทรัพย์ใช้ backend ที่เลือก (`cloudflare` เป็นค่าเริ่มต้น); สมาชิก นายหน้าแนะนำบนหน้าเว็บ รีวิว ลูกค้า งานติดตาม และข้อมูล LINE ยังใช้ Firebase การอ่านข้อมูลไม่สร้างข้อมูลตัวอย่างลงฐานข้อมูล
 - โหมด local ใช้ตรวจหน้าเว็บสำหรับพัฒนา ไม่มีบัญชีสมาชิกหรือสิทธิ์พนักงาน
 - Favorites และรายการเปรียบเทียบเก็บ ID ของทรัพย์ที่ผู้ใช้เลือกในเบราว์เซอร์
 - หน้าข้อมูลระบบแสดงโหมดที่เลือก การเปลี่ยนข้อมูลติดต่อหรือฐานข้อมูลต้องแก้โครงการแล้วเผยแพร่ใหม่

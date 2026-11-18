@@ -47,7 +47,7 @@ import {
 import { getAgents } from '@/lib/store/agents-store';
 import { fetchStaffApi } from '@/lib/staff-api';
 import { loadStaffPropertyPhotos } from '@/lib/property-media';
-import { useCloudflarePropertyBackend } from '@/lib/cloudflare-properties';
+import { cloudflareCatalogAgents, useCloudflarePropertyBackend } from '@/lib/cloudflare-properties';
 import StaffPropertyImage from '@/components/admin/StaffPropertyImage';
 import { propertyHref } from '@/components/properties/property-link';
 import { PropertyType, PropertyStatus, UserProfile, Agent, AgentRank, FacingDirection } from '@/lib/types';
@@ -81,6 +81,8 @@ import { parseRawPropertyText, generateProfessionalDescription } from '@/lib/pro
 import SmartDescriptionGeneratorModal, { PropertySpecsForAI } from '@/components/admin/SmartDescriptionGeneratorModal';
 import VoiceDictationBar from '@/components/ui/VoiceDictationBar';
 import PropertyFormProgress, { FormValidationItem } from '@/components/admin/PropertyFormProgress';
+
+type AssignableAgent = UserProfile & { catalog_title?: string; catalog_public?: boolean };
 
 function PropertyEditor() {
   const router = useRouter();
@@ -194,12 +196,23 @@ function PropertyEditor() {
   };
 
   // Staff (Agent & Admin) List & Specific Contact Channels
-  const [eligibleStaff, setEligibleStaff] = useState<UserProfile[]>([]);
+  const [eligibleStaff, setEligibleStaff] = useState<AssignableAgent[]>([]);
+  const [staffLoading, setStaffLoading] = useState(true);
+  const [staffError, setStaffError] = useState('');
   const [selectedAgentId, setSelectedAgentId] = useState<string>('');
-  const [agentPhone, setAgentPhone] = useState<string>('081-604-0097');
-  const [agentLine, setAgentLine] = useState<string>('@930xzcyi');
-  const [agentFacebook, setAgentFacebook] = useState<string>('');
-  const [agentPhoto, setAgentPhoto] = useState('');
+  const [editableAgentPhone, setAgentPhone] = useState<string>('081-604-0097');
+  const [editableAgentLine, setAgentLine] = useState<string>('@930xzcyi');
+  const [editableAgentFacebook, setAgentFacebook] = useState<string>('');
+  const [editableAgentPhoto, setAgentPhoto] = useState('');
+  // D1 saves a registered agent relationship, never a contact override. Derive
+  // these values on every render so late listing/agent responses cannot restore
+  // stale embedded contact data or overwrite the selected agent's contacts.
+  const selectedCatalogAgent = useCloudflarePropertyBackend
+    ? eligibleStaff.find(agent => agent.id === selectedAgentId) : undefined;
+  const agentPhone = useCloudflarePropertyBackend ? selectedCatalogAgent?.phone || '' : editableAgentPhone;
+  const agentLine = useCloudflarePropertyBackend ? selectedCatalogAgent?.line_id || '' : editableAgentLine;
+  const agentFacebook = useCloudflarePropertyBackend ? selectedCatalogAgent?.facebook || '' : editableAgentFacebook;
+  const agentPhoto = useCloudflarePropertyBackend ? selectedCatalogAgent?.avatar_url || '' : editableAgentPhoto;
   const [currentUserRole, setCurrentUserRole] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [imageUrlInput, setImageUrlInput] = useState('');
@@ -444,14 +457,43 @@ function PropertyEditor() {
 
   // 1. Load Staff Members (Only ADMIN and AGENT)
   useEffect(() => {
+    let active = true;
+    const controller = new AbortController();
     async function loadStaff() {
+      setStaffLoading(true);
+      setStaffError('');
       try {
         const current = getStoredUser();
         if (current) {
           setCurrentUserRole(current.role || 'USER');
         }
 
+        if (useCloudflarePropertyBackend) {
+          const agents = await cloudflareCatalogAgents(controller.signal);
+          if (!active) return;
+          // Catalog agent IDs are the foreign keys accepted by D1. Do not infer
+          // them from a Firebase UID, email, name, or a browser-only profile.
+          const registered: AssignableAgent[] = agents.map(agent => ({
+            id: agent.id, full_name: agent.name, role: 'AGENT',
+            catalog_title: agent.title, catalog_public: agent.is_public, phone: agent.phone, line_id: agent.line_id,
+            facebook: agent.facebook, email: agent.email,
+            avatar_url: agent.photo_url, bio: agent.bio,
+          }));
+          setEligibleStaff(registered);
+          if (!registered.length) setStaffError('ยังไม่มีนายหน้าที่ลงทะเบียนสำหรับประกาศ กรุณาติดต่อผู้ดูแลระบบ');
+          if (!editId && registered.length) {
+            const chosen = registered.find(agent => agent.id === current?.id) || registered[0];
+            setSelectedAgentId(chosen.id);
+            setAgentPhone(chosen.phone || '');
+            setAgentLine(chosen.line_id || '');
+            setAgentFacebook(chosen.facebook || '');
+            setAgentPhoto(chosen.avatar_url || '');
+          }
+          return;
+        }
+
         const users = await fetchUsers();
+        if (!active) return;
         const customAgents = getAgents();
 
         // Convert custom agents to staff list if not already present
@@ -518,10 +560,13 @@ function PropertyEditor() {
           setAgentFacebook(chosen.facebook || (chosen.role === 'ADMIN' ? DEFAULT_OFFICIAL_FACEBOOK : ''));
         }
       } catch (err) {
-        console.warn('Error fetching staff list:', err);
+        if (active) setStaffError(err instanceof Error ? err.message : 'โหลดรายชื่อนายหน้าไม่สำเร็จ กรุณาลองใหม่');
+      } finally {
+        if (active) setStaffLoading(false);
       }
     }
-    loadStaff();
+    void loadStaff();
+    return () => { active = false; controller.abort(); };
   }, [editId]);
 
   // Handle manual selection of agent from dropdown
@@ -529,9 +574,9 @@ function PropertyEditor() {
     setSelectedAgentId(agentId);
     const target = eligibleStaff.find(s => s.id === agentId);
     if (target) {
-      setAgentPhone(target.phone || '081-604-0097');
-      setAgentLine(target.line_id || '@930xzcyi');
-      setAgentFacebook(target.facebook || (target.role === 'ADMIN' ? DEFAULT_OFFICIAL_FACEBOOK : ''));
+      setAgentPhone(target.phone || (useCloudflarePropertyBackend ? '' : '081-604-0097'));
+      setAgentLine(target.line_id || (useCloudflarePropertyBackend ? '' : '@930xzcyi'));
+      setAgentFacebook(target.facebook || (!useCloudflarePropertyBackend && target.role === 'ADMIN' ? DEFAULT_OFFICIAL_FACEBOOK : ''));
       setAgentPhoto(target.avatar_url || '');
     }
   };
@@ -793,7 +838,8 @@ function PropertyEditor() {
   };
 
   // Find the selected Agent User Profile
-  const currentAssignedStaff = eligibleStaff.find(s => s.id === selectedAgentId) || eligibleStaff[0];
+  const currentAssignedStaff = eligibleStaff.find(s => s.id === selectedAgentId) ||
+    (useCloudflarePropertyBackend ? undefined : eligibleStaff[0]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -825,8 +871,8 @@ function PropertyEditor() {
       handleScrollToSection('section-4-images');
       return; 
     }
-    if (!selectedAgentId) {
-      setError('กรุณาเลือกนายหน้าผู้ดูแลทรัพย์');
+    if (!selectedAgentId || (useCloudflarePropertyBackend && (staffLoading || staffError || !currentAssignedStaff))) {
+      setError(staffError || 'กรุณาเลือกนายหน้าผู้ดูแลทรัพย์ที่ลงทะเบียนแล้ว');
       handleScrollToSection('section-6-agent');
       return;
     }
@@ -854,11 +900,11 @@ function PropertyEditor() {
         id: agentProfile?.id || 'admin-benz',
         name: agentProfile?.full_name || 'คุณฉันทากร นวลจันทร์ (เบนซ์)',
         rank: resolvedRank,
-        title: resolvedRank,
-        phone: agentPhone.trim() || agentProfile?.phone || '081-604-0097',
-        line_id: agentLine.trim() || agentProfile?.line_id || '@930xzcyi',
-        facebook: agentFacebook.trim() || agentProfile?.facebook || (resolvedRank === 'แอดมิน' ? DEFAULT_OFFICIAL_FACEBOOK : ''),
-        email: agentProfile?.email || 'chantakorn@chantakornproperty.com',
+        title: agentProfile?.catalog_title || resolvedRank,
+        phone: useCloudflarePropertyBackend ? agentPhone : agentPhone.trim() || agentProfile?.phone || '081-604-0097',
+        line_id: useCloudflarePropertyBackend ? agentLine : agentLine.trim() || agentProfile?.line_id || '@930xzcyi',
+        facebook: useCloudflarePropertyBackend ? agentFacebook : agentFacebook.trim() || agentProfile?.facebook || (resolvedRank === 'แอดมิน' ? DEFAULT_OFFICIAL_FACEBOOK : ''),
+        email: agentProfile?.email || (useCloudflarePropertyBackend ? '' : 'chantakorn@chantakornproperty.com'),
         photo_url: agentProfile?.avatar_url || agentPhoto,
         bio: agentProfile?.bio || (resolvedRank === 'แอดมิน'
           ? 'ผู้ดูแลระบบและที่ปรึกษาอสังหาริมทรัพย์ Chantakorn Property ดูแลลูกค้าทุกท่านอย่างซื่อตรงและโปร่งใส'
@@ -1024,8 +1070,8 @@ function PropertyEditor() {
       targetElementId: 'section-6-agent',
       label: 'นายหน้าผู้รับผิดชอบทรัพย์',
       isRequired: true,
-      isValid: Boolean(selectedAgentId),
-      message: !selectedAgentId 
+      isValid: Boolean(selectedAgentId && (!useCloudflarePropertyBackend || currentAssignedStaff)),
+      message: !selectedAgentId || (useCloudflarePropertyBackend && !currentAssignedStaff)
         ? 'ต้องเลือกนายหน้าผู้ดูแล' 
         : `นายหน้า: ${eligibleStaff.find(s => s.id === selectedAgentId)?.full_name || 'คุณฉันทากร'}`,
       currentValuePreview: eligibleStaff.find(s => s.id === selectedAgentId)?.full_name,
@@ -2598,7 +2644,9 @@ function PropertyEditor() {
             <div>
               <p className="font-bold">นโยบายช่องทางติดต่อนายหน้าผู้ลงทรัพย์:</p>
               <p className="text-blue-800 text-[11px] mt-0.5">
-                เวลานายหน้าหรือแอดมินท่านใดลงข้อมูลทรัพย์ ให้ใส่ <strong>LINE</strong> และ <strong>Facebook</strong> ของนายหน้าคนนั้นเอง เพื่อให้ผู้ซื้อ/ผู้เช่าสามารถคลิกแชทหรือโทรติดต่อตรงกับนายหน้าผู้ดูแลได้ทันที
+                {useCloudflarePropertyBackend
+                  ? 'ข้อมูลติดต่อใช้จากนายหน้าที่เลือก หากต้องแก้ไข กรุณาให้ผู้ดูแลปรับข้อมูลนายหน้าก่อน'
+                  : <>เวลานายหน้าหรือแอดมินท่านใดลงข้อมูลทรัพย์ ให้ใส่ <strong>LINE</strong> และ <strong>Facebook</strong> ของนายหน้าคนนั้นเอง เพื่อให้ผู้ซื้อ/ผู้เช่าสามารถคลิกแชทหรือโทรติดต่อตรงกับนายหน้าผู้ดูแลได้ทันที</>}
               </p>
             </div>
           </div>
@@ -2610,19 +2658,24 @@ function PropertyEditor() {
               <div>
                 <label className="block text-xs font-bold text-navy-950 mb-1.5 flex items-center justify-between">
                   <span>เลือกนายหน้าผู้ดูแลประกาศนี้ *</span>
-                  <span className="text-[10px] font-normal text-brand-muted">สมาชิกที่มียศ แอดมิน หรือ นายหน้า เท่านั้น</span>
+                  <span className="text-[10px] font-normal text-brand-muted">{useCloudflarePropertyBackend ? 'นายหน้าที่ลงทะเบียนสำหรับประกาศ' : 'สมาชิกที่มียศ แอดมิน หรือ นายหน้า เท่านั้น'}</span>
                 </label>
                 <select
                   value={selectedAgentId}
                   onChange={(e) => handleSelectAgent(e.target.value)}
+                  disabled={staffLoading || Boolean(staffError)}
                   className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3 text-xs font-bold text-navy-950 focus:bg-white focus:ring-2 focus:ring-gold-500 outline-hidden transition-all shadow-xs"
                 >
+                  <option value="">{staffLoading ? 'กำลังโหลดรายชื่อนายหน้า...' : 'เลือกนายหน้าผู้ดูแล'}</option>
+                  {useCloudflarePropertyBackend && selectedAgentId && !currentAssignedStaff && <option value={selectedAgentId}>นายหน้าเดิมไม่อยู่ในรายชื่อ กรุณาเลือกใหม่</option>}
                   {eligibleStaff.map((staff) => (
                     <option key={staff.id} value={staff.id}>
-                      {staff.full_name} ({staff.role === 'ADMIN' ? '🛡️ ยศ: แอดมิน' : '👔 ยศ: นายหน้า'})
+                      {staff.full_name} ({staff.catalog_title || (staff.role === 'ADMIN' ? '🛡️ ยศ: แอดมิน' : '👔 ยศ: นายหน้า')}){staff.catalog_public === false ? ' · ไม่แสดงข้อมูลติดต่อสาธารณะ' : ''}
                     </option>
                   ))}
                 </select>
+                {staffError && <p role="alert" className="mt-2 text-xs text-red-700">{staffError}</p>}
+                {selectedCatalogAgent?.catalog_public === false && <p role="status" className="mt-2 text-xs text-amber-800">นายหน้ารายนี้ยังรับผิดชอบประกาศได้ แต่ข้อมูลติดต่อจะไม่แสดงต่อสาธารณะ</p>}
               </div>
 
               {/* Agent Phone */}
@@ -2634,6 +2687,7 @@ function PropertyEditor() {
                 <input
                   type="tel"
                   value={agentPhone}
+                  readOnly={useCloudflarePropertyBackend}
                   onChange={(e) => setAgentPhone(e.target.value)}
                   placeholder="เช่น 081-604-0097 หรือ 082-xxx-xxxx"
                   className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3 text-xs text-navy-950 focus:bg-white focus:ring-2 focus:ring-gold-500 outline-hidden transition-all"
@@ -2653,6 +2707,7 @@ function PropertyEditor() {
                   <input
                     type="text"
                     value={agentLine}
+                    readOnly={useCloudflarePropertyBackend}
                     onChange={(e) => setAgentLine(e.target.value)}
                     placeholder="เช่น @930xzcyi หรือ benz_agent หรือ https://line.me/ti/p/~..."
                     className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3 pr-20 text-xs text-navy-950 focus:bg-white focus:ring-2 focus:ring-[#06C755] outline-hidden transition-all"
@@ -2678,6 +2733,7 @@ function PropertyEditor() {
                   <input
                     type="url"
                     value={agentFacebook}
+                    readOnly={useCloudflarePropertyBackend}
                     onChange={(e) => setAgentFacebook(e.target.value)}
                     placeholder="เช่น https://www.facebook.com/yourname หรือ ลิงก์เพจเฟสบุ๊ค"
                     className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3 pr-20 text-xs text-navy-950 focus:bg-white focus:ring-2 focus:ring-[#1877F2] outline-hidden transition-all"
@@ -2689,7 +2745,7 @@ function PropertyEditor() {
                   </div>
                 </div>
                 <p className="text-[10px] text-gray-500 mt-1">
-                  🌐 เวลานายหน้าคนไหนลงข้อมูล ให้ใส่ Facebook ของตนเอง หรือปล่อยว่างเพื่อใช้ Facebook เพจหลัก
+                  {useCloudflarePropertyBackend ? 'แสดงช่องทางติดต่อจากข้อมูลนายหน้าที่เลือก' : '🌐 เวลานายหน้าคนไหนลงข้อมูล ให้ใส่ Facebook ของตนเอง หรือปล่อยว่างเพื่อใช้ Facebook เพจหลัก'}
                 </p>
               </div>
 
@@ -2723,7 +2779,8 @@ function PropertyEditor() {
                 <span className="flex items-center gap-2"><Eye className="h-4 w-4" />ดูตัวอย่างข้อมูลติดต่อ</span>
                 <ChevronDown className="h-4 w-4 shrink-0 transition-transform group-open:rotate-180" />
               </summary>
-              <div className="mt-4 space-y-4">
+              {selectedCatalogAgent?.catalog_public === false && <p className="mt-4 text-xs text-slate-300">ข้อมูลติดต่อนายหน้ารายนี้ไม่แสดงต่อสาธารณะ</p>}
+              <div className="mt-4 space-y-4" hidden={selectedCatalogAgent?.catalog_public === false}>
               {/* Agent Profile Header */}
               <div className="flex items-center space-x-3.5">
                 <div className="relative w-16 h-16 rounded-2xl overflow-hidden bg-navy-800 shrink-0 border-2 border-gold-400 shadow-md">
@@ -2752,7 +2809,7 @@ function PropertyEditor() {
                       ? 'bg-gold-500/20 text-gold-300 border border-gold-500/40'
                       : 'bg-blue-500/20 text-blue-300 border border-blue-500/40'
                   }`}>
-                    {currentAssignedStaff?.role === 'ADMIN' ? '🛡️ ยศ: แอดมิน (Admin)' : '👔 ยศ: นายหน้า (Agent)'}
+                    {currentAssignedStaff?.catalog_title || (currentAssignedStaff?.role === 'ADMIN' ? '🛡️ ยศ: แอดมิน (Admin)' : '👔 ยศ: นายหน้า (Agent)')}
                   </span>
                   <p className="text-[11px] text-gray-400">
                     {currentAssignedStaff?.role === 'ADMIN' ? 'ผู้ดูแลระบบและที่ปรึกษา' : 'ตัวแทนนายหน้าผู้รับผิดชอบทรัพย์นี้'}

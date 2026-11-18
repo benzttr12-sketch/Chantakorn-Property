@@ -13,10 +13,10 @@ type PhotoDownload = { status: 'loading'; completed: number; total: number }
   | { status: 'success' | 'error'; message: string };
 
 const TONES: { value: MarketingTone; label: string }[] = [
-  { value: 'hot_deal', label: '📋 เน้นข้อมูล' },
-  { value: 'luxury', label: '💎 เรียบหรู' },
-  { value: 'friendly', label: '🏡 เป็นกันเอง' },
-  { value: 'investor', label: '📈 นักลงทุน' },
+  { value: 'hot_deal', label: 'เน้นข้อมูล' },
+  { value: 'luxury', label: 'เรียบหรู' },
+  { value: 'friendly', label: 'เป็นกันเอง' },
+  { value: 'investor', label: 'นักลงทุน' },
 ];
 
 /**
@@ -164,7 +164,7 @@ export default function FacebookPostModal({ isOpen, property, onClose }: {
             <p className="text-sm font-bold text-navy-950 mt-1">{formatPropertyCode(property.id)} · {getPropertyTypeName(property.property_type)} · {formatPrice(property.price, property.status)}</p>
             <p className="text-[11px] text-gray-500 mt-0.5">
               {property.status === 'rent' ? 'ให้เช่า' : 'ขาย'} · {property.district}, {property.province}
-              {property.published ? '' : ' · ⚠️ ยังไม่เผยแพร่ (ลิงก์ในโพสต์ยังไม่เห็นสาธารณะ)'}
+              {property.published ? '' : ' · ยังไม่เผยแพร่ (ลิงก์ในโพสต์ยังไม่เห็นสาธารณะ)'}
             </p>
           </div>
 
@@ -226,6 +226,7 @@ export default function FacebookPostModal({ isOpen, property, onClose }: {
           </div>
 
           <label htmlFor="facebook-post-content" className="block text-xs font-bold text-navy-950">ข้อความโพสต์ · แก้ไขได้ก่อนคัดลอก</label>
+          <p className="text-[11px] text-slate-500">ข้อความกระชับ ไม่มีอิโมจิ แยกราคา ทำเล และจุดเด่นให้อ่านง่าย</p>
           <textarea
             id="facebook-post-content"
             ref={textRef}
@@ -234,6 +235,21 @@ export default function FacebookPostModal({ isOpen, property, onClose }: {
             rows={14}
             className="w-full p-4 rounded-2xl border border-slate-200 text-xs leading-relaxed text-slate-700 bg-slate-50 font-medium"
           />
+
+          <details className="rounded-2xl border border-slate-200 p-3">
+            <summary className="cursor-pointer text-xs font-bold text-navy-950">ตัวอย่างข้อความแบบเน้นหัวข้อ</summary>
+            <div aria-label="ตัวอย่างข้อความโพสต์" className="mt-3 space-y-1 break-words text-xs leading-relaxed text-slate-700">
+              {content.split('\n').map((line, index) => {
+                const labelEnd = line.indexOf(':');
+                return <p key={index} className={line ? '' : 'h-2'}>
+                  {index === 0 || line.startsWith('ราคา:') ? <strong className="font-bold text-navy-950">{line}</strong>
+                    : labelEnd > 0 && labelEnd <= 24 ? <><strong className="font-bold text-navy-950">{line.slice(0, labelEnd + 1)}</strong>{line.slice(labelEnd + 1)}</>
+                    : line}
+                </p>;
+              })}
+            </div>
+            <p className="mt-2 text-[11px] text-slate-500">ข้อความที่คัดลอกใช้หัวข้อแยกบรรทัด ตัวหนาใช้แสดงในตัวอย่างนี้</p>
+          </details>
 
           {post && post.hashtags.length > 0 && (
             <p className="text-[11px] text-gray-400">ตรวจราคา พื้นที่ และช่องทางติดต่อก่อนโพสต์</p>
