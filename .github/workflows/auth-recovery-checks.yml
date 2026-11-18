@@ -1,0 +1,68 @@
+name: Auth and recovery gates
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'src/lib/auth-helpers.ts'
+      - 'src/lib/firebase/client.ts'
+      - 'src/lib/server-auth.ts'
+      - 'src/app/login/**'
+      - 'src/app/register/**'
+      - 'src/app/admin/layout.tsx'
+      - 'src/components/layout/Header.tsx'
+      - 'src/components/profile/ProfileEditor.tsx'
+      - 'next.config.mjs'
+      - 'vercel.json'
+      - 'scripts/*backup*'
+      - 'scripts/firestore-restore-validation.mjs'
+      - 'tests/*auth*'
+      - 'tests/*login*'
+      - 'tests/*backup*'
+      - 'tests/admin-session-navigation.test.cjs'
+      - 'tests/firestore-restore-validation.test.cjs'
+      - 'docs/admin-backup-operations.md'
+      - 'firebase.restore.test.json'
+      - '.github/workflows/auth-recovery-checks.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  auth-and-recovery:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.19.0'
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - name: Exercise login, logout, account switching and authorization regression suites
+        run: node --test tests/admin-auth-session.test.cjs tests/admin-session-navigation.test.cjs tests/google-login-screen.test.cjs tests/google-login-policy.test.cjs tests/auth-screen-transitions.test.cjs tests/staff-auth-cleanup.test.cjs
+      - name: Verify offline encrypted archives, reconciliation and fail-closed restore guards
+        run: node --test tests/firestore-backup-codec.test.cjs tests/firestore-backup-runtime.test.cjs tests/firebase-auth-backup.test.cjs tests/r2-backup.test.cjs tests/backup-reconciliation.test.cjs tests/firestore-restore-validation.test.cjs
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: Restore a synthetic encrypted sample into a loopback demo emulator
+        run: npx --yes firebase-tools@15.33.0 emulators:exec --project demo-chantakorn-restore --config firebase.restore.test.json --only firestore "node --test tests/firestore-restore-validation.test.cjs"
+        env:
+          RUN_FIRESTORE_RESTORE_EMULATOR_TESTS: 'true'
+          FIRESTORE_EMULATOR_HOST: '127.0.0.1:8085'
+
+  windows-key-custody:
+    runs-on: windows-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.19.0'
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - name: Verify real current-user DPAPI and private NTFS ACL protections with synthetic data
+        run: node --test tests/admin-backup-vault.test.cjs
