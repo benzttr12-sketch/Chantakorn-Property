@@ -15,7 +15,7 @@ const tabs = [
 type SearchTab = (typeof tabs)[number]['value'];
 
 const labelClass = 'mb-1.5 block text-xs font-semibold text-slate-800';
-const selectClass = 'min-h-11 w-full min-w-0 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900 hover:bg-white focus:ring-2 focus:ring-gold-500';
+const selectClass = 'min-h-12 w-full min-w-0 rounded-xl border border-[#e5e0d6] bg-white px-3 py-2 text-sm text-navy-950 hover:border-[#b59b68] focus:ring-2 focus:ring-[#b59b68]';
 
 export default function FloatingSearchBox() {
   const router = useRouter();
@@ -47,17 +47,17 @@ export default function FloatingSearchBox() {
   }
 
   return (
-    <div className="w-full rounded-2xl border border-slate-200/90 bg-white/95 p-4 shadow-xl sm:p-5">
-      <h2 className="mb-3 text-lg font-semibold text-navy-950">ค้นหาทรัพย์</h2>
-      <div role="group" aria-label="เลือกซื้อ เช่า หรือขายฝาก" className="mb-4 flex flex-wrap gap-2">
+    <div className="w-full rounded-2xl border border-white/50 bg-[#fcfbf8] p-5 shadow-[0_16px_48px_-16px_rgba(0,0,0,0.45)] sm:rounded-3xl sm:p-7">
+      <h2 className="mb-5 text-xl font-semibold tracking-tight text-navy-950">ค้นหาทรัพย์</h2>
+      <div role="group" aria-label="เลือกซื้อ เช่า หรือขายฝาก" className="mb-5 flex flex-wrap gap-1 rounded-xl bg-[#f0ece4] p-1">
         {tabs.map(({ value, label }) => (
           <button
             key={value}
             type="button"
             onClick={() => selectTab(value)}
             aria-pressed={tab === value}
-            className={`min-h-11 cursor-pointer rounded-xl px-3 py-2 text-sm font-semibold transition-colors sm:px-4 ${
-              tab === value ? 'bg-navy-950 text-gold-300' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+            className={`min-h-11 flex-1 cursor-pointer whitespace-nowrap rounded-lg px-2 py-2 text-sm font-medium transition-colors sm:px-4 ${
+              tab === value ? 'bg-navy-950 text-[#efe3cb] shadow-sm' : 'text-slate-600 hover:bg-white/70'
             }`}
           >
             {label}
@@ -74,7 +74,7 @@ export default function FloatingSearchBox() {
           </Link>
         </div>
       ) : (
-        <form onSubmit={handleSearch} className="grid items-end gap-3 sm:grid-cols-2">
+        <form onSubmit={handleSearch} className="grid items-end gap-4 sm:grid-cols-2">
           <div className="min-w-0">
             <label htmlFor="home-search-type" className={labelClass}>ประเภททรัพย์</label>
             <select
@@ -139,7 +139,7 @@ export default function FloatingSearchBox() {
 
           <button
             type="submit"
-            className="flex min-h-11 w-full cursor-pointer items-center justify-center gap-2 rounded-xl bg-gold-400 px-4 py-2 text-sm font-semibold text-navy-950 transition-colors hover:bg-gold-300"
+            className="flex min-h-12 w-full cursor-pointer items-center justify-center gap-2 rounded-xl bg-navy-950 px-4 py-2 text-sm font-semibold text-[#efe3cb] transition-colors hover:bg-navy-800"
           >
             <Search size={16} aria-hidden="true" />
             ค้นหาทรัพย์

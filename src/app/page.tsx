@@ -17,17 +17,17 @@ export default function HomePage() {
       <section
         id="home-calculators"
         aria-labelledby="home-calculators-title"
-        className="scroll-mt-36 bg-white px-4 py-10 sm:px-6 md:py-14 lg:px-8"
+        className="scroll-mt-36 px-4 py-8 sm:px-6 md:py-10 lg:px-8"
       >
-        <div className="mx-auto max-w-7xl">
-          <h2 id="home-calculators-title" className="text-2xl font-black tracking-tight text-navy-950 sm:text-3xl">
+        <div className="mx-auto max-w-7xl rounded-3xl border border-[#e4ded1] bg-[#eeeadf] p-5 sm:p-7">
+          <h2 id="home-calculators-title" className="text-2xl font-semibold tracking-tight text-navy-950 sm:text-3xl">
             เครื่องมือคำนวณ
           </h2>
           <div className="mt-5 grid gap-3 lg:grid-cols-2">
             <LandValuationCTA />
-            <details className="group rounded-2xl border border-slate-200 bg-slate-50/60 lg:open:col-span-2">
+            <details className="group rounded-2xl border border-[#ddd6c7] bg-white shadow-sm lg:open:col-span-2">
               <summary className="flex min-h-20 cursor-pointer list-none items-center gap-3 rounded-2xl px-4 py-3.5 hover:bg-gold-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gold-600 sm:px-5 [&::-webkit-details-marker]:hidden">
-                <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-gold-100 text-gold-800">
+                <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-[#f1eadc] text-[#7b5c28]">
                   <Calculator size={20} aria-hidden="true" />
                 </span>
                 <span className="min-w-0 flex-1">
@@ -45,7 +45,7 @@ export default function HomePage() {
       </section>
 
       <div className="mx-auto w-full max-w-7xl px-4 pb-10 sm:px-6 md:pb-14 lg:px-8">
-        <details id="home-matchmaker" className="group rounded-2xl border border-slate-200">
+        <details id="home-matchmaker" className="group rounded-2xl border border-[#e4ded1] bg-white">
           <summary className="flex min-h-14 cursor-pointer list-none items-center gap-3 rounded-2xl px-4 py-3 text-sm font-bold text-navy-950 hover:bg-gold-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gold-600 sm:px-5 [&::-webkit-details-marker]:hidden">
             <Compass size={18} aria-hidden="true" className="shrink-0 text-gold-700" />
             <span className="flex-1">ช่วยเลือกทรัพย์ตามทำเลและงบ</span>
