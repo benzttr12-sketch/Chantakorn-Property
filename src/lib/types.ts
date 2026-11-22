@@ -11,6 +11,8 @@ export interface PropertyImage {
 export type AgentRank = 'แอดมิน' | 'นายหน้า';
 
 export interface Agent {
+  /** Catalog visibility metadata is present only in staff responses. */
+  is_public?: boolean;
   id: string;
   name: string;
   rank?: AgentRank;

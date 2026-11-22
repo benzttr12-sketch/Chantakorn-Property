@@ -230,3 +230,21 @@ test('listings without photos keep the copy and Facebook actions without downloa
   assert.deepEqual(modal.copied, ['ข้อความแก้ไขแล้ว']);
   assert.ok(nodes(output).some(node => node.type === 'a' && node.props.href === 'https://facebook.com/official-page'));
 });
+
+test('Facebook keeps plain-text copying while the preview emphasizes edited headings without emoji controls', async () => {
+  const modal = component({ property: { ...listing, cover_image: '', images: [] } });
+  const initial = modal.render();
+  const toneButtons = nodes(initial).filter(node => node.type === 'button' && node.props['aria-pressed'] !== undefined);
+  assert.deepEqual(toneButtons.map(text), ['เน้นข้อมูล', 'เรียบหรู', 'เป็นกันเอง', 'นักลงทุน']);
+  assert.doesNotMatch(text(initial), /\p{Extended_Pictographic}/u);
+  const edited = 'ขายที่ดิน\nราคา: ฿600,000\nทำเล: สทิงพระ\nรายละเอียดและรูป: https://example.test/listing';
+  nodes(initial).find(node => node.type === 'textarea').props.onChange({ target: { value: edited } });
+  const output = modal.render();
+  const preview = nodes(output).find(node => node.props['aria-label'] === 'ตัวอย่างข้อความโพสต์');
+  assert.ok(nodes(preview).some(node => node.type === 'strong' && text(node) === 'ราคา: ฿600,000'));
+  assert.ok(nodes(preview).some(node => node.type === 'strong' && text(node) === 'ทำเล:'));
+  const copy = nodes(output).find(node => node.type === 'button' && text(node).includes('คัดลอกข้อความโพสต์'));
+  await copy.props.onClick();
+  assert.deepEqual(modal.copied, [edited]);
+  assert.doesNotMatch(modal.copied[0], /\*\*/);
+});
