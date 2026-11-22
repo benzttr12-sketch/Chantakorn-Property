@@ -224,18 +224,15 @@ function matchesPropertySearch(property: Property, keyword: string, knownLocatio
   return terms.every(term => searchable.includes(term));
 }
 
-function isConsignmentRequest(text: string): boolean {
-  return /ฝากขาย|ฝากเช่า|ประเมิน|(?:ต้องการ|อยาก|จะ|ช่วย|รับ)\s*ขาย|(?:ผม|ฉัน|ดิฉัน|เรา)\s*(?:มี.*)?(?:ขายบ้าน|ขายที่ดิน)|ปล่อยเช่า/.test(text);
-}
+const TEXT_SEARCH_COMMANDS = new Set(['ดูทรัพย์', 'ค้นหาทรัพย์', 'รายการทรัพย์', 'ดูทรัพย์ทั้งหมด', 'all']);
 
-// Explicit requests to find listings take precedence over the service keywords.
-function isExplicitPropertySearch(text: string): boolean {
-  return /(?:ขอดู|ช่วยหา|ค้นหา|ดู|หา)\s*(?:รายการ)?(?:ทรัพย์|อสังหา|บ้าน|ที่ดิน|คอนโด|อาคารพาณิชย์|ตึกแถว|ทาวน์โฮม|ทาวน์เฮ้าส์|ขายฝาก)/.test(text)
-    || /\b(?:find|show|search)\s+(?:(?:me|for)\s+)?(?:properties|property|houses?|land|condos?|consignment)\b/.test(text);
-}
-
-function isRedemptionConsultation(text: string): boolean {
-  return /ขายฝาก|จำนอง|\bconsignment\b/.test(text);
+// A keyword inside a conversation is not a command. The rich menu also sends
+// plain text, so recognize its exact values and an explicit search prefix.
+function propertySearchCommand(text: string): string | undefined {
+  if (TEXT_SEARCH_COMMANDS.has(text.toLowerCase())) return 'all';
+  if (/^ckp?-[a-z0-9]+$/i.test(text)) return text;
+  const query = /^(?:ดูทรัพย์|ค้นหาทรัพย์)[ \t]+(\S[^\r\n]*)$/.exec(text)?.[1];
+  return query?.replace(/ฝากขาย/g, 'ขาย');
 }
 
 // Search only published production listings; failed storage is different from zero matches.
@@ -669,6 +666,7 @@ export async function GET(req: Request) {
     isChannelAccessTokenConfigured,
     isChannelSecretConfigured,
     signatureVerificationSupported: true,
+    textReplyPolicy: 'explicit_commands',
     supportedEvents: ['message (text)', 'follow', 'postback'],
     instructions: {
       step1: 'คัดลอก Webhook URL ไปวางใน LINE Developers Console > Messaging API > Webhook settings',
@@ -718,6 +716,7 @@ export async function POST(req: Request) {
     let failedReplies = 0;
     let successfulReplies = 0;
     let simulatedReplies = 0;
+    let unansweredTextMessages = 0;
     let unavailableSearches = 0;
     const errorCodes = new Set<string>();
     const pendingInquiries: InquiryData[] = [];
@@ -791,64 +790,51 @@ export async function POST(req: Request) {
           });
         }
 
-        // Intent 1: Greetings, Help, Main Menu
-        if (
-          lowerText === 'สวัสดี' ||
-          lowerText === 'ดีครับ' ||
-          lowerText === 'ดีค่ะ' ||
-          lowerText === 'hi' ||
-          lowerText === 'hello' ||
-          lowerText === 'เมนู' ||
-          lowerText === 'menu' ||
-          lowerText === 'ช่วยเหลือ' ||
-          lowerText === 'help' ||
-          lowerText === 'เริ่มต้น'
-        ) {
-          const welcomeMsg = buildWelcomeFlex(hostOrigin);
-          await reply(replyToken, [welcomeMsg]);
+        if (isWebsiteFormSubmission) {
+          unansweredTextMessages += 1;
+          continue;
+        }
+        const search = propertySearchCommand(userText);
+        if (search !== undefined) {
+          await replyWithProperties(replyToken, search);
+          continue;
         }
 
-        // The service menu presents both choices before a customer opens either website.
-        else if (lowerText === 'บริการฝากขาย') {
-          await reply(replyToken, [buildServiceChoicesFlex(hostOrigin)]);
-        }
-
-        // Search wording such as ดูบ้านขายฝาก is a catalog request, not a service request.
-        else if (!isWebsiteFormSubmission && (isExplicitPropertySearch(lowerText) ||
-          (/\bckp?-[a-z0-9]+\b/i.test(lowerText) && !isConsignmentRequest(lowerText)))) {
-          // In a listing search, ฝากขาย is sale wording rather than a brokerage request.
-          await replyWithProperties(replyToken, userText.replace(/ฝากขาย/g, 'ขาย'));
-        }
-
-        // Redemption and mortgages are distinct from brokerage for a sale.
-        else if (!isWebsiteFormSubmission && isRedemptionConsultation(lowerText)) {
-          await reply(replyToken, [buildRedemptionFlex(hostOrigin)]);
-        }
-
-        // Intent 2: Listing / Selling / Valuation
-        else if (isWebsiteFormSubmission || isConsignmentRequest(lowerText)) {
-          const consignmentMsg = buildConsignmentFlex(hostOrigin);
-          await reply(replyToken, [consignmentMsg]);
-        }
-
-        // Intent 3: Contact / Agent / Phone / Office
-        else if (
-          lowerText.includes('ติดต่อ') ||
-          lowerText.includes('เบอร์') ||
-          lowerText.includes('โทร') ||
-          lowerText.includes('นายหน้า') ||
-          lowerText.includes('แอดมิน') ||
-          lowerText.includes('ออฟฟิศ') ||
-          lowerText.includes('แผนที่') ||
-          lowerText.includes('contact')
-        ) {
-          const contactMsg = buildContactFlex(hostOrigin);
-          await reply(replyToken, [contactMsg]);
-        }
-
-        // Intent 4: Search Properties (Houses, Land, Condo, Location, Price, Status)
-        else {
-          await replyWithProperties(replyToken, userText);
+        switch (lowerText) {
+          case 'เมนู':
+          case 'menu':
+          case 'ช่วยเหลือ':
+          case 'help':
+          case 'เริ่มต้น':
+            await reply(replyToken, [buildWelcomeFlex(hostOrigin)]);
+            break;
+          case 'บริการฝากขาย':
+            await reply(replyToken, [buildServiceChoicesFlex(hostOrigin)]);
+            break;
+          case 'ฝากขาย':
+          case 'ฝากเช่า':
+          case 'ประเมินราคา':
+          case 'ฝากขายทรัพย์':
+            await reply(replyToken, [buildConsignmentFlex(hostOrigin)]);
+            break;
+          case 'ขายฝาก':
+          case 'จำนอง':
+          case 'ปรึกษาขายฝาก':
+          case 'ปรึกษาจำนอง':
+          case 'ขายฝาก / จำนอง':
+            await reply(replyToken, [buildRedemptionFlex(hostOrigin)]);
+            break;
+          case 'ติดต่อ':
+          case 'ติดต่อเรา':
+          case 'ติดต่อทีมงาน':
+          case 'contact':
+            await reply(replyToken, [buildContactFlex(hostOrigin)]);
+            break;
+          case 'บทความข่าวสาร':
+            await reply(replyToken, [{ type: 'text', text: `ติดตามข้อมูลและความเคลื่อนไหวของ Chantakorn Property ได้ที่เว็บไซต์\n${hostOrigin}` }]);
+            break;
+          default:
+            unansweredTextMessages += 1;
         }
       }
 
@@ -867,7 +853,7 @@ export async function POST(req: Request) {
         } else if (action === 'contact') {
           const contactMsg = buildContactFlex(hostOrigin);
           await reply(replyToken, [contactMsg]);
-        } else {
+        } else if (action === 'menu') {
           const welcomeMsg = buildWelcomeFlex(hostOrigin);
           await reply(replyToken, [welcomeMsg]);
         }
@@ -885,7 +871,7 @@ export async function POST(req: Request) {
     if (failedFollowerWrites) errorCodes.add('FOLLOWER_STORAGE_UNAVAILABLE');
     // Acknowledge processed LINE events; reply and storage outcomes remain explicit.
     console.info('[LINE Webhook] Processing result', {
-      processedEvents: events.length, successfulReplies, failedReplies, simulatedReplies, unavailableSearches,
+      processedEvents: events.length, successfulReplies, failedReplies, simulatedReplies, unansweredTextMessages, unavailableSearches,
       failedInquiryWrites, failedFollowerWrites, errorCodes: [...errorCodes], simulation: isSimulation,
     });
     return jsonResponse({
@@ -894,6 +880,7 @@ export async function POST(req: Request) {
       successfulReplies,
       failedReplies,
       simulatedReplies,
+      unansweredTextMessages,
       unavailableSearches,
       failedInquiryWrites,
       failedFollowerWrites,
