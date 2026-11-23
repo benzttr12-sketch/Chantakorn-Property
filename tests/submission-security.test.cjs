@@ -20,6 +20,7 @@ function firestore(initial = {}, { failWrite = () => false } = {}) {
   let rows = new Map(Object.entries(initial).map(([key, value]) => [key, structuredClone(value)]));
   let pending = Promise.resolve();
   const sizes = [];
+  const reads = [];
   function snapshot(ref, data) {
     return { ref, id: ref.id, exists: data !== undefined, data: () => data === undefined ? undefined : structuredClone(data) };
   }
@@ -28,7 +29,7 @@ function firestore(initial = {}, { failWrite = () => false } = {}) {
       const collection = {
         doc(id) {
           const ref = { id, path: `${name}/${id}` };
-          ref.get = async () => snapshot(ref, rows.get(ref.path));
+          ref.get = async () => { reads.push(ref.path); return snapshot(ref, rows.get(ref.path)); };
           for (const action of ['create', 'set', 'update', 'delete']) ref[action] = data => database.runTransaction(async tx => tx[action](ref, data));
           return ref;
         },
@@ -46,7 +47,7 @@ function firestore(initial = {}, { failWrite = () => false } = {}) {
         const writes = [];
         let written = false;
         const tx = {
-          async get(ref) { assert.equal(written, false, 'Firestore requires all reads before writes'); return snapshot(ref, rows.get(ref.path)); },
+          async get(ref) { assert.equal(written, false, 'Firestore requires all reads before writes'); reads.push(ref.path); return snapshot(ref, rows.get(ref.path)); },
           async getAll(...refs) { return Promise.all(refs.map(ref => tx.get(ref))); },
         };
         for (const action of ['create', 'set', 'update', 'delete']) tx[action] = (ref, data) => {
@@ -75,6 +76,7 @@ function firestore(initial = {}, { failWrite = () => false } = {}) {
     read: path => structuredClone(rows.get(path)),
     documents: name => [...rows.entries()].filter(([key]) => key.startsWith(`${name}/`)),
     sizes,
+    reads,
   };
   return database;
 }
@@ -86,7 +88,7 @@ function submissionHarness({ db = firestore(), send = async () => Response.json(
     '@/lib/server-firestore': server, './server-firestore': server,
     '@/lib/server-budget': { enforceRequestBudget: budget },
     './line-notify-service': { sendLineNotification: async (...args) => { sends.push(args); return send(...args); } },
-  }, { ...globals, process: { env } });
+  }, { ...globals, process: { env: { NEXT_PUBLIC_PROPERTY_STORAGE_BACKEND: 'firebase', ...env } } });
   return { db, sends, load, api: load('app/api/inquiries/route.ts'), media: load('app/api/inquiries/media/route.ts') };
 }
 
@@ -117,6 +119,7 @@ test('concurrent anonymous retries save one receipt and send one persisted, boun
   assert.ok(responses.every(response => response.status === 201));
   const receipts = await Promise.all(responses.map(response => response.json()));
   assert.equal(new Set(receipts.map(row => row.inquiry.created_at)).size, 1);
+  assert.ok(receipts.every(row => row.inquiry.property_title === 'Stored property title'));
   assert.equal(h.db.documents('inquiries').length, 1);
   assert.equal(h.db.read(`inquiries/${body.id}`).status, 'new');
   assert.equal(h.db.read(`inquiries/${body.id}`).property_title, 'Stored property title');
@@ -230,6 +233,106 @@ test('property inquiry receipts require a currently published listing', async ()
   for (const property_id of ['draft', 'missing']) assert.equal((await h.api.POST(request(inquiry({ property_id })))).status, 400);
   assert.equal(h.db.documents('inquiries').length, 0);
   assert.equal(h.sends.length, 0);
+});
+
+const catalogOrigin = 'https://catalog.example';
+const d1PropertyId = '8adca02a-3479-47aa-a101-037434ff4bcb';
+const d1Listing = (extra = {}) => ({ id: d1PropertyId, title: 'Canonical D1 listing', published: true, ...extra });
+const cloudflareEnv = { NEXT_PUBLIC_PROPERTY_STORAGE_BACKEND: 'cloudflare', NEXT_PUBLIC_CLOUDFLARE_API_ORIGIN: catalogOrigin };
+
+test('D1-only inquiry and viewing receipts use the selected public catalog outside Firestore transactions', async () => {
+  for (const inquiry_type of ['inquiry', 'viewing']) {
+    const db = firestore();
+    let insideTransaction = false, lookups = 0;
+    const runTransaction = db.runTransaction;
+    db.runTransaction = operation => runTransaction(async tx => {
+      insideTransaction = true;
+      try { return await operation(tx); } finally { insideTransaction = false; }
+    });
+    const h = submissionHarness({ db, env: {
+      ...cloudflareEnv,
+      // Exercise both explicit and default Cloudflare catalog selection.
+      NEXT_PUBLIC_PROPERTY_STORAGE_BACKEND: inquiry_type === 'viewing' ? undefined : ' cloudflare ',
+    }, globals: { fetch: async (url, init) => {
+      lookups++;
+      assert.equal(insideTransaction, false);
+      assert.equal(url, `${catalogOrigin}/v1/properties/${d1PropertyId}`);
+      assert.equal(init.method, 'GET');
+      assert.equal(init.credentials, 'omit');
+      assert.equal(init.redirect, 'error');
+      assert.equal(init.headers, undefined);
+      assert.equal(init.body, undefined);
+      return Response.json({ data: d1Listing() });
+    } } });
+    const body = inquiry({ inquiry_type, property_id: d1PropertyId, property_title: 'Untrusted client title' });
+    const responses = await Promise.all(Array.from({ length: 4 }, () => h.api.POST(request(body))));
+    assert.ok(responses.every(response => response.status === 201));
+    for (const response of responses) {
+      const saved = (await response.json()).inquiry;
+      assert.equal(saved.property_id, d1PropertyId);
+      assert.equal(saved.property_title, 'Canonical D1 listing');
+      assert.equal(saved.inquiry_type, inquiry_type);
+      assert.equal(saved.submission_hash, undefined);
+      assert.equal(saved.line_notice_state, undefined);
+    }
+    assert.ok(lookups > 0);
+    assert.equal(db.reads.some(path => path.startsWith('properties/')), false);
+    assert.equal(db.documents('inquiries').length, 1);
+    assert.equal(db.read(`inquiries/${body.id}`).property_title, 'Canonical D1 listing');
+    assert.equal(h.sends.length, 1);
+  }
+});
+
+test('missing, forbidden, draft and deleted D1 properties cannot fall back to a published Firestore listing', async () => {
+  for (const response of [
+    () => Response.json({}, { status: 403 }), () => Response.json({}, { status: 404 }),
+    () => Response.json({ data: d1Listing({ published: false }) }),
+    () => Response.json({ data: d1Listing({ deleted_at: '2026-11-16' }) }),
+    () => Response.json({ data: d1Listing({ deletedAt: '2026-11-16' }) }),
+  ]) {
+    const db = firestore({ [`properties/${d1PropertyId}`]: { published: true, title: 'Legacy property' } });
+    const h = submissionHarness({ db, env: cloudflareEnv, globals: { fetch: async () => response() } });
+    assert.equal((await h.api.POST(request(inquiry({ property_id: d1PropertyId })))).status, 400);
+    assert.equal(db.reads.some(path => path.startsWith('properties/')), false);
+    assert.equal(db.documents('inquiries').length, 0);
+    assert.equal(h.sends.length, 0);
+  }
+});
+
+test('unavailable or malformed D1 catalogs fail without receipts, legacy fallback or LINE notifications', async () => {
+  for (const fetch of [
+    async () => Response.json({}, { status: 503 }),
+    async () => { throw new Error('Catalog offline'); },
+    async () => Response.json({ data: null }),
+    async () => Response.json({ data: d1Listing({ title: undefined }) }),
+  ]) {
+    const db = firestore({ [`properties/${d1PropertyId}`]: { published: true, title: 'Legacy property' } });
+    const h = submissionHarness({ db, env: cloudflareEnv, globals: { fetch } });
+    assert.equal((await h.api.POST(request(inquiry({ property_id: d1PropertyId })))).status, 503);
+    assert.equal(db.reads.some(path => path.startsWith('properties/')), false);
+    assert.equal(db.documents('inquiries').length, 0);
+    assert.equal(h.sends.length, 0);
+  }
+});
+
+test('saved D1 inquiry retries preserve their receipt and canonical title after withdrawal or a catalog outage', async () => {
+  let lookups = 0;
+  const h = submissionHarness({ env: cloudflareEnv, globals: { fetch: async () => {
+    if (++lookups > 1) throw new Error('Listing withdrawn and catalog unavailable');
+    return Response.json({ data: d1Listing() });
+  } } });
+  const body = inquiry({ property_id: d1PropertyId, property_title: 'Client title' });
+  const first = await h.api.POST(request(body));
+  assert.equal(first.status, 201);
+  const saved = (await first.json()).inquiry;
+  const retry = await h.api.POST(request(body));
+  assert.equal(retry.status, 201);
+  assert.deepEqual((await retry.json()).inquiry, saved);
+  assert.equal(saved.property_title, 'Canonical D1 listing');
+  assert.equal((await h.api.POST(request({ ...body, message: 'Different request' }))).status, 409);
+  assert.equal(lookups, 1);
+  assert.equal(h.db.documents('inquiries').length, 1);
+  assert.equal(h.sends.length, 1);
 });
 
 test('forged, expired, consumed and mismatched photo sessions cannot create receipts', async () => {

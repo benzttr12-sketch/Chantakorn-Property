@@ -1,4 +1,4 @@
-name: Cloudflare property Admin bridge (root checks)
+name: Property catalog and marketing (root checks)
 
 on:
   pull_request:
@@ -8,10 +8,23 @@ on:
       - 'src/components/admin/StaffPropertyImage.tsx'
       - 'src/lib/store/properties-store.ts'
       - 'src/app/admin/properties/**'
+      - 'src/app/api/inquiries/**'
+      - 'src/lib/server-property-catalog.ts'
       - 'src/app/properties/page.tsx'
       - 'src/components/admin/CollapsiblePropertyCard.tsx'
+      - 'src/components/admin/QuickPropertyModal.tsx'
+      - 'src/components/admin/FacebookPostModal.tsx'
+      - 'src/lib/automation-engine.ts'
       - 'tests/cloudflare-properties.test.cjs'
       - 'tests/cloudflare-property-preview.test.cjs'
+      - 'tests/cloudflare-property-store.test.cjs'
+      - 'tests/cloudflare-cutover.test.cjs'
+      - 'tests/submission-security.test.cjs'
+      - 'tests/property-editor-cleanup.test.cjs'
+      - 'tests/quick-property-cleanup.test.cjs'
+      - 'tests/facebook-post-content.test.cjs'
+      - 'tests/facebook-post-download.test.cjs'
+      - 'scripts/verify-cloudflare.mjs'
       - 'src/lib/property-link.ts'
       - 'tests/property-links.test.cjs'
       - 'src/app/sitemap.ts'

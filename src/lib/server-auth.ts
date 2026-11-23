@@ -18,7 +18,7 @@ type FirestoreProfileResponse = {
 };
 
 /** Verify the caller's Firebase ID token and server-controlled staff role. */
-export async function requireStaff(req: Request): Promise<Response | null> {
+async function requireRole(req: Request, adminOnly: boolean): Promise<Response | null> {
   const token = req.headers.get('authorization')?.match(/^Bearer\s+(.+)$/i)?.[1];
   if (!token) {
     return jsonResponse({ error: 'กรุณาเข้าสู่ระบบพนักงาน' }, { status: 401 });
@@ -64,13 +64,23 @@ export async function requireStaff(req: Request): Promise<Response | null> {
 
     const profile = (await profileResponse.json()) as FirestoreProfileResponse;
     const role = profile.fields?.role?.stringValue;
-    if (role !== 'ADMIN' && role !== 'AGENT') {
+    if (role !== 'ADMIN' && (adminOnly || role !== 'AGENT')) {
       return jsonResponse({ error: 'บัญชีนี้ไม่มีสิทธิ์เข้าถึง API' }, { status: 403 });
     }
 
     return null;
-  } catch (error) {
-    console.error('Could not verify staff identity:', error);
+  } catch {
+    // Provider errors may contain credentials or private identity data.
+    console.error('Could not verify staff identity');
     return jsonResponse({ error: 'ยืนยันตัวตนไม่สำเร็จ กรุณาลองอีกครั้ง' }, { status: 503 });
   }
+}
+
+/** Require an authenticated, verified ADMIN for privileged operations. */
+export function requireAdmin(req: Request): Promise<Response | null> {
+  return requireRole(req, true);
+}
+
+export function requireStaff(req: Request): Promise<Response | null> {
+  return requireRole(req, false);
 }
