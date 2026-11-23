@@ -117,7 +117,7 @@ export default function MortgageCalculator({
   };
 
   return (
-    <div className={`bg-white rounded-3xl border border-surface-border shadow-card overflow-hidden ${compact ? 'p-5 sm:p-6' : 'p-6 sm:p-8 lg:p-10'}`}>
+    <div className={`bg-white rounded-3xl border border-surface-border shadow-card overflow-hidden ${compact ? 'p-3 sm:p-6' : 'p-6 sm:p-8 lg:p-10'}`}>
       {/* Header */}
       {!compact && (
         <div className="text-center max-w-2xl mx-auto mb-8">
@@ -139,39 +139,39 @@ export default function MortgageCalculator({
         <button
           type="button"
           onClick={() => setActiveTab('consignment')}
-          className={`flex-1 flex items-center justify-center space-x-2 py-2.5 px-3 sm:px-4 rounded-xl text-xs sm:text-sm font-bold transition-all ${
+          className={`flex min-w-0 flex-1 items-center justify-center gap-2 rounded-xl px-1 py-2.5 text-center text-xs font-bold transition-all sm:px-4 sm:text-sm ${
             activeTab === 'consignment'
               ? 'bg-navy-950 text-gold-400 shadow-md ring-1 ring-black/5'
               : 'text-gray-600 hover:text-navy-950 hover:bg-white/60'
           }`}
         >
-          <Coins className="w-4 h-4" />
+          <Coins className="hidden size-4 shrink-0 sm:block" />
           <span>คำนวณวงเงิน & ดอกเบี้ย</span>
         </button>
 
         <button
           type="button"
           onClick={() => setActiveTab('land_fees')}
-          className={`flex-1 flex items-center justify-center space-x-2 py-2.5 px-3 sm:px-4 rounded-xl text-xs sm:text-sm font-bold transition-all ${
+          className={`flex min-w-0 flex-1 items-center justify-center gap-2 rounded-xl px-1 py-2.5 text-center text-xs font-bold transition-all sm:px-4 sm:text-sm ${
             activeTab === 'land_fees'
               ? 'bg-navy-950 text-gold-400 shadow-md ring-1 ring-black/5'
               : 'text-gray-600 hover:text-navy-950 hover:bg-white/60'
           }`}
         >
-          <Landmark className="w-4 h-4" />
+          <Landmark className="hidden size-4 shrink-0 sm:block" />
           <span>ค่าธรรมเนียมกรมที่ดิน</span>
         </button>
 
         <button
           type="button"
           onClick={() => setActiveTab('benefits')}
-          className={`flex-1 flex items-center justify-center space-x-2 py-2.5 px-3 sm:px-4 rounded-xl text-xs sm:text-sm font-bold transition-all ${
+          className={`flex min-w-0 flex-1 items-center justify-center gap-2 rounded-xl px-1 py-2.5 text-center text-xs font-bold transition-all sm:px-4 sm:text-sm ${
             activeTab === 'benefits'
               ? 'bg-navy-950 text-gold-400 shadow-md ring-1 ring-black/5'
               : 'text-gray-600 hover:text-navy-950 hover:bg-white/60'
           }`}
         >
-          <ShieldCheck className="w-4 h-4" />
+          <ShieldCheck className="hidden size-4 shrink-0 sm:block" />
           <span>เงื่อนไข & จุดเด่น</span>
         </button>
       </div>

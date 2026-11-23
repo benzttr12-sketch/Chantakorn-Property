@@ -228,7 +228,7 @@ export default function Footer() {
               </li>
               <li className="flex items-center space-x-2.5">
                 <Mail className="w-4 h-4 text-[#d6b77b] shrink-0" />
-                <a href="mailto:contact@chantakornproperty.com" className="hover:text-[#d6b77b] text-xs">
+                <a href="mailto:contact@chantakornproperty.com" className="min-w-0 text-xs wrap-anywhere hover:text-[#d6b77b]">
                   contact@chantakornproperty.com
                 </a>
               </li>
