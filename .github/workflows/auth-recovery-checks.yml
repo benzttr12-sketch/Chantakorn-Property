@@ -16,13 +16,17 @@ on:
       - 'vercel.json'
       - 'scripts/*backup*'
       - 'scripts/firestore-restore-validation.mjs'
+      - 'tests/admin-backup-vault.test.cjs'
       - 'tests/*auth*'
       - 'tests/*login*'
       - 'tests/*backup*'
       - 'tests/admin-session-navigation.test.cjs'
       - 'tests/firestore-restore-validation.test.cjs'
       - 'docs/admin-backup-operations.md'
+      - 'firebase.json'
       - 'firebase.restore.test.json'
+      - 'firestore.rules'
+      - 'package-lock.json'
       - '.github/workflows/auth-recovery-checks.yml'
   workflow_dispatch:
 

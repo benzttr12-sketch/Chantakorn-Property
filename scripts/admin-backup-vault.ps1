@@ -11,6 +11,8 @@ param(
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
+# Native exit codes are inspected below, including the reconciliation review result.
+$PSNativeCommandUseErrorActionPreference = $false
 $backupRepository = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..')).TrimEnd('\')
 $vaultPhase = 'preflight'
 
