@@ -186,7 +186,8 @@ export const auditEvents = sqliteTable('audit_events', {
   createdAt: text('created_at').notNull(),
 }, (table) => [index('idx_audit_events_time').on(table.createdAt)]);
 
-// A singleton invalidation token; SQL triggers maintain it inside catalog writes.
+// A singleton invalidation token; migrations 0004 and 0008 maintain it inside
+// property, media and agent writes. The triggers are reviewed SQL, not ORM DDL.
 export const catalogGeneration = sqliteTable('catalog_generation', {
   id: integer('id').primaryKey(),
   version: text('version').notNull(),

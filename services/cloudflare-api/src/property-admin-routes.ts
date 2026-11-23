@@ -8,6 +8,7 @@ import { auditedMutation } from './audited-mutation.ts';
 import { adminCursor, parseAdminQuery } from './admin-query.ts';
 import { matchAllowedOrigin } from './media-validation.ts';
 import { SWEEP_STATUS_KEY } from './media-orphan-sweep.ts';
+import { agentsForRows, type CatalogAgent } from './property-agents.ts';
 
 type Env = PropertyAuthEnv & {
   PROPERTY_MEDIA: R2Bucket; PRIVATE_MEDIA: R2Bucket; MEDIA_SWEEP_ENABLED?: string;
@@ -32,7 +33,7 @@ const jsonObject = (value: string | null): Record<string, unknown> | undefined =
     return item && typeof item === 'object' && !Array.isArray(item) ? item as Record<string, unknown> : undefined;
   } catch { return undefined; }
 };
-export function toEditorProperty(row: DbProperty, files: MediaRecord[], includePrivate: boolean) {
+export function toEditorProperty(row: DbProperty, files: MediaRecord[], includePrivate: boolean, agent?: CatalogAgent) {
   const images = files.sort((a, b) => a.sortOrder - b.sortOrder).map(x => publicMediaPath(x.id));
   const fields = {
     id: row.id, code: row.code, title: row.title, slug: row.slug, description: row.description,
@@ -49,6 +50,7 @@ export function toEditorProperty(row: DbProperty, files: MediaRecord[], includeP
     video_url: row.videoUrl || '', videos: jsonList(row.videosJson),
     featured: row.featured, published: row.published,
     agent_id: row.agentId || undefined, created_at: row.createdAt, updated_at: row.updatedAt,
+    ...(agent && agent.id === row.agentId ? { agent } : {}),
   };
   return includePrivate ? { ...fields, internal_notes: row.internalNotes ?? '' } : fields;
 }
@@ -242,10 +244,10 @@ propertyAdmin.get('/v1/admin/properties', async c => {
     if (row.published) counts.published += amount;
     else counts.draft += amount;
   }
-  const m = await mediaForRows(db, visible);
+  const [m, assignedAgents] = await Promise.all([mediaForRows(db, visible), agentsForRows(db, visible)]);
   const last = visible.at(-1);
   return c.json({
-    data: visible.map(row => toEditorProperty(row, m.get(row.id) || [], true)),
+    data: visible.map(row => toEditorProperty(row, m.get(row.id) || [], true, assignedAgents.get(row.agentId || ''))),
     next_cursor: rows.length > query.limit && last ? adminCursor(last, query.sortBy) : null,
     total: counts.all,
     counts,
@@ -261,8 +263,8 @@ propertyAdmin.get('/v1/admin/properties/:id', async c => {
   const [row] = await db.select().from(properties)
     .where(and(eq(properties.id, id), isNull(properties.deletedAt))).limit(1);
   if (!row) return c.json({ error: 'Property not found' }, 404);
-  const m = await mediaForRows(db, [row]);
-  return c.json({ data: toEditorProperty(row, m.get(id) || [], true) });
+  const [m, assignedAgents] = await Promise.all([mediaForRows(db, [row]), agentsForRows(db, [row])]);
+  return c.json({ data: toEditorProperty(row, m.get(id) || [], true, assignedAgents.get(row.agentId || '')) });
 });
 
 propertyAdmin.post('/v1/admin/properties', async c => {
@@ -284,7 +286,8 @@ propertyAdmin.post('/v1/admin/properties', async c => {
     } as typeof properties.$inferInsert).toSQL();
     await auditedMutation(c.env.DB, mutation, staff.uid, 'created', identity.id);
     const [row] = await db.select().from(properties).where(eq(properties.id, identity.id)).limit(1);
-    return c.json({ data: toEditorProperty(row, [], true) }, 201);
+    const assignedAgents = await agentsForRows(db, [row]);
+    return c.json({ data: toEditorProperty(row, [], true, assignedAgents.get(row.agentId || '')) }, 201);
   } catch (error) { return routeError(error, c); }
 });
 
@@ -337,8 +340,8 @@ propertyAdmin.patch('/v1/admin/properties/:id', async c => {
     const result = await auditedMutation(c.env.DB, mutation, staff.uid, 'updated', id);
     if (!result.results.length) return c.json({ error: 'Listing changed during save' }, 409);
     const [row] = await db.select().from(properties).where(eq(properties.id, id)).limit(1);
-    const media = await mediaForRows(db, [row]);
-    return c.json({ data: toEditorProperty(row, media.get(row.id) || [], true) });
+    const [media, assignedAgents] = await Promise.all([mediaForRows(db, [row]), agentsForRows(db, [row])]);
+    return c.json({ data: toEditorProperty(row, media.get(row.id) || [], true, assignedAgents.get(row.agentId || '')) });
   } catch (error) { return routeError(error, c); }
 });
 

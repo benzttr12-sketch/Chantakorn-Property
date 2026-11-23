@@ -9,6 +9,16 @@ type Check = { name: string; ok: boolean; code: string; message: string };
 type LineResult =
   | { ok: true; data: Record<string, unknown> }
   | { ok: false; code: string };
+type MenuSummary = { id: string; name: string; selected: boolean; width: number; height: number; areaCount: number };
+type RichMenuReport = {
+  status: 'checked' | 'unavailable' | 'not_checked';
+  defaultStatus: 'set' | 'none' | 'unavailable' | 'not_checked';
+  defaultId: string | null;
+  listStatus: 'available' | 'unavailable' | 'not_checked';
+  totalMenus: number | null;
+  menus: MenuSummary[];
+  message: string;
+};
 
 const NO_STORE = { 'Cache-Control': 'no-store, private' };
 const LINE_TIMEOUT_MS = 5000;
@@ -108,6 +118,58 @@ async function checkLine(token: string, expectedEndpoint: string | null): Promis
   return checks;
 }
 
+const RICH_MENU_ID = /^richmenu-[0-9a-f]{32}$/;
+
+async function checkRichMenus(token: string, accountMatched: boolean): Promise<RichMenuReport> {
+  if (!accountMatched) return {
+    status: 'not_checked', defaultStatus: 'not_checked', defaultId: null,
+    listStatus: 'not_checked', totalMenus: null, menus: [],
+    message: 'ยังตรวจริชเมนูไม่ได้จนกว่าจะยืนยัน Token ของบัญชีนี้',
+  };
+
+  const [defaultResult, listResult] = await Promise.all([
+    readLine('/v2/bot/user/all/richmenu', token),
+    readLine('/v2/bot/richmenu/list', token),
+  ]);
+  const defaultId = defaultResult.ok && typeof defaultResult.data.richMenuId === 'string'
+    && RICH_MENU_ID.test(defaultResult.data.richMenuId) ? defaultResult.data.richMenuId : null;
+  const defaultStatus = defaultId ? 'set'
+    : !defaultResult.ok && defaultResult.code === 'LINE_NOT_FOUND' ? 'none' : 'unavailable';
+  const redactions = [token, process.env.LINE_CHANNEL_SECRET?.trim()].filter((value): value is string => Boolean(value));
+  const cleanName = (value: string) => {
+    let name = value;
+    for (const secret of redactions) name = name.split(secret).join('[REDACTED]');
+    return Array.from(name.replace(/[\u0000-\u001f\u007f]/g, ' ')).slice(0, 120).join('');
+  };
+  const rawMenus = listResult.ok ? listResult.data.richmenus : null;
+  const validMenus = Array.isArray(rawMenus) && rawMenus.length <= 1000 && rawMenus.every((item) => {
+    if (!item || typeof item !== 'object' || Array.isArray(item)) return false;
+    const menu = item as Record<string, unknown>;
+    const size = menu.size as Record<string, unknown> | undefined;
+    return typeof menu.richMenuId === 'string' && RICH_MENU_ID.test(menu.richMenuId)
+      && typeof menu.name === 'string' && typeof menu.selected === 'boolean'
+      && size && typeof size === 'object' && !Array.isArray(size)
+      && Number.isInteger(size.width) && Number(size.width) > 0 && Number(size.width) <= 10000
+      && Number.isInteger(size.height) && Number(size.height) > 0 && Number(size.height) <= 10000
+      && Array.isArray(menu.areas) && menu.areas.length <= 20;
+  });
+  const allMenus: MenuSummary[] = validMenus ? rawMenus.map((item) => {
+    const menu = item as { richMenuId: string; name: string; selected: boolean; size: { width: number; height: number }; areas: unknown[] };
+    return { id: menu.richMenuId, name: cleanName(menu.name), selected: menu.selected,
+      width: menu.size.width, height: menu.size.height, areaCount: menu.areas.length };
+  }) : [];
+  // Keep the API default visible even when the channel has many stored menus.
+  const menus = [...allMenus.filter(menu => menu.id === defaultId), ...allMenus.filter(menu => menu.id !== defaultId)].slice(0, 20);
+  const complete = defaultStatus !== 'unavailable' && validMenus;
+  return {
+    status: complete ? 'checked' : 'unavailable', defaultStatus, defaultId,
+    listStatus: validMenus ? 'available' : 'unavailable', totalMenus: validMenus ? allMenus.length : null, menus,
+    message: !complete ? 'อ่านสถานะริชเมนูจาก LINE ไม่ครบ กรุณาลองตรวจอีกครั้ง'
+      : defaultStatus === 'none' ? 'ไม่พบเมนูหลักที่ตั้งผ่าน API ผลนี้ไม่รวมเมนูที่สร้างใน LINE OA Manager'
+      : 'พบเมนูหลักที่ตั้งผ่าน API ซึ่งมีลำดับการแสดงเหนือเมนูใน LINE OA Manager',
+  };
+}
+
 export async function GET(req: Request) {
   const denied = await requireStaff(req);
   if (denied) {
@@ -132,6 +194,7 @@ export async function GET(req: Request) {
     checkLine(token, expectedEndpoint),
     checkProperties(),
   ]);
+  const richMenu = await checkRichMenus(token, lineChecks.some(check => check.code === 'LINE_ACCOUNT_MATCH'));
   const checks: Check[] = [
     ...lineChecks,
     { name: 'ลายเซ็นข้อความเข้า', ok: secretConfigured, code: secretConfigured ? 'LINE_SECRET_CONFIGURED' : 'LINE_SECRET_MISSING',
@@ -143,6 +206,7 @@ export async function GET(req: Request) {
     ready,
     message: ready ? 'ตรวจสอบการเชื่อมต่อ LINE การรับข้อความ และรายการทรัพย์ผ่านแล้ว' : 'พบการตั้งค่าที่ต้องแก้ไข กรุณาดูผลตรวจสอบด้านล่าง',
     checks,
+    richMenu,
     ...(expectedEndpoint ? { expectedWebhookEndpoint: expectedEndpoint } : {}),
   }, { headers: NO_STORE });
 }
