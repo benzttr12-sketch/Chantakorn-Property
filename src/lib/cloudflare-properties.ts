@@ -1,6 +1,6 @@
 'use client';
 
-import type { Property, PropertyFilters } from '@/lib/types';
+import type { Agent, Property, PropertyFilters } from '@/lib/types';
 import { auth } from '@/lib/firebase/client';
 
 const requested = (process.env.NEXT_PUBLIC_PROPERTY_STORAGE_BACKEND || 'cloudflare').trim().toLowerCase();
@@ -53,6 +53,47 @@ function toExistingProperty(row: Property): Property {
   const cover = row.cover_image?.startsWith('/v1/media/properties/')
     ? absoluteCloudflareMedia(row.cover_image) : row.cover_image;
   return { ...row, images, cover_image: cover || '', features: row.features || [], furniture: row.furniture || '' };
+}
+
+export type CatalogAgent = Agent & { is_public: boolean };
+
+/** Registered catalog agents are independent of Firebase staff profiles. Follow
+ * bounded native pages rather than offering profile UIDs that violate the D1 FK. */
+export async function cloudflareCatalogAgents(signal?: AbortSignal): Promise<CatalogAgent[]> {
+  const agents: CatalogAgent[] = [];
+  const seen = new Set<string>();
+  let cursor: string | null = null;
+  for (let page = 0; page < 10; page++) {
+    const query = new URLSearchParams({ limit: '100' });
+    if (cursor) query.set('cursor', cursor);
+    const result = await request<{ data: Array<Record<string, unknown>>; next_cursor: string | null }>(
+      `/v1/admin/agents?${query}`, { signal }, true);
+    if (!Array.isArray(result.data) || result.data.length > 100 ||
+        (result.next_cursor !== null && (typeof result.next_cursor !== 'string' ||
+          !/^[A-Za-z0-9_-]{1,96}$/.test(result.next_cursor) || result.next_cursor === cursor)))
+      throw new Error('Cloudflare API ส่งรายชื่อนายหน้าไม่ถูกต้อง');
+    for (const row of result.data) {
+      if (!row || typeof row !== 'object' || typeof row.id !== 'string' ||
+          !/^[A-Za-z0-9_-]{1,96}$/.test(row.id) || seen.has(row.id) ||
+          typeof row.name !== 'string' || !row.name.trim() ||
+          typeof row.title !== 'string' || typeof row.is_public !== 'boolean' ||
+          ['phone', 'line_id', 'facebook', 'email', 'photo_url', 'bio'].some(key => row[key] != null && typeof row[key] !== 'string'))
+        throw new Error('Cloudflare API ส่งรายชื่อนายหน้าไม่ถูกต้อง');
+      seen.add(row.id);
+      agents.push({
+        id: row.id, name: row.name, title: row.title,
+        phone: (row.phone as string) || '', line_id: (row.line_id as string) || '',
+        facebook: (row.facebook as string) || '', email: (row.email as string) || '',
+        photo_url: (row.photo_url as string) || '', bio: (row.bio as string) || '',
+        is_public: row.is_public,
+      });
+    }
+    if (result.next_cursor === null) return agents;
+    if (result.next_cursor !== result.data.at(-1)?.id)
+      throw new Error('Cloudflare API ส่งรายชื่อนายหน้าไม่ถูกต้อง');
+    cursor = result.next_cursor;
+  }
+  throw new Error('รายชื่อนายหน้าเกินขีดจำกัด กรุณาติดต่อผู้ดูแลระบบ');
 }
 
 /** One bounded request; callers control page navigation and abort obsolete searches. */

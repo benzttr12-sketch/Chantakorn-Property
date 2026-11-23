@@ -48,13 +48,15 @@ function component(relative, mocks, props) {
   });
   return { render() { cursor = 0; return module.exports.default(props); } };
 }
-function quickEntry() {
+function quickEntry({ persist = async property => property } = {}) {
   const saved = [];
+  const successes = [];
+  let closed = 0;
   const requests = [];
   const fengShuiCalls = [];
   const staff = { id: 'staff-fixture', full_name: 'ทีมงานทดสอบ', role: 'AGENT', avatar_url: '' };
   const modal = component('components/admin/QuickPropertyModal.tsx', {
-    '@/lib/store/properties-store': { createProperty: async property => { saved.push(property); } },
+    '@/lib/store/properties-store': { createProperty: async property => { saved.push(property); return persist(property); } },
     '@/lib/property-text-parser': parser,
     '@/data/locations': locations,
     '@/lib/feng-shui': { calculateFengShui: (direction, options) => {
@@ -70,8 +72,8 @@ function quickEntry() {
       requests.push({ url, body: JSON.parse(init.body) });
       return Response.json({ success: true, description: 'คำบรรยายที่ทีมตรวจสอบจาก AI' });
     } },
-  }, { isOpen: true, onSuccess() {}, onClose() {} });
-  return { ...modal, saved, requests, fengShuiCalls };
+  }, { isOpen: true, onSuccess(property) { successes.push(property); }, onClose() { closed++; } });
+  return { ...modal, saved, requests, fengShuiCalls, successes, get closed() { return closed; } };
 }
 function button(output, label) {
   const result = nodes(output).find(node => node.type === 'button' && text(node).includes(label));
@@ -231,6 +233,36 @@ test('voice, AI drafting and a staff-entered video remain available with explici
   assert.equal(modal.saved[0].description, 'คำบรรยายที่ทีมตรวจสอบจาก AI');
   assert.equal(modal.saved[0].cover_image, '');
   assert.equal(modal.saved[0].images.length, 0);
+});
+
+test('quick entry waits for persistence and returns the canonical ID, revision and publication state', async () => {
+  let resolveSave;
+  const pending = new Promise(resolve => { resolveSave = resolve; });
+  const modal = quickEntry({ persist: () => pending });
+  const review = parseEntry(modal, 'ขายบ้านเดี่ยว ควนลัง หาดใหญ่ ราคา 3.89 ล้าน');
+  nodes(review).find(node => node.type === 'input' && node.props.type === 'checkbox').props.onChange({ target: { checked: true } });
+  const saving = button(modal.render(), 'ยืนยันและเผยแพร่ทรัพย์').props.onClick();
+  assert.equal(modal.saved.length, 1);
+  assert.equal(modal.successes.length, 0);
+  assert.equal(modal.closed, 0);
+  const persisted = { ...modal.saved[0], id: '00000000-0000-4000-8000-000000000001', code: 'CK-SAVED',
+    updated_at: '2026-11-17T00:00:00.000Z', published: false };
+  assert.notEqual(modal.saved[0].id, persisted.id);
+  assert.equal(modal.saved[0].published, true);
+  resolveSave(persisted);
+  await saving;
+  assert.equal(modal.successes[0], persisted);
+  assert.equal(modal.successes[0].published, false);
+  assert.equal(modal.closed, 1);
+});
+
+test('failed quick entry stays open and cannot report a locally generated property as saved', async () => {
+  const modal = quickEntry({ persist: async () => { throw new Error('Worker unavailable'); } });
+  const review = parseEntry(modal, 'ขายบ้านเดี่ยว ควนลัง หาดใหญ่ ราคา 3.89 ล้าน');
+  await button(review, 'บันทึกฉบับร่าง').props.onClick();
+  assert.equal(modal.successes.length, 0);
+  assert.equal(modal.closed, 0);
+  assert.match(text(modal.render()), /เกิดข้อผิดพลาดในการลงประกาศ/);
 });
 
 test('property cards try real gallery photos and show a neutral placeholder if none load', () => {
