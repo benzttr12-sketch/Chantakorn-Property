@@ -41,10 +41,14 @@ function load(file, { env = {}, fetch = async () => { throw Error('Unexpected re
   return module.exports;
 }
 
-function signedRequest(text, secret = 'test-secret', url = 'https://example.com/api/line/webhook') {
-  const body = JSON.stringify({ events: [{ type: 'message', replyToken: 'real-reply-token', source: { userId: 'Utest' }, message: { type: 'text', text } }] });
+function signedEvents(events, secret = 'test-secret', url = 'https://example.com/api/line/webhook') {
+  const body = JSON.stringify({ events });
   const signature = createHmac('sha256', secret).update(body).digest('base64');
   return new Request(url, { method: 'POST', headers: { 'x-line-signature': signature }, body });
+}
+
+function signedRequest(text, secret, url) {
+  return signedEvents([{ type: 'message', replyToken: 'real-reply-token', source: { userId: 'Utest' }, message: { type: 'text', text } }], secret, url);
 }
 
 function propertyDocument(property) {
@@ -91,6 +95,7 @@ test('diagnostics expose source revision and presence checks without revealing c
   assert.equal(result.status, 'configured');
   assert.equal(result.buildRevision, 'abc123');
   assert.equal(result.credentialValidation, 'presence_only');
+  assert.equal(result.textReplyPolicy, 'explicit_commands');
   assert.equal(result.webhookEndpoint, 'https://api.example.com/api/line/webhook');
   assert.equal(JSON.stringify(result).includes('private-token'), false);
   assert.equal(JSON.stringify(result).includes('private-secret'), false);
@@ -140,11 +145,13 @@ test('staff simulation neither writes customer records nor sends real replies', 
     body: JSON.stringify({ events: [
       { type: 'follow', replyToken: 'test_follow', source: { userId: 'Utest' } },
       { type: 'message', replyToken: 'test_message', source: { userId: 'Utest' }, message: { type: 'text', text: 'ดูทรัพย์' } },
+      { type: 'message', replyToken: 'test_chat', source: { userId: 'Utest' }, message: { type: 'text', text: 'ขอบคุณค่ะ เดี๋ยวติดต่อกลับ' } },
     ] }),
   }));
   const result = await response.json();
   assert.equal(result.simulation, true);
   assert.equal(result.simulatedReplies, 2);
+  assert.equal(result.unansweredTextMessages, 1);
   assert.equal(result.successfulReplies, 0);
   assert.equal(writes, 0);
   assert.equal(sends, 0);
@@ -294,23 +301,122 @@ const searchableProperties = [
   { id: 'land-three', title: 'ที่ดินขายหาดใหญ่', published: true, property_type: 'land', status: 'sale', district: 'หาดใหญ่', province: 'สงขลา' },
 ];
 
-test('Thai buyer phrases search by type, sale status and location instead of opening the seller form', async () => {
+test('signed chat messages stay silent without catalog reads and still reach the staff inbox', async () => {
+  const userId = `U${'a'.repeat(32)}`;
+  const texts = [
+    'สวัสดี', 'hi', 'ขอบคุณครับ', 'พรุ่งนี้สะดวกไหมคะ', 'ทั้งหมด', 'ดูทรัพย์ที่คุยกันนะครับ',
+    'ขอเบอร์โทรทีมงานหน่อยค่ะ', 'พรุ่งนี้จะติดต่อกลับ', 'ต้องการฝากขายบ้าน', 'อยากขายที่ดิน',
+    'บ้านขาย หาดใหญ่', 'อยากปรึกษาขายฝากครับ', 'หาบ้านเช่าหาดใหญ่ค่ะ',
+    'ขอนัดชมทรัพย์ CK-813F2B พรุ่งนี้ค่ะ',
+  ];
+  const webForm = 'ค้นหาทรัพย์ [CP-WEB-FORM:813f2b90-36a7-488a-baf7-e7a79cd7c475] ข้อมูลผู้ติดต่อ';
+  const inbox = [];
+  const followers = [];
+  let catalogReads = 0;
+  let replyCalls = 0;
+  const api = load('app/api/line/webhook/route.ts', {
+    env: { LINE_CHANNEL_SECRET: 'test-secret', LINE_CHANNEL_ACCESS_TOKEN: 'test-token' },
+    firestore: {
+      listFirestoreDocuments: async () => { catalogReads++; return searchableProperties; },
+      createFirestoreDocument: async (collection, record) => { inbox.push({ collection, ...record }); return { ok: true }; },
+      patchFirestoreDocument: async (collection, id, fields) => { followers.push({ collection, id, fields }); return { ok: true }; },
+    },
+    fetch: async () => { replyCalls++; return Response.json({}); },
+  });
+  const response = await api.POST(signedEvents([...texts, webForm].map((text, index) => ({
+    type: 'message', replyToken: `reply-${index}`, source: { userId }, message: { type: 'text', text },
+  }))));
+  assert.equal(response.status, 200);
+  const result = await response.json();
+  assert.equal(result.success, true);
+  assert.equal(result.processedEvents, texts.length + 1);
+  assert.equal(result.unansweredTextMessages, texts.length + 1);
+  assert.equal(result.successfulReplies, 0);
+  assert.equal(result.failedReplies, 0);
+  assert.equal(result.failedInquiryWrites, 0);
+  assert.equal(result.failedFollowerWrites, 0);
+  assert.equal(catalogReads, 0);
+  assert.equal(replyCalls, 0);
+  assert.deepEqual(inbox.map(record => record.message), texts);
+  assert.ok(inbox.every(record => record.collection === 'inquiries' && record.line_id === userId));
+  assert.equal(followers.length, 1);
+  assert.equal(followers[0].collection, 'line_followers');
+  assert.equal(followers[0].id, userId);
+  assert.equal(followers[0].fields.is_active, true);
+});
+
+test('explicit help, contact and news commands keep the customer shortcuts available', async () => {
+  for (const phrase of ['เมนู', 'menu', 'ช่วยเหลือ', 'help', 'เริ่มต้น']) {
+    const { sent, result } = await customerReply(phrase, searchableProperties);
+    assert.equal(result.successfulReplies, 1, phrase);
+    assert.match(sent[0].messages[0].altText, /ยินดีต้อนรับสู่ Chantakorn Property/, phrase);
+  }
+  for (const phrase of ['ติดต่อ', 'ติดต่อเรา', 'ติดต่อทีมงาน', 'contact']) {
+    const { sent, result } = await customerReply(phrase, searchableProperties);
+    assert.equal(result.successfulReplies, 1, phrase);
+    assert.match(sent[0].messages[0].altText, /ติดต่อทีมงาน Chantakorn Property/, phrase);
+  }
+  const news = await customerReply('บทความข่าวสาร', searchableProperties);
+  assert.equal(news.result.successfulReplies, 1);
+  assert.equal(news.sent[0].messages[0].type, 'text');
+  assert.match(news.sent[0].messages[0].text, /https:\/\/site\.example\.com(?:\/|$)/);
+});
+
+test('supported postbacks still reply but an unknown button does not send a fallback message', async () => {
+  const sent = [];
+  const api = load('app/api/line/webhook/route.ts', {
+    env: { LINE_CHANNEL_SECRET: 'test-secret', LINE_CHANNEL_ACCESS_TOKEN: 'test-token' },
+    firestore: { listFirestoreDocuments: async () => searchableProperties },
+    fetch: async (url, init) => {
+      assert.equal(url, 'https://api.line.me/v2/bot/message/reply');
+      sent.push(JSON.parse(init.body));
+      return Response.json({});
+    },
+  });
+  const buttons = [
+    ['browse', 'action=search_all'],
+    ['search', new URLSearchParams({ action: 'search', keyword: 'บ้านขาย หาดใหญ่' }).toString()],
+    ['seller', 'action=consignment'],
+    ['contact', 'action=contact'],
+    ['menu', 'action=menu'],
+    ['unknown', 'action=unrecognized'],
+  ];
+  const response = await api.POST(signedEvents(buttons.map(([replyToken, data]) => ({
+    type: 'postback', replyToken, source: { userId: 'Utest' }, postback: { data },
+  }))));
+  assert.equal(response.status, 200);
+  const result = await response.json();
+  assert.equal(result.success, true);
+  assert.equal(result.processedEvents, buttons.length);
+  assert.equal(result.successfulReplies, 5);
+  assert.equal(result.failedReplies, 0);
+  assert.equal(result.unansweredTextMessages, 0);
+  assert.deepEqual(sent.map(request => request.replyToken), ['browse', 'search', 'seller', 'contact', 'menu']);
+  assert.equal(sent[0].messages[0].contents.contents.length, 4);
+  assert.equal(sent[1].messages[0].contents.contents.length, 1);
+  assert.match(sent[2].messages[0].altText, /ฝากขายอสังหาริมทรัพย์/);
+  assert.match(sent[3].messages[0].altText, /ติดต่อทีมงาน/);
+  assert.match(sent[4].messages[0].altText, /ยินดีต้อนรับสู่ Chantakorn Property/);
+});
+
+test('explicit search commands keep listing filters for type, sale status and location', async () => {
   for (const [phrase, expectedTitle] of [
-    ['มีขายที่ดิน สิงหนครไหมครับ', 'ที่ดินสิงหนคร'],
-    ['ขอดูบ้านขายแถวหาดใหญ่หน่อยครับ', 'บ้านขายหาดใหญ่'],
-    ['อยากซื้อบ้าน ในหาดใหญ่', 'บ้านขายหาดใหญ่'],
-    ['หาบ้านเช่าหาดใหญ่ค่ะ', 'บ้านเช่าหาดใหญ่'],
+    ['ค้นหาทรัพย์ ที่ดินขาย สิงหนคร', 'ที่ดินสิงหนคร'],
+    ['ดูทรัพย์ บ้านขาย หาดใหญ่', 'บ้านขายหาดใหญ่'],
+    ['ค้นหาทรัพย์ บ้านซื้อ หาดใหญ่', 'บ้านขายหาดใหญ่'],
+    ['ดูทรัพย์ บ้านเช่า หาดใหญ่', 'บ้านเช่าหาดใหญ่'],
   ]) {
     const { sent, result } = await customerReply(phrase, searchableProperties);
     assert.equal(result.successfulReplies, 1);
+    assert.equal(result.unansweredTextMessages, 0);
     const bubbles = sent[0].messages[0].contents.contents;
     assert.equal(bubbles.length, 1, phrase);
     assert.equal(bubbles[0].body.contents[1].text, expectedTitle, phrase);
   }
 });
 
-test('explicit seller requests and website consignment markers still open the seller flow', async () => {
-  for (const phrase of ['ต้องการขายที่ดิน สิงหนคร', 'อยากขายบ้าน', 'ฝากขายบ้าน', '[CP-WEB-FORM:813f2b90-36a7-488a-baf7-e7a79cd7c475] ข้อมูลผู้ติดต่อ']) {
+test('exact seller commands still open the seller flow without reading listings', async () => {
+  for (const phrase of ['ฝากขาย', 'ฝากเช่า', 'ประเมินราคา', 'ฝากขายทรัพย์']) {
     let reads = 0;
     let writes = 0;
     const { sent } = await customerReply(phrase, searchableProperties, { firestore: {
@@ -318,23 +424,25 @@ test('explicit seller requests and website consignment markers still open the se
       createFirestoreDocument: async () => { writes += 1; return { ok: true }; },
     } });
     assert.equal(reads, 0, phrase);
-    assert.equal(writes, phrase.startsWith('[CP-WEB-FORM:') ? 0 : 1, phrase);
+    assert.equal(writes, 1, phrase);
     assert.equal(sent[0].messages[0].contents.body.contents.at(-1).action.uri, 'https://site.example.com/sell');
   }
 });
 
 test('property codes find a specific listing and general listing commands return published results', async () => {
-  const { sent } = await customerReply('ขอดูรหัสทรัพย์ CK-813F2B', searchableProperties);
-  assert.equal(sent[0].messages[0].contents.contents.length, 1);
-  assert.equal(sent[0].messages[0].contents.contents[0].body.contents[1].text, 'ที่ดินสิงหนคร');
-  for (const phrase of ['ดูทรัพย์', 'ค้นหาทรัพย์', 'รายการทรัพย์', 'ทั้งหมด']) {
+  for (const phrase of ['CK-813F2B', 'ค้นหาทรัพย์ CK-813F2B', ' cK-813f2b ']) {
+    const { sent } = await customerReply(phrase, searchableProperties);
+    assert.equal(sent[0].messages[0].contents.contents.length, 1, phrase);
+    assert.equal(sent[0].messages[0].contents.contents[0].body.contents[1].text, 'ที่ดินสิงหนคร', phrase);
+  }
+  for (const phrase of ['ดูทรัพย์', 'ค้นหาทรัพย์', 'รายการทรัพย์', 'ดูทรัพย์ทั้งหมด', 'all']) {
     const reply = await customerReply(phrase, searchableProperties);
     assert.equal(reply.sent[0].messages[0].contents.contents.length, 4, phrase);
   }
 });
 
 test('unmatched locations or property codes never return unrelated homes', async () => {
-  for (const phrase of ['บ้านขายเชียงใหม่', 'ที่ดิน ตรัง', 'CK-999999']) {
+  for (const phrase of ['ดูทรัพย์ บ้านขายเชียงใหม่', 'ค้นหาทรัพย์ ที่ดิน ตรัง', 'CK-999999']) {
     const { sent, result } = await customerReply(phrase, searchableProperties);
     assert.equal(result.successfulReplies, 1);
     assert.equal(sent[0].messages.length, 1);
@@ -350,16 +458,16 @@ test('a place beginning with บ้าน stays a location and Thai place names 
     { id: 'hatyai-house', title: 'บ้านใจกลางเมือง', published: true, property_type: 'house', status: 'sale', district: 'หาดใหญ่', subdistrict: 'คอหงส์' },
     { id: 'similar-word', title: 'โครงการดใหญ่', published: true, property_type: 'house', status: 'sale', district: 'สะเดา' },
   ];
-  const land = await customerReply('ขอดูที่ดิน บ้านพรุ', properties);
+  const land = await customerReply('ค้นหาทรัพย์ ที่ดิน บ้านพรุ', properties);
   assert.equal(land.sent[0].messages[0].contents.contents.length, 1);
   assert.equal(land.sent[0].messages[0].contents.contents[0].body.contents[1].text, 'ที่ดินใกล้สวน');
-  const house = await customerReply('บ้านขาย หาดใหญ่', properties);
+  const house = await customerReply('ดูทรัพย์ บ้านขาย หาดใหญ่', properties);
   assert.equal(house.sent[0].messages[0].contents.contents.length, 1);
   assert.equal(house.sent[0].messages[0].contents.contents[0].body.contents[1].text, 'บ้านใจกลางเมือง');
 });
 
 test('a long customer query cannot overflow Flex alternative text or split an emoji', async () => {
-  const { sent, result } = await customerReply(`CK-813F2B ${'🙂'.repeat(2400)}`, searchableProperties);
+  const { sent, result } = await customerReply(`ค้นหาทรัพย์ CK-813F2B ${'🙂'.repeat(2400)}`, searchableProperties);
   assert.equal(result.successfulReplies, 1);
   const message = sent[0].messages[0];
   assert.ok(message.altText.length <= 400);
@@ -417,7 +525,7 @@ test('reply rejection diagnostics classify LINE failures without logging credent
       fetch: async () => Response.json({ message }, { status }),
       log: (...args) => logs.push(args),
     });
-    const response = await api.POST(signedRequest('private-customer-text', 'private-secret'));
+    const response = await api.POST(signedRequest('ค้นหาทรัพย์ private-customer-text', 'private-secret'));
     const result = await response.json();
     assert.equal(result.failedReplies, 1);
     assert.deepEqual(result.errorCodes, [expectedCode]);
@@ -733,10 +841,10 @@ test('Firestore property search constrains results to published documents', asyn
 
 test('brokerage and sale-with-redemption requests get separate illustrated cards and destinations', async () => {
   for (const [phrase, image, destination, title] of [
-    ['ฝากขายบ้าน', 'sell-service.png', '/sell', 'ฝากขายทรัพย์กับเรา'],
+    ['ฝากขาย', 'sell-service.png', '/sell', 'ฝากขายทรัพย์กับเรา'],
     ['ขายฝาก', 'sale-with-redemption.png', '/contact', 'ปรึกษาขายฝาก / จำนอง'],
     ['ปรึกษาจำนอง', 'sale-with-redemption.png', '/contact', 'ปรึกษาขายฝาก / จำนอง'],
-    ['ขายฝาก/จำนอง', 'sale-with-redemption.png', '/contact', 'ปรึกษาขายฝาก / จำนอง'],
+    ['ขายฝาก / จำนอง', 'sale-with-redemption.png', '/contact', 'ปรึกษาขายฝาก / จำนอง'],
   ]) {
     let reads = 0;
     const { sent } = await customerReply(phrase, searchableProperties, { firestore: {
@@ -756,7 +864,7 @@ test('brokerage and sale-with-redemption requests get separate illustrated cards
 test('explicit searches for consignment listings and all listings remain catalog searches', async () => {
   const properties = [...searchableProperties,
     { id: 'redemption', title: 'ทรัพย์ขายฝาก', published: true, property_type: 'consignment', status: 'sale' }];
-  const specific = await customerReply('ดูทรัพย์ขายฝาก', properties);
+  const specific = await customerReply('ดูทรัพย์ ขายฝาก', properties);
   assert.equal(specific.sent[0].messages[0].contents.contents.length, 1);
   assert.equal(specific.sent[0].messages[0].contents.contents[0].body.contents[1].text, 'ทรัพย์ขายฝาก');
   const all = await customerReply('all', properties);
@@ -814,7 +922,7 @@ test('explicit property searches take precedence over both service intents', asy
     { id: 'consignment', title: 'บ้านที่ดินคอนโดขายฝาก', published: true, property_type: 'consignment', status: 'sale' },
     { id: 'sale-house', title: 'บ้านขาย', published: true, property_type: 'house', status: 'sale' },
   ];
-  for (const phrase of ['ดูบ้านขายฝาก', 'หาที่ดินขายฝาก', 'ค้นหาคอนโดขายฝาก', 'ดูทรัพย์ฝากขาย', 'find consignment', 'show consignment']) {
+  for (const phrase of ['ดูทรัพย์ บ้านขายฝาก', 'ดูทรัพย์ ที่ดินขายฝาก', 'ค้นหาทรัพย์ คอนโดขายฝาก', 'ดูทรัพย์ ฝากขาย', 'ค้นหาทรัพย์ consignment']) {
     let reads = 0;
     const { sent } = await customerReply(phrase, properties, { firestore: {
       listFirestoreDocuments: async () => { reads++; return properties; },
@@ -825,7 +933,7 @@ test('explicit property searches take precedence over both service intents', asy
     assert.ok(message.type === 'text' || message.contents.type === 'carousel', phrase);
     assert.ok(!JSON.stringify(message).includes('/images/line/'), phrase);
   }
-  for (const [phrase, suffix] of [['ต้องการฝากขายบ้าน', '/sell'], ['ปรึกษาขายฝาก', '/contact']]) {
+  for (const [phrase, suffix] of [['ฝากขายทรัพย์', '/sell'], ['ปรึกษาขายฝาก', '/contact']]) {
     let reads = 0;
     const { sent } = await customerReply(phrase, properties, { firestore: {
       listFirestoreDocuments: async () => { reads++; return properties; },
@@ -844,11 +952,11 @@ test('a consignment search with a property type requires both category and textu
     { id: 'unclear', title: 'ทรัพย์ขายฝาก', published: true, property_type: 'consignment', status: 'sale' },
     { id: 'place-name', title: 'ที่ดินบ้านพรุ', subdistrict: 'บ้านพรุ', published: true, property_type: 'consignment', status: 'sale' },
   ];
-  const { sent } = await customerReply('ดูบ้านขายฝาก', properties);
+  const { sent } = await customerReply('ดูทรัพย์ บ้านขายฝาก', properties);
   const cards = sent[0].messages[0].contents.contents;
   assert.equal(cards.length, 1);
   assert.equal(cards[0].body.contents[1].text, 'บ้านสำหรับขายฝาก');
-  const search = await customerReply('ดูที่ดินขายฝาก', properties);
+  const search = await customerReply('ค้นหาทรัพย์ ที่ดินขายฝาก', properties);
   const landTitles = search.sent[0].messages[0].contents.contents.map(card => card.body.contents[1].text);
   assert.deepEqual(landTitles, ['ที่ดินสำหรับขายฝาก', 'ที่ดินบ้านพรุ']);
 });

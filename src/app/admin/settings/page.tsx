@@ -31,6 +31,7 @@ interface SimulationResult {
   success: boolean;
   simulation?: boolean;
   simulatedReplies?: number;
+  unansweredTextMessages?: number;
   unavailableSearches?: number;
   errorCodes?: string[];
   error?: string;
@@ -224,7 +225,30 @@ export default function AdminSettingsPage() {
         <summary className="flex cursor-pointer list-none items-center justify-between gap-3 font-semibold text-navy-950">การเชื่อมต่อขั้นสูงและทดสอบคำสั่ง<ChevronDown className="h-5 w-5 shrink-0 transition-transform group-open:rotate-180" /></summary>
         <div className="mt-6 space-y-6">
           <div><label htmlFor="line-webhook-url" className="text-sm font-medium text-navy-950">Webhook URL</label><div className="mt-2 flex flex-wrap gap-2"><input id="line-webhook-url" readOnly value={webhookUrl} className="min-w-0 flex-1 rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 text-xs" /><button type="button" disabled={!webhookUrl} onClick={copyWebhook} className="admin-secondary"><Copy className="h-4 w-4" />{copied ? 'คัดลอกแล้ว' : 'คัดลอก'}</button></div>{copyError && <p role="alert" className="mt-2 text-sm text-red-700">{copyError}</p>}<p className="mt-3 text-xs leading-relaxed text-slate-500">นำ URL ไปตั้งใน <a href="https://developers.line.biz/console/" target="_blank" rel="noreferrer" className="font-medium text-navy-950 underline">LINE Developers</a> ที่ Messaging API → Webhook settings แล้วเปิด Use webhook และกด Verify</p></div>
-          <div className="border-t border-slate-100 pt-5"><h3 className="text-sm font-semibold text-navy-950">ทดสอบคำสั่งแบบจำลอง</h3><p className="mt-1 text-xs text-slate-500">ตรวจการประมวลผลคำสั่ง โดยไม่ส่งข้อความจริงและไม่บันทึกผู้ติดต่อ</p><div className="mt-3 flex flex-wrap gap-2">{['ดูทรัพย์', 'สวัสดี', 'ฝากขาย', 'ติดต่อ'].map(text => <button type="button" key={text} aria-pressed={keyword === text} onClick={() => setKeyword(text)} className={`rounded-lg border px-3 py-2 text-xs ${keyword === text ? 'border-navy-950 bg-navy-950 text-white' : 'border-slate-200 text-slate-600'}`}>{text}</button>)}</div><label htmlFor="line-simulation-keyword" className="mt-4 block text-xs font-medium text-slate-600">ข้อความที่ต้องการทดสอบ</label><div className="mt-2 flex flex-wrap gap-2"><input id="line-simulation-keyword" value={keyword} onChange={event => setKeyword(event.target.value)} className="min-w-0 flex-1 rounded-xl border border-slate-200 px-3 py-3 text-sm" /><button type="button" disabled={simulating || !keyword.trim()} onClick={simulate} className="admin-secondary">{simulating && <Loader2 className="h-4 w-4 animate-spin" />}ทดสอบคำสั่ง</button></div>{simulation && <div role="status" className="mt-4 rounded-xl bg-slate-50 p-4 text-sm"><p className="font-medium text-navy-950">{simulation.success && !simulation.unavailableSearches ? 'ประมวลผลคำสั่งจำลองแล้ว' : 'ยังประมวลผลคำสั่งได้ไม่ครบ'}</p><p className="mt-1 text-slate-500">จำลองการตอบ {simulation.simulatedReplies || 0} ข้อความ</p>{simulation.error && <p className="mt-2 text-red-700">{simulation.error}</p>}{Boolean(simulation.unavailableSearches) && <p className="mt-2 text-amber-700">ยังโหลดรายการทรัพย์ไม่ได้ กรุณาตรวจการเชื่อมต่อข้อมูล</p>}<details className="mt-3"><summary className="cursor-pointer text-xs text-slate-500">รายละเอียดผลทดสอบ</summary><pre className="mt-2 whitespace-pre-wrap break-all text-xs text-slate-600">{JSON.stringify(simulation, null, 2)}</pre></details></div>}</div>
+          <div className="border-t border-slate-100 pt-5">
+            <h3 className="text-sm font-semibold text-navy-950">ทดสอบการตอบ LINE แบบจำลอง</h3>
+            <p className="mt-1 text-xs text-slate-500">บอตตอบเฉพาะคำสั่งที่รองรับ ข้อความสนทนาทั่วไปเว้นให้ทีมงานตอบเอง การทดสอบนี้ไม่ส่งข้อความจริงและไม่บันทึกผู้ติดต่อ</p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              {['ดูทรัพย์', 'บริการฝากขาย', 'ติดต่อทีมงาน', 'ขอบคุณครับ'].map(text => (
+                <button type="button" key={text} aria-pressed={keyword === text} onClick={() => setKeyword(text)} className={`rounded-lg border px-3 py-2 text-xs ${keyword === text ? 'border-navy-950 bg-navy-950 text-white' : 'border-slate-200 text-slate-600'}`}>{text}</button>
+              ))}
+            </div>
+            <label htmlFor="line-simulation-keyword" className="mt-4 block text-xs font-medium text-slate-600">ข้อความที่ต้องการทดสอบ</label>
+            <div className="mt-2 flex flex-wrap gap-2">
+              <input id="line-simulation-keyword" value={keyword} onChange={event => setKeyword(event.target.value)} className="min-w-0 flex-1 rounded-xl border border-slate-200 px-3 py-3 text-sm" />
+              <button type="button" disabled={simulating || !keyword.trim()} onClick={simulate} className="admin-secondary">{simulating && <Loader2 className="h-4 w-4 animate-spin" />}ทดสอบข้อความ</button>
+            </div>
+            {simulation && (
+              <div role="status" className="mt-4 rounded-xl bg-slate-50 p-4 text-sm">
+                <p className="font-medium text-navy-950">{simulation.success && !simulation.unavailableSearches ? 'ประมวลผลข้อความจำลองแล้ว' : 'ยังประมวลผลข้อความได้ไม่ครบ'}</p>
+                <p className="mt-1 text-slate-500">จำลองการตอบ {simulation.simulatedReplies || 0} ข้อความ</p>
+                {Boolean(simulation.unansweredTextMessages) && <p className="mt-1 text-slate-500">เว้นการตอบ {simulation.unansweredTextMessages} ข้อความ ให้ทีมงานคุยต่อ</p>}
+                {simulation.error && <p className="mt-2 text-red-700">{simulation.error}</p>}
+                {Boolean(simulation.unavailableSearches) && <p className="mt-2 text-amber-700">ยังโหลดรายการทรัพย์ไม่ได้ กรุณาตรวจการเชื่อมต่อข้อมูล</p>}
+                <details className="mt-3"><summary className="cursor-pointer text-xs text-slate-500">รายละเอียดผลทดสอบ</summary><pre className="mt-2 whitespace-pre-wrap break-all text-xs text-slate-600">{JSON.stringify(simulation, null, 2)}</pre></details>
+              </div>
+            )}
+          </div>
           <div className="rounded-2xl bg-slate-50 p-4 text-xs leading-relaxed text-slate-500">ค่าเชื่อมต่อและผู้รับอยู่บนเซิร์ฟเวอร์ หากต้องเปลี่ยนบัญชี ให้ผู้ดูแลปรับค่าที่ระบบโฮสต์</div>
         </div>
       </details>
