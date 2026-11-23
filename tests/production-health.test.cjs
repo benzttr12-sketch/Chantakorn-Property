@@ -130,6 +130,23 @@ test('empty catalog is valid and certificate expiry fails independently', async 
   assert.equal(report.checks.filter(row => row.code === 'certificate-expiring').length, 2);
 });
 
+test('the catalog checks a bounded sample and reports when no listing has an image', async () => {
+  const { runProductionChecks } = await monitor;
+  const noCover = { title: 'Photo-less listing', published: true, cover_image: '' };
+  const withCover = { title: 'Listing with photo', published: true, cover_image: '/v1/media/properties/synthetic-cover' };
+  for (const data of [[noCover], [noCover, withCover]]) {
+    const f = fixture((url, opts) => {
+      if (url.pathname !== '/v1/properties') return;
+      assert.equal(url.searchParams.get('limit'), '5');
+      return json({ data, next_cursor: null }, { 'access-control-allow-origin': opts.headers.Origin });
+    });
+    const report = await runProductionChecks(f);
+    assert.equal(report.ok, true);
+    assert.equal(f.requests.filter(row => row.url.pathname === withCover.cover_image).length, data.length === 2 ? 2 : 0);
+    assert.equal(report.checks.filter(row => row.note === 'no-cover-in-sample').length, data.length === 1 ? 2 : 0);
+  }
+});
+
 test('transient failures retry within the bound and raw provider details never reach reports', async () => {
   const { runProductionChecks } = await monitor;
   let calls = 0;

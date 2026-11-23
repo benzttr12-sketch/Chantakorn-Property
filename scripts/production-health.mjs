@@ -9,6 +9,7 @@ const NAMESERVERS = ['elmo.ns.cloudflare.com', 'megan.ns.cloudflare.com'];
 const RESOLVERS = ['https://dns.google/resolve', 'https://cloudflare-dns.com/dns-query'];
 const DAY = 86_400_000;
 const MAX_BODY = 1_048_576;
+const CATALOG_SAMPLE_SIZE = 5;
 
 class HealthError extends Error {}
 function requireHealth(value, code) { if (!value) throw new HealthError(code); }
@@ -138,17 +139,21 @@ export async function runProductionChecks({ fetchImpl = fetch, readCertificate =
       requireHealth(result.headers.get('cross-origin-opener-policy') === 'unsafe-none', 'auth-helper-opener-policy-changed');
     });
     add(`catalog-${host}`, async () => {
-      const result = await request(API_ORIGIN + '/v1/properties?limit=1', { headers: { Origin: origin } });
+      const result = await request(`${API_ORIGIN}/v1/properties?limit=${CATALOG_SAMPLE_SIZE}`, { headers: { Origin: origin } });
       requireHealth(result.status === 200, 'catalog-http-status');
       requireHealth(result.headers.get('access-control-allow-origin') === origin, 'catalog-origin-denied');
       const payload = json(result);
-      requireHealth(Array.isArray(payload.data) && payload.data.length <= 1 &&
+      requireHealth(Array.isArray(payload.data) && payload.data.length <= CATALOG_SAMPLE_SIZE &&
         (payload.next_cursor === null || typeof payload.next_cursor === 'string'), 'catalog-schema-invalid');
-      if (!payload.data.length) return; // An intentionally empty catalog is valid.
-      const property = payload.data[0];
-      requireHealth(property.published === true && typeof property.title === 'string', 'catalog-publication-invalid');
-      requireHealth(typeof property.cover_image === 'string' && property.cover_image.length > 0, 'catalog-cover-missing');
-      const imageUrl = new URL(property.cover_image, API_ORIGIN);
+      for (const property of payload.data) {
+        requireHealth(property?.published === true && typeof property.title === 'string', 'catalog-publication-invalid');
+        requireHealth(typeof property.cover_image === 'string', 'catalog-cover-invalid');
+      }
+      // Publishing without a photo is supported. Sample the first listing with
+      // a cover so a valid photo-less listing does not hide a broken R2 probe.
+      const cover = payload.data.find(property => property.cover_image)?.cover_image;
+      if (!cover) return 'no-cover-in-sample';
+      const imageUrl = new URL(cover, API_ORIGIN);
       requireHealth(imageUrl.origin === API_ORIGIN && imageUrl.pathname.startsWith('/v1/media/properties/') &&
         !imageUrl.username && !imageUrl.password && !imageUrl.search, 'catalog-cover-origin-invalid');
       // A range request bounds bandwidth; no private media or customer URLs.
@@ -175,8 +180,8 @@ export async function runProductionChecks({ fetchImpl = fetch, readCertificate =
       const index = next++, task = tasks[index];
       for (let attempt = 1; attempt <= attempts; attempt++) {
         try {
-          await task.run();
-          results[index] = { id: task.id, ok: true };
+          const note = await task.run();
+          results[index] = note ? { id: task.id, ok: true, note } : { id: task.id, ok: true };
           break;
         } catch (error) {
           results[index] = { id: task.id, ok: false, code: error instanceof HealthError ? error.message : 'request-failed' };
@@ -194,7 +199,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
   if (process.env.GITHUB_STEP_SUMMARY) {
     await appendFile(process.env.GITHUB_STEP_SUMMARY, `## Production health: ${report.ok ? 'PASS' : 'FAIL'}\n\n` +
       `${report.checks.length - failed.length}/${report.checks.length} read-only checks passed.\n\n` +
-      failed.map(check => `- ${check.id}: ${check.code}\n`).join(''));
+      report.checks.filter(check => check.code || check.note).map(check => `- ${check.id}: ${check.code ?? check.note}\n`).join(''));
   }
   if (process.env.HEALTH_REPORT_PATH) await writeFile(process.env.HEALTH_REPORT_PATH, JSON.stringify(report), { flag: 'wx' });
   if (!report.ok) process.exitCode = 1;
