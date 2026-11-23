@@ -47,6 +47,27 @@ function json(result) {
   try { return JSON.parse(result.text); } catch { throw new HealthError('invalid-json'); }
 }
 
+function allowsGoogleScript(policyHeader) {
+  if (!policyHeader) return false;
+  let foundScriptPolicy = false;
+  for (const policy of policyHeader.split(',')) {
+    const directives = new Map();
+    for (const directive of policy.split(';')) {
+      const [name, ...sources] = directive.trim().split(/\s+/);
+      const key = name.toLowerCase();
+      if (key && !directives.has(key)) directives.set(key, sources);
+    }
+    const scriptSources = directives.get('script-src') ?? directives.get('default-src');
+    const elementSources = directives.get('script-src-elem');
+    for (const sources of [scriptSources, elementSources]) {
+      if (!sources) continue;
+      foundScriptPolicy = true;
+      if (!sources.some(source => source === 'https://apis.google.com')) return false;
+    }
+  }
+  return foundScriptPolicy;
+}
+
 export function certificateDays(hostname, now = Date.now()) {
   return new Promise((resolve, reject) => {
     const socket = tls.connect({ host: hostname, port: 443, servername: hostname, rejectUnauthorized: true });
@@ -107,7 +128,7 @@ export async function runProductionChecks({ fetchImpl = fetch, readCertificate =
         requireHealth(result.headers.get('content-type')?.includes('text/html'), 'expected-html');
         requireHealth(/<title>CHANTAKORN PROPERTY/i.test(result.text), 'wrong-website');
         requireHealth(result.headers.get('cross-origin-opener-policy') === 'same-origin-allow-popups', 'popup-policy-changed');
-        requireHealth(result.headers.get('content-security-policy')?.includes('https://apis.google.com'), 'google-script-policy-changed');
+        requireHealth(allowsGoogleScript(result.headers.get('content-security-policy')), 'google-script-policy-changed');
       });
     }
     add(`auth-helper-${host}`, async () => {

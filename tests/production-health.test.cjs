@@ -102,6 +102,26 @@ test('catalog monitor never follows an external or private cover URL', async () 
   }
 });
 
+test('the Google login check requires the exact origin in every applicable script policy', async () => {
+  const { runProductionChecks } = await monitor;
+  const withPolicy = policy => fixture(url => url.pathname === '/login' && new Response('<title>CHANTAKORN PROPERTY</title>', {
+    headers: { ...appHeaders, 'content-security-policy': policy },
+  }));
+  const supported = await runProductionChecks(withPolicy("default-src 'self' https://apis.google.com; frame-ancestors 'none', upgrade-insecure-requests"));
+  assert.equal(supported.ok, true);
+  for (const policy of [
+    "script-src 'self' https://apis.google.com.example.invalid",
+    "script-src 'self' https://example.invalid/https://apis.google.com",
+    "script-src 'self'; connect-src https://apis.google.com",
+    "script-src 'self' https://apis.google.com; script-src-elem 'self'",
+    "script-src 'self' https://apis.google.com, default-src 'self'",
+  ]) {
+    const report = await runProductionChecks(withPolicy(policy));
+    assert.equal(report.ok, false, policy);
+    assert.equal(report.checks.filter(row => row.code === 'google-script-policy-changed').length, 2, policy);
+  }
+});
+
 test('empty catalog is valid and certificate expiry fails independently', async () => {
   const { runProductionChecks } = await monitor;
   const f = fixture((url, opts) => url.pathname === '/v1/properties' && json({ data: [], next_cursor: null }, { 'access-control-allow-origin': opts.headers.Origin }));
