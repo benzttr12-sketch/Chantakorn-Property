@@ -230,6 +230,136 @@ test('local Worker HTTP / D1 / R2 / Firebase authorization contract', async t =>
     assert.equal(failed.status, 503); assert.equal(failed.headers.get('Cache-Control'), 'no-store');
     await db.prepare('UPDATE catalog_generation SET version=? WHERE id=1').bind(version).run();
   });
+  await t.test('catalog agent picker returns canonical paginated IDs accepted by the property foreign key', async () => {
+    const path = '/v1/admin/agents';
+    assert.equal((await fetchApi(path)).status, 401);
+    assert.deepEqual(await (await fetchApi(path, { headers })).json(), { data: [], next_cursor: null });
+    for (const [id, name, visible] of [['catalog-agent-one', 'First agent', 1], ['catalog-agent-two', 'Second agent', 0]]) {
+      await db.prepare(`INSERT INTO agents
+        (id,uid,name,title,phone,line_id,email,is_public,created_at,updated_at)
+        VALUES (?,?,?,?,?,?,?,?,?,?)`).bind(id, uid, name, 'ที่ปรึกษา', '0811111111', 'agent-line',
+          'catalog-agent@example.test', visible, '2026-10-20', '2026-10-20').run();
+    }
+    let listingId;
+    try {
+      const first = await fetchApi(path + '?limit=1', { headers });
+      assert.equal(first.status, 200);
+      assert.equal(first.headers.get('Cache-Control'), 'private, no-store');
+      assert.equal(first.headers.get('Access-Control-Allow-Origin'), origin);
+      const page = await first.json();
+      assert.equal(page.data[0].id, 'catalog-agent-one');
+      assert.equal(page.data[0].line_id, 'agent-line');
+      assert.equal('uid' in page.data[0], false);
+      assert.equal('role' in page.data[0], false);
+      assert.equal(page.data[0].is_public, true, 'staff picker can explain whether assigned contacts will be public');
+      assert.equal(page.next_cursor, 'catalog-agent-one');
+      const second = await (await fetchApi(path + '?limit=1&cursor=' + page.next_cursor, { headers })).json();
+      assert.equal(second.data[0].id, 'catalog-agent-two');
+      assert.equal(second.data[0].is_public, false);
+      assert.equal(second.next_cursor, null);
+      for (const query of ['limit=0', 'limit=101', 'limit=01', 'limit=1&limit=2', 'cursor=', 'cursor=../profile', 'unknown=1'])
+        assert.equal((await fetchApi(path + '?' + query, { headers })).status, 400);
+      const payload = { title: 'Catalog assignment', slug: 'catalog-assignment', property_type: 'house', status: 'sale',
+        price: 123, province: 'Test', district: 'Test', agent_id: second.data[0].id };
+      const saved = await fetchApi('/v1/admin/properties', { method: 'POST', headers, body: JSON.stringify(payload) });
+      assert.equal(saved.status, 201);
+      const listing = (await saved.json()).data;
+      listingId = listing.id;
+      assert.equal(listing.agent_id, 'catalog-agent-two');
+      assert.equal((await db.prepare('SELECT agent_id FROM properties WHERE id=?').bind(listing.id).first()).agent_id, 'catalog-agent-two');
+      const rejected = await fetchApi('/v1/admin/properties/' + listing.id, { method: 'PATCH', headers,
+        body: JSON.stringify({ updates: { agent_id: uid }, expected_updated_at: listing.updated_at }) });
+      assert.equal(rejected.status, 400, 'a Firebase staff UID is not a catalog agent ID');
+      await db.prepare('UPDATE profiles SET role=? WHERE uid=?').bind('AGENT', uid).run();
+      assert.equal((await fetchApi(path, { headers })).status, 200);
+      await db.prepare('UPDATE profiles SET role=? WHERE uid=?').bind('USER', uid).run();
+      assert.equal((await fetchApi(path, { headers })).status, 403);
+      await db.prepare('UPDATE profiles SET role=? WHERE uid=?').bind('ADMIN', uid).run();
+      account.disabled = true;
+      assert.equal((await fetchApi(path, { headers })).status, 403);
+    } finally {
+      account.disabled = false;
+      await db.prepare('UPDATE profiles SET role=? WHERE uid=?').bind('ADMIN', uid).run();
+      if (listingId) await db.prepare('DELETE FROM properties WHERE id=?').bind(listingId).run();
+      await db.prepare("DELETE FROM agents WHERE id IN ('catalog-agent-one','catalog-agent-two')").run();
+    }
+  });
+  await t.test('assigned D1 contacts survive saves and invalidate public caches on agent edits or hiding', async () => {
+    const canonical = {
+      id: 'contact-agent', name: 'Canonical contact', title: 'Property advisor', phone: '0811111111',
+      line_id: 'canonical-line', facebook: 'https://facebook.com/canonical-test',
+      email: 'canonical@example.test', photo_url: 'https://example.test/avatar.jpg', bio: 'Approved biography',
+    };
+    for (const [id, visible] of [[canonical.id, 1], ['hidden-contact-agent', 0]]) {
+      await db.prepare(`INSERT INTO agents
+        (id,uid,name,title,phone,line_id,facebook,email,photo_url,bio,is_public,created_at,updated_at)
+        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`).bind(id, uid, canonical.name, canonical.title, canonical.phone,
+        canonical.line_id, canonical.facebook, canonical.email, canonical.photo_url, canonical.bio,
+        visible, '2026-10-20', '2026-10-20').run();
+    }
+    let listingId;
+    try {
+      const payload = { title: 'Contact projection listing', slug: 'contact-projection', property_type: 'house',
+        status: 'sale', price: 123, province: 'Test', district: 'Test', agent_id: canonical.id };
+      const spoofed = await fetchApi('/v1/admin/properties', { method: 'POST', headers,
+        body: JSON.stringify({ ...payload, agent: { id: canonical.id, phone: 'CALLER-CONTROLLED' } }) });
+      assert.equal(spoofed.status, 400, 'catalog agent contacts are not client-editable property fields');
+      const created = await fetchApi('/v1/admin/properties', { method: 'POST', headers, body: JSON.stringify(payload) });
+      assert.equal(created.status, 201);
+      let listing = (await created.json()).data;
+      listingId = listing.id;
+      assert.deepEqual(listing.agent, { ...canonical, is_public: true }, 'create response resolves the persisted D1 foreign key and staff visibility');
+      assert.equal(JSON.stringify(listing.agent).includes(uid), false);
+      const admin = '/v1/admin/properties/' + listing.id;
+      assert.deepEqual((await (await fetchApi(admin, { headers })).json()).data.agent, { ...canonical, is_public: true });
+      const adminList = await (await fetchApi('/v1/admin/properties?searchQuery=Contact%20projection', { headers })).json();
+      assert.deepEqual(adminList.data.find(row => row.id === listing.id).agent, { ...canonical, is_public: true });
+
+      const assignedHidden = await fetchApi(admin, { method: 'PATCH', headers,
+        body: JSON.stringify({ updates: { agent_id: 'hidden-contact-agent' }, expected_updated_at: listing.updated_at }) });
+      assert.equal(assignedHidden.status, 200);
+      listing = (await assignedHidden.json()).data;
+      assert.deepEqual(listing.agent, { ...canonical, id: 'hidden-contact-agent', is_public: false }, 'staff can inspect hidden contact assignments without treating them as public marketing contacts');
+      const reassigned = await fetchApi(admin, { method: 'PATCH', headers,
+        body: JSON.stringify({ updates: { agent_id: canonical.id }, expected_updated_at: listing.updated_at }) });
+      assert.equal(reassigned.status, 200);
+      listing = (await reassigned.json()).data;
+      assert.deepEqual(listing.agent, { ...canonical, is_public: true }, 'update response uses the new canonical assignment');
+
+      await db.prepare('UPDATE properties SET published=1 WHERE id=?').bind(listing.id).run();
+      const detail = '/v1/properties/' + listing.id;
+      const list = '/v1/properties?searchQuery=Contact%20projection';
+      assert.deepEqual((await (await fetchApi(detail)).json()).data.agent, canonical);
+      assert.equal((await fetchApi(detail)).headers.get('X-Catalog-Cache'), 'HIT');
+      assert.deepEqual((await (await fetchApi(list)).json()).data[0].agent, canonical);
+      assert.equal((await fetchApi(list)).headers.get('X-Catalog-Cache'), 'HIT');
+      await db.prepare('UPDATE agents SET phone=? WHERE id=?').bind('0822222222', canonical.id).run();
+      for (const path of [detail, list]) {
+        const refreshed = await fetchApi(path);
+        assert.equal(refreshed.headers.get('X-Catalog-Cache'), 'MISS');
+        const body = await refreshed.json();
+        assert.deepEqual((Array.isArray(body.data) ? body.data[0] : body.data).agent, { ...canonical, phone: '0822222222' });
+      }
+      await db.prepare('UPDATE agents SET is_public=0 WHERE id=?').bind(canonical.id).run();
+      for (const path of [detail, list]) {
+        const hidden = await fetchApi(path);
+        assert.equal(hidden.headers.get('X-Catalog-Cache'), 'MISS');
+        const body = await hidden.json();
+        const row = Array.isArray(body.data) ? body.data[0] : body.data;
+        assert.equal(Object.hasOwn(row, 'agent'), false, 'a hidden agent must not leak contacts through a listing or cached payload');
+      }
+      const privateAgent = (await (await fetchApi(admin, { headers })).json()).data.agent;
+      assert.equal(privateAgent.phone, '0822222222');
+      assert.equal(privateAgent.is_public, false, 'staff metadata retains the hidden state for marketing consumers');
+      await db.prepare('DELETE FROM agents WHERE id=?').bind(canonical.id).run();
+      const removed = (await (await fetchApi(detail)).json()).data;
+      assert.equal(Object.hasOwn(removed, 'agent'), false);
+      assert.equal(Object.hasOwn(removed, 'agent_id'), false);
+    } finally {
+      if (listingId) await db.prepare('DELETE FROM properties WHERE id=?').bind(listingId).run();
+      await db.prepare("DELETE FROM agents WHERE id IN ('contact-agent','hidden-contact-agent')").run();
+    }
+  });
   await t.test('private R2 read requires active signed Firebase staff identity', async () => {
     const anonymous = await fetchApi('/v1/media/inquiries/' + privateId);
     assert.equal(anonymous.status, 401);

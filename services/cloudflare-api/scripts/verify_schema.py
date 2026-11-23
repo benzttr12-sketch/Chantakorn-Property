@@ -98,5 +98,23 @@ for sort, expected_index in [
     assert any(expected_index in line for line in plan), plan
     assert not any('TEMP B-TREE' in line for line in plan), plan
 
+# Agent contacts are hydrated into public catalog payloads. All three mutations
+# must rotate their cache generation even without touching a property row.
+triggers = {row['name'] for row in db.execute("SELECT name FROM sqlite_master WHERE type='trigger'")}
+assert {'catalog_agents_insert', 'catalog_agents_update', 'catalog_agents_delete'} <= triggers
+def catalog_version():
+    return db.execute('SELECT version FROM catalog_generation WHERE id=1').fetchone()[0]
+
+previous = catalog_version()
+for statement in [
+    "INSERT INTO agents(id,name,created_at,updated_at) VALUES ('cache-agent','Agent','2026-10-20','2026-10-20')",
+    "UPDATE agents SET phone='0811111111',is_public=0 WHERE id='cache-agent'",
+    "DELETE FROM agents WHERE id='cache-agent'",
+]:
+    db.execute(statement)
+    current = catalog_version()
+    assert len(current) == 32 and current != previous, 'Agent mutations must invalidate public catalog caches'
+    previous = current
+
 db.close()
 print('OK: D1 fresh-start SQL creates expected tables, starts empty, bounds public queries and uses indexed ordering')

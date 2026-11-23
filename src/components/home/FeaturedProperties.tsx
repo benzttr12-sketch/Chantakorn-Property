@@ -2,12 +2,12 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
-import { Sparkles, ArrowRight, Building, Home, Trees, Store, MapPin, CalendarDays, Maximize, Bed, RotateCcw } from 'lucide-react';
+import { ArrowRight, Building, Home, Trees, Store, RotateCcw } from 'lucide-react';
 import PropertyCard from '@/components/properties/PropertyCard';
-import { propertyHref } from '@/components/properties/property-link';
 import { Property } from '@/lib/types';
 import { fetchProperties } from '@/lib/store/properties-store';
-import { formatThaiNumber, getPropertyTypeName } from '@/lib/utils';
+
+const FEATURED_LIMIT = 3;
 
 const FILTER_TABS = [
   { id: 'all', label: 'ทั้งหมด', icon: null },
@@ -40,70 +40,6 @@ function FeaturedCard({ property }: { property: Property }) {
       createdAt={property.created_at}
       facingDirection={property.facing_direction}
     />
-  );
-}
-
-function PropertySpotlight({ property }: { property: Property }) {
-  return (
-    <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-[0.95fr_1.05fr] lg:gap-8">
-      <div className="min-w-0">
-        <FeaturedCard property={property} />
-      </div>
-      <aside className="relative flex min-w-0 flex-col justify-between overflow-hidden rounded-3xl bg-navy-950 p-7 text-white sm:p-10 lg:p-12">
-        <div aria-hidden="true" className="pointer-events-none absolute -right-16 -top-16 h-56 w-56 rounded-full border border-gold-400/15" />
-        <div aria-hidden="true" className="pointer-events-none absolute -right-5 -top-5 h-32 w-32 rounded-full border border-gold-400/15" />
-        <div className="relative">
-          <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-gold-400/25 px-3 py-1.5 text-xs font-semibold text-gold-300">
-            <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full bg-gold-400" />
-            {getPropertyTypeName(property.property_type)}ที่เปิดดูได้ตอนนี้
-          </div>
-          <h3 className="text-3xl font-bold leading-snug tracking-tight sm:text-4xl">
-            รู้จักทรัพย์นี้<br /><span className="text-gold-300">ให้มากขึ้น</span>
-          </h3>
-          <p className="mt-5 text-base font-semibold leading-relaxed text-slate-100">{property.title}</p>
-          <p className="mt-3 flex items-start gap-2 text-sm leading-relaxed text-slate-300">
-            <MapPin aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0 text-gold-300" />
-            {[property.subdistrict, property.district, property.province].filter(Boolean).join(' · ')}
-          </p>
-          {(property.land_size > 0 || property.usable_area > 0 || property.bedrooms > 0) && (
-            <dl className="mt-6 flex flex-wrap gap-x-7 gap-y-4 border-y border-white/10 py-5">
-              {property.land_size > 0 && (
-                <div>
-                  <dt className="mb-1 flex items-center gap-1.5 text-xs text-slate-400"><Maximize aria-hidden="true" className="h-3.5 w-3.5" />พื้นที่ดิน</dt>
-                  <dd className="text-base font-semibold text-white">{formatThaiNumber(property.land_size)} <span className="text-xs font-normal text-slate-300">ตร.ว.</span></dd>
-                </div>
-              )}
-              {property.usable_area > 0 && (
-                <div>
-                  <dt className="mb-1 text-xs text-slate-400">พื้นที่ใช้สอย</dt>
-                  <dd className="text-base font-semibold text-white">{formatThaiNumber(property.usable_area)} <span className="text-xs font-normal text-slate-300">ตร.ม.</span></dd>
-                </div>
-              )}
-              {property.bedrooms > 0 && (
-                <div>
-                  <dt className="mb-1 flex items-center gap-1.5 text-xs text-slate-400"><Bed aria-hidden="true" className="h-3.5 w-3.5" />ห้องนอน</dt>
-                  <dd className="text-base font-semibold text-white">{property.bedrooms} <span className="text-xs font-normal text-slate-300">ห้อง</span></dd>
-                </div>
-              )}
-            </dl>
-          )}
-        </div>
-        <div className="relative mt-8">
-          <p className="mb-5 max-w-sm text-sm leading-relaxed text-slate-300">ดูภาพ ทำเล และข้อมูลทรัพย์ให้ครบ แล้วส่งคำขอนัดชมในวันที่คุณสะดวก</p>
-          <Link
-            href={`${propertyHref(property)}#inquiry`}
-            className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-gold-300 px-5 py-3.5 text-sm font-bold text-navy-950 transition-colors hover:bg-gold-200 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-4 focus-visible:ring-offset-navy-950 sm:w-auto"
-          >
-            <CalendarDays aria-hidden="true" className="h-4 w-4" />
-            ส่งคำขอนัดชมทรัพย์นี้
-            <ArrowRight aria-hidden="true" className="h-4 w-4" />
-          </Link>
-          <Link href={propertyHref(property)} className="mt-4 flex w-fit items-center gap-2 rounded-sm text-xs font-semibold text-gold-200 underline decoration-gold-200/30 underline-offset-4 hover:decoration-gold-200 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-gold-300">
-            เปิดข้อมูลและภาพทรัพย์<ArrowRight aria-hidden="true" className="h-3.5 w-3.5" />
-          </Link>
-        </div>
-      </aside>
-    </div>
   );
 }
 
@@ -145,34 +81,25 @@ export default function FeaturedProperties() {
     const filtered = activeCategory === 'all'
       ? allProperties
       : allProperties.filter(property => property.property_type === activeCategory);
-    return [...filtered.filter(property => property.featured), ...filtered.filter(property => !property.featured)].slice(0, 6);
+    return [...filtered.filter(property => property.featured), ...filtered.filter(property => !property.featured)].slice(0, FEATURED_LIMIT);
   }, [allProperties, activeCategory]);
 
   const totalMatches = categoryCounts.get(activeCategory) || 0;
   const activeLabel = FILTER_TABS.find(tab => tab.id === activeCategory)?.label || 'ทั้งหมด';
 
   return (
-    <section id="home-properties" aria-labelledby="home-properties-title" className="relative scroll-mt-24 border-y border-slate-200/80 bg-[#FAFAFA] py-16 md:py-24">
+    <section id="home-properties" aria-labelledby="home-properties-title" className="relative scroll-mt-24 border-y border-slate-200/80 bg-[#FAFAFA] py-10 md:py-14">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-        <div className="mb-8 flex flex-col justify-between gap-6 md:flex-row md:items-end">
-          <div>
-            <div className="mb-3 flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-gold-700">
-              <Sparkles aria-hidden="true" className="h-3.5 w-3.5" />
-              <span>EXPLORE YOUR NEXT CHAPTER</span>
-            </div>
-            <h2 id="home-properties-title" className="text-balance text-3xl font-black tracking-tight text-navy-950 sm:text-4xl lg:text-5xl">
-              เริ่มต้นจากทรัพย์ที่ใช่
-            </h2>
-            <p className="mt-3 max-w-xl text-sm leading-relaxed text-slate-600 sm:text-base">
-              เลือกประเภทที่สนใจ เปิดดูภาพและรายละเอียด แล้วค่อยวางแผนนัดชมสถานที่จริง
-            </p>
-          </div>
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+          <h2 id="home-properties-title" className="text-2xl font-black tracking-tight text-navy-950 sm:text-3xl">
+            ทรัพย์แนะนำ
+          </h2>
           <Link href="/properties" className="inline-flex shrink-0 items-center gap-2 self-start rounded-xl border border-slate-200 bg-white px-5 py-3 text-sm font-bold text-navy-950 transition-colors hover:border-gold-300 hover:text-gold-700 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-gold-500 focus-visible:ring-offset-4 md:self-auto">
             ดูทรัพย์ทั้งหมด<ArrowRight aria-hidden="true" className="h-4 w-4 text-gold-600" />
           </Link>
         </div>
 
-        <div role="group" aria-label="เลือกประเภททรัพย์" className="-mx-4 flex items-center gap-2 overflow-x-auto px-4 pb-4 sm:mx-0 sm:px-0">
+        <div id="home-categories" role="group" aria-label="เลือกประเภททรัพย์" className="-mx-4 flex items-center gap-2 overflow-x-auto px-4 pb-3 sm:mx-0 sm:px-0">
           {FILTER_TABS.map(tab => {
             const Icon = tab.icon;
             const isActive = activeCategory === tab.id;
@@ -196,8 +123,8 @@ export default function FeaturedProperties() {
         </div>
 
         <div id="home-property-results" aria-busy={loading}>
-          <p role="status" aria-live="polite" className="mb-6 text-xs leading-relaxed text-slate-500">
-            {loading ? 'กำลังโหลดรายการทรัพย์…' : error ? 'ยังโหลดรายการทรัพย์ไม่ได้' : `${activeLabel} · ${totalMatches} รายการ${totalMatches > 6 ? ' · แสดง 6 รายการแรก' : ''}`}
+          <p role="status" aria-live="polite" className="mb-4 text-xs leading-relaxed text-slate-600">
+            {loading ? 'กำลังโหลดรายการทรัพย์…' : error ? 'ยังโหลดรายการทรัพย์ไม่ได้' : `${activeLabel} · ${totalMatches} รายการ${totalMatches > FEATURED_LIMIT ? ` · แสดง ${FEATURED_LIMIT} รายการ` : ''}`}
           </p>
           {loading ? (
             <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3" aria-hidden="true">
@@ -224,12 +151,8 @@ export default function FeaturedProperties() {
               )}
             </div>
           ) : (
-            <div key={activeCategory} className="home-results-enter">
-              {displayedProperties.length === 1 ? <PropertySpotlight property={displayedProperties[0]} /> : (
-                <div className={`grid gap-6 sm:grid-cols-2 lg:gap-8 ${displayedProperties.length > 2 ? 'lg:grid-cols-3' : ''}`}>
-                  {displayedProperties.map(property => <FeaturedCard key={property.id} property={property} />)}
-                </div>
-              )}
+            <div key={activeCategory} className="home-results-enter grid gap-6 sm:grid-cols-2 lg:grid-cols-3 lg:gap-8">
+              {displayedProperties.map(property => <FeaturedCard key={property.id} property={property} />)}
             </div>
           )}
         </div>

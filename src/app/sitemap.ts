@@ -10,7 +10,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const basePath = process.env.NEXT_PUBLIC_BASE_PATH || '';
   const siteBase = /^https?:\/\/[^/]+$/.test(baseUrl) ? baseUrl + basePath : baseUrl;
   const staticPages: MetadataRoute.Sitemap = [
-    '', '/properties', '/buy', '/rent', '/sell', '/services', '/about', '/contact',
+    '', '/properties', '/buy', '/rent', '/sell', '/services', '/about', '/contact', '/land-valuation',
   ].map(route => ({ url: `${siteBase}${route}`, changeFrequency: 'weekly', priority: route === '' ? 1 : 0.8 }));
   try {
     const rows = await sitemapCatalog();

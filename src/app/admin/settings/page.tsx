@@ -1,9 +1,11 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { ArrowUpRight, Check, ChevronDown, Copy, Database, Loader2, MessageCircle, RefreshCw, Send, ShieldCheck } from 'lucide-react';
 import { fetchStaffApi } from '@/lib/staff-api';
+import LineRichMenuRestore from '@/components/admin/LineRichMenuRestore';
+import LineRichMenuTransition from '@/components/admin/LineRichMenuTransition';
 import { apiUrl } from '@/lib/api-url';
 import { dataBackend } from '@/lib/backend';
 import { LinePreferences, saveLinePreferences } from '@/lib/line-admin-settings';
@@ -16,11 +18,20 @@ interface ConnectionResult {
   ready: boolean;
   message: string;
   checks: Array<{ name: string; ok: boolean; message: string }>;
+  richMenu?: {
+    status: 'checked' | 'unavailable' | 'not_checked';
+    defaultStatus: 'set' | 'none' | 'unavailable' | 'not_checked';
+    defaultId: string | null;
+    totalMenus: number | null;
+    menus: Array<{ id: string; name: string; selected: boolean; width: number; height: number; areaCount: number }>;
+    message: string;
+  };
 }
 interface SimulationResult {
   success: boolean;
   simulation?: boolean;
   simulatedReplies?: number;
+  unansweredTextMessages?: number;
   unavailableSearches?: number;
   errorCodes?: string[];
   error?: string;
@@ -40,6 +51,7 @@ export default function AdminSettingsPage() {
   const [copied, setCopied] = useState(false);
   const [copyError, setCopyError] = useState('');
   const [checking, setChecking] = useState(false);
+  const checkRevision = useRef(0);
   const [connection, setConnection] = useState<ConnectionResult | null>(null);
   const [keyword, setKeyword] = useState('ดูทรัพย์');
   const [simulating, setSimulating] = useState(false);
@@ -104,17 +116,24 @@ export default function AdminSettingsPage() {
     } catch { setCopyError('คัดลอกไม่สำเร็จ กรุณาเลือกข้อความในช่อง URL แล้วคัดลอก'); }
   }
 
+  function invalidateConnection() {
+    checkRevision.current += 1;
+    setConnection(null);
+    setChecking(false);
+  }
+
   async function checkConnection() {
+    const revision = ++checkRevision.current;
     setChecking(true);
     setConnection(null);
     try {
       const response = await fetchStaffApi('/api/line/diagnostics', { cache: 'no-store' });
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || 'ตรวจการเชื่อมต่อไม่สำเร็จ');
-      setConnection({ ready: result.ready === true, message: result.message, checks: result.checks || [] });
+      if (revision === checkRevision.current) setConnection({ ready: result.ready === true, message: result.message, checks: result.checks || [], richMenu: result.richMenu });
     } catch (error) {
-      setConnection({ ready: false, message: error instanceof Error ? error.message : 'ตรวจการเชื่อมต่อไม่สำเร็จ', checks: [] });
-    } finally { setChecking(false); }
+      if (revision === checkRevision.current) setConnection({ ready: false, message: error instanceof Error ? error.message : 'ตรวจการเชื่อมต่อไม่สำเร็จ', checks: [] });
+    } finally { if (revision === checkRevision.current) setChecking(false); }
   }
 
   async function simulate() {
@@ -169,6 +188,22 @@ export default function AdminSettingsPage() {
       </section>
       {configError && <div role="alert" className="flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-red-50 p-4 text-sm text-red-700"><span>{configError}</span><button type="button" onClick={loadConfig} disabled={loading} className="inline-flex items-center gap-2 font-semibold"><RefreshCw className="h-4 w-4" />ลองใหม่</button></div>}
       {connection && <div role="status" className={`rounded-2xl border p-5 text-sm ${connection.ready ? 'border-emerald-200 bg-emerald-50 text-emerald-900' : 'border-amber-200 bg-amber-50 text-amber-900'}`}><p className="font-semibold">{connection.message}</p><ul className="mt-3 space-y-2">{connection.checks.map(item => <li key={item.name}>{item.ok ? '✓' : '•'} {item.message}</li>)}</ul><p className="mt-4 text-xs">ยืนยันการตอบกลับจริงโดยส่ง “ดูทรัพย์” จาก LINE ของลูกค้า แล้วตรวจว่าได้รับการ์ดทรัพย์</p></div>}
+      {connection?.richMenu && <section aria-label="ผลตรวจริชเมนูจาก API" className="admin-panel space-y-3 text-sm">
+        <h2 className="font-semibold text-navy-950">ริชเมนูจาก API</h2>
+        <p className={connection.richMenu.status === 'unavailable' ? 'text-amber-700' : 'text-slate-600'}>{connection.richMenu.message}</p>
+        <dl className="grid gap-3 sm:grid-cols-2">
+          <div><dt className="text-xs text-slate-500">เมนูหลักจาก API</dt><dd className="mt-1 break-all font-mono text-xs">{connection.richMenu.defaultStatus === 'set' ? connection.richMenu.defaultId : connection.richMenu.defaultStatus === 'none' ? 'ไม่มีค่าเริ่มต้นจาก API' : connection.richMenu.defaultStatus === 'not_checked' ? 'ยังไม่ได้ตรวจ' : 'อ่านไม่ได้'}</dd></div>
+          <div><dt className="text-xs text-slate-500">จำนวนเมนูที่สร้างผ่าน API</dt><dd className="mt-1">{connection.richMenu.totalMenus === null ? 'ยังอ่านไม่ได้' : `${connection.richMenu.totalMenus} เมนู`}</dd></div>
+        </dl>
+        {connection.richMenu.menus.length > 0 && <ul className="space-y-2">{connection.richMenu.menus.map(menu => <li key={menu.id} className="rounded-xl border border-slate-200 p-3">
+          <p className="font-medium text-navy-950">{menu.name || 'เมนูไม่มีชื่อ'}</p><p className="mt-1 break-all font-mono text-xs text-slate-500">{menu.id}</p>
+          <p className="mt-1 text-xs text-slate-600">{menu.width} × {menu.height} · {menu.areaCount} พื้นที่ · เริ่มต้น{menu.selected ? 'แสดง' : 'ซ่อน'}</p>
+        </li>)}</ul>}
+        <p className="text-xs leading-relaxed text-slate-500">ผลนี้ไม่รวมเมนูที่สร้างผ่าน LINE OA Manager และไม่ตรวจการผูกเมนูเฉพาะผู้ใช้ เป็นการอ่านสถานะเท่านั้น</p>
+      </section>}
+
+      <LineRichMenuRestore checkedEmpty={connection?.richMenu?.status === 'checked' && connection.richMenu.defaultStatus === 'none' && connection.richMenu.totalMenus === 0} onAttemptStarted={invalidateConnection} onAttemptFinished={invalidateConnection} />
+      <LineRichMenuTransition checkedDefault={connection?.richMenu?.status === 'checked' && connection.richMenu.defaultStatus === 'set' && !!connection.richMenu.defaultId} onAttemptStarted={invalidateConnection} onAttemptFinished={invalidateConnection} />
 
       <div className="grid items-start gap-6 lg:grid-cols-[1.2fr_1fr]">
         <section className="admin-panel">
@@ -190,7 +225,30 @@ export default function AdminSettingsPage() {
         <summary className="flex cursor-pointer list-none items-center justify-between gap-3 font-semibold text-navy-950">การเชื่อมต่อขั้นสูงและทดสอบคำสั่ง<ChevronDown className="h-5 w-5 shrink-0 transition-transform group-open:rotate-180" /></summary>
         <div className="mt-6 space-y-6">
           <div><label htmlFor="line-webhook-url" className="text-sm font-medium text-navy-950">Webhook URL</label><div className="mt-2 flex flex-wrap gap-2"><input id="line-webhook-url" readOnly value={webhookUrl} className="min-w-0 flex-1 rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 text-xs" /><button type="button" disabled={!webhookUrl} onClick={copyWebhook} className="admin-secondary"><Copy className="h-4 w-4" />{copied ? 'คัดลอกแล้ว' : 'คัดลอก'}</button></div>{copyError && <p role="alert" className="mt-2 text-sm text-red-700">{copyError}</p>}<p className="mt-3 text-xs leading-relaxed text-slate-500">นำ URL ไปตั้งใน <a href="https://developers.line.biz/console/" target="_blank" rel="noreferrer" className="font-medium text-navy-950 underline">LINE Developers</a> ที่ Messaging API → Webhook settings แล้วเปิด Use webhook และกด Verify</p></div>
-          <div className="border-t border-slate-100 pt-5"><h3 className="text-sm font-semibold text-navy-950">ทดสอบคำสั่งแบบจำลอง</h3><p className="mt-1 text-xs text-slate-500">ตรวจการประมวลผลคำสั่ง โดยไม่ส่งข้อความจริงและไม่บันทึกผู้ติดต่อ</p><div className="mt-3 flex flex-wrap gap-2">{['ดูทรัพย์', 'สวัสดี', 'ฝากขาย', 'ติดต่อ'].map(text => <button type="button" key={text} aria-pressed={keyword === text} onClick={() => setKeyword(text)} className={`rounded-lg border px-3 py-2 text-xs ${keyword === text ? 'border-navy-950 bg-navy-950 text-white' : 'border-slate-200 text-slate-600'}`}>{text}</button>)}</div><label htmlFor="line-simulation-keyword" className="mt-4 block text-xs font-medium text-slate-600">ข้อความที่ต้องการทดสอบ</label><div className="mt-2 flex flex-wrap gap-2"><input id="line-simulation-keyword" value={keyword} onChange={event => setKeyword(event.target.value)} className="min-w-0 flex-1 rounded-xl border border-slate-200 px-3 py-3 text-sm" /><button type="button" disabled={simulating || !keyword.trim()} onClick={simulate} className="admin-secondary">{simulating && <Loader2 className="h-4 w-4 animate-spin" />}ทดสอบคำสั่ง</button></div>{simulation && <div role="status" className="mt-4 rounded-xl bg-slate-50 p-4 text-sm"><p className="font-medium text-navy-950">{simulation.success && !simulation.unavailableSearches ? 'ประมวลผลคำสั่งจำลองแล้ว' : 'ยังประมวลผลคำสั่งได้ไม่ครบ'}</p><p className="mt-1 text-slate-500">จำลองการตอบ {simulation.simulatedReplies || 0} ข้อความ</p>{simulation.error && <p className="mt-2 text-red-700">{simulation.error}</p>}{Boolean(simulation.unavailableSearches) && <p className="mt-2 text-amber-700">ยังโหลดรายการทรัพย์ไม่ได้ กรุณาตรวจการเชื่อมต่อข้อมูล</p>}<details className="mt-3"><summary className="cursor-pointer text-xs text-slate-500">รายละเอียดผลทดสอบ</summary><pre className="mt-2 whitespace-pre-wrap break-all text-xs text-slate-600">{JSON.stringify(simulation, null, 2)}</pre></details></div>}</div>
+          <div className="border-t border-slate-100 pt-5">
+            <h3 className="text-sm font-semibold text-navy-950">ทดสอบการตอบ LINE แบบจำลอง</h3>
+            <p className="mt-1 text-xs text-slate-500">บอตตอบเฉพาะคำสั่งที่รองรับ ข้อความสนทนาทั่วไปเว้นให้ทีมงานตอบเอง การทดสอบนี้ไม่ส่งข้อความจริงและไม่บันทึกผู้ติดต่อ</p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              {['ดูทรัพย์', 'บริการฝากขาย', 'ติดต่อทีมงาน', 'ขอบคุณครับ'].map(text => (
+                <button type="button" key={text} aria-pressed={keyword === text} onClick={() => setKeyword(text)} className={`rounded-lg border px-3 py-2 text-xs ${keyword === text ? 'border-navy-950 bg-navy-950 text-white' : 'border-slate-200 text-slate-600'}`}>{text}</button>
+              ))}
+            </div>
+            <label htmlFor="line-simulation-keyword" className="mt-4 block text-xs font-medium text-slate-600">ข้อความที่ต้องการทดสอบ</label>
+            <div className="mt-2 flex flex-wrap gap-2">
+              <input id="line-simulation-keyword" value={keyword} onChange={event => setKeyword(event.target.value)} className="min-w-0 flex-1 rounded-xl border border-slate-200 px-3 py-3 text-sm" />
+              <button type="button" disabled={simulating || !keyword.trim()} onClick={simulate} className="admin-secondary">{simulating && <Loader2 className="h-4 w-4 animate-spin" />}ทดสอบข้อความ</button>
+            </div>
+            {simulation && (
+              <div role="status" className="mt-4 rounded-xl bg-slate-50 p-4 text-sm">
+                <p className="font-medium text-navy-950">{simulation.success && !simulation.unavailableSearches ? 'ประมวลผลข้อความจำลองแล้ว' : 'ยังประมวลผลข้อความได้ไม่ครบ'}</p>
+                <p className="mt-1 text-slate-500">จำลองการตอบ {simulation.simulatedReplies || 0} ข้อความ</p>
+                {Boolean(simulation.unansweredTextMessages) && <p className="mt-1 text-slate-500">เว้นการตอบ {simulation.unansweredTextMessages} ข้อความ ให้ทีมงานคุยต่อ</p>}
+                {simulation.error && <p className="mt-2 text-red-700">{simulation.error}</p>}
+                {Boolean(simulation.unavailableSearches) && <p className="mt-2 text-amber-700">ยังโหลดรายการทรัพย์ไม่ได้ กรุณาตรวจการเชื่อมต่อข้อมูล</p>}
+                <details className="mt-3"><summary className="cursor-pointer text-xs text-slate-500">รายละเอียดผลทดสอบ</summary><pre className="mt-2 whitespace-pre-wrap break-all text-xs text-slate-600">{JSON.stringify(simulation, null, 2)}</pre></details>
+              </div>
+            )}
+          </div>
           <div className="rounded-2xl bg-slate-50 p-4 text-xs leading-relaxed text-slate-500">ค่าเชื่อมต่อและผู้รับอยู่บนเซิร์ฟเวอร์ หากต้องเปลี่ยนบัญชี ให้ผู้ดูแลปรับค่าที่ระบบโฮสต์</div>
         </div>
       </details>
