@@ -214,9 +214,9 @@ export default function MortgageCalculator({
               />
               <div className="flex justify-between text-[10px] text-gray-400 mt-1">
                 <span>฿10,000 (หลักหมื่น)</span>
-                <span>฿500,000</span>
+                <span className="hidden sm:inline">฿500,000</span>
                 <span>฿1,000,000</span>
-                <span>฿5,000,000</span>
+                <span className="hidden sm:inline">฿5,000,000</span>
                 <span>฿20,000,000+</span>
               </div>
               {/* Presets */}
