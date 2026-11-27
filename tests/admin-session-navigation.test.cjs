@@ -96,7 +96,7 @@ test('a member denied at Admin can open staff login without a logout detour', as
   assert.ok(!text(tree).includes('Protected content'));
 });
 
-test('Google sign-in explicitly offers account choice while retaining the configured first-party handler', () => {
+function firebaseClientAt(hostname) {
   let parameters, initialized;
   const module = { exports: {} };
   const source = ts.transpileModule(fs.readFileSync(path.join(__dirname, '../src/lib/firebase/client.ts'), 'utf8'), {
@@ -105,7 +105,7 @@ test('Google sign-in explicitly offers account choice while retaining the config
   const config = { apiKey: 'fixture', projectId: 'fixture', authDomain: 'fixture.firebaseapp.com' };
   vm.runInNewContext(source, {
     module, exports: module.exports, process: { env: {} }, console,
-    window: { location: { hostname: 'chantakornproperty.com' } },
+    ...(hostname === undefined ? {} : { window: { location: { hostname } } }),
     require: name => {
       if (name === 'firebase/app') return { getApps: () => [], initializeApp: value => { initialized = value; return {}; } };
       if (name === 'firebase/auth') return { getAuth: () => ({}), GoogleAuthProvider: class { setCustomParameters(value) { parameters = value; } } };
@@ -114,6 +114,35 @@ test('Google sign-in explicitly offers account choice while retaining the config
       throw new Error(name);
     },
   });
-  assert.equal(parameters.prompt, 'select_account');
-  assert.equal(initialized.authDomain, 'chantakornproperty.com');
+  return { parameters, initialized };
+}
+
+test('Google sign-in uses the exact first-party handler and account chooser on both production hosts', () => {
+  for (const hostname of ['chantakornproperty.com', 'www.chantakornproperty.com']) {
+    const { parameters, initialized } = firebaseClientAt(hostname);
+    assert.equal(parameters.prompt, 'select_account');
+    assert.equal(initialized.authDomain, hostname);
+  }
+});
+
+test('server rendering, previews and lookalike hosts retain the configured Firebase handler', () => {
+  for (const hostname of [undefined, 'localhost', 'preview.vercel.app', 'evilchantakornproperty.com', 'chantakornproperty.com.untrusted.invalid', 'www.chantakornproperty.com.untrusted.invalid']) {
+    const { initialized } = firebaseClientAt(hostname);
+    assert.equal(initialized.authDomain, 'fixture.firebaseapp.com', String(hostname));
+  }
+});
+
+test('both auth proxy routes target only the configured Firebase project and preserve handler paths', () => {
+  const config = JSON.parse(fs.readFileSync(path.join(__dirname, '../vercel.json'), 'utf8'));
+  const firebase = JSON.parse(fs.readFileSync(path.join(__dirname, '../firebase-applet-config.json'), 'utf8'));
+  for (const source of ['/__/auth/:path*', '/__/auth']) {
+    const rewrite = config.rewrites.find(row => row.source === source);
+    assert.ok(rewrite);
+    const destination = new URL(rewrite.destination);
+    assert.equal(destination.protocol, 'https:');
+    assert.equal(destination.hostname, firebase.authDomain);
+    assert.equal(destination.pathname, source);
+    assert.equal(destination.search, '');
+    assert.equal(destination.username, '');
+  }
 });

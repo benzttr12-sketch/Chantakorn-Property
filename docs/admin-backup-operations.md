@@ -36,6 +36,16 @@ Individual scripts also support `backup|verify ABSOLUTE_OFF_REPO_FILE` with `CHA
 
 Offline reconciliation authenticates and checks every Firestore/Auth record before comparing profile UIDs/roles to enabled Auth identities and inspecting LINE follower identities/states. It reports aggregate counts and findings only. `complete:true` means the bounded inventories were fully examined; check `inventoriesMatch` and the findings count separately. It does not grant roles, repair identities automatically or imply an atomic snapshot.
 
+The reconciliation CLI exits **0** only for a complete inventory with no
+findings, **2** for a complete inventory requiring identity/LINE review, and
+**1** when the inventory cannot be fully authenticated or inspected. Exit 2
+retains the aggregate report on stdout. The vault wrapper preserves exit 2
+and emits an explicit `reviewRequired:true`, `ok:false` result instead of its
+final success result. Other nonzero exits fail the gate. An unmatched
+account may be intentional; an administrator must review the current source
+before deciding. Never auto-create profiles, grant roles, mark email verified
+or delete accounts merely to make the report pass.
+
 ## Integrity and isolated restore
 
 All exports stream directly into gzip/AES-256-GCM ciphertext, with no plaintext staging files. Separate manifests contain only source identifiers, redacted counts, cryptographic parameters and ciphertext checksums. Auth/R2 source headers are authenticated with GCM additional data. R2 verification checks every original object-byte SHA-256 as well as the encrypted archive checksum. Firestore/Auth verification validates typed records, uniqueness, counts and limits.
@@ -49,3 +59,11 @@ Storage constraints follow the official [Firestore data types](https://firebase.
 ## Evidence boundaries
 
 Unit fixtures exercise encryption/tamper rejection, native-value restore, path protections, concurrent export ownership, pagination and caps. Windows tests exercise real DPAPI recovery and private ACLs. The optional real emulator fixture is enabled with `RUN_FIRESTORE_RESTORE_EMULATOR_TESTS=true` and a numeric-loopback `FIRESTORE_EMULATOR_HOST`; it uses synthetic records only. Do not present fixture results as a completed production-data restore or a transactionally consistent migration snapshot.
+
+`Auth and recovery gates` now runs the real synthetic emulator restore on
+Linux and actual DPAPI/ACL fixtures on Windows for relevant PRs. The CI has
+no production credentials, does not run exports and does not receive real
+archives. A green CI result is separate from an administrator's private
+restore drill, current reconciliation, D1 recovery evidence, and portable-key/
+off-device custody. This vault currently archives **Firestore, Auth metadata
+and R2**, not D1; do not infer a D1 backup from its success result.

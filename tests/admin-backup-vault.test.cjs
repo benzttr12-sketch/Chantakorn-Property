@@ -100,3 +100,39 @@ test('vault rejects junction traversal and unapproved backup reads before creati
   assert.equal(fs.existsSync(f.archives), false);
   assert.equal(run(['-Action', 'Verify', '-SnapshotId', '..', '-ArchiveRoot', f.archives, '-KeyRoot', f.keys]).status, 1);
 });
+
+test('vault preserves reconciliation exit 2 even when the caller treats native nonzero exits as errors', { skip: !windows }, async t => {
+  const f = fixture(t);
+  const prepared = run(['-Action', 'Prepare', '-ArchiveRoot', f.archives, '-KeyRoot', f.keys]);
+  assert.equal(prepared.status, 0, prepared.stderr);
+  const { snapshotId, archiveDirectory } = JSON.parse(prepared.stdout);
+  const password = 'synthetic-vault-reconciliation-password';
+  const project = JSON.parse(fs.readFileSync(path.join(repository, 'firebase-applet-config.json'), 'utf8')).projectId;
+  const database = JSON.parse(fs.readFileSync(path.join(repository, 'firebase.json'), 'utf8')).firestore.database;
+  const { createEncryptedArchive } = await import('../scripts/firestore-backup-runtime.mjs');
+  const { createAuthEncryptedArchive, normalizeAuthUser } = await import('../scripts/firebase-auth-backup-runtime.mjs');
+  await createEncryptedArchive({ filePath: path.join(archiveDirectory, 'firestore.enc'), password, records: [],
+    counts: { records: 0, collections: {} }, metadata: { firestoreProject: project, firestoreDatabase: database } });
+  await createAuthEncryptedArchive({ filePath: path.join(archiveDirectory, 'firebase-auth.enc'), password, project,
+    records: [normalizeAuthUser({ localId: 'synthetic-account-with-no-profile' })] });
+
+  const result = spawnSync(powershell, ['-NoProfile', '-NonInteractive', '-Command', `
+    $ErrorActionPreference = 'Stop'
+    $PSNativeCommandUseErrorActionPreference = $true
+    $fixtureSecret = ConvertTo-SecureString $env:TEST_VAULT_PASSWORD -AsPlainText -Force
+    try { [IO.File]::WriteAllText($env:TEST_VAULT_KEY, (ConvertFrom-SecureString $fixtureSecret)) }
+    finally { $fixtureSecret.Dispose() }
+    & $env:TEST_VAULT_SCRIPT -Action Reconcile -SnapshotId $env:TEST_VAULT_ID -ArchiveRoot $env:TEST_VAULT_ARCHIVES -KeyRoot $env:TEST_VAULT_KEYS -Sources @('Firestore', 'Auth')
+    exit $LASTEXITCODE
+  `], { encoding: 'utf8', timeout: 30000, env: { ...process.env, TEST_VAULT_PASSWORD: password,
+    TEST_VAULT_KEY: path.join(f.keys, `${snapshotId}.dpapi`), TEST_VAULT_SCRIPT: script, TEST_VAULT_ID: snapshotId,
+    TEST_VAULT_ARCHIVES: f.archives, TEST_VAULT_KEYS: f.keys } });
+  if (result.error) throw result.error;
+  assert.equal(result.status, 2, result.stderr);
+  assert.equal(result.stderr, '');
+  const lines = result.stdout.trim().split(/\r?\n/).map(line => JSON.parse(line));
+  assert.equal(lines.at(-2).findings, 1);
+  assert.deepEqual(lines.at(-1), { ok: false, action: 'Reconcile', snapshotId, complete: true,
+    reviewRequired: true, inventoriesMatch: false, cutoverReady: false });
+  assert.ok(!result.stdout.includes(password));
+});
