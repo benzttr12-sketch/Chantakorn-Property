@@ -341,39 +341,6 @@
   .mobile-compare-dock, .mobile-line-dock, .mobile-line-dock[data-compare-active="true"] { bottom: 2rem; }
 }
 
-/* Homepage discovery keeps every section readable before hydration. */
-.home-hero-background {
-  height: min(880px, 100%);
-}
-
-.home-hero-backdrop {
-  object-position: 62% center;
-  opacity: 0.94;
-}
-
-.home-mesh-drift {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  opacity: 0;
-  pointer-events: none;
-}
-
-.home-mesh-drift[data-rendered='true'] { opacity: 0.24; }
-
-.home-hero-shade {
-  background: linear-gradient(180deg, rgba(5, 17, 34, 0.82), rgba(5, 17, 34, 0.72) 45%, rgba(5, 17, 34, 0.96));
-}
-
-@media (min-width: 1024px) {
-  .home-hero-background { height: 100%; }
-  .home-hero-backdrop { object-position: center; }
-  .home-hero-shade {
-    background: linear-gradient(90deg, rgba(5, 17, 34, 0.92), rgba(5, 17, 34, 0.76) 42%, rgba(5, 17, 34, 0.2)), linear-gradient(0deg, rgba(5, 17, 34, 0.55), transparent 60%);
-  }
-}
-
 .home-experience :is(a, button, input, select, summary):focus-visible {
   outline: 2px solid #a17b3a;
   outline-offset: 3px;

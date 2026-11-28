@@ -47,34 +47,36 @@ export default function FloatingSearchBox() {
   }
 
   return (
-    <div className="w-full rounded-2xl border border-white/50 bg-[#fcfbf8] p-5 shadow-[0_16px_48px_-16px_rgba(0,0,0,0.45)] sm:rounded-3xl sm:p-7">
-      <h2 className="mb-5 text-xl font-semibold tracking-tight text-navy-950">ค้นหาทรัพย์</h2>
-      <div role="group" aria-label="เลือกซื้อ เช่า หรือขายฝาก" className="mb-5 flex flex-wrap gap-1 rounded-xl bg-[#f0ece4] p-1">
-        {tabs.map(({ value, label }) => (
-          <button
-            key={value}
-            type="button"
-            onClick={() => selectTab(value)}
-            aria-pressed={tab === value}
-            className={`min-h-11 flex-1 cursor-pointer whitespace-nowrap rounded-lg px-2 py-2 text-sm font-medium transition-colors sm:px-4 ${
-              tab === value ? 'bg-navy-950 text-[#efe3cb] shadow-sm' : 'text-slate-600 hover:bg-white/70'
-            }`}
-          >
-            {label}
-          </button>
-        ))}
+    <div className="w-full min-w-0 rounded-2xl border border-[#e4dac7] bg-[#fcfaf5] p-4 shadow-[0_18px_45px_-20px_rgba(0,0,0,0.5)] sm:p-5 lg:px-6">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <h2 id="home-search-title" className="text-xl font-semibold tracking-tight text-navy-950">ค้นหาทรัพย์</h2>
+        <div role="group" aria-label="เลือกซื้อ เช่า หรือขายฝาก" className="grid min-w-0 grid-cols-[0.8fr_0.8fr_1.4fr] gap-1 rounded-xl bg-[#ede7da] p-1 sm:min-w-72">
+          {tabs.map(({ value, label }) => (
+            <button
+              key={value}
+              type="button"
+              onClick={() => selectTab(value)}
+              aria-pressed={tab === value}
+              className={`min-h-11 min-w-0 cursor-pointer rounded-lg px-1.5 py-2 text-sm font-medium transition-colors sm:px-3 ${
+                tab === value ? 'bg-navy-950 text-[#efe3cb] shadow-sm' : 'text-slate-700 hover:bg-white/70'
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
       </div>
 
       {tab === 'consignment' ? (
-        <div className="rounded-xl border border-gold-200 bg-gold-50 p-4">
-          <p className="mb-3 text-sm leading-6 text-slate-700">สอบถามเงื่อนไขและขั้นตอนการขายฝากหรือจำนองอสังหาริมทรัพย์กับทีมงาน</p>
-          <Link href="/sell" className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-navy-950 px-4 py-2 text-sm font-semibold text-gold-300 hover:bg-navy-900">
+        <div className="mt-4 flex flex-col items-start gap-3 rounded-xl border border-gold-200 bg-gold-50 p-3 sm:flex-row sm:items-center sm:justify-between sm:px-4">
+          <p className="text-sm leading-6 text-slate-700">สอบถามเงื่อนไขและขั้นตอนการขายฝากหรือจำนองอสังหาริมทรัพย์กับทีมงาน</p>
+          <Link href="/sell" className="inline-flex min-h-11 shrink-0 items-center gap-2 rounded-xl bg-navy-950 px-4 py-2 text-sm font-semibold text-gold-300 hover:bg-navy-900">
             ปรึกษาเรื่องขายฝาก
             <ArrowRight size={16} aria-hidden="true" />
           </Link>
         </div>
       ) : (
-        <form onSubmit={handleSearch} className="grid items-end gap-4 sm:grid-cols-2">
+        <form onSubmit={handleSearch} className="mt-4 grid min-w-0 grid-cols-1 items-end gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <div className="min-w-0">
             <label htmlFor="home-search-type" className={labelClass}>ประเภททรัพย์</label>
             <select
